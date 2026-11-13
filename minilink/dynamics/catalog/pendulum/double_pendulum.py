@@ -32,10 +32,10 @@ class DoublePendulum(MechanicalSystem):
         super().__init__(dof=2, actuators=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -252,7 +252,7 @@ class DoublePendulum(MechanicalSystem):
         l2 = self.l2
 
         torque_radius = 0.2 * max(l1, l2)
-        u_lim = float(self.inputs["u"].upper_bound[0])
+        u_lim = float(self.inputs["u"].upper[0])
         torque_scale = 2.0 * np.pi / 3.0 / u_lim
 
         # The sweep is negated for the q = 0 upright, +y link convention
@@ -280,8 +280,8 @@ class Acrobot(DoublePendulum):
             dim=1,
             labels=["tau"],
             units=["Nm"],
-            lower_bound=[-10.0],
-            upper_bound=[10.0],
+            lower=[-10.0],
+            upper=[10.0],
         )
 
     def B(self, q, params=None):
@@ -304,4 +304,4 @@ if __name__ == "__main__":
     sys.inputs["u"].nominal_value[0] = 1.0
     # sys.inputs["u"].nominal_value[1] = 1.0
     sys.compute_trajectory(tf=4.0)
-    sys.animate(time_factor_video=1.0)
+    sys.animate(speed=1.0)

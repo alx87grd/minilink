@@ -18,7 +18,7 @@ from minilink import (
     TransferFunction,
     feedback,
 )
-from minilink.core.roles import block_roles, command_port, roles
+from minilink.core.roles import command_port, roles, subsystem_roles
 from minilink.core.system import DynamicSystem, System
 
 
@@ -26,7 +26,7 @@ class _TwoInTwoOut(DynamicSystem):
     """dx = -x + u, y = x on two channels."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=2, output_dim=2)
+        super().__init__(state_dim=2, input_dim=2, output_dim=2)
 
     def f(self, x, u, t=0, params=None):
         return -x + u
@@ -34,7 +34,7 @@ class _TwoInTwoOut(DynamicSystem):
 
 class _TwoInThreeOut(DynamicSystem):
     def __init__(self):
-        super().__init__(n=3, input_dim=2, output_dim=3)
+        super().__init__(state_dim=3, input_dim=2, output_dim=3)
 
     def f(self, x, u, t=0, params=None):
         return -x + np.array([u[0], u[1], u[0] + u[1]])
@@ -75,7 +75,7 @@ class TestJunction(unittest.TestCase):
         np.testing.assert_allclose(_poles(T), _poles(feedback(L)), atol=1e-9)
 
     def test_vector_loop_uses_a_vector_junction(self):
-        T = PID(Kp=[3.0, 5.0], dof=2) @ _TwoInTwoOut()
+        T = PID(Kp=[3.0, 5.0], dim=2) @ _TwoInTwoOut()
         self.assertEqual(list(T.subsystems), ["controller", "plant", "error"])
         self.assertEqual(T.subsystems["error"].dim, 2)
         self.assertEqual(T.inputs["r"].dim, 2)
@@ -402,7 +402,7 @@ class TestLoopInputs(unittest.TestCase):
                 loop = closed_loop(
                     C,
                     self.H,
-                    reference=Step(0.0, 1.0),
+                    reference=Step(1.0, 0.0),
                     disturbance=WhiteNoise(1, psd=1e-2, seed=1),
                     noise=WhiteNoise(1, psd=1e-4, seed=2),
                 )
@@ -419,14 +419,14 @@ class TestLoopInputs(unittest.TestCase):
         from minilink.core.diagram import DiagramSystem
 
         C = PID(4.0, 2.0, 0.5)
-        inside = closed_loop(C, self.H, reference=Step(0.0, 1.0))
+        inside = closed_loop(C, self.H, reference=Step(1.0, 0.0))
         outside = DiagramSystem()
-        outside.add_subsystem(Step(0.0, 1.0), "reference")
+        outside.add_subsystem(Step(1.0, 0.0), "reference")
         outside.add_subsystem(closed_loop(C, self.H), "loop")
         outside.connect("reference", "y", "loop", "r")
         np.testing.assert_allclose(
-            inside.compute_trajectory(tf=4.0, n_steps=201).x,
-            outside.compute_trajectory(tf=4.0, n_steps=201).x,
+            inside.compute_trajectory(tf=4.0, n_samples=201).x,
+            outside.compute_trajectory(tf=4.0, n_samples=201).x,
             atol=1e-9,
         )
 
@@ -606,24 +606,24 @@ class TestResolver(unittest.TestCase):
     def test_block_roles_read_the_port_names(self):
         from minilink import NoisyPendulum, StateFeedback
 
-        pid = block_roles(PID())
+        pid = subsystem_roles(PID())
         self.assertEqual(
             (pid.measurements, pid.reference, pid.command), ((), None, "u")
         )
         self.assertEqual(pid.entry, "e")
         self.assertTrue(pid.error_driven and pid.stateful)
 
-        p = block_roles(P(ports="reference"))
+        p = subsystem_roles(P(ports="reference"))
         self.assertEqual((p.measurement, p.reference, p.entry), ("y", "r", None))
         self.assertFalse(p.error_driven or p.stateful)
 
-        lqr = block_roles(StateFeedback(np.array([[1.0, 1.0]])))
+        lqr = subsystem_roles(StateFeedback(np.array([[1.0, 1.0]])))
         self.assertEqual((lqr.measurements, lqr.reference), (("x",), "r"))
 
-        compensator = block_roles(TransferFunction([1.0], [1.0, 1.0]))
+        compensator = subsystem_roles(TransferFunction([1.0], [1.0, 1.0]))
         self.assertEqual((compensator.measurements, compensator.entry), ((), "u"))
 
-        plant = block_roles(NoisyPendulum())
+        plant = subsystem_roles(NoisyPendulum())
         # a plant's d and n are never the entry: its one free input is u
         self.assertEqual(
             (plant.measurements, plant.command, plant.entry), ((), None, "u")

@@ -21,8 +21,8 @@ FAN_SAMPLES = 64  # samples drawn in the fan
 
 # Plant: theta = 0 hanging, theta = pi upright, torque limited
 plant = Pendulum()
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
 
 
 # Cost: the wrapped angle error to upright, a rate term, a small effort term; no
@@ -82,8 +82,8 @@ def mppi_tick(U, x0, key):
 
     # The planner's evidence: the nominal rollout of U_new, and the tick's diagnostics
     x_plan = ev.rollout(x0, U_new, 0.0, DT)
-    effective_samples = 1.0 / jnp.sum(w**2)
-    return U_new, x_plan, X, S, w, effective_samples
+    effective_rollouts = 1.0 / jnp.sum(w**2)
+    return U_new, x_plan, X, S, w, effective_rollouts
 
 
 # Receding horizon by hand: solve, apply u_0, step the plant, shift the sequence

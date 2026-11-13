@@ -71,17 +71,17 @@ class MathematicalProgramEvaluator(ABC):
 
     @property
     def has_gradient(self) -> bool:
-        """True when :meth:`gradient` can be called."""
+        """True when :meth:`grad_J` can be called."""
         return False
 
     @property
     def has_hessian(self) -> bool:
-        """True when :meth:`hessian` can be called."""
+        """True when :meth:`hess_J` can be called."""
         return False
 
     @property
     def has_jacobian_h(self) -> bool:
-        """True when :meth:`jacobian_h` can be evaluated.
+        """True when :meth:`jac_h` can be evaluated.
 
         Note this means "callable", not "analytic derivatives exist": with no
         equality constraints the empty ``(0, n_z)`` Jacobian is always
@@ -91,7 +91,7 @@ class MathematicalProgramEvaluator(ABC):
 
     @property
     def has_jacobian_g(self) -> bool:
-        """True when :meth:`jacobian_g` can be evaluated (see :attr:`has_jacobian_h`)."""
+        """True when :meth:`jac_g` can be evaluated (see :attr:`has_jacobian_h`)."""
         return self.n_g == 0
 
     def bind(self, params=None) -> None:

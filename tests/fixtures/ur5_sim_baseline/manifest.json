@@ -3,7 +3,7 @@
   "module": "minilink.dynamics.catalog.manipulators.ur5",
   "tf": 0.5,
   "dt": 0.001,
-  "solver": "rk4_fixedsteps",
+  "solver": "rk4",
   "backend": "numpy",
   "input_mode": "zero_torque",
   "gravity": 0.0,

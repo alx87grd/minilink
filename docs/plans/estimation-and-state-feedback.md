@@ -12,8 +12,8 @@ Kalman filter, the sampled filters, and Layer 3, the estimation problem and its 
 §5, §6). The open work is in TODO.md (the P4 follow-ups, `LQGPlanner`, the estimation
 follow-ups). P4's build plan, its ask-first list and its verification were cut once it
 landed (the history is in git). **Where it sits:** `LQGPlanner` stays a v0.5 feature
-([TODO.md](TODO.md) §4), the follow-ups v0.9 rows; the sampled filters read the core's hybrid
-loop and the draws (TODO §1.3, §1.5).
+([TODO.md](TODO.md) §4), the follow-ups v0.9 rows; the sampled filters read the core's sampled
+loop and the draws (DESIGN §4 "Randomness", §5).
 
 ## 1. Vision
 
@@ -52,20 +52,20 @@ a comment. DESIGN §3 and §4 state these rules as built.
 ```
 Layer 0  gains on arrays            lqr_gain(A, B, Q, R) -> K                 kalman_gain(A, C, Q_n, R_n) -> L  (= lqr_gain(Aᵀ, Cᵀ, Q_n, R_n)ᵀ)
                                     place_gain(A, B, poles) -> K              luenberger_gain(A, C, poles) -> L  (= place_gain(Aᵀ, Cᵀ, poles)ᵀ)
-                                    lqr_gain_schedule(..., tf) -> (t, K, S)   kalman_gain_schedule(..., P0, tf) -> (t, L, P)   [later]
+                                    lqr_gain_schedule(..., horizon) -> (t, K, S)   kalman_gain_schedule(..., P0, tf) -> (t, L, P)   [later]
 
 Layer 1  blocks                     StateFeedback(K, x_bar, u_bar)            x, r -> u    u = ū − K (x − r)
                                     TimeVaryingFeedback(t, K, ...)    x, r -> u    u = ū − K(t)(x − r)
                                     TrajectoryFeedback(traj, K)            x -> u       u = u_d(t) − K(t)(x − x_d(t))
-                                    StateObserver(A, B, C, L, D, x_bar, u_bar, y_bar)    u, y -> x    dx̂ = A(x̂−x̄) + B(u−ū) + L(y−ŷ)
+                                    StateObserver(model, L)                              u, y -> x    dx̂ = A(x̂−x̄) + B(u−ū) + L(y−ŷ)
                                     TimeVaryingStateObserver(t, L, A, B, C, ...)      u, y -> x    L(t)                                 [later]
                                     TrajectoryObserver(traj, L, A, B, C schedules)    u, y -> x    δx̂ about x_d(t), y_d(t)              [later]
                                     ExtendedKalmanFilter(model, Q_n, R_n, x0, P0)     u, y -> x, P  A(x̂), C(x̂) online, P a state        [later]
                                     UnscentedKalmanFilter / ParticleFilter (StepSystem) u, y -> x   on a clock, `% dt`                  [later]
 
 Layer 2  designs on a model         lqr(model, Q, R)  place(model, poles)       kalman(model, Q_n, R_n)  luenberger(model, poles)
-         or a plant                 lqr_finite_horizon(model, Q, R, S_f, tf)  kalman_finite_horizon(model, Q_n, R_n, P0, tf)  [later]
-                                    trajectory_lqr(sys, traj, Q, R)           trajectory_kalman(sys, traj, Q_n, R_n, P0)       [later]
+         or a plant                 lqr_finite_horizon(model, Q, R, S_f, horizon)  kalman_finite_horizon(model, Q_n, R_n, P0, tf)  [later]
+                                    lqr_trajectory(sys, traj, Q, R)           trajectory_kalman(sys, traj, Q_n, R_n, P0)       [later]
                                     lqg(model, Q, R, Q_n, R_n) -> controller box {observer, gain}
                                     one signature: lqr(sys, Q, R, *, x_bar=None, u_bar=None, t=0.0, params=None, method, eps):
                                       an LTISystem as is, with the point it carries; any other System linearized at (x̄, ū),
@@ -73,10 +73,10 @@ Layer 2  designs on a model         lqr(model, Q, R)  place(model, poles)       
 
 Layer 3  problems and solutions     PlanningProblem (stochastic by its parts)          EstimationProblem                                  [later]
                                     Planner(problem).solve() -> PlanningSolution      Estimator-tool(problem).solve() -> EstimationSolution
-                                      policy (a controller block)                       the estimator block
+                                      controller (a block)                              the estimator block
                                       record (RiccatiRecord: K, P, poles)        record (L, P, poles; or the P(t) schedule)
-                                      trajectory (nominal run), evaluation (J draws)    trajectory (x̂ along the data), evaluation (error statistics)
-                                      cost_to_go J(x)                                   covariance P(t), the dual of J
+                                      trajectory (an open-loop plan), evaluation (J)    trajectory (x̂ along the data), evaluation (error statistics)
+                                      cost_to_go J(x), a Field                          covariance P(t), the dual of J
                                     LQRPlanner, LQGPlanner (v0.5)                      KalmanEstimator, ExtendedKalmanEstimator, ParticleEstimator, MovingHorizonEstimator
 
 The loop  ctl @ plant       lqg(…) @ plant       a hand-built box: add_subsystem(observer, "observer"), add_subsystem(gain, "gain"),
@@ -88,7 +88,7 @@ The loop  ctl @ plant       lqg(…) @ plant       a hand-built box: add_subsyst
 | Rung | Control | Estimation | Linearized | Gain |
 | --- | --- | --- | --- | --- |
 | About an equilibrium | `lqr`, `place` -> constant `K` | `kalman`, `luenberger` -> constant `L` | once, at x̄ | algebraic Riccati, or placement |
-| Along a nominal trajectory, offline | `trajectory_lqr(sys, traj, Q, R)` -> `K(t)`, backward Riccati from `S_f` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` -> `L(t)`, forward Riccati from `P0` (the linearized Kalman filter about `x_d(t)`, `u_d(t)`, `y_d(t)`) | at every sample of the trajectory, `A_k`, `B_k`, `C_k` | the same exact Hamiltonian step, dual pair, opposite direction |
+| Along a nominal trajectory, offline | `lqr_trajectory(sys, traj, Q, R)` -> `K(t)`, backward Riccati from `S_f` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` -> `L(t)`, forward Riccati from `P0` (the linearized Kalman filter about `x_d(t)`, `u_d(t)`, `y_d(t)`) | at every sample of the trajectory, `A_k`, `B_k`, `C_k` | the same exact Hamiltonian step, dual pair, opposite direction |
 | At the current point, online | iLQR / MPC (research lane) | `ExtendedKalmanFilter`: `A(x̂)`, `C(x̂)` inside `f`, `P` integrated as state | every instant, at x̂ | the Riccati differential equation integrated with the estimate |
 
 The EKF along a trajectory is the middle rung: the same block shape as `TrajectoryFeedback` (schedules in `params`, `interpolate_schedule` between samples, held past the end), with the plant's nominal `y_d(t) = h(x_d, u_d)` as a third schedule and the estimate written as `x̂ = x_d(t) + δx̂`. Nothing in the core changes for it; it needs the Riccati machinery to run forward on the dual pair (the backward map already exists in `riccati_step`); `interpolate_schedule` already has the one home both bands import (`core/trajectory.py`).
@@ -127,17 +127,17 @@ statistics over the problem's draws (the dual of `J`), and `covariance` as the d
 past data). The evaluator's dual scores estimation error, consistency (NEES) and innovation
 whiteness. Where the pieces come from today: `Planner` base (`planning/planner.py`),
 `PlanningSolution` (`planning/results.py`), `evaluate` on the compiled problem (`planning/evaluator.py`;
-`MonteCarloEvaluator` folded into it in v0.3), `nominal_trajectory`.
+`MonteCarloEvaluator` folded into it in v0.3).
 
 ## 6. Stress test: the slots the later estimators take
 
 | Estimator | Shape | Ports / state | Entry | Verdict |
 | --- | --- | --- | --- | --- |
 | Time-varying Kalman (continuous) | `TimeVaryingStateObserver`, `L(t)` from the forward Riccati schedule | `u`, `y` -> `x`; x̂ only | `kalman_finite_horizon(model, Q_n, R_n, P0, tf)` | holds: the dual of `lqr_finite_horizon` line for line |
-| Linearized Kalman along a trajectory | `TrajectoryObserver`: schedules `t, x_d, u_d, y_d, A, B, C, L` in `params`; `x̂ = x_d(t) + δx̂` | `u`, `y` -> `x` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` | holds: the dual of `trajectory_lqr`; needs `riccati_step` run forward (`interpolate_schedule` is in `core/trajectory.py`) |
+| Linearized Kalman along a trajectory | `TrajectoryObserver`: schedules `t, x_d, u_d, y_d, A, B, C, L` in `params`; `x̂ = x_d(t) + δx̂` | `u`, `y` -> `x` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` | holds: the dual of `lqr_trajectory`; needs `riccati_step` run forward (`interpolate_schedule` is in `core/trajectory.py`) |
 | Extended Kalman filter | `ExtendedKalmanFilter(model, Q_n, R_n, x0, P0)`: state `[x̂; vec(P)]`; `A(x̂) = ∂f/∂x`, `C(x̂) = ∂h/∂x` taken **directly on `model.f` / `model.h`** inside `f` (`jax.jacfwd` when tracing, central differences on NumPy), never through `analysis.jacobian`, which compiles an evaluator and coerces to NumPy per call | `u`, `y` -> `x` (a slice), `P` | the block is the algorithm; later `ExtendedKalmanEstimator(problem)` | holds: `estimate` is already a port function, not `compute_state`; the model-based params rule (DESIGN §4) covers `model.params` |
-| Unscented Kalman, discrete Kalman | `StepSystem`s on a clock, `ukf % dt` and `gain % dt` wired as the `lqg` box is (`x` and `u` connected) into a `SampledDiagramSystem`, then `@ plant`; today a hand-built `StepDiagramSystem` (`add_subsystem`, `connect`, `computer % dt @ plant`), as the flow `+` refuses a `StepSystem` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` with a `c2d` | strains today's sampled seam: `expose_computer_boundary_ports` auto-exposes one block only and `as_step_diagram` names it `controller` regardless of `id` (AC-8a, S31); the discrete numbers need a `c2d`, which has no row since P6 was dropped (2026-10-17); `kalman` stays continuous in name |
-| Particle filter | `StepSystem(N·n + N)`, counter-based draws from `(seed, k)`, its `seed` an integer leaf of `problem.realize(key, n_trials)`'s tree | `u`, `y` -> `x` (weighted mean) | `ParticleFilter(model, process_noise: Distribution, measurement_noise: Distribution, n_particles, seed)` | holds the port convention; needs RN-2 (`sample(key)`) and the realized tree |
+| Unscented Kalman, discrete Kalman | `StepSystem`s on a clock, `ukf % dt` and `gain % dt` wired as the `lqg` box is (`x` and `u` connected) by the step algebra into a `SampledDiagramSystem`, then `@ plant` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` on the exact discretization (`discretize(model, dt, solver="exact")`) | holds: the sampled loop is a step diagram (DESIGN §5); `kalman` stays continuous in name |
+| Particle filter | `StepSystem(N·n + N)`, counter-based draws from `(seed, k)`, its `seed` an integer leaf of `problem.realize(key, n)`'s tree | `u`, `y` -> `x` (weighted mean) | `ParticleFilter(model, process_noise: Distribution, measurement_noise: Distribution, n_particles, seed)` | holds the port convention, on `sample(key)` and the realized tree (both landed) |
 | Moving-horizon estimator | a trajopt over a window of past data | `u`, `y` -> `x` | `MovingHorizonEstimator(problem)` (Layer 3) | holds: the dual of MPC; needs `EstimationProblem.data` |
 | Parameter estimators (RLS, gradient laws) | `u`, `y` -> `theta` | not `x` | online identification in `minilink.learning`, or a new role | the role means a *state* estimate; decide the noun when it lands |
 

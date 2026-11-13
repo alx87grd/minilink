@@ -47,7 +47,7 @@ def mpc_animation_overlays(
     rollout : Trajectory
         A run of the loop ``mpc % dt @ plant`` (``compute_rollout``, or the
         evaluator's ``trajectory``), the MPC block's ``z`` among its signals.
-    mpc : PredictiveController
+    mpc : ModelPredictiveController
         The MPC box (its compiled face reads the plans).
     loop : SampledDiagramSystem, optional
         The loop the run is of, for a run that records its state only
@@ -200,7 +200,8 @@ def plot_sampled_futures(
     *,
     loop,
     ticks,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     n_shown: int = 32,
     ax=None,
     show: bool = True,
@@ -208,9 +209,9 @@ def plot_sampled_futures(
     """
     The fans of a sampling MPC at the solves of ``ticks``: the heaviest futures shaded by weight, the plan in black, the closed loop.
 
-    ``axes`` names what is drawn against what: two state indices (``(0, 1)``,
-    the car's plane), or ``("t", i)`` for the state ``i`` against time (the
-    pendulum's angle). ``ticks`` index the solves of the run. Returns
+    ``x_axis`` and ``y_axis`` name what is drawn against what: two state
+    indices (``0`` and ``1``, the car's plane), or ``x_axis="t"`` for the state
+    ``y_axis`` against time (the pendulum's angle). ``ticks`` index the solves of the run. Returns
     ``(fig, ax)``.
     """
     # Lazy import: matplotlib loads with the first figure
@@ -226,7 +227,7 @@ def plot_sampled_futures(
 
     def coordinates(t, x_path):
         """The drawn pair of a path: time or a state on each axis."""
-        return [t if axis == "t" else x_path[:, axis] for axis in axes]
+        return [t if axis == "t" else x_path[:, axis] for axis in (x_axis, y_axis)]
 
     # Each fan: its futures shaded by weight, the plan they moved to
     for tick in ticks:
@@ -246,8 +247,8 @@ def plot_sampled_futures(
     ax.plot(
         *coordinates(plant.t, plant.x.T), color="tab:grey", lw=2, label="closed loop"
     )
-    ax.set_xlabel("t [s]" if axes[0] == "t" else f"x[{axes[0]}]")
-    ax.set_ylabel("t [s]" if axes[1] == "t" else f"x[{axes[1]}]")
+    ax.set_xlabel("t [s]" if x_axis == "t" else f"x[{x_axis}]")
+    ax.set_ylabel("t [s]" if y_axis == "t" else f"x[{y_axis}]")
     ax.set_title(f"MPPI: {n_shown} of {pv.K} sampled futures, shaded by weight")
     ax.legend(loc="best", fontsize=8)
     if show:
@@ -327,7 +328,7 @@ def tick_solves_of(rollout, mpc, loop):
 
     require_loop(loop, "<the MPC's solve inputs>")
     ev = loop.compile()
-    path, block = solving_block_of(loop, mpc.pv)
+    path, block = solving_subsystem_of(loop, mpc.pv)
     divisor = ev.operation_of(path).divisor
     x_slice, _ = nested_layout(loop)[path]
     base = loop.sample_period
@@ -347,14 +348,14 @@ def tick_solves_of(rollout, mpc, loop):
     return solves
 
 
-def solving_block_of(loop, pv):
+def solving_subsystem_of(loop, pv):
     """``(path, block)`` of the block of ``loop`` that solves on ``pv``: the MPC's solve."""
     found = []
-    for path, sys in blocks_of(loop):
+    for path, sys in subsystems_of(loop):
         own = getattr(sys, "source", None) or sys
         if hasattr(own, "solve_inputs") and getattr(own, "pv", None) is pv:
             found.append((path, own))
-    require_one_block([path for path, _ in found])
+    require_one_subsystem([path for path, _ in found])
 
     return found[0]
 
@@ -403,10 +404,10 @@ def plan_history_of(rollout, mpc, loop, block):
     # Lazy import: the sampled plan's layout loads with the first plan read
     from minilink.core.compile.plan import nested_layout
 
-    path = block_path_of(rollout, mpc, loop, block)
+    path = subsystem_path_of(rollout, mpc, loop, block)
     name = f"{'/'.join(path)}:z"
     if rollout.has_signal(name):
-        return rollout.get_signal(name)
+        return rollout.signal(name)
     require_loop(loop, name)
 
     # The block's state slice in the loop's nested layout, by its path ("a/b")
@@ -415,29 +416,31 @@ def plan_history_of(rollout, mpc, loop, block):
     return rollout.x[x_slice]
 
 
-def block_path_of(rollout, mpc, loop, block):
+def subsystem_path_of(rollout, mpc, loop, block):
     """The MPC block's path: as given, else the block of ``loop`` holding ``mpc``'s face, else the run's one plan signal."""
     if block is not None:
         return tuple(block.split("/"))
     if loop is not None:
-        paths = [path for path, sys in blocks_of(loop) if holds_plan_of(sys, mpc.pv)]
-        require_one_block(paths)
+        paths = [
+            path for path, sys in subsystems_of(loop) if holds_plan_of(sys, mpc.pv)
+        ]
+        require_one_subsystem(paths)
         return paths[0]
 
     names = [name[: -len(":z")] for name in rollout.signals if name.endswith(":z")]
     if not names:
         require_loop(loop, "<block>:z")
-    require_one_block(names)
+    require_one_subsystem(names)
 
     return tuple(names[0].split("/"))
 
 
-def blocks_of(diagram, prefix=()):
+def subsystems_of(diagram, prefix=()):
     """Every leaf block of a diagram with its path, its nested boxes walked."""
     for sys_id, sys in diagram.subsystems.items():
         path = (*prefix, sys_id)
         if hasattr(sys, "subsystems"):
-            yield from blocks_of(sys, path)
+            yield from subsystems_of(sys, path)
         else:
             yield path, sys
 
@@ -449,7 +452,7 @@ def holds_plan_of(block, pv) -> bool:
     return getattr(own, "pv", None) is pv and int(block.n) == pv.n_z
 
 
-def require_one_block(found):
+def require_one_subsystem(found):
     """Refuse a search for the MPC block that finds none, or several."""
     if len(found) != 1:
         raise ValueError(

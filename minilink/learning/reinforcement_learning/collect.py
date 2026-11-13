@@ -11,17 +11,17 @@ from minilink.planning.environment import MAX_SEED
 ###############################################################################
 
 
-def rollout(env, policy, theta, carry, key, *, n_steps, n_envs):
+def rollout(env, policy, theta, carry, key, *, n_steps, n_rollouts):
     """
-    Step ``n_envs`` plants ``n_steps`` times under ``π_θ``; return ``(batch, carry)``.
+    Step ``n_rollouts`` rollouts ``n_steps`` periods each under ``π_θ``; return ``(batch, carry)``.
 
-    ``batch`` holds one transition per step and plant, arrays of shape
-    ``(n_steps, n_envs, ...)``: the state ``x``, the normalized action ``a``,
+    ``batch`` holds one transition per step and rollout, arrays of shape
+    ``(n_steps, n_rollouts, ...)``: the state ``x``, the normalized action ``a``,
     the ``reward``, the next state ``x_next``, and how the step ended,
     ``terminated`` (the episode's cost fully counted) or ``done`` (terminated
     or truncated, the episode restarts). ``ep_return`` is the return of an
     episode that ended at that step (NaN elsewhere), for the logs. ``carry``
-    is ``(x, t, ep_return, params, seed)`` with a leading ``n_envs`` axis:
+    is ``(x, t, ep_return, params, seed)`` with a leading ``n_rollouts`` axis:
     ``seed`` is the episode's seed of the policy, which draws the action of
     tick ``k = ⌊t/dt⌋`` at ``CounterKey(seed, k)``, the draw the seeded policy
     block makes with that seed.
@@ -40,7 +40,7 @@ def rollout(env, policy, theta, carry, key, *, n_steps, n_envs):
 
         # Plant: one control period, and the return of the running episode
         x_next, t_next, reward, terminated, truncated = env.step(
-            x, t, u, k_step, params
+            x, u, t, k_step, params
         )
         done = terminated | truncated
         ep_return = ep_return + reward
@@ -69,9 +69,9 @@ def rollout(env, policy, theta, carry, key, *, n_steps, n_envs):
         return carry, transition
 
     def scan_step(carry, key):
-        return jax.vmap(env_step)(carry, jax.random.split(key, n_envs))
+        return jax.vmap(env_step)(carry, jax.random.split(key, n_rollouts))
 
-    # The n_steps control periods of the n_envs plants
+    # The n_steps control periods of the n_rollouts rollouts
     carry, batch = jax.lax.scan(scan_step, carry, jax.random.split(key, n_steps))
 
     return batch, carry
@@ -227,8 +227,8 @@ def discounted_sum(increment, done, factor):
     return s
 
 
-def reset_carry(env, key, n_envs):
-    """Initial ``(x, t, ep_return, params, seed)`` carry for ``n_envs`` plants."""
+def reset_carry(env, key, n_rollouts):
+    """Initial ``(x, t, ep_return, params, seed)`` carry for ``n_rollouts`` rollouts."""
     jax, jnp = require_jax(), require_jax_numpy()
 
     k_x, k_params = jax.random.split(key)
@@ -236,11 +236,11 @@ def reset_carry(env, key, n_envs):
 
     # A fresh start, fresh parameters and a fresh policy seed per plant, at t0
     # with a zero return
-    x = jax.vmap(env.reset)(jax.random.split(k_x, n_envs))
-    params = jax.vmap(env.sample_params)(jax.random.split(k_params, n_envs))
-    seed = jax.vmap(episode_policy_seed)(jax.random.split(k_seed, n_envs))
-    t = jnp.full(n_envs, env.t0)
-    ep_return = jnp.zeros(n_envs)
+    x = jax.vmap(env.reset)(jax.random.split(k_x, n_rollouts))
+    params = jax.vmap(env.sample_params)(jax.random.split(k_params, n_rollouts))
+    seed = jax.vmap(episode_policy_seed)(jax.random.split(k_seed, n_rollouts))
+    t = jnp.full(n_rollouts, env.t0)
+    ep_return = jnp.zeros(n_rollouts)
 
     return x, t, ep_return, params, seed
 

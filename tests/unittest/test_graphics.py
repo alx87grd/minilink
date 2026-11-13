@@ -1086,7 +1086,7 @@ from minilink.simulation.simulator import Simulator
 
 class Integrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])
@@ -1105,7 +1105,7 @@ class PController(System):
 
     def ctl(self, x, u, t=0, params=None):
         Kp = params["Kp"] if params else self.params["Kp"]
-        r, y = self.get_port_values_from_u(u, "r", "y")
+        r, y = self.ports(u, "r", "y")
         return np.array([Kp * (r[0] - y[0])])
 
 
@@ -1150,7 +1150,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertTrue(traj_plus.has_signal("controller:u"))
         self.assertTrue(traj_plus.has_signal("plant:y"))
         n_pts = len(self.traj.t)
-        self.assertEqual(traj_plus.get_signal("controller:u").shape, (1, n_pts))
+        self.assertEqual(traj_plus.signal("controller:u").shape, (1, n_pts))
 
     def test_plot_time_signals_does_not_crash(self):
         from minilink.graphical.common.environment import override_env
@@ -1230,7 +1230,7 @@ class TestAdvancedPlotting(unittest.TestCase):
     def test_plot_trajectory_computes_missing_trajectory_then_plots(self):
         sys = Integrator()
         result = sys.plot_trajectory(show=False)
-        self.assertEqual(result.backend, "matplotlib")
+        self.assertEqual(result.renderer, "matplotlib")
         self.assertIsNotNone(result.figure)
         self.assertIsNotNone(sys.traj)
         plt.close(result.figure)
@@ -1367,7 +1367,7 @@ def debug_state_skin(plant):
 
 class Integrator_plotly_renderer(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])
@@ -1571,12 +1571,12 @@ class TestPlotlySignalPlot(unittest.TestCase):
             u=np.array([[0.25, 0.25]]),
         )
         result = plot_time_signals(
-            sys, traj0, signals=("x", "u"), backend="plotly", show=False
+            sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
         self.assertEqual(len(result.figure.data), 2)
         self.assertEqual(result.figure.layout.width, PLOTLY_FIG_WIDTH)
         handle = open_time_signal_plot(
-            sys, traj0, signals=("x", "u"), backend="plotly", show=False
+            sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
         handle.update(traj1)
         np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
@@ -1584,13 +1584,15 @@ class TestPlotlySignalPlot(unittest.TestCase):
     def test_plotly_ylabels_bracket_units_once(self):
         pytest.importorskip("plotly")
         sys = Integrator_plotly_renderer()
-        sys.state.units = ["[m]"]  # already bracketed, as the manipulator ports declare
+        sys.state.units = [
+            "[m]"
+        ]  # a unit written with its brackets is not bracketed twice
         sys.inputs["u"].units = ["N"]
         traj = Trajectory(
             t=np.array([0.0, 1.0]), x=np.array([[0.0, 1.0]]), u=np.array([[1.0, 1.0]])
         )
         result = plot_time_signals(
-            sys, traj, signals=("x", "u"), backend="plotly", show=False
+            sys, traj, signals=("x", "u"), renderer="plotly", show=False
         )
         layout = result.figure.layout
         self.assertEqual(layout.yaxis.title.text, "x[0] [m]")
@@ -1780,7 +1782,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_impedance_error_plane_values(self):
-        pd = Impedance(dof=1, Kp=10.0, Kd=1.0)
+        pd = Impedance(dim=1, Kp=10.0, Kd=1.0)
         res = pd.plot_control_law(
             bounds=((-1.0, 1.0), (-2.0, 2.0)), grid_shape=(5, 5), show=False
         )
@@ -1798,8 +1800,8 @@ class TestPlotControlLaw(unittest.TestCase):
     def test_modelbased_default_axes_are_qdq(self):
         ct = ComputedTorque(Pendulum())
         res = ct.plot_control_law(grid_shape=(5, 5), show=False)
-        self.assertEqual(res.axes.get_xlabel(), "q0")
-        self.assertEqual(res.axes.get_ylabel(), "dq0")
+        self.assertEqual(res.axes.get_xlabel(), "q1")
+        self.assertEqual(res.axes.get_ylabel(), "dq1")
         plt.close(res.figure)
 
     def test_dynamic_law_pins_internal_state_at_x0(self):
@@ -1844,7 +1846,7 @@ class TestPlotControlLaw(unittest.TestCase):
         res = lqr.plot_control_law(
             bounds=((-1.0, 1.0), (-1.0, 1.0)),
             grid_shape=(5, 5),
-            show_3d=True,
+            is_3d=True,
             show=False,
         )
         self.assertEqual(res.axes.name, "3d")

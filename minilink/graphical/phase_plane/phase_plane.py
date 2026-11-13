@@ -27,7 +27,7 @@ def plot_phase_plane(
     grid_shape: tuple[int, int] = (21, 21),
     params=None,
     title: str | None = None,
-    backend: str = "matplotlib",
+    renderer: str = "matplotlib",
     streamplot: bool = False,
     show: bool = True,
     **kwargs,
@@ -40,11 +40,11 @@ def plot_phase_plane(
         Continuous-time model whose ``f`` defines the vector field (leaf
         subclass or wired diagram with stacked ``f``).
     """
-    backend_key = plot_backend_of(backend)
-    require_plot_backend(backend_key, backend)
-    require_renderer_keywords(backend_key, kwargs)
+    renderer_key = renderer_key_of(renderer)
+    require_renderer(renderer_key, renderer)
+    require_renderer_keywords(renderer_key, kwargs)
 
-    # The field on its grid, then the figure on the chosen backend
+    # The field on its grid, then the figure on the chosen renderer
     spec = build_phase_plane_spec(
         sys,
         traj,
@@ -59,7 +59,7 @@ def plot_phase_plane(
         title=title,
     )
 
-    if backend_key == "plotly":
+    if renderer_key == "plotly":
         return render_phase_plane_plotly(spec, streamplot=streamplot, show=show)
 
     return render_phase_plane_matplotlib(
@@ -303,7 +303,7 @@ def render_phase_plane_matplotlib(
         if pause > 0.0:
             plt.pause(pause)
 
-    return PlotResult(backend="matplotlib", payload=(fig, ax), figure=fig, axes=ax)
+    return PlotResult(renderer="matplotlib", payload=(fig, ax), figure=fig, axes=ax)
 
 
 def render_phase_plane_plotly(
@@ -401,7 +401,7 @@ def render_phase_plane_plotly(
     if show:
         fig.show()
 
-    return PlotResult(backend="plotly", payload=fig, figure=fig)
+    return PlotResult(renderer="plotly", payload=fig, figure=fig)
 
 
 ###############################################################################
@@ -409,19 +409,19 @@ def render_phase_plane_plotly(
 ###############################################################################
 
 
-def plot_backend_of(backend: str) -> str:
-    """The backend's key, lowercase; ``"mpl"`` is matplotlib."""
-    key = str(backend).lower()
+def renderer_key_of(renderer: str) -> str:
+    """The renderer's key, lowercase; ``"mpl"`` is matplotlib."""
+    key = str(renderer).lower()
     if key in {"matplotlib", "mpl"}:
         return "matplotlib"
     return key
 
 
-def require_plot_backend(key, backend):
-    """Refuse a backend other than matplotlib and plotly."""
+def require_renderer(key, renderer):
+    """Refuse a renderer other than matplotlib and plotly."""
     if key not in ("matplotlib", "plotly"):
         raise ValueError(
-            f"Unknown plot backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+            f"Unknown renderer {renderer!r}. Expected 'matplotlib' or 'plotly'."
         )
 
 
@@ -430,7 +430,7 @@ def require_renderer_keywords(key, kwargs):
     if key == "plotly" and kwargs:
         names = ", ".join(sorted(kwargs))
         raise TypeError(
-            f"plot_phase_plane(backend='plotly') got keyword arguments the plotly "
+            f"plot_phase_plane(renderer='plotly') got keyword arguments the plotly "
             f"renderer does not take: {names}"
         )
 
@@ -494,7 +494,7 @@ def x_ref_of(sys, x_ref) -> np.ndarray:
 def u_of(sys, u) -> np.ndarray:
     """The held input: ``u``, else the input ports' values."""
     if u is None:
-        value = sys.get_u_from_input_ports()
+        value = sys.u_nominal
     else:
         value = u
     arr = np.asarray(value, dtype=float).reshape(-1)
@@ -538,8 +538,8 @@ def phase_bounds_of(
         y_bounds = require_ordered_bounds(arr[1], "y bounds")
         return x_bounds, y_bounds
 
-    lower = sys.state.lower_bound
-    upper = sys.state.upper_bound
+    lower = sys.state.lower
+    upper = sys.state.upper
 
     x_bounds = bounds_from_state_or_overlay(
         lower,

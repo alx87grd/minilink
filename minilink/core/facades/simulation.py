@@ -1,6 +1,10 @@
 """Simulation shortcuts: compile a system, simulate it, score the run."""
 
+import warnings
+
 import numpy as np
+
+from minilink.core.options import caller_stacklevel
 
 ###############################################################################
 # Public API
@@ -19,7 +23,7 @@ class SystemSimulation:
     :class:`DynamicSimulation` and :class:`StepSimulation` override it.
     """
 
-    def compile(self, backend="numpy", verbose=False):
+    def compile(self, *, backend="numpy", verbose=False):
         """
         Convenience shortcut to compile the system into a backend evaluator.
 
@@ -35,9 +39,9 @@ class SystemSimulation:
         tf=10,
         u=None,
         *,
-        input_port_id=None,
+        port=None,
         t0=0,
-        n_steps=None,
+        n_samples=None,
         dt=None,
         solver=None,
         show=False,
@@ -58,11 +62,13 @@ class SystemSimulation:
             The prescribed input: a sampled matrix ``(m, N)`` (a column per
             sample, the layout of ``traj.u``), a function ``u(t)`` of the full
             input, a constant vector, or a scalar on a one-input system; ``None``
-            is the nominal input. With ``input_port_id`` it describes that one
+            is the nominal input. With ``port`` it describes that one
             port, the others at their nominal values.
+        n_samples : int, optional
+            Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to the simulator (default ``"numpy"``).
-            Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Use ``backend="auto"`` (see :data:`~minilink.core.backends.BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print simulator setup (solver, ``dt``, compile backend). Default
@@ -81,13 +87,13 @@ class SystemSimulation:
             x0=x0,
             t0=t0,
             tf=tf,
-            n_steps=n_steps,
+            n_samples=n_samples,
             dt=dt,
             solver=solver,
             backend=backend,
             verbose=verbose,
         )
-        traj = sim.solve(u=u, input_port_id=input_port_id)
+        traj = sim.solve(u=u, port=port)
 
         if show:
             # A real cycle through minilink.core.system
@@ -144,9 +150,9 @@ class DynamicSimulation:
         tf=10,
         u=None,
         *,
-        input_port_id=None,
+        port=None,
         t0=0,
-        n_steps=None,
+        n_samples=None,
         dt=None,
         solver=None,
         show=False,
@@ -172,12 +178,14 @@ class DynamicSimulation:
             vector, or a scalar on a one-input system; ``None`` is the nominal
             input. A sampled input is held over each sample period and a function
             of time is read where the solver evaluates ``f``, on every solver.
-        input_port_id : str, optional
+        port : str, optional
             The one input port ``u`` describes, the others kept at their nominal
             values.
+        n_samples : int, optional
+            Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``"numpy"``).
-            Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Use ``backend="auto"`` (see :data:`~minilink.core.backends.BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print solver selection, time grid, and compile backend (default
@@ -203,7 +211,7 @@ class DynamicSimulation:
             The simulated trajectory, also stored in :attr:`traj`.
         """
         # A real cycle through minilink.core.system
-        from minilink.core.diagram import block_roles
+        from minilink.core.diagram import subsystem_layouts
         from minilink.core.trajectory import Trajectory
         from minilink.simulation.simulator import Simulator
 
@@ -212,16 +220,14 @@ class DynamicSimulation:
             x0=x0,
             t0=t0,
             tf=tf,
-            n_steps=n_steps,
+            n_samples=n_samples,
             dt=dt,
             solver=solver,
             backend=backend,
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
-        traj = sim.solve(
-            u=u, input_port_id=input_port_id, record=recorded_names_of(self, record)
-        )
+        traj = sim.solve(u=u, port=port, record=recorded_names_of(self, record))
         if hasattr(self, "state_index"):
             # A diagram's run: every block's state slice, the inputs recorded
             traj = Trajectory(
@@ -229,7 +235,7 @@ class DynamicSimulation:
                 x=traj.x,
                 u=traj.u,
                 signals=traj.signals,
-                roles=block_roles(self, traj.signal_names),
+                roles=subsystem_layouts(self, traj.signal_names),
             )
 
         if show:
@@ -282,7 +288,8 @@ class StepSimulation:
         Parameters
         ----------
         tf : float
-            End of the run in seconds; the run takes ``round((tf - t0) / Δ)`` ticks.
+            End of the run in seconds; the run takes ``round((tf - t0) / Δ)`` ticks,
+            and warns when it so ends at another time than ``tf``.
         u : array, sequence, callable, or None, optional
             The input of each tick, as for :meth:`compute_rollout`.
         x0 : array, optional
@@ -314,6 +321,7 @@ class StepSimulation:
         require_run_solver(solver)
         h = self.sample_period
         n_steps = int(round((float(tf) - float(t0)) / h))
+        warn_off_tick_end(tf, t0, h, n_steps)
         host = solver == "scipy"
         run = stepped_view(self, dt, None if host else solver)
         ev = run.compile(backend="numpy" if host else backend, verbose=verbose)
@@ -362,7 +370,7 @@ class StepSimulation:
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
-            roles.update(plant_block_roles(plant_op, plant_slice.start))
+            roles.update(plant_subsystem_layouts(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -400,7 +408,7 @@ class StepSimulation:
         Parameters
         ----------
         n_steps : int
-            Number of step transitions to apply.
+            Number of step transitions to apply: ``n_steps + 1`` samples.
         u : array, sequence, callable, or None, optional
             The input of each step: ``None`` (the nominal input), a constant
             vector, an ``(m, n_steps)`` sequence (a column per step, the layout
@@ -471,7 +479,7 @@ class StepSimulation:
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
-            roles.update(plant_block_roles(plant_op, plant_slice.start))
+            roles.update(plant_subsystem_layouts(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -493,6 +501,21 @@ class StepSimulation:
 ###############################################################################
 
 
+def warn_off_tick_end(tf, t0, h, n_steps):
+    """Warn when a run of whole ticks ends at another time than the ``tf`` asked for."""
+    t_end = float(t0) + n_steps * h
+    gap = abs(t_end - float(tf))
+
+    # A loop on a clock stops on a tick: the end it reaches is announced
+    if gap > 1e-9 * max(1.0, abs(float(tf))):
+        warnings.warn(
+            f"tf={float(tf):g} is not a whole number of ticks of {h:g} s from "
+            f"t0={float(t0):g}: the run takes {n_steps} ticks and ends at "
+            f"{t_end:g} s",
+            stacklevel=caller_stacklevel(),
+        )
+
+
 def require_continuous_underneath(system):
     """Refuse the dense run of a system with no continuous time underneath: a tick law counts, it has no seconds."""
     # A real cycle through minilink.core.system
@@ -504,7 +527,7 @@ def require_continuous_underneath(system):
         not on_a_clock
         or system.sample_period is None
         or isinstance(system, SampledSystem)
-        and system.counts
+        and system.is_tick_law
     ):
         raise TypeError(
             f"{type(system).__name__} {system.name!r} counts its ticks: it has no continuous "
@@ -535,7 +558,7 @@ def stepped_view(system, dt=None, solver=None):
         return system
     if isinstance(system, SampledDiagramSystem):
         return with_plant_steps(system, **plant_steps_of(system, dt, solver))
-    if system.resolves:
+    if system.is_integrated:
         substeps = None if dt is None else steps_per_period(system.sample_period, dt)
         return system.with_steps(substeps=substeps, solver=solver)
 
@@ -657,13 +680,13 @@ def dense_points_of(system, ev):
     if plan is not None:
         return plan.dense_points
 
-    return system.substeps if system.resolves else 1
+    return system.substeps if system.is_integrated else 1
 
 
 def scored_trajectory(system, of, traj):
     """The trajectory a cost shortcut scores: the system's own, or one block's inside it (its recorded run, else reconstructed)."""
     # A real cycle through minilink.core.system
-    from minilink.core.diagram import DiagramSystem, block_run
+    from minilink.core.diagram import DiagramSystem, subsystem_run
 
     traj = system.traj if traj is None else traj
     if traj is None:
@@ -688,16 +711,16 @@ def scored_trajectory(system, of, traj):
             f"this run records no input for {path!r}: record=({path + ':u'!r},)"
         )
 
-    return block_run(system, path, traj)
+    return subsystem_run(system, path, traj)
 
 
-def plant_block_roles(plant_op, offset):
+def plant_subsystem_layouts(plant_op, offset):
     """The blocks inside a loop's plant when it is itself a diagram, by path ``"plant/<id>"``, their slices offset into the loop's state."""
     # A real cycle through minilink.core.system
-    from minilink.core.diagram import block_roles
+    from minilink.core.diagram import subsystem_layouts
 
     plant = getattr(plant_op.system, "source", plant_op.system)
     if not hasattr(plant, "state_index"):
         return {}
 
-    return block_roles(plant, (), offset, "plant/")
+    return subsystem_layouts(plant, (), offset, "plant/")

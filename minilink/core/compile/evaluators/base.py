@@ -143,6 +143,24 @@ class Evaluator(JacobianMixin):
         """Every boundary output port at ``(x, u, t)``; ``params=None`` reads the compiled ones."""
         raise NotImplementedError
 
+    def h(self, x, u=None, t=0.0, params=None):
+        """
+        The output map ``y = h(x, u, t; p)``: the ``"y"`` port, as ``sys.h``; empty when there is none.
+
+        ``u=None`` holds the nominal input; on a discrete evaluator ``t`` is
+        the tick ``k``. The other ports are :meth:`outputs`'.
+        """
+        xp = self.xp
+        u = self.nominal_input if u is None else u
+
+        # Every output port at (x, u, t), then the y port among them
+        outputs = self.outputs(x, u, t, params)
+        if "y" not in outputs:
+            return xp.zeros(0)
+        y = outputs["y"]
+
+        return y
+
     ###########################################################################
     # Internal machinery
     ###########################################################################
@@ -271,7 +289,7 @@ class ContinuousEvaluator(Evaluator):
         """``[x_0, …, x_N]``, shape ``(N + 1, n)``: the step model run over ``u_seq``.
 
         ``hold="zoh"`` holds each row of ``u_seq`` (shape ``(N, m)``) over its
-        period; ``hold="foh"`` reads ``u_seq`` as ``N + 1`` knots, linear between
+        period; ``hold="linear"`` reads ``u_seq`` as ``N + 1`` knots, linear between
         them. ``u_seq=None`` holds the nominal input for ``n_steps`` periods.
         ``record`` (a diagram's) names signals kept from each step's own first
         stage, ``"block:port"`` or a block's input ``"block:u"``: the run then
@@ -335,6 +353,9 @@ class ContinuousEvaluator(Evaluator):
             required), one sequence shared by the batch, or one per member.
         t0, dt : float
             Start time and step, shared by the batch.
+        n_steps : int, optional
+            Number of periods: ``n_steps + 1`` samples per member (required
+            with the nominal input, else read off ``u_sequences``).
         params : None or pytree
             ``None`` uses the compiled values. Otherwise a params pytree whose
             leaves are either shared by the batch or carry a leading axis of
@@ -373,7 +394,7 @@ class ContinuousEvaluator(Evaluator):
         """The input sequence as a ``(rows, m)`` array; the nominal input repeated when None."""
         xp = self.xp
         if u_seq is None:
-            rows = int(n_steps) + (1 if hold == "foh" else 0)
+            rows = int(n_steps) + (1 if hold == "linear" else 0)
             return xp.tile(xp.asarray(self._u_nominal, dtype=float), (rows, 1))
 
         u_seq = xp.asarray(u_seq, dtype=float)
@@ -383,12 +404,12 @@ class ContinuousEvaluator(Evaluator):
         return u_seq
 
 
-def blocks_params(diagram, frozen):
+def subsystems_params(diagram, frozen):
     """A diagram's parameters now, by the block ids its compiled tree holds."""
     return {sys_id: diagram.subsystems[sys_id].params for sys_id in frozen}
 
 
-def every_block(frozen, diagram):
+def every_subsystem(frozen, diagram):
     """``frozen`` naming every block of ``diagram``: one with no operation (a sink) its parameters copied."""
     for sys_id, sub in diagram.subsystems.items():
         if sys_id not in frozen:
@@ -484,16 +505,18 @@ def require_jax_evaluator(evaluator, verb):
         raise TypeError(f"{verb} needs a JAX evaluator: compile(backend='jax')")
 
 
-def check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
-    """Refuse a block function that does not trace (``jax.make_jaxpr``)."""
-    from jax.errors import ConcretizationTypeError
+class NotTraceableError(RuntimeError):
+    """A block function that JAX cannot trace: the verdict on which an automatic backend falls back to NumPy."""
 
+
+def require_jax_traceable(func, label, dummy_x, dummy_u, dummy_t, params, jax):
+    """Refuse a block function that does not trace (``jax.make_jaxpr``), with a :class:`NotTraceableError`."""
     try:
         jax.make_jaxpr(lambda x, u, t: func(x, u, t, params))(dummy_x, dummy_u, dummy_t)
-    except (ConcretizationTypeError, TypeError, Exception) as e:
-        raise RuntimeError(
+    except Exception as e:
+        raise NotTraceableError(
             f"\n\nBlock '{label}' is not JAX-traceable.\n"
-            f"Its f()/compute() likely performs in-place array mutation "
+            f"Its f()/h() likely performs in-place array mutation "
             f"(e.g., x[0] = ...)\n"
             f"or uses Python control flow on traced values "
             f"(e.g., if t < threshold).\n"

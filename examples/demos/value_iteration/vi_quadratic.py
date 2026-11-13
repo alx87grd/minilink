@@ -12,10 +12,10 @@ from minilink import (
 INF = 300.0
 
 plant = DoubleIntegrator()
-plant.state.lower_bound[:] = [-10.0, -5.0]
-plant.state.upper_bound[:] = [10.0, 5.0]
-plant.inputs["u"].lower_bound = np.array([-5.0])
-plant.inputs["u"].upper_bound = np.array([5.0])
+plant.state.lower[:] = [-10.0, -5.0]
+plant.state.upper[:] = [10.0, 5.0]
+plant.inputs["u"].lower = np.array([-5.0])
+plant.inputs["u"].upper = np.array([5.0])
 
 cost = QuadraticCost.from_system(
     plant, x_bar=np.zeros(2), R=np.array([[10.0]]), S=np.diag([10.0, 10.0])
@@ -31,12 +31,11 @@ planner = DynamicProgrammingPlanner(
     tol=0.5,
     max_iterations=1000,
     out_of_bound_cost=INF,
-    verbose=True,
 )
-planner.solve()
-planner.plot_cost_to_go(jmax=INF, show_3d=True)
+planner.solve(verbose=True)
+planner.plot_cost_to_go(jmax=INF, is_3d=True)
 
-controller = planner.get_controller()
+controller = planner.controller
 controller.plot_control_law()  # interpolated law the closed loop actually feels
 diagram = controller @ plant
 

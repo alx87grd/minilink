@@ -8,7 +8,7 @@ sys = Pendulum()
 sys.x0[0] = 2.0
 
 sys.compute_trajectory(u=lambda t: 3.0 * np.sin(10.0 * t), tf=5.0)
-sys.plot_trajectory(backend="plotly")
+sys.plot_trajectory(renderer="plotly")
 
 sys.animate(renderer="matplotlib")
 sys.animate(renderer="matplotlib", native=False)

@@ -1,9 +1,9 @@
-"""Solve panels: the frame and the vector preview of the human-readable reports."""
+"""Report panels: the frame and the vector preview of the human-readable reports."""
 
 import numpy as np
 
-# One frame width and one preview style for every solve panel: the
-# Optimizer's and the TrajectoryOptimizationPlanner's
+# One frame width and one preview style for every panel: the simulator's,
+# the Optimizer's and the TrajectoryOptimizationPlanner's
 DISP_LINE_WIDTH = 60
 DISP_RULE_MAIN = "=" * DISP_LINE_WIDTH
 DISP_RULE_DIV = "-" * DISP_LINE_WIDTH
@@ -12,6 +12,19 @@ DISP_RULE_DIV = "-" * DISP_LINE_WIDTH
 ###############################################################################
 # Public API
 ###############################################################################
+
+
+def one_callback(callback):
+    """``callback`` as one callable: ``None``, a callable, or a list of callables called in turn with the same arguments."""
+    if callback is None or callable(callback):
+        return callback
+    hooks = list(callback)
+
+    def every_hook(*args):
+        for hook in hooks:
+            hook(*args)
+
+    return every_hook
 
 
 def preview_vector(value) -> str | None:

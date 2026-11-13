@@ -4,15 +4,15 @@ import warnings
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_NUMPY
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.compile.compiler import build_on_auto
+from minilink.core.compile.evaluators.compiled import body_of
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input
-from minilink.simulation.simulator import COMPILE_BACKEND_AUTO
 from minilink.simulation.time_grid import build_time_grid
 
-__all__ = ["StaticSimulator", "COMPILE_BACKEND_AUTO"]
+__all__ = ["StaticSimulator"]
 
 
 ###############################################################################
@@ -35,7 +35,7 @@ class StaticSimulator:
         *,
         x0=None,
         t0=0,
-        n_steps=None,
+        n_samples=None,
         dt=None,
         solver=None,
         verbose=False,
@@ -53,11 +53,11 @@ class StaticSimulator:
         self.sys = sys
 
         # Outputs are sampled, not integrated: no dt policy, so the automatic
-        # grid is the DEFAULT_N_STEPS reporting grid
-        self.t, self.dt, self.n_pts = build_time_grid(
+        # grid is the DEFAULT_N_SAMPLES reporting grid
+        self.t, self.dt, self.n_samples = build_time_grid(
             t0,
             tf,
-            n_steps=n_steps,
+            n_samples=n_samples,
             dt=dt,
             verbose=verbose,
         )
@@ -65,14 +65,12 @@ class StaticSimulator:
         # The compiled system, on backend or, for "auto", JAX then NumPy
         self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
 
-    def solve(self, *, u=None, input_port_id=None):
+    def solve(self, *, u=None, port=None):
         """Sample the outputs on the grid: under the nominal input, or ``u`` prescribed as for ``Simulator.solve``."""
         if u is None:
             u_traj = self.nominal_u_traj()
         else:
-            u_traj = coerce_forced_input(
-                self.sys, self.t, u, input_port_id=input_port_id
-            )
+            u_traj = coerce_forced_input(self.sys, self.t, u, port=port)
 
         return self.build_trajectory(u_traj)
 
@@ -82,16 +80,14 @@ class StaticSimulator:
 
     def resolve_and_build_evaluator(self, sys, backend):
         """The backend and its evaluator: ``backend``, or JAX then NumPy for ``"auto"``."""
-        return resolve_auto_backend(
-            lambda backend: sys.compile(backend=backend), backend
-        )
+        return build_on_auto(lambda backend: sys.compile(backend=backend), backend)
 
     def nominal_u_traj(self):
-        """The nominal input held over the grid, ``(m, n_pts)``."""
+        """The nominal input held over the grid, ``(m, n_samples)``."""
         m = self.sys.m
-        n_pts = self.n_pts
+        n_samples = self.n_samples
 
-        u_traj = np.zeros((m, n_pts))
+        u_traj = np.zeros((m, n_samples))
         if m > 0:
             u_bar = self.evaluator._u_nominal
             u_traj[:, :] = np.asarray(u_bar).reshape(m, 1)
@@ -100,31 +96,21 @@ class StaticSimulator:
 
     def build_trajectory(self, u_traj):
         """Evaluate the boundary outputs at every sample and record them in ``signals``."""
-        evaluator = self.evaluator
         times = self.t
-        n_pts = self.n_pts
-        m = self.sys.m
+        n_samples = self.n_samples
 
-        x_traj = np.zeros((0, n_pts))
-        signals = {}
-        empty_x = np.array([])
+        # y = h(u, t) at every sample, one channel a row
+        outputs = outputs_on_grid(self.evaluator, self.sys, u_traj, times)
 
-        for i, ti in enumerate(times):
-            # y = h(u, t) at the sample
-            u_i = u_traj[:, i] if m > 0 else np.array([])
-            out = evaluator.outputs(empty_x, u_i, float(ti))
+        # The output channels; x and u are the trajectory's own channels, as in
+        # the hybrid simulator
+        signals = {
+            key: values for key, values in outputs.items() if key not in {"x", "u"}
+        }
 
-            # Each output channel, one column per sample; x and u are the
-            # trajectory's own channels, as in the hybrid simulator
-            for key, value in out.items():
-                if key in {"x", "u"}:
-                    continue
-                arr = np.asarray(value, dtype=float).reshape(-1)
-                if key not in signals:
-                    signals[key] = np.zeros((arr.size, n_pts))
-                signals[key][:, i] = arr
-
-        return Trajectory(t=times, x=x_traj, u=u_traj, signals=signals)
+        return Trajectory(
+            t=times, x=np.zeros((0, n_samples)), u=u_traj, signals=signals
+        )
 
 
 ###############################################################################
@@ -141,3 +127,38 @@ def require_static_system(sys):
         )
     if sys.n != 0:
         raise TypeError(f"StaticSimulator requires n=0 static System, got n={sys.n}")
+
+
+def outputs_on_grid(evaluator, sys, u_traj, times):
+    """``{port: (dim, n_samples)}``, the outputs at every sample: one ``vmap`` of the jitted body on JAX, a loop on NumPy."""
+    m = sys.m
+    n_samples = times.shape[0]
+    empty_x = np.array([])
+
+    # NumPy: y = h(u_k, t_k) sample by sample
+    if evaluator.backend != BACKEND_JAX:
+        columns = {}
+        for i, ti in enumerate(times):
+            u_i = u_traj[:, i] if m > 0 else empty_x
+            for key, value in evaluator.outputs(empty_x, u_i, float(ti)).items():
+                arr = np.asarray(value, dtype=float).reshape(-1)
+                if key not in columns:
+                    columns[key] = np.zeros((arr.size, n_samples))
+                columns[key][:, i] = arr
+        return columns
+
+    # JAX: the whole grid in one dispatch, the jitted map kept on the evaluator
+    forms = evaluator.compiled_forms
+    if "outputs_on_grid" not in forms:
+        jax, jnp = evaluator.jax, evaluator.jnp
+        outputs = body_of(evaluator, "outputs")
+        forms["outputs_on_grid"] = jax.jit(
+            jax.vmap(lambda u, t: outputs(jnp.zeros(0), u, t, None))
+        )
+    grid = forms["outputs_on_grid"](np.asarray(u_traj, dtype=float).T, times)
+
+    # The ports in their declared order, one channel a row
+    return {
+        key: np.asarray(grid[key], dtype=float).reshape(n_samples, -1).T
+        for key in sys.outputs
+    }

@@ -8,7 +8,8 @@ import numpy as np
 import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
-from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
+from minilink.core.backends import BACKEND_AUTO
+from minilink.simulation.simulator import Simulator
 from minilink.core.system import AUTO_DT_SCALE
 
 
@@ -23,7 +24,7 @@ def _have_jax() -> bool:
 
 class StableLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "StableLinearSystem"
         self.x0 = np.array([1.0])
 
@@ -38,7 +39,7 @@ class StableLinearSystem(DynamicSystem):
 
 class TwoPortLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, output_dim=1, y_dependencies=())
         self.name = "TwoPortLinearSystem"
         self.add_input_port("left", nominal_value=1.0)
         self.add_input_port("right", nominal_value=2.0)
@@ -80,7 +81,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             DiscontinuousLinearSystem(),
             tf=1.0,
-            n_steps=5,
+            n_samples=5,
             solver_warnings="ignore",
             verbose=False,
         )
@@ -90,14 +91,14 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(),
             tf=1.0,
-            n_steps=10000,
+            n_samples=10000,
             backend="numpy",
             verbose=False,
         )
         self.assertEqual(sim.solver_mode, "scipy")
 
     def test_default_compile_backend_is_numpy(self):
-        sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
+        sim = Simulator(StableLinearSystem(), tf=1.0, n_samples=5, verbose=False)
         self.assertEqual(sim.backend, "numpy")
 
     @pytest.mark.optional
@@ -107,8 +108,8 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(),
             tf=1.0,
-            n_steps=5,
-            backend=COMPILE_BACKEND_AUTO,
+            n_samples=5,
+            backend=BACKEND_AUTO,
             verbose=False,
         )
         self.assertEqual(sim.backend, "jax")
@@ -120,11 +121,11 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(),
             tf=1.0,
-            n_steps=10000,
+            n_samples=10000,
             backend="jax",
             verbose=False,
         )
-        self.assertEqual(sim.solver_mode, "rk4_fixedsteps")
+        self.assertEqual(sim.solver_mode, "rk4")
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -133,7 +134,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(),
             tf=1.0,
-            n_steps=9999,
+            n_samples=9999,
             backend="jax",
             verbose=False,
         )
@@ -146,7 +147,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             DiscontinuousLinearSystem(),
             tf=1.0,
-            n_steps=10000,
+            n_samples=10000,
             backend="jax",
             solver_warnings="ignore",
             verbose=False,
@@ -168,7 +169,7 @@ class TestNewSimulator(unittest.TestCase):
             Simulator(
                 DiscontinuousLinearSystem(),
                 tf=1.0,
-                n_steps=5,
+                n_samples=5,
                 solver_warnings="warn",
                 verbose=False,
             )
@@ -178,8 +179,8 @@ class TestNewSimulator(unittest.TestCase):
             Simulator(
                 DiscontinuousLinearSystem(),
                 tf=1.0,
-                n_steps=5,
-                solver="rk4_fixedsteps",
+                n_samples=5,
+                solver="rk4",
                 solver_warnings="warn",
                 verbose=False,
             )
@@ -189,7 +190,7 @@ class TestNewSimulator(unittest.TestCase):
             Simulator(
                 DiscontinuousLinearSystem(),
                 tf=1.0,
-                n_steps=5,
+                n_samples=5,
                 solver="scipy_stiff",
                 solver_warnings="warn",
                 verbose=False,
@@ -205,7 +206,7 @@ class TestNewSimulator(unittest.TestCase):
     def test_smooth_system_emits_no_discontinuous_warning(self):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", UserWarning)
-            Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
+            Simulator(StableLinearSystem(), tf=1.0, n_samples=5, verbose=False)
         discontinuous_msgs = [
             w.message for w in caught if "Discontinuous feedback" in str(w.message)
         ]
@@ -214,9 +215,9 @@ class TestNewSimulator(unittest.TestCase):
     def test_invalid_time_grid_arguments_raise_value_error(self):
         sys = StableLinearSystem()
         with self.assertRaises(ValueError):
-            Simulator(sys, tf=0.0, n_steps=5, verbose=False)
+            Simulator(sys, tf=0.0, n_samples=5, verbose=False)
         with self.assertRaises(ValueError):
-            Simulator(sys, tf=1.0, n_steps=1, verbose=False)
+            Simulator(sys, tf=1.0, n_samples=1, verbose=False)
         with self.assertRaises(ValueError):
             Simulator(sys, tf=1.0, dt=0.0, verbose=False)
 
@@ -226,7 +227,7 @@ class TestNewSimulator(unittest.TestCase):
                 StableLinearSystem(),
                 x0=np.array([[1.0]]),
                 tf=1.0,
-                n_steps=5,
+                n_samples=5,
                 verbose=False,
             )
 
@@ -241,7 +242,7 @@ class TestNewSimulator(unittest.TestCase):
             t=np.array([0.0]),
             y=np.array([[1.0]]),
         )
-        sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
+        sim = Simulator(StableLinearSystem(), tf=1.0, n_samples=5, verbose=False)
         with patch(
             "minilink.simulation.solvers.scipy_ivp.solve_ivp",
             return_value=failed_solution,
@@ -257,7 +258,7 @@ class TestNewSimulator(unittest.TestCase):
 
     def test_solve_populates_last_traj_and_last_debug(self):
         sim = Simulator(
-            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+            StableLinearSystem(), tf=0.2, n_samples=3, solver="euler", verbose=False
         )
         traj = sim.solve()
         self.assertIs(sim.last_traj, traj)
@@ -267,7 +268,7 @@ class TestNewSimulator(unittest.TestCase):
 
     def test_solve_with_u_validates_shape(self):
         sim = Simulator(
-            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+            StableLinearSystem(), tf=0.2, n_samples=3, solver="euler", verbose=False
         )
         bad_u = np.zeros((3, 1))
         with self.assertRaises(ValueError):
@@ -275,23 +276,23 @@ class TestNewSimulator(unittest.TestCase):
 
     def test_solve_with_u_accepts_callable_full_input(self):
         sim = Simulator(
-            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+            StableLinearSystem(), tf=0.2, n_samples=3, solver="euler", verbose=False
         )
         traj = sim.solve(u=lambda t: 10.0 * t)
         np.testing.assert_allclose(traj.u, np.array([[0.0, 1.0, 2.0]]))
 
     def test_solve_with_u_accepts_constant_vector(self):
         sim = Simulator(
-            TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+            TwoPortLinearSystem(), tf=0.2, n_samples=3, solver="euler", verbose=False
         )
         traj = sim.solve(u=np.array([3.0, 4.0]))
         np.testing.assert_allclose(traj.u, np.array([[3.0, 3.0, 3.0], [4.0, 4.0, 4.0]]))
 
     def test_solve_with_u_accepts_scalar_on_one_named_port(self):
         sim = Simulator(
-            TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+            TwoPortLinearSystem(), tf=0.2, n_samples=3, solver="euler", verbose=False
         )
-        traj = sim.solve(u=5.0, input_port_id="left")
+        traj = sim.solve(u=5.0, port="left")
         np.testing.assert_allclose(traj.u[0, :], np.array([5.0, 5.0, 5.0]))
         np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
 
@@ -299,13 +300,13 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(),
             tf=0.2,
-            n_steps=3,
-            solver="rk4_fixedsteps",
+            n_samples=3,
+            solver="rk4",
             verbose=False,
         )
         u_traj = np.zeros((1, 3))
         traj = sim.solve(u=u_traj)
-        self.assertEqual(sim.last_debug["solver"], "rk4_fixedsteps")
+        self.assertEqual(sim.last_debug["solver"], "rk4")
         np.testing.assert_allclose(traj.u, u_traj)
         np.testing.assert_allclose(traj.x[:, 0], [1.0])
         self.assertLess(traj.x[0, -1], 1.0)
@@ -313,7 +314,7 @@ class TestNewSimulator(unittest.TestCase):
     def test_wrapper_compute_trajectory_uses_new_simulator_path(self):
         sys = StableLinearSystem()
         traj = sys.compute_trajectory(
-            tf=0.2, n_steps=3, solver="euler", show=False, verbose=False
+            tf=0.2, n_samples=3, solver="euler", show=False, verbose=False
         )
         self.assertIs(sys.traj, traj)
         self.assertEqual(traj.x.shape, (1, 3))
@@ -324,7 +325,7 @@ class TestNewSimulator(unittest.TestCase):
         sys = StableLinearSystem()
         u_traj = np.array([[0.0, 0.5, 1.0]])
         traj = sys.compute_trajectory(
-            u=u_traj, tf=0.2, n_steps=3, solver="euler", show=False, verbose=False
+            u=u_traj, tf=0.2, n_samples=3, solver="euler", show=False, verbose=False
         )
         self.assertIs(sys.traj, traj)
         np.testing.assert_allclose(traj.u, u_traj)
@@ -333,9 +334,9 @@ class TestNewSimulator(unittest.TestCase):
         sys = TwoPortLinearSystem()
         traj = sys.compute_trajectory(
             u=lambda t: 10.0 * t,
-            input_port_id="left",
+            port="left",
             tf=0.2,
-            n_steps=3,
+            n_samples=3,
             solver="euler",
             show=False,
             verbose=False,
@@ -349,82 +350,58 @@ class TestEulerSolverModes(unittest.TestCase):
         self.plant = StableLinearSystem()
         self.ev = self.plant.compile(backend="numpy", verbose=False)
 
-    def test_euler_variable_dt_on_nonuniform_grid(self):
-        from minilink.simulation.solvers.euler import EulerSolverBackend
-
-        times = np.array([0.0, 0.05, 0.2, 0.25])
-        backend = EulerSolverBackend()
-        x_traj = backend.integrate(self.ev, times, self.plant.x0)
-        self.assertEqual(x_traj.shape, (1, times.size))
-        self.assertEqual(backend.last_debug["solver"], "euler")
-
-    def test_euler_fixedsteps_matches_euler_on_uniform_grid(self):
-        from minilink.simulation.solvers.euler import EulerSolverBackend
+    def test_a_fixed_step_solver_refuses_a_nonuniform_grid_naming_scipy(self):
         from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
-
-        times = np.linspace(0.0, 0.2, 4)
-        generic = EulerSolverBackend()
-        fixed = EulerFixedStepSolverBackend()
-        x_generic = generic.integrate(self.ev, times, self.plant.x0)
-        x_fixed = fixed.integrate(self.ev, times, self.plant.x0)
-        np.testing.assert_allclose(x_generic, x_fixed, rtol=0.0, atol=1e-12)
-        self.assertEqual(fixed.last_debug["solver"], "euler_fixedsteps")
-
-    def test_euler_fixedsteps_rejects_nonuniform_grid(self):
-        from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
-
-        times = np.array([0.0, 0.05, 0.2, 0.25])
-        backend = EulerFixedStepSolverBackend()
-        with self.assertRaises(ValueError):
-            backend.integrate(self.ev, times, self.plant.x0)
-
-    def test_forced_callable_of_another_size_is_named(self):
-        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, verbose=False)
-        with self.assertRaisesRegex(ValueError, "u callable returned wrong dimension"):
-            sim.solve(u=lambda t: [t, t])
-
-    def test_rk4_fixedsteps_rejects_nonuniform_grid(self):
         from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 
         times = np.array([0.0, 0.05, 0.2, 0.25])
         u = np.zeros((1, times.size))
-        backend = RK4SolverBackend()
-        message = "rk4_fixedsteps requires a uniform time grid"
-        with self.assertRaisesRegex(ValueError, message):
-            backend.integrate(self.ev, times, self.plant.x0)
-        with self.assertRaisesRegex(ValueError, message):
-            backend.integrate_forced(self.ev, times, u, self.plant.x0)
+        cases = ((EulerFixedStepSolverBackend(), "euler"), (RK4SolverBackend(), "rk4"))
+        for backend, name in cases:
+            message = (
+                f"solver='{name}' steps at a fixed dt and needs a uniform time grid; "
+                ".*solver='scipy'"
+            )
+            with self.assertRaisesRegex(ValueError, message):
+                backend.integrate(self.ev, times, self.plant.x0)
+            with self.assertRaisesRegex(ValueError, message):
+                backend.integrate_forced(self.ev, times, u, self.plant.x0)
+
+    def test_forced_callable_of_another_size_is_named(self):
+        sim = Simulator(StableLinearSystem(), tf=0.2, n_samples=3, verbose=False)
+        with self.assertRaisesRegex(ValueError, "u callable returned wrong dimension"):
+            sim.solve(u=lambda t: [t, t])
 
     def test_an_uneven_grid_at_the_nanosecond_scale_is_not_uniform(self):
         from minilink.analysis.linear import uniform_step
-        from minilink.simulation.simulator import time_grid_is_uniform
+        from minilink.simulation.solvers.solver import fixed_steps_of
         from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
         from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 
         times = np.array([0.0, 1e-9, 3e-9, 4e-9])
         for backend in (EulerFixedStepSolverBackend(), RK4SolverBackend()):
-            with self.assertRaisesRegex(ValueError, "requires a uniform time grid"):
+            with self.assertRaisesRegex(ValueError, "needs a uniform time grid"):
                 backend.integrate(self.ev, times, self.plant.x0)
-        self.assertFalse(time_grid_is_uniform(times))
+        self.assertIsNone(fixed_steps_of(times))
         with self.assertRaisesRegex(ValueError, "uniform time grid"):
             uniform_step(times)
 
         # An even grid at the same scale is uniform
         even = 1e-9 * np.arange(4)
-        self.assertTrue(time_grid_is_uniform(even))
+        self.assertIsNotNone(fixed_steps_of(even))
         self.assertEqual(uniform_step(even), even[1])
 
-    def test_simulator_accepts_euler_fixedsteps(self):
+    def test_simulator_accepts_euler(self):
         sim = Simulator(
             StableLinearSystem(),
             tf=0.2,
-            n_steps=3,
-            solver="euler_fixedsteps",
+            n_samples=3,
+            solver="euler",
             verbose=False,
         )
         traj = sim.solve()
-        self.assertEqual(sim.solver_mode, "euler_fixedsteps")
-        self.assertEqual(sim.last_debug["solver"], "euler_fixedsteps")
+        self.assertEqual(sim.solver_mode, "euler")
+        self.assertEqual(sim.last_debug["solver"], "euler")
         self.assertEqual(traj.x.shape, (1, 3))
 
 
@@ -443,7 +420,7 @@ except ImportError:
 class TestStaticSimulator(unittest.TestCase):
     def test_gain_compute_trajectory_shape(self):
         gain = Gain(K=2.0, dim=1)
-        traj = gain.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
+        traj = gain.compute_trajectory(t0=0, tf=1, n_samples=5, verbose=False)
         self.assertEqual(traj.x.shape, (0, 5))
         self.assertEqual(traj.u.shape, (1, 5))
         self.assertIn("y", traj.signals)
@@ -453,7 +430,7 @@ class TestStaticSimulator(unittest.TestCase):
         from minilink import P
 
         ctl = P(2.0, ports="reference")
-        traj = ctl.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
+        traj = ctl.compute_trajectory(t0=0, tf=1, n_samples=5, verbose=False)
         self.assertEqual(traj.u.shape, (2, 5))  # the stacked inputs r, y
         self.assertNotIn("u", traj.signals)
 
@@ -461,7 +438,7 @@ class TestStaticSimulator(unittest.TestCase):
         step = Step(
             initial_value=np.array([0.0]), final_value=np.array([1.0]), step_time=0.5
         )
-        traj = step.compute_trajectory(t0=0, tf=1, n_steps=3, verbose=False)
+        traj = step.compute_trajectory(t0=0, tf=1, n_samples=3, verbose=False)
         self.assertEqual(traj.x.shape, (0, 3))
         y = traj.signals["y"]
         np.testing.assert_array_equal(y[:, 0], [0.0])
@@ -470,7 +447,7 @@ class TestStaticSimulator(unittest.TestCase):
 
     def test_static_simulator_direct(self):
         gain = Gain(K=3.0, dim=1)
-        sim = StaticSimulator(gain, t0=0, tf=0.2, n_steps=3)
+        sim = StaticSimulator(gain, t0=0, tf=0.2, n_samples=3)
         traj = sim.solve(u=np.array([[1.0, 2.0, 3.0]]))
         np.testing.assert_allclose(traj.signals["y"], [[3.0, 6.0, 9.0]])
 
@@ -482,7 +459,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
     def test_gain_jax_compile_backend(self):
         gain = Gain(K=2.0, dim=1)
         traj = gain.compute_trajectory(
-            t0=0, tf=0.5, n_steps=3, backend="jax", verbose=False
+            t0=0, tf=0.5, n_samples=3, backend="jax", verbose=False
         )
         self.assertEqual(traj.x.shape, (0, 3))
         self.assertIn("y", traj.signals)
@@ -550,7 +527,7 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
         traj_euler = _integrate(self.diagram, solver="euler")
-        traj_rk4 = _integrate(self.diagram, solver="rk4_fixedsteps")
+        traj_rk4 = _integrate(self.diagram, solver="rk4")
         err_euler = _max_ddq_consistency_error(self.diagram, traj_euler)
         err_rk4 = _max_ddq_consistency_error(self.diagram, traj_rk4)
         self.assertLess(
@@ -561,7 +538,7 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_rk4_coarse_dt_can_freeze_state_while_euler_moves(self):
         traj_euler = _integrate(self.diagram, solver="euler")
-        traj_rk4 = _integrate(self.diagram, solver="rk4_fixedsteps")
+        traj_rk4 = _integrate(self.diagram, solver="rk4")
         dq_motion_euler = float(np.max(np.abs(np.diff(traj_euler.x[1]))))
         dq_motion_rk4 = float(np.max(np.abs(np.diff(traj_rk4.x[1]))))
         self.assertGreater(
@@ -617,15 +594,12 @@ class TestTheClockOperator(unittest.TestCase):
         pytest = __import__("pytest")
         jax = pytest.importorskip("jax")
         del jax
-        from minilink.planning.trajectory_optimization.mpc import (
-            ModelPredictiveController,
-        )
+        from minilink.control import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
         from minilink import BicycleDynRate
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
-            DirectCollocationOptions,
             DirectCollocationTranscription,
         )
         from minilink.planning.trajectory_optimization.planner import (
@@ -643,11 +617,9 @@ class TestTheClockOperator(unittest.TestCase):
                 cost=QuadraticCost.from_system(sys, x_bar=x0),
                 U=sys.input_box,
             ),
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="jax",
-            method="scipy_slsqp",
+            method="slsqp",
             options={"maxiter": 5, "ftol": 0.1},
         )
         computer = ModelPredictiveController(planner) % 0.2
@@ -924,10 +896,10 @@ class TestRealtimeSimulator(unittest.TestCase):
         from minilink.simulation.realtime import PygameInput
 
         sys = TwoPortLinearSystem()
-        sys.inputs["left"].lower_bound[0] = -10.0
-        sys.inputs["left"].upper_bound[0] = 10.0
-        sys.inputs["right"].lower_bound[0] = -5.0
-        sys.inputs["right"].upper_bound[0] = 5.0
+        sys.inputs["left"].lower[0] = -10.0
+        sys.inputs["left"].upper[0] = 10.0
+        sys.inputs["right"].lower[0] = -5.0
+        sys.inputs["right"].upper[0] = 5.0
 
         fake_joy = MagicMock()
         fake_joy.get_numaxes.return_value = 6
@@ -1063,12 +1035,12 @@ class TestRealtimeSimulator(unittest.TestCase):
         self.assertEqual(spec.traces[2].label, "pos")
         plt.close("all")
 
-        # The backend is plot_backend; a name passed as plot is refused and says so
-        with self.assertRaisesRegex(ValueError, "plot_backend"):
+        # The renderer is plot_renderer; a name passed as plot is refused and says so
+        with self.assertRaisesRegex(ValueError, "plot_renderer"):
             RealtimeSimulator(sys, renderer=None, plot="plotly")
-        with self.assertRaisesRegex(ValueError, "Unknown signal backend"):
+        with self.assertRaisesRegex(ValueError, "Unknown signal renderer"):
             RealtimeSimulator(
-                sys, renderer=None, plot=("y",), plot_backend="invalid_backend"
+                sys, renderer=None, plot=("y",), plot_renderer="invalid_renderer"
             )
 
 
@@ -1087,7 +1059,7 @@ class UndeclaredPlant(DynamicSystem):
     """A custom plant that declares no time constant: ``ẋ = −x + u``."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         xp = array_module(x)
@@ -1098,20 +1070,20 @@ class TestAutomaticTimeGrid(unittest.TestCase):
     """The solver first, then a grid sized to it: Δt = 0.1 τ_min, dividing every hold period."""
 
     def test_adaptive_default_is_a_fine_reporting_grid_with_scipy(self):
-        from minilink.simulation.time_grid import DEFAULT_N_STEPS
+        from minilink.simulation.time_grid import DEFAULT_N_SAMPLES
 
         sim = Simulator(StableLinearSystem(), tf=10.0, verbose=False)
         self.assertEqual(sim.solver_mode, "scipy")
-        self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
-        self.assertAlmostEqual(sim.dt, 10.0 / (DEFAULT_N_STEPS - 1))
+        self.assertEqual(sim.n_samples, DEFAULT_N_SAMPLES)
+        self.assertAlmostEqual(sim.dt, 10.0 / (DEFAULT_N_SAMPLES - 1))
         self.assertTrue(sim.auto_time_grid)
 
     def test_fixed_step_solver_takes_dt_from_time_constant(self):
         sys = StableLinearSystem()
         sys.solver_info["smallest_time_constant"] = 0.1
-        sim = Simulator(sys, tf=1.0, solver="rk4_fixedsteps", verbose=False)
+        sim = Simulator(sys, tf=1.0, solver="rk4", verbose=False)
         self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * AUTO_DT_SCALE
-        self.assertEqual(sim.n_pts, 101)
+        self.assertEqual(sim.n_samples, 101)
 
     def test_discontinuous_plant_defaults_to_euler_with_time_constant_dt(self):
         import warnings
@@ -1193,11 +1165,11 @@ class TestAutomaticTimeGrid(unittest.TestCase):
 
         cases = [
             # (plant time constant, sample period, discontinuous) -> (solver, dt)
-            (None, 0.01, False, "rk4_fixedsteps", 0.01 / 100),
-            (0.003, 0.01, False, "rk4_fixedsteps", 0.01 / 34),
-            (0.5, 0.01, False, "rk4_fixedsteps", 0.01 / 1),
-            (0.5, 0.001, False, "rk4_fixedsteps", 0.001 / 1),
-            (0.02, 0.01, False, "rk4_fixedsteps", 0.01 / 5),
+            (None, 0.01, False, "rk4", 0.01 / 100),
+            (0.003, 0.01, False, "rk4", 0.01 / 34),
+            (0.5, 0.01, False, "rk4", 0.01 / 1),
+            (0.5, 0.001, False, "rk4", 0.001 / 1),
+            (0.02, 0.01, False, "rk4", 0.01 / 5),
             (None, 0.01, True, "euler", 0.01 / 100),
         ]
         for tau, period, discontinuous, solver, dt in cases:
@@ -1262,7 +1234,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
 
         # The step follows the plant's own numbers
         pendulum.params["gravity"] = 4.0 * g
-        sim = Simulator(pendulum, tf=1.0, solver="rk4_fixedsteps", verbose=False)
+        sim = Simulator(pendulum, tf=1.0, solver="rk4", verbose=False)
         self.assertAlmostEqual(
             sim.dt,
             AUTO_DT_SCALE * np.sqrt((m * l**2 + I) / (4.0 * m * g * l)),
@@ -1331,12 +1303,12 @@ class TestAutomaticTimeGrid(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            Simulator(loop, tf=1.0, dt=0.003, solver="rk4_fixedsteps", verbose=False)
+            Simulator(loop, tf=1.0, dt=0.003, solver="rk4", verbose=False)
         self.assertTrue(any("does not divide" in str(w.message) for w in caught))
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            Simulator(loop, tf=1.0, dt=0.005, solver="rk4_fixedsteps", verbose=False)
+            Simulator(loop, tf=1.0, dt=0.005, solver="rk4", verbose=False)
         self.assertFalse(any("does not divide" in str(w.message) for w in caught))
 
         # a loop without a held signal keeps its adaptive default, silently
@@ -1347,27 +1319,27 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertEqual(caught, [])
 
     def test_explicit_grid_still_wins(self):
-        sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=51, verbose=False)
-        self.assertEqual(sim.n_pts, 51)
+        sim = Simulator(StableLinearSystem(), tf=1.0, n_samples=51, verbose=False)
+        self.assertEqual(sim.n_samples, 51)
         self.assertFalse(sim.auto_time_grid)
 
     def test_static_simulator_shares_the_default(self):
         from minilink.blocks.sources import Step
         from minilink.simulation.static_simulator import StaticSimulator
-        from minilink.simulation.time_grid import DEFAULT_N_STEPS
+        from minilink.simulation.time_grid import DEFAULT_N_SAMPLES
 
         sim = StaticSimulator(Step(), tf=10.0, verbose=False)
-        self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
+        self.assertEqual(sim.n_samples, DEFAULT_N_SAMPLES)
 
     @pytest.mark.optional
     @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_jax_automatic_grid_never_selects_rk4(self):
-        from minilink.simulation.time_grid import DEFAULT_N_STEPS
+        from minilink.simulation.time_grid import DEFAULT_N_SAMPLES
 
         sim = Simulator(StableLinearSystem(), tf=10.0, backend="jax", verbose=False)
         self.assertEqual(sim.solver_mode, "scipy")
-        self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
+        self.assertEqual(sim.n_samples, DEFAULT_N_SAMPLES)
 
 
 class TestDtTimeGrid(unittest.TestCase):
@@ -1392,10 +1364,10 @@ class TestDtTimeGrid(unittest.TestCase):
         from minilink.blocks.basic import Integrator
 
         sim = Simulator(Integrator(), tf=1.1, dt=0.1, verbose=False)
-        self.assertEqual(sim.n_pts, 12)
+        self.assertEqual(sim.n_samples, 12)
         self.assertAlmostEqual(sim.t[-1], 1.1)
         sim = Simulator(Integrator(), tf=0.2, dt=0.1, verbose=False)
-        self.assertEqual(sim.n_pts, 3)
+        self.assertEqual(sim.n_samples, 3)
         self.assertAlmostEqual(sim.t[-1], 0.2)
 
     def test_automatic_dt_grid_ends_at_tf(self):
@@ -1405,13 +1377,48 @@ class TestDtTimeGrid(unittest.TestCase):
         self.assertEqual(n_pts, 12)
         self.assertAlmostEqual(t[-1], 1.1)
 
-    def test_non_dividing_dt_still_covers_tf(self):
+    def test_non_dividing_dt_shortens_its_last_step_onto_tf(self):
         from minilink.simulation.time_grid import build_time_grid
 
         t, dt, n_pts = build_time_grid(0.0, 1.0, dt=0.3)
         self.assertEqual(n_pts, 5)
         self.assertAlmostEqual(dt, 0.3)
-        np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.2])
+        np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.0])
+        self.assertEqual(t[-1], 1.0)
+
+        # A dt longer than the run is one step, the run itself
+        t, _, n_pts = build_time_grid(0.5, 0.7, dt=0.3)
+        np.testing.assert_array_equal(t, [0.5, 0.7])
+
+    def test_a_fixed_step_solver_lands_on_tf_with_a_shorter_last_step(self):
+        """ẋ = u with u = 1 from x = 0: every fixed-step method is exact, x(tf) = tf."""
+        from minilink.blocks.basic import Integrator
+
+        for solver in ("rk4", "euler"):
+            plant = Integrator()
+            plant.inputs["u"].nominal_value = np.array([1.0])
+            with self.subTest(solver=solver, input="nominal"):
+                traj = plant.compute_trajectory(
+                    x0=[0.0], tf=1.0, dt=0.3, solver=solver, verbose=False
+                )
+                np.testing.assert_allclose(traj.t, [0.0, 0.3, 0.6, 0.9, 1.0])
+                np.testing.assert_allclose(traj.x[0], traj.t, atol=1e-12)
+            with self.subTest(solver=solver, input="forced"):
+                traj = plant.compute_trajectory(
+                    x0=[0.0], tf=1.0, dt=0.3, solver=solver, u=lambda t: [2.0]
+                )
+                np.testing.assert_allclose(traj.x[0], 2.0 * traj.t, atol=1e-12)
+
+    def test_a_fixed_step_grid_reads_its_last_step(self):
+        from minilink.simulation.solvers.solver import fixed_steps_of
+
+        self.assertEqual(fixed_steps_of(np.array([0.0, 0.3, 0.6, 0.9])), (0.3, 0.3))
+        dt, dt_last = fixed_steps_of(np.array([0.0, 0.3, 0.6, 0.9, 1.0]))
+        self.assertEqual(dt, 0.3)
+        self.assertAlmostEqual(dt_last, 0.1)
+        # A step in the middle that differs, or a last one longer than dt: not fixed-step
+        self.assertIsNone(fixed_steps_of(np.array([0.0, 0.3, 0.5, 0.8])))
+        self.assertIsNone(fixed_steps_of(np.array([0.0, 0.3, 0.6, 1.0])))
 
     def test_dt_is_any_positive_finite_scalar_and_always_checked(self):
         from minilink.simulation.time_grid import build_time_grid
@@ -1426,7 +1433,11 @@ class TestDtTimeGrid(unittest.TestCase):
             with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
                 build_time_grid(0.0, 1.0, dt=bad)
             with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
-                build_time_grid(0.0, 1.0, n_steps=11, dt=bad)
+                build_time_grid(0.0, 1.0, n_samples=11, dt=bad)
+
+        # A count and a step together are refused: the grid has one owner
+        with self.assertRaisesRegex(ValueError, "n_samples or dt, not both"):
+            build_time_grid(0.0, 1.0, n_samples=11, dt=0.1)
 
 
 def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
@@ -1435,13 +1446,13 @@ def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
 
     plant = Pendulum()
     plant.x0 = np.array([0.4, -0.2])
-    ev = plant.compile("numpy")
+    ev = plant.compile(backend="numpy")
     t = np.linspace(0.0, 1.0, 20)
     dt = t[1] - t[0]
     u = 0.5 * np.sin(2.0 * t)[None, :]
 
     sampled = plant.compute_trajectory(
-        u=u, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+        u=u, tf=1.0, n_samples=20, solver="rk4", verbose=False
     )
     held = ev.rollout(plant.x0, u[:, :-1].T, 0.0, dt)
     np.testing.assert_allclose(sampled.x, held.T, rtol=1e-12)
@@ -1450,7 +1461,7 @@ def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
         return np.array([0.5 * np.sin(2.0 * tt)])
 
     forced = plant.compute_trajectory(
-        u=u_of_t, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+        u=u_of_t, tf=1.0, n_samples=20, solver="rk4", verbose=False
     )
     x = plant.x0
     for k in range(19):
@@ -1480,7 +1491,7 @@ def test_rk4_on_a_held_noise_converges_as_the_step_shrinks(backend):
             A, B, np.eye(2), np.zeros((2, 1))
         )
         traj = loop.compute_trajectory(
-            tf=1.0, dt=dt, solver="rk4_fixedsteps", backend=backend, verbose=False
+            tf=1.0, dt=dt, solver="rk4", backend=backend, verbose=False
         )
         return traj.x[:, -1]
 
@@ -1499,7 +1510,7 @@ def test_every_solver_holds_a_sampled_input_and_reads_a_function_where_it_evalua
 
     class Integrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1)
+            super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
         def f(self, x, u, t=0.0, params=None):
             return np.array([u[0]])
@@ -1510,20 +1521,20 @@ def test_every_solver_holds_a_sampled_input_and_reads_a_function_where_it_evalua
     u_samples = np.array([[0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]])
 
     # Each sample held over its period: x(tf) = Σ u_k Δt, on every solver
-    for solver in ("rk4_fixedsteps", "euler", "euler_fixedsteps", "scipy"):
-        run = plant.compute_trajectory(u=u_samples, tf=1.0, n_steps=11, solver=solver)
+    for solver in ("rk4", "euler", "euler", "scipy"):
+        run = plant.compute_trajectory(u=u_samples, tf=1.0, n_samples=11, solver=solver)
         np.testing.assert_allclose(run.x[0, -1], 5.0 * dt, rtol=1e-6)
         np.testing.assert_allclose(run.u, u_samples)
 
     # A function of time read where the method evaluates f: x(tf) = ∫ t dt = tf² / 2
-    for solver in ("rk4_fixedsteps", "scipy"):
+    for solver in ("rk4", "scipy"):
         run = plant.compute_trajectory(
-            u=lambda tt: np.array([tt]), tf=1.0, n_steps=11, solver=solver
+            u=lambda tt: np.array([tt]), tf=1.0, n_samples=11, solver=solver
         )
         np.testing.assert_allclose(run.x[0, -1], 0.5, rtol=1e-6)
     # Euler reads it at the grid times, the held sample: the left Riemann sum
     run = plant.compute_trajectory(
-        u=lambda tt: np.array([tt]), tf=1.0, n_steps=11, solver="euler"
+        u=lambda tt: np.array([tt]), tf=1.0, n_samples=11, solver="euler"
     )
     np.testing.assert_allclose(run.x[0, -1], dt * np.sum(t[:-1]), rtol=1e-9)
 
@@ -1543,11 +1554,11 @@ def _pid_pendulum():
     "run",
     [
         {},
-        {"solver": "rk4_fixedsteps", "n_steps": 201},
-        {"solver": "euler_fixedsteps", "n_steps": 201},
+        {"solver": "rk4", "n_samples": 201},
+        {"solver": "euler", "n_samples": 201},
         {"solver": "euler"},
         pytest.param(
-            {"solver": "rk4_fixedsteps", "n_steps": 201, "backend": "jax"},
+            {"solver": "rk4", "n_samples": 201, "backend": "jax"},
             marks=pytest.mark.jax,
         ),
     ],
@@ -1562,7 +1573,7 @@ def test_a_diagram_run_records_the_plants_input_from_the_run_itself(run):
     assert traj.of("plant").u.shape == (1, traj.n_samples)
     expected = loop.reconstruct_internal_signals(bare, ports=("plant:u",))
     np.testing.assert_allclose(
-        traj.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
+        traj.signal("plant:u"), expected.signal("plant:u"), atol=1e-12
     )
 
     # record=None keeps nothing, the plant's role still names its state slice
@@ -1593,8 +1604,8 @@ def test_a_held_simulator_records_on_the_numbers_the_run_was_made_with():
     from minilink import Simulator
 
     loop = _pid_pendulum()
-    for solver in ("scipy", "rk4_fixedsteps"):
-        sim = Simulator(loop, tf=1.0, n_steps=201, solver=solver)
+    for solver in ("scipy", "rk4"):
+        sim = Simulator(loop, tf=1.0, n_samples=201, solver=solver)
         tree = sim.params
         tree["controller"]["Kp"] = np.array([2.0])
         run = sim.solve(params=tree, record=("plant:u",))
@@ -1603,6 +1614,147 @@ def test_a_held_simulator_records_on_the_numbers_the_run_was_made_with():
         expected = loop.reconstruct_internal_signals(run, ("plant:u",), params=tree)
         stale = loop.reconstruct_internal_signals(run, ("plant:u",))
         np.testing.assert_allclose(
-            run.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
+            run.signal("plant:u"), expected.signal("plant:u"), atol=1e-12
         )
-        assert not np.allclose(run.get_signal("plant:u"), stale.get_signal("plant:u"))
+        assert not np.allclose(run.signal("plant:u"), stale.signal("plant:u"))
+
+
+def test_the_stiff_preset_tightens_only_the_method_and_takes_the_jacobian_on_both_backends():
+    """scipy_stiff is Radau at scipy's tolerances, with ∂f/∂x from the evaluator on NumPy and JAX alike."""
+    from minilink.simulation.simulator import _USER_SOLVER_MODES
+
+    smooth = _USER_SOLVER_MODES["scipy"][1]
+    stiff = _USER_SOLVER_MODES["scipy_stiff"][1]
+    assert stiff["method"] == "Radau"
+    assert (stiff["rtol"], stiff["atol"]) == (smooth["rtol"], smooth["atol"])
+
+    runs = {}
+    backends = ("numpy", "jax") if _have_jax() else ("numpy",)
+    for backend in backends:
+        plant = Pendulum()
+        plant.x0[0] = 1.0
+        sim = Simulator(plant, tf=2.0, solver="scipy_stiff", backend=backend)
+        runs[backend] = sim.solve().x
+        assert sim.solver_backend.last_debug["jac_applied"]
+        assert sim.solver_backend.last_debug["njev"] >= 1
+
+    # The two Jacobians (central differences, forward mode) give one trajectory
+    if len(runs) == 2:
+        np.testing.assert_allclose(runs["numpy"], runs["jax"], atol=1e-9)
+
+    # At scipy's tolerances, the stiff run meets the default one
+    plant = Pendulum()
+    plant.x0[0] = 1.0
+    smooth_run = Simulator(plant, tf=2.0, solver="scipy").solve().x
+    np.testing.assert_allclose(runs["numpy"], smooth_run, atol=1e-3)
+
+
+from minilink.planning.trajectory_optimization.transcription import (  # noqa: E402
+    fixed_grid_t,
+)
+
+SAMPLE_AND_STEP_COUNTS = {
+    # A horizon verb: n_samples points on [t0, tf], endpoints included
+    "Simulator": lambda N: Simulator(Integrator(), tf=1.0, n_samples=N).solve().t.size,
+    "compute_trajectory": lambda N: (
+        Integrator().compute_trajectory(tf=1.0, n_samples=N).t.size
+    ),
+    "static compute_trajectory": lambda N: (
+        Gain(K=2.0, dim=1).compute_trajectory(tf=1.0, n_samples=N).t.size
+    ),
+    # A run of periods: n_steps transitions, n_steps + 1 samples
+    "transcription knots": lambda N: fixed_grid_t(1.0, N).size - 1,
+    "rollout": lambda N: (
+        Integrator().compile().rollout(np.zeros(1), None, 0.0, 0.01, n_steps=N).shape[0]
+        - 1
+    ),
+    "compute_rollout": lambda N: (
+        Integrator().discretize(0.01).compute_rollout(N).t.size - 1
+    ),
+}
+
+
+@pytest.mark.parametrize("verb", sorted(SAMPLE_AND_STEP_COUNTS))
+def test_n_samples_counts_points_on_a_horizon_and_n_steps_transitions_on_a_run(verb):
+    """One rule (RULES 2.7): n_samples is the grid's points on a horizon verb, n_steps the transitions on a stepping verb."""
+    assert SAMPLE_AND_STEP_COUNTS[verb](7) == 7
+
+
+def test_rollout_batch_counts_transitions_like_rollout():
+    """rollout_batch(n_steps=N) gives N + 1 samples per member, as rollout does."""
+    pytest.importorskip("jax")
+    ev = Pendulum().compile(backend="jax")
+    xs = ev.rollout_batch(np.zeros((3, 2)), dt=0.01, n_steps=7)
+    assert xs.shape == (3, 8, 2)
+
+
+def test_a_static_leaf_samples_its_grid_in_one_jax_call():
+    """On JAX the static grid is one vmapped call, sampling what the NumPy loop samples."""
+    pytest.importorskip("jax")
+    from minilink.blocks.sources import Sine
+
+    blocks = {
+        "gain": lambda: Gain(K=np.array([[2.0, 0.0], [1.0, -1.0]])),
+        "step": lambda: Step(np.array([1.0]), np.array([0.0]), 0.5),
+        "sine": lambda: Sine(amplitude=[1.0, 2.0], omega=[3.0, 5.0]),
+    }
+    for name, make in blocks.items():
+        runs = {}
+        for backend in ("numpy", "jax"):
+            block = make()
+            sim = StaticSimulator(block, tf=1.0, n_samples=101, backend=backend)
+            u = (lambda t: np.array([t, 1.0 - t])) if block.m else None
+            runs[backend] = sim.solve(u=u)
+            if backend == "jax":
+                # The grid's map is compiled once, then reused by every solve
+                assert "outputs_on_grid" in sim.evaluator.compiled_forms
+        numpy_run, jax_run = runs["numpy"], runs["jax"]
+        assert list(jax_run.signals) == list(numpy_run.signals), name
+        for key in numpy_run.signals:
+            np.testing.assert_allclose(
+                jax_run.signals[key], numpy_run.signals[key], atol=1e-12, err_msg=name
+            )
+
+
+def test_a_simulators_solver_options_are_its_own_copy_of_the_preset():
+    from minilink import Pendulum
+    from minilink.simulation.simulator import Simulator
+
+    edited = Simulator(Pendulum(), tf=0.1, solver="scipy_stiff")
+    edited.solver_backend_options.update(rtol=1e-10, atol=1e-10)
+    fresh = Simulator(Pendulum(), tf=0.1, solver="scipy_stiff")
+
+    assert (
+        fresh.solver_backend_options["rtol"],
+        fresh.solver_backend_options["atol"],
+    ) == (1e-4, 1e-7)
+
+
+def test_a_sampled_input_off_the_runs_grid_names_the_grids_keywords():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    with pytest.raises(ValueError, match=r"got \(1, 7\).*n_samples=7"):
+        plant.compute_trajectory(tf=1.0, u=np.ones((1, 7)))
+    traj = plant.compute_trajectory(tf=1.0, u=np.ones((1, 7)), n_samples=7)
+    assert traj.u.shape == (1, 7)
+    with pytest.raises(ValueError, match=r"got \(2, 7\)$"):
+        plant.compute_trajectory(tf=1.0, u=np.ones((2, 7)))
+
+
+def test_a_sampled_loop_announces_an_end_off_its_ticks():
+    """A loop on a clock stops on a tick: a tf between two ticks warns with the end it reaches (the maintainer, 2026-11-11)."""
+    import warnings
+
+    from minilink import PID, Pendulum
+
+    loop = (PID(Kp=5.0, Kd=1.0) % 0.1) @ Pendulum()
+
+    with pytest.warns(UserWarning, match="ends at 1 s"):
+        traj = loop.compute_trajectory(tf=1.05)
+    assert traj.t[-1] == pytest.approx(1.0)
+
+    # A tf on a tick is silent
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        loop.compute_trajectory(tf=1.0)

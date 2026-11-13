@@ -13,6 +13,7 @@ from minilink.analysis.linear import Margins
 from minilink.analysis.linearization import (
     channel_label,
     channel_subtitle,
+    discrete_period,
     siso_matrices,
 )
 from minilink.graphical.common import PlotResult
@@ -45,7 +46,7 @@ def frequency_response(
     of=None,
     wrt=None,
     w=None,
-    n: int = 200,
+    n_samples: int = 200,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -74,7 +75,7 @@ def frequency_response(
         widened until it brackets the 0 dB crossing; a step or sampled system's
         (its difference equation, ``G(e^{jωΔ})``) runs three decades up to its
         Nyquist frequency ``π/Δ``, in rad per tick for a tick law.
-    n : int, optional
+    n_samples : int, optional
         Number of frequencies for the automatic grid.
     method : {"auto", "fd", "jax"}, optional
         Differentiation backend, see :func:`~minilink.analysis.derivatives.jacobian`.
@@ -85,7 +86,7 @@ def frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     period = discrete_period(sys)
-    w = frequency_grid(A, B, C, D, w, n, period)
+    w = frequency_grid(A, B, C, D, w, n_samples, period)
 
     # G(jω) on the grid, G(e^{jωΔ}) for a difference equation
     G = linear.frequency_response(A, B, C, D, w, period)
@@ -103,7 +104,7 @@ def bode(
     of=None,
     wrt=None,
     w=None,
-    n: int = 200,
+    n_samples: int = 200,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -112,7 +113,17 @@ def bode(
     Same arguments as :func:`frequency_response`; the phase is unwrapped.
     """
     w, G = frequency_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        w=w,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
 
     # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
@@ -133,7 +144,7 @@ def margins(
     of=None,
     wrt=None,
     w=None,
-    n: int = _MARGIN_GRID_POINTS,
+    n_samples: int = _MARGIN_GRID_POINTS,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> Margins:
@@ -147,7 +158,7 @@ def margins(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     period = discrete_period(sys)
-    w = frequency_grid(A, B, C, D, w, n, period)
+    w = frequency_grid(A, B, C, D, w, n_samples, period)
 
     # L(jω) on the grid brackets the crossovers; each is then solved on the exact L(jω)
     G = linear.frequency_response(A, B, C, D, w, period)
@@ -166,7 +177,7 @@ def nyquist(
     of=None,
     wrt=None,
     w=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -177,7 +188,17 @@ def nyquist(
     those frequencies (the indented contour is not drawn).
     """
     w, G = frequency_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        w=w,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
 
     return w, G
@@ -241,7 +262,8 @@ def root_locus(
     ``gains`` defaults to an adaptive sweep from ``K = 0`` to the gain where
     the far branches leave the picture. Returns ``(gains, roots)`` with
     ``roots`` of shape ``(len(gains), n)``, one continuous branch per column.
-    ``minimal`` as in :func:`pzmap`.
+    ``minimal`` as in :func:`pzmap`. A step or sampled system's roots are the
+    poles in ``z`` of its difference equation closed with ``u_k = -K y_k``.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
@@ -276,10 +298,14 @@ def transfer_function(
     The numerator and denominator come from the zeros, poles and gain of
     :func:`pzmap`; the block is their state-space realization and carries
     ``numerator``, ``denominator``, ``poles`` and ``zeros``, so it can be
-    plotted, simulated, or wired like any other block.
+    plotted, simulated, or wired like any other block. A transfer function
+    is continuous: a step or sampled system is refused (design on the
+    continuous plant, then put the design on a clock, ``% dt``).
     """
     # Lazy import: the block and its graphics load on first use, not with the analysis
     from minilink.blocks.transfer_function import TransferFunction
+
+    require_continuous_system(sys)
 
     z, p, k = pzmap(
         sys,
@@ -314,25 +340,25 @@ def plot_bode(
     of=None,
     wrt=None,
     w=None,
-    n: int = 200,
+    n_samples: int = 200,
     margins: bool = True,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
     title: str | None = None,
 ) -> PlotResult:
     """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
 
     The crossovers and the printed margins are those of :func:`margins`, read
-    on its grid (or on ``w``), not on the ``n`` plotted frequencies.
+    on its grid (or on ``w``), not on the ``n_samples`` plotted frequencies.
     ``title`` overrides the figure heading (default ``"Bode Diagram"``).
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     period = discrete_period(sys)
-    w_plot = frequency_grid(A, B, C, D, w, n, period)
+    w_plot = frequency_grid(A, B, C, D, w, n_samples, period)
 
     # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
     G = linear.frequency_response(A, B, C, D, w_plot, period)
@@ -352,7 +378,7 @@ def plot_bode(
         w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
     )
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_pzmap(
@@ -368,7 +394,7 @@ def plot_pzmap(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros.
@@ -392,7 +418,7 @@ def plot_pzmap(
 
     figure = pzmap_figure(z, p, sys, of, wrt, radius, discrete_period(sys))
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_root_locus(
@@ -409,14 +435,15 @@ def plot_root_locus(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Root locus of the selected channel closed with ``u = -K y``.
 
     ``minimal`` as in :func:`pzmap`. ``radius`` frames the branches within that
     distance of the origin; the default frames three times the radius of the
-    open-loop roots, so the far tails of the asymptotes leave the picture.
+    open-loop roots, so the far tails of the asymptotes leave the picture. A
+    step or sampled system's locus is in ``z``, drawn with the unit circle.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
@@ -428,9 +455,11 @@ def plot_root_locus(
     # p(K) = eig(A − B K (1 + K d)⁻¹ C) over the gain sweep
     gains, roots = linear.root_locus(A, B, C, D, gains)
 
-    figure = root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius)
+    figure = root_locus_figure(
+        A, B, C, D, gains, roots, sys, of, wrt, radius, discrete_period(sys)
+    )
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_nyquist(
@@ -443,20 +472,30 @@ def plot_nyquist(
     of=None,
     wrt=None,
     w=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Nyquist diagram of the selected channel with the critical point ``-1``."""
     w, G = nyquist(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        w=w,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
 
     figure = nyquist_figure(w, G, sys, of, wrt)
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 ###############################################################################
@@ -464,35 +503,31 @@ def plot_nyquist(
 ###############################################################################
 
 
-def frequency_grid(A, B, C, D, w, n, period=None):
+def require_continuous_system(sys):
+    """Refuse a step or sampled system: a transfer function is continuous."""
+    if discrete_period(sys) is not None:
+        raise TypeError(
+            f"{sys.name!r} is a step or sampled system: a transfer function is "
+            "continuous; design on the continuous plant, then `% dt`"
+        )
+
+
+def frequency_grid(A, B, C, D, w, n_samples, period=None):
     """The frequencies to evaluate: the user's, or a log grid from the poles and zeros (to the Nyquist frequency ``π/Δ`` of a difference equation)."""
-    # By default, n frequencies evenly spaced in log ω across the poles and zeros;
+    # By default, n_samples frequencies evenly spaced in log ω across the poles and zeros;
     # a difference equation's three decades below its Nyquist frequency π/Δ
     if w is None and period is not None:
         w_nyquist = np.pi / float(period)
-        w = np.logspace(np.log10(w_nyquist) - 3.0, np.log10(w_nyquist), int(n))
+        w = np.logspace(np.log10(w_nyquist) - 3.0, np.log10(w_nyquist), int(n_samples))
     elif w is None:
         w_min, w_max = linear.frequency_range(A, B, C, D)
-        w = np.logspace(np.log10(w_min), np.log10(w_max), int(n))
+        w = np.logspace(np.log10(w_min), np.log10(w_max), int(n_samples))
 
     w = np.asarray(w, dtype=float).reshape(-1)
     if w.size == 0 or np.any(w <= 0.0):
         raise ValueError("Frequencies must be positive.")
 
     return w
-
-
-def discrete_period(sys):
-    """``Δ`` of a step system's model (1 per tick for a tick law), ``None`` for a continuous one."""
-    # Lazy import: the step system loads with the first discrete analysis
-    from minilink.analysis.linearization import period_of
-    from minilink.core.discrete.step_system import StepSystem
-
-    if not isinstance(sys, StepSystem):
-        return None
-    period = period_of(sys)
-
-    return 1.0 if period is None else period
 
 
 def loop_response(A, B, C, D, period=None):
@@ -611,8 +646,7 @@ def pzmap_figure(z, p, sys, of, wrt, radius=None, period=None):
     # In z, the unit circle |z| = 1, the stability boundary, framed too
     traces = root_markers(p, z)
     if period is not None:
-        theta = np.linspace(0.0, 2.0 * np.pi, 361)
-        circle = np.exp(1j * theta)
+        circle = unit_circle()
         traces = (
             Trace(circle.real, circle.imag, style.AXIS_COLOR, dash="dash"),
         ) + traces
@@ -665,8 +699,8 @@ def root_text(s) -> str:
     return f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {zeta:.3f}, ωn = {wn:.3g} rad/s"
 
 
-def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
-    """The root-locus figure: one trace per branch, with the open-loop poles and zeros."""
+def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None, period=None):
+    """The root-locus figure: one trace per branch, with the open-loop poles and zeros; a difference equation's with the unit circle."""
     # The view keeps the poles, zeros and the branches near them; the far tails
     # of the asymptotes leave the frame as they do in MATLAB, or the window
     # within radius of the origin when one is given.
@@ -689,14 +723,22 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
         )
         for j in range(roots.shape[1])
     )
+    traces = branches + root_markers(linear.poles(A), linear.zeros(A, B, C, D))
+
+    # In z, the unit circle |z| = 1, the stability boundary, framed too
+    if period is not None:
+        circle = unit_circle()
+        traces = (
+            Trace(circle.real, circle.imag, style.AXIS_COLOR, dash="dash"),
+        ) + traces
+        near = np.concatenate([near, circle])
 
     return ControlFigure(
         title=style.ROOT_LOCUS_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
         panels=(
             Panel(
-                traces=branches
-                + root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
+                traces=traces,
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
                 zero_lines=True,
@@ -705,6 +747,14 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
             ),
         ),
     )
+
+
+def unit_circle():
+    """The unit circle ``|z| = 1``, 361 points from ``θ = 0`` to ``2π``."""
+    theta = np.linspace(0.0, 2.0 * np.pi, 361)
+    circle = np.exp(1j * theta)
+
+    return circle
 
 
 def nyquist_figure(w, G, sys, of, wrt):

@@ -34,7 +34,10 @@ class CorePerfSuiteConfig:
     sim_n_runs: int = 2
     diagram_dense_nodes: int = 50
     diagram_dense_connections: int = 5
-    static_n_steps: int = 200
+    static_n_samples: int = 200
+    batch_size: int = 1000
+    batch_n_steps: int = 1000
+    batch_reps: int = 5
 
 
 DIAGRAM_DENSE_X = None  # set per build
@@ -51,6 +54,7 @@ def run_core_perf_suite(
     metrics.extend(_diagram_dx_metrics(cfg))
     metrics.extend(_simulation_metrics(cfg))
     metrics.extend(_static_facade_metrics(cfg))
+    metrics.extend(_rollout_batch_metrics(cfg))
     return metrics
 
 
@@ -184,7 +188,7 @@ def _simulation_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     try:
         pendulum_result = benchmark_simulation_backend(
             pendulum,
-            candidate=SimulationBenchmarkVariant("rk4_fixedsteps", "jax"),
+            candidate=SimulationBenchmarkVariant("rk4", "jax"),
             truth=TRUTH_SIMULATION_VARIANT,
             t0=pendulum_case.t0,
             tf=pendulum_case.tf,
@@ -207,7 +211,7 @@ def _simulation_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     diagram = diagram_case.build()
     diagram_result = benchmark_simulation_backend(
         diagram,
-        candidate=SimulationBenchmarkVariant("rk4_fixedsteps", "numpy"),
+        candidate=SimulationBenchmarkVariant("rk4", "numpy"),
         truth=TRUTH_SIMULATION_VARIANT,
         t0=diagram_case.t0,
         tf=diagram_case.tf,
@@ -264,7 +268,7 @@ def _static_facade_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     gain = Gain(K=2.0, dim=1)
     t0 = time.perf_counter()
     gain.compute_trajectory(
-        t0=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
+        t0=0, tf=1, n_samples=cfg.static_n_samples, show=False, verbose=False
     )
     metrics.append(
         MetricRecord(
@@ -288,7 +292,7 @@ def _static_facade_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     diagram.connect("src", "y", "gain", "u")
     t0 = time.perf_counter()
     diagram.compute_trajectory(
-        t0=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
+        t0=0, tf=1, n_samples=cfg.static_n_samples, show=False, verbose=False
     )
     metrics.append(
         MetricRecord(
@@ -301,3 +305,68 @@ def _static_facade_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
         )
     )
     return metrics
+
+
+def _rollout_batch_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
+    """The batch-rollout claim (README, DESIGN §5): pendulum, B rollouts of N RK4 steps, warm.
+
+    ``plain_s`` is the compiled numbers, ``family_s`` one rod length per member
+    (``params`` with a leading batch axis on ``l``); ``family_speedup`` is
+    ``plain_s / family_s``, the price of the family as a ratio, machine-free.
+    """
+    try:
+        import jax  # noqa: F401
+    except ImportError:
+        return []
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    plant = Pendulum()
+    evaluator = plant.compile(backend="jax")
+    batch, n_steps = cfg.batch_size, cfg.batch_n_steps
+    x0s = np.tile([1.0, 0.0], (batch, 1))
+    family = dict(plant.params, l=np.linspace(0.5, 2.0, batch))
+
+    def warm_median(params):
+        def run():
+            evaluator.rollout_batch(
+                x0s, n_steps=n_steps, dt=0.005, params=params
+            ).block_until_ready()
+
+        run()  # the compile
+        times = []
+        for _ in range(cfg.batch_reps):
+            t0 = time.perf_counter()
+            run()
+            times.append(time.perf_counter() - t0)
+        return float(np.median(times))
+
+    plain_s = warm_median(None)
+    family_s = warm_median(family)
+    prefix = "rollout_batch.pendulum"
+    notes = f"{batch} rollouts x {n_steps} RK4 steps, warm median of {cfg.batch_reps}"
+    return [
+        MetricRecord(
+            id=f"{prefix}.plain_s",
+            gate="speed",
+            direction="lower_better",
+            value=plain_s,
+            unit="s",
+            notes=notes,
+        ),
+        MetricRecord(
+            id=f"{prefix}.family_s",
+            gate="speed",
+            direction="lower_better",
+            value=family_s,
+            unit="s",
+            notes=notes + ", one rod length per member",
+        ),
+        MetricRecord(
+            id=f"{prefix}.family_speedup",
+            gate="speed",
+            direction="higher_better",
+            value=plain_s / family_s,
+            unit="ratio",
+            notes="plain_s / family_s: the price of a parameter family",
+        ),
+    ]

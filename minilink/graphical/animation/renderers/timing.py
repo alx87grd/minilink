@@ -19,7 +19,7 @@ class AnimationFrameSchedule:
 
 def trajectory_frame_schedule(
     traj,
-    time_factor_video: float,
+    speed: float,
     *,
     target_fps: float = 30.0,
 ) -> AnimationFrameSchedule:
@@ -42,9 +42,9 @@ def trajectory_frame_schedule(
             target_fps=target_fps,
         )
     sim_dt = (traj.t[-1] - traj.t[0]) / (nsteps - 1)
-    video_dt = frame_dt * time_factor_video
+    video_dt = frame_dt * speed
     skip_steps = max(1, int(np.round(video_dt / sim_dt)))
-    interval_ms = (sim_dt * skip_steps / time_factor_video) * 1000.0
+    interval_ms = (sim_dt * skip_steps / speed) * 1000.0
     n_frames = math.ceil((nsteps - 1) / skip_steps) + 1
     return AnimationFrameSchedule(
         nsteps=nsteps,

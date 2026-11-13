@@ -1,4 +1,4 @@
-"""Stochastic policies for training: a controller block's mean action with an exploration head around it."""
+"""Stochastic policies for training: the actor block's mean action with an exploration head around it."""
 
 import functools
 import math
@@ -38,14 +38,14 @@ def over_states(method):
 
 class ExplorationPolicy:
     """
-    ``pi_theta(a | x)``: the law of a controller block, made stochastic by an exploration head.
+    ``pi_theta(a | x)``: the law of the actor block, made stochastic by an exploration head.
 
-    The controller, a :class:`~minilink.control.neural.NeuralPolicy`,
-    gives the normalized mean action ``mu_theta(x) = MLP(z(x))`` and the map
-    from a normalized action onto the plant's input port. The head gives the
-    distribution around the mean: ``sample``, ``log_prob``, ``entropy``. The
-    parameters ``theta = {"mlp", "head"}`` form one pytree, so an algorithm
-    differentiates through both, and ``theta["mlp"]`` is what the controller
+    The actor, a :class:`~minilink.control.neural.NeuralPolicy` (the
+    planner's ``actor``), gives the normalized mean action
+    ``mu_theta(x) = MLP(z(x))`` and the map from a normalized action onto the
+    plant's input port. The head gives the distribution around the mean:
+    ``sample``, ``log_prob``, ``entropy``. The parameters ``theta = {"mlp", "head"}`` form one pytree, so an algorithm
+    differentiates through both, and ``theta["mlp"]`` is what the actor
     block carries once training is over.
 
     Every method takes one state ``x`` or a batch of states (leading axes),
@@ -56,35 +56,35 @@ class ExplorationPolicy:
     that sample; the off-policy losses keep JAX keys.
     """
 
-    def __init__(self, controller, head):
-        self.controller = controller
+    def __init__(self, actor, head):
+        self.actor = actor
         self.head = head
         self.m = int(head.m)
 
     @property
     def deterministic(self):
-        """The controller block's own law ``u = pi(x)``, the one used once training is over."""
-        return self.controller
+        """The actor block's own law ``u = pi(x)``, the one used once training is over."""
+        return self.actor
 
     def init(self):
-        """Initial parameters: the controller's network and the head's own."""
+        """Initial parameters: the actor's network and the head's own."""
         jax, jnp = require_jax(), require_jax_numpy()
 
-        mlp = jax.tree_util.tree_map(jnp.asarray, self.controller.params["mlp"])
+        mlp = jax.tree_util.tree_map(jnp.asarray, self.actor.params["mlp"])
         head = self.head.init()
 
         return {"mlp": mlp, "head": head}
 
     def features(self, x):
         """The policy's features ``z(x)``, the network's input."""
-        return self.controller.observe(x)
+        return self.actor.observe(x)
 
     def input(self, a):
         """Plant input ``u = u_mid + u_half clip(a, -1, 1)`` of a normalized action."""
         xp = array_module(a)
 
-        u_mid = self.controller.u_mid
-        u_half = self.controller.u_half
+        u_mid = self.actor.u_mid
+        u_half = self.actor.u_half
 
         u = u_mid + u_half * xp.clip(a, -1.0, 1.0)
 
@@ -92,7 +92,7 @@ class ExplorationPolicy:
 
     def mean(self, theta, x):
         """Normalized mean action ``mu_theta(x)``."""
-        return self.controller.mean_action(x, {"mlp": theta["mlp"]})
+        return self.actor.mean_action(x, {"mlp": theta["mlp"]})
 
     @over_states
     def sample(self, theta, x, key):
@@ -212,7 +212,12 @@ class SquashedGaussianHead:
 
         # The log-std network on the features, its last layer near zero
         self.mlp = MLP(
-            n_features, self.m, hidden, activation, seed=seed, output_gain=0.01
+            n_features,
+            self.m,
+            hidden=hidden,
+            activation=activation,
+            seed=seed,
+            output_gain=0.01,
         )
 
     def init(self):
@@ -230,7 +235,7 @@ class SquashedGaussianHead:
         mlp = self.mlp
         lo, hi = self.log_std_bounds
 
-        log_std = jnp.clip(mlp.compute(None, z, params=params["log_std_mlp"]), lo, hi)
+        log_std = jnp.clip(mlp.h(None, z, params=params["log_std_mlp"]), lo, hi)
 
         return log_std
 

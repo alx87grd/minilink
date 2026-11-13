@@ -113,7 +113,7 @@ class DemoVelocityLoop(System):
 # diagram.connect("yaw_rate_loop", "delta", "vehicle", "delta")
 #
 # With matching named ports, autowire replaces those ten connection calls.
-vehicle = DynamicBicycle()
+vehicle = DynamicBicycle(named_ports=True)
 vehicle.name = "Vehicle"
 diagram = (
     DemoPathPlanner()

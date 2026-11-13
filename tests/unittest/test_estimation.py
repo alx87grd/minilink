@@ -11,7 +11,7 @@ from minilink.core.closed_loop import closed_loop
 from minilink.core.diagram import DiagramSystem
 from minilink.core.roles import roles
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.abstraction.state_space import LTISystem
+from minilink.dynamics.abstraction.state_space import LinearizedSystem, LTISystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.estimation.design import kalman, kalman_gain, luenberger, luenberger_gain
 from minilink.estimation.observer import StateObserver
@@ -25,7 +25,7 @@ L = place_gain(A.T, C.T, POLES).T  # the dual placement, written out here
 
 
 def observer():
-    return StateObserver(A, B, C, L)
+    return StateObserver(LTISystem(A, B, C), L)
 
 
 def test_ports_params_and_labels():
@@ -51,15 +51,62 @@ def test_the_innovation_form():
 
 def test_the_operating_point_is_an_equilibrium_of_the_estimate():
     x_bar, u_bar = np.array([0.7, 0.0]), np.array([0.0])
-    obs = StateObserver(A, B, C, L, x_bar=x_bar, u_bar=u_bar, y_bar=C @ x_bar + 0.1)
+    model = LinearizedSystem(
+        A,
+        B,
+        C,
+        np.zeros((1, 1)),
+        x_bar=x_bar,
+        u_bar=u_bar,
+        y_bar=C @ x_bar + 0.1,
+        dx_bar=np.zeros(2),
+    )
+    obs = StateObserver(model, L)
     np.testing.assert_allclose(obs.params["y_bar"], C @ x_bar + 0.1)
+    np.testing.assert_allclose(obs.x0, x_bar)
     dx_hat = obs.f(x_bar, np.concatenate([u_bar, C @ x_bar + 0.1]))
     np.testing.assert_allclose(dx_hat, 0.0, atol=1e-12)
-    # a shape that describes no plant is refused
+    # a gain that describes no plant is refused, and a plant: the observer runs a linear model
     with pytest.raises(ValueError, match="L must be"):
-        StateObserver(A, B, C, np.ones((3, 1)))
-    with pytest.raises(ValueError, match=r"x_bar must have shape \(2,\)"):
-        StateObserver(A, B, C, L, x_bar=[0.7, 0.0, 0.0])
+        StateObserver(LTISystem(A, B, C), np.ones((3, 1)))
+    with pytest.raises(TypeError, match=r"LTISystem\(A, B, C, D\) or linearize"):
+        StateObserver(Pendulum(), L)
+
+
+def test_an_observer_off_an_equilibrium_copies_its_model_drift_included():
+    """With no correction (L = 0) the estimate moves as the model does, dx̄ = f(x̄, ū) kept."""
+    from minilink import Gain
+
+    plant = Pendulum() >> Gain([[1.0, 0.0]])
+    model = linearize(plant, np.array([np.pi / 2, 0.0]))
+    obs = StateObserver(model, np.zeros((2, 1)))
+    x_hat, u = np.array([1.4, 0.2]), np.array([0.3])
+    y = np.array([0.9])
+    np.testing.assert_allclose(obs.f(x_hat, np.concatenate([u, y])), model.f(x_hat, u))
+    assert model.f(model.x_bar, model.u_bar)[1] < -1.0
+
+
+def test_an_observer_is_continuous_and_its_gain_reads_z():
+    """Ruling Q4: the observer refuses a step model; the gain on its matrices has its poles in z."""
+    from minilink.control.design import place
+    from minilink.dynamics.abstraction.state_space import DiscreteLTISystem
+
+    tick_law = DiscreteLTISystem(np.eye(2) + 0.1 * A, 0.1 * B, C)
+    step_linearization = linearize(Pendulum() % 0.1, x_bar=np.zeros(2))
+    for model in (tick_law, step_linearization):
+        with pytest.raises(TypeError, match=r"a StateObserver is continuous"):
+            StateObserver(model, np.ones((2, 1)))
+    with pytest.raises(TypeError, match=r"observer % dt"):
+        luenberger(Pendulum() % 0.1, [0.5, 0.6])
+
+    # A gain is fine: its poles are read in z
+    z_poles = [0.5, 0.6]
+    L = luenberger_gain(tick_law.A(), tick_law.C(), z_poles)
+    error_poles = np.linalg.eigvals(tick_law.A() - L @ tick_law.C())
+    np.testing.assert_allclose(np.sort(error_poles.real), z_poles, atol=1e-10)
+    K = place(tick_law, z_poles).K
+    closed = np.linalg.eigvals(tick_law.A() - tick_law.B() @ K)
+    np.testing.assert_allclose(np.sort(closed.real), z_poles, atol=1e-10)
 
 
 def test_the_estimate_converges_on_the_plant():
@@ -70,7 +117,6 @@ def test_the_estimate_converges_on_the_plant():
     loop.add_subsystem(obs, "observer")
     loop.connect("plant", "y", "observer", "y")  # both read the nominal u = 0
     plant.x0 = np.array([1.0, 0.5])
-    loop.refresh()
     traj = loop.compute_trajectory(tf=6.0)
     x_plant = traj.x[slice(*loop.state_index["plant"]), -1]
     x_hat = traj.x[slice(*loop.state_index["observer"]), -1]
@@ -100,7 +146,6 @@ def test_a_box_with_a_gain_is_a_controller_and_the_roles_see_the_observer():
     who = roles(loop)
     assert who.plant is plant and who.controller is box and who.observer is obs
     plant.x0 = np.array([1.0, 0.0])
-    loop.refresh()
     traj = loop.compute_trajectory(tf=12.0)
     np.testing.assert_allclose(traj.x[:, -1], 0.0, atol=1e-3)
     # the separation principle: the loop's poles are the gain's and the observer's
@@ -120,7 +165,7 @@ def test_an_observer_is_not_a_controller():
 
     class SampledObserver(StepSystem):  # a discrete filter has the same ports
         def __init__(self):
-            super().__init__(n=2)
+            super().__init__(state_dim=2)
             self.add_input_port("u", dim=1)
             self.add_input_port("y", dim=1)
             self.add_output_port("x", dim=2, function=self.compute_state)
@@ -286,7 +331,6 @@ def test_lqg_holds_the_cart_pole_upright_from_a_disturbed_start():
     ]
     loop = box @ plant
     plant.x0 = np.array([-0.5, np.pi + 0.2, 0.0, 0.0])
-    loop.refresh()
     traj = loop.compute_trajectory(tf=8.0)
     plant_state = traj.x[slice(*loop.state_index["plant"]), -1]
     np.testing.assert_allclose(plant_state, x_up, atol=1e-2)
@@ -331,8 +375,8 @@ def test_the_role_loop_and_the_box_loop_give_one_trajectory():
         reference=False,
     )
     boxed = closed_loop(lqg(plant, Q, R, Q_n, R_n, x_bar=x_up), plant, reference=False)
-    a = by_role.compute_trajectory(tf=4.0, n_steps=201)
-    b = boxed.compute_trajectory(tf=4.0, n_steps=201)
+    a = by_role.compute_trajectory(tf=4.0, n_samples=201)
+    b = boxed.compute_trajectory(tf=4.0, n_samples=201)
     np.testing.assert_allclose(
         a.x[slice(*by_role.state_index["plant"])],
         b.x[slice(*boxed.state_index["plant"])],
@@ -364,3 +408,94 @@ def test_what_closed_loop_refuses_with_an_observer():
         closed_loop(lqr(plant, np.eye(2), np.eye(1)), plant, observer=LowPassFilter())
     with pytest.raises(ValueError, match="pass it as observer="):
         closed_loop(lqr(plant, np.eye(2), np.eye(1)), plant, filter=observer())
+
+
+@pytest.mark.parametrize("design", ["lqr", "lqr_finite_horizon", "kalman", "lqg"])
+def test_a_riccati_design_refuses_a_discrete_time_model(design):
+    """The continuous Riccati equation on a discretized plant gives an unstable gain: each design refuses it."""
+    from minilink.analysis.discretization import discretize
+    from minilink.control.design import lqr_finite_horizon, place
+
+    plant = discretize(Pendulum(), 0.1)
+    I2 = np.eye(2)
+    I1 = np.eye(1)
+    calls = {
+        "lqr": lambda: lqr(plant, I2, I1),
+        "lqr_finite_horizon": lambda: lqr_finite_horizon(plant, I2, I1, I2, 1.0),
+        "kalman": lambda: kalman(plant, I2, I2),
+        "lqg": lambda: lqg(plant, I2, I1, I2, I2),
+    }
+
+    with pytest.raises(ValueError, match="discrete-time model"):
+        calls[design]()
+
+    # The poles of a discrete-time model are placed in z, as before
+    assert place(plant, [0.5, 0.6]) is not None
+
+
+def test_a_design_at_a_point_the_plant_does_not_rest_at_is_announced():
+    """The linear model drops f(x̄, ū): a design away from an equilibrium warns, one at an equilibrium is silent."""
+    import warnings
+
+    plant = Pendulum()
+
+    with pytest.warns(UserWarning, match="does not rest at the design point"):
+        lqr(plant, np.eye(2), np.eye(1), x_bar=[np.pi / 4, 0.0])
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        lqr(plant, np.eye(2), np.eye(1), x_bar=[np.pi, 0.0])
+
+
+def test_refusals_name_what_to_pass():
+    """A wrong weight, solver, plant or shaping is refused in the caller's words, with the valid choices."""
+    from minilink import Optimizer, compare
+    from minilink.control.robotic import TaskImpedance
+    from minilink.control.siso import PID
+    from minilink.core.sets import BoxSet
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    plant = Pendulum()
+    upright = [np.pi, 0.0]
+
+    with pytest.raises(ValueError, match=r"Q must have shape \(n, n\) = \(2, 2\)"):
+        lqr(plant, [1.0, 1.0], [1.0], x_bar=upright)
+    with pytest.raises(ValueError, match=r"Q_n must have shape \(n, n\)"):
+        kalman(plant, 0.1, 0.1, x_bar=upright)
+    with pytest.raises(ValueError, match="expected one of.*rk4"):
+        plant.compute_trajectory(1.0, solver="rk45")
+    with pytest.raises(ValueError, match="wrt must be 'x' or 'u' or 't' or 'params';"):
+        plant.jacobian("f", "z", np.zeros(2))
+    with pytest.raises(TypeError, match="requires a Manipulator plant"):
+        TaskImpedance(plant)
+    with pytest.raises(TypeError, match="shaping is a function"):
+        BoxSet([-1.0], [1.0]).as_cost(shaping="quadratic_hinge")
+    with pytest.raises(TypeError, match="pass the problem first"):
+        compare(A=PID(1.0, 0.0, 0.0))
+    with pytest.raises(ValueError, match="needs the objective's gradient"):
+        Optimizer(
+            MathematicalProgram(n_z=2, J=lambda z: z @ z), np.zeros(2), method="gd"
+        )
+
+
+def test_a_design_warning_points_at_the_line_that_called_it():
+    """A warning of a default is raised at the caller's line, not inside the library."""
+    plant = Pendulum()
+
+    with pytest.warns(UserWarning, match="does not rest") as caught:
+        lqr(plant, np.eye(2), np.eye(1), x_bar=[1.0, 0.0])
+
+    assert caught[0].filename == __file__
+
+
+def test_core_objects_print_one_line_in_a_list():
+    """``repr`` is the head of the summary, so a list, a record or an error names its objects."""
+    from minilink.core.roles import roles
+    from minilink.core.sets import BoxSet
+
+    plant = Pendulum()
+    gain = lqr(plant, np.eye(2), np.eye(1), x_bar=[np.pi, 0.0])
+
+    assert repr(plant) == "<Pendulum, n=2>"
+    assert repr(BoxSet([-1.0], [1.0])).startswith("<BoxSet, dim=1")
+    assert "plant=<Pendulum, n=2>" in repr(roles(gain @ plant))

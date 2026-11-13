@@ -8,7 +8,7 @@ from minilink.core.backends import array_module
 
 class Fibonacci(StepSystem):
     def __init__(self):
-        super().__init__(n=2, expose_state=True)
+        super().__init__(state_dim=2, expose_state=True)
         self.name = "Fibonacci"
         self.x0 = np.array([0.0, 1.0])
         self.state.labels = ("F_k", "F_{k+1}")

@@ -1,11 +1,5 @@
-"""Spatial workspace: obstacles, reference paths, and the workspace fields."""
+"""Spatial workspace: the scene, its obstacles, the reference track and the workspace fields."""
 
-from minilink.core.geometry.paths import (
-    PolylinePath,
-    ReferencePath,
-    circuit_waypoints,
-    from_waypoints,
-)
 from minilink.core.shaping import (
     inverse_barrier,
     occupancy,
@@ -32,15 +26,11 @@ __all__ = [
     "CollisionBody",
     "CorridorMarginField",
     "PathDistanceField",
-    "PolylinePath",
-    "ReferencePath",
     "ReferenceTrack",
     "Scene",
     "mount",
     "car_outline",
     "disc",
-    "circuit_waypoints",
-    "from_waypoints",
     "inverse_barrier",
     "occupancy",
     "point_probe",

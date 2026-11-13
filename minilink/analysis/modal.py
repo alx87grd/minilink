@@ -2,13 +2,51 @@
 
 import numpy as np
 
+from minilink.analysis import linear
 from minilink.analysis.derivatives import jacobian, operating_point
-from minilink.analysis.linearization import require_own_point
+from minilink.analysis.linearization import linearize_matrices
 from minilink.core.trajectory import Trajectory
 
 ###############################################################################
 # Public API
 ###############################################################################
+
+
+def poles(
+    sys,
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    *,
+    method="auto",
+    eps=1e-6,
+):
+    """
+    The poles of ``sys`` at an operating point: the eigenvalues of its linear model's ``A``.
+
+    A linearization at its own point is read as stored; any other system is
+    linearized at ``(x_bar, u_bar)``, the nominal state and inputs by default,
+    as :func:`~minilink.analysis.frequency.bode` and
+    :func:`~minilink.analysis.frequency.pzmap` read it (a point the plant does
+    not rest at is warned). On a step or sampled system, the poles in ``z`` of
+    its difference equation, ``A_d = ∂step/∂x``: stable inside the unit circle.
+    Every mode of the state, not one channel's (:func:`pzmap` reduces a
+    channel to its minimal realization).
+
+    Returns
+    -------
+    poles : ndarray of shape (n,)
+        The roots of ``det(λ I − A) = 0``, complex.
+    """
+    A, _, _, _ = linearize_matrices(
+        sys, x_bar, u_bar, t, params, method=method, eps=eps
+    )
+
+    # det(λ I − A) = 0
+    p = linear.poles(A)
+
+    return p
 
 
 def modal_analysis(
@@ -48,8 +86,6 @@ def modal_analysis(
     modes : ndarray of shape (n, n)
         Eigenvectors (columns are mode shapes in perturbation coordinates).
     """
-    require_own_point(sys, x_bar, u_bar)
-
     # A = ∂f/∂x at (x_bar, u_bar)
     A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
 
@@ -71,8 +107,8 @@ def animate_modal(
     eps=1e-6,
     amplitude=1.0,
     tf=None,
-    n_steps=2001,
-    time_factor_video=3.0,
+    n_samples=2001,
+    speed=3.0,
     renderer="matplotlib",
     is_3d=False,
     show=True,
@@ -117,21 +153,21 @@ def animate_modal(
         vector = modes[:, index]
 
         # Time long enough for a few periods, or for the decay
-        time = np.linspace(0.0, mode_horizon(pole, tf), n_steps)
+        time = np.linspace(0.0, mode_horizon(pole, tf), n_samples)
 
         # Δx(t) = amp · Re{ v e^{λ t} }
         delta_x = amplitude * np.real(vector[:, None] * np.exp(pole * time))
 
         # x(t) = x_bar + Δx(t), under the input held at u_bar
         x = x_bar[:, None] + delta_x
-        u = np.tile(u_bar[:, None], (1, n_steps))
+        u = np.tile(u_bar[:, None], (1, n_samples))
 
         # The mode as an absolute trajectory, drawn by the system's own kinematics
         traj = Trajectory(t=time, x=x, u=u)
         title = f"Mode {index}: {pole.real:.1f}{pole.imag:+.1f}j"
         inline = sys.animate(
             traj,
-            time_factor_video=time_factor_video,
+            speed=speed,
             is_3d=is_3d,
             html=html,
             renderer=renderer,

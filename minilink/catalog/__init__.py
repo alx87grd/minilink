@@ -51,10 +51,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Equations
     "DoubleIntegrator": ("minilink.dynamics.catalog.equations", "DoubleIntegrator"),
     "TripleIntegrator": ("minilink.dynamics.catalog.equations", "TripleIntegrator"),
-    "VanderPol": ("minilink.dynamics.catalog.equations", "VanderPol"),
+    "VanDerPol": ("minilink.dynamics.catalog.equations", "VanDerPol"),
     "Lorenz": ("minilink.dynamics.catalog.equations", "Lorenz"),
     # Astro
-    "ThreeBodyProblem": ("minilink.dynamics.catalog.astro", "ThreeBodyProblem"),
+    "ThreeBody": ("minilink.dynamics.catalog.astro", "ThreeBody"),
     # Aerial
     "ConstantSpeedHelicopterTunnel": (
         "minilink.dynamics.catalog.aerial",
@@ -77,23 +77,21 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Boat2DWithCurrent": ("minilink.dynamics.catalog.marine", "Boat2DWithCurrent"),
     # Vehicles
     "BicycleDynRate": ("minilink.dynamics.catalog.vehicles", "BicycleDynRate"),
-    "DynamicBicycle": ("minilink.dynamics.catalog.vehicles", "DynamicBicycle"),
-    "DynamicBicycleCar3D": (
+    "DrivetrainBicycle": (
         "minilink.dynamics.catalog.vehicles",
-        "DynamicBicycleCar3D",
+        "DrivetrainBicycle",
     ),
+    "DynamicBicycle": ("minilink.dynamics.catalog.vehicles", "DynamicBicycle"),
     "HolonomicMobileRobot": (
         "minilink.dynamics.catalog.vehicles",
         "HolonomicMobileRobot",
     ),
     "KinematicBicycle": ("minilink.dynamics.catalog.vehicles", "KinematicBicycle"),
-    "KinematicCar": ("minilink.dynamics.catalog.vehicles", "KinematicCar"),
+    "SuspensionCar3D": ("minilink.dynamics.catalog.vehicles", "SuspensionCar3D"),
+    "FormulaCar3D": ("minilink.dynamics.catalog.vehicles", "FormulaCar3D"),
+    "OffRoadCar3D": ("minilink.dynamics.catalog.vehicles", "OffRoadCar3D"),
     "UdeSRacecar": ("minilink.dynamics.catalog.vehicles", "UdeSRacecar"),
     "UdeSRacecarDyn": ("minilink.dynamics.catalog.vehicles", "UdeSRacecarDyn"),
-    "UdeSRacecarDyn3D": (
-        "minilink.dynamics.catalog.vehicles",
-        "UdeSRacecarDyn3D",
-    ),
     "LongitudinalTorqueCar": (
         "minilink.dynamics.catalog.vehicles",
         "LongitudinalTorqueCar",

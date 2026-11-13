@@ -9,13 +9,12 @@ from minilink.core.backends import (
 )
 from minilink.core.compile.evaluators.stepping import step_body
 from minilink.optimization.mathematical_program import MathematicalProgram
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.transcription import (
     ConstraintFunction,
-    FixedGridOptions,
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
@@ -26,10 +25,6 @@ from minilink.planning.trajectory_optimization.transcription import (
 ###############################################################################
 # Public API
 ###############################################################################
-
-
-class MultipleShootingOptions(FixedGridOptions):
-    """Grid options for fixed-step multiple shooting."""
 
 
 class MultipleShootingTranscription(DirectCollocationTranscription):
@@ -44,9 +39,6 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     # The transcription's name in a program's metadata
     name = "multiple_shooting"
 
-    def __init__(self, options: MultipleShootingOptions):
-        self.options = options
-
     def transcribe(
         self,
         problem: PlanningProblem,
@@ -59,7 +51,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
             return self.transcribe_jax(problem, backend=backend)
 
-        problem.require_cost()
+        require_cost(problem)
         step = self.make_step(problem, backend, dynamics)
 
         # Dynamics: the shooting defect of every interval vanishes
@@ -103,9 +95,9 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         """
         jnp = jax.numpy
 
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         grid = self.knot_offsets(problem, jnp)
-        dt = jnp.asarray(self.options.dt(problem))
+        dt = jnp.asarray(self.dt(problem))
         unpack_jax = self.jax_unpacker(problem)
 
         # One RK4 step between neighbouring knots, the input linear in between
@@ -149,7 +141,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     def make_step(self, problem: PlanningProblem, backend: str, dynamics=None):
         """One RK4 step between knots, ``step(x, u0, u1, t)``, on the grid's ``dt``."""
         f = dynamics_function(problem, backend) if dynamics is None else dynamics
-        dt = self.options.dt(problem)
+        dt = self.dt(problem)
 
         def step(x, u0, u1, t):
             return step_body(f, x, u0, u1, t, dt, "rk4", 1)
@@ -159,7 +151,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     def dynamics_residual(self, z: np.ndarray, problem: PlanningProblem, step):
         """Shooting defects of the packed knots, flattened."""
         x, u = self.unpack(z, problem)
-        t = self.options.t(problem)
+        t = self.t(problem)
 
         # d_k = x_{k+1} − RK4(x_k, u_k, u_{k+1}) on every interval
         residuals = []

@@ -9,7 +9,7 @@ from minilink.core.system import System
 
 class Accumulator(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -95,7 +95,7 @@ class KDependentPort(System):
 
 class Accumulator_step_diagram(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -141,7 +141,7 @@ class TestStepDiagram(unittest.TestCase):
         diagram.add_input_port("u")
         diagram.connect("input", "u", "blk", "u")
         diagram.connect_new_output_port("blk", "y", "y")
-        y = diagram.compute_subsys_output_port(
+        y = diagram.compute_subsystem_output_port(
             np.array([]), np.array([2.0]), 3, "blk", "y"
         )
         self.assertAlmostEqual(float(y[0]), 5.0)
@@ -176,7 +176,7 @@ from minilink.graphical.diagrams.dot import block_html
 
 class Accumulator_step_diagram_topology(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.x0 = array_module().zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -215,7 +215,7 @@ from minilink.control.siso import P
 
 class DiscreteAccumulator(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "DiscreteAccumulator"
         self.x0 = np.zeros(1)
 
@@ -308,7 +308,7 @@ except ImportError:
 
 class AffineStep(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.x0 = np.array([0.0])
 
     def step(self, x, u, k=0, params=None):
@@ -400,7 +400,7 @@ class TestStepRolloutJax(unittest.TestCase):
 
         class JaxFriendlyStep(StepSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1)
+                super().__init__(state_dim=1, input_dim=1)
                 self.x0 = np.array([0.0])
 
             def step(self, x, u, k=0, params=None):
@@ -429,7 +429,7 @@ except ImportError:
 
 class Accumulator_step_diagram_jax(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -484,7 +484,7 @@ class TestStepDiagramJax(unittest.TestCase):
 
 class Counter(StepSystem):
     def __init__(self):
-        super().__init__(n=1)
+        super().__init__(state_dim=1)
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -509,7 +509,7 @@ class TestFacadesRollout(unittest.TestCase):
         plant = Counter()
         rollout = plant.compute_rollout(n_steps=3)
         result = plant.plot_rollout(rollout, show=False)
-        self.assertEqual(result.backend, "matplotlib")
+        self.assertEqual(result.renderer, "matplotlib")
         fig, axes = result.payload
         self.assertEqual(axes[-1].get_xlabel(), "Step [k]")
 
@@ -619,3 +619,36 @@ def test_a_system_on_a_clock_rolls_out_from_its_origin():
         np.testing.assert_allclose(shifted[-1], x, rtol=1e-13)
     traj = sampled.compute_rollout(4, t0=2.0)
     np.testing.assert_allclose(traj.t, 2.0 + 0.05 * np.arange(5))
+
+
+class TestRolloutInputsAndDefaultIds(unittest.TestCase):
+    """A scalar input on a one-input rollout; ``add_subsystem`` without an id."""
+
+    def test_a_scalar_is_the_constant_input_of_a_one_input_rollout(self):
+        scalar = Accumulator().compute_rollout(3, 2.0)
+        vector = Accumulator().compute_rollout(3, np.array([2.0]))
+        np.testing.assert_array_equal(scalar.x, vector.x)
+        np.testing.assert_array_equal(scalar.x[0], [0.0, 2.0, 4.0, 6.0])
+
+    def test_a_diagram_names_a_subsystem_added_without_an_id(self):
+        from minilink import Pendulum
+        from minilink.control.siso import PID
+        from minilink.core.diagram import DiagramSystem
+        from minilink.core.discrete.step_diagram import StepDiagramSystem
+
+        diagram = DiagramSystem()
+        ids = [diagram.add_subsystem(Pendulum()) for _ in range(2)]
+        ids.append(diagram.add_subsystem(PID(), "controller"))
+        self.assertEqual(ids, ["Pendulum", "Pendulum2", "controller"])
+        self.assertEqual(list(diagram.subsystems), ids)
+        named = Pendulum()
+        named.id = "plant"
+        self.assertEqual(diagram.add_subsystem(named), "plant")
+        with self.assertRaisesRegex(ValueError, "already has a 'plant'"):
+            diagram.add_subsystem(named)
+
+        ticks = StepDiagramSystem()
+        self.assertEqual(ticks.add_subsystem(UnitDelay()), "UnitDelay")
+        self.assertEqual(ticks.add_subsystem(UnitDelay()), "UnitDelay2")
+        with self.assertRaisesRegex(TypeError, "cannot join"):
+            DiagramSystem().add_subsystem(UnitDelay())

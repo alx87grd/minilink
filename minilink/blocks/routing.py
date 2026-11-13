@@ -64,11 +64,9 @@ class Sum(System):
         # Ports: one input per sign, the signed sum out
         for i in range(self.signs.size):
             self.add_input_port(f"in{i}", dim=self.dim)
-        self.add_output_port(
-            "y", dim=self.dim, function=self.compute, dependencies="all"
-        )
+        self.add_output_port("y", dim=self.dim, function=self.h, dependencies="all")
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         xp = array_module(u)
 
         signs = xp.asarray(self.signs)
@@ -87,11 +85,12 @@ class Gain(System):
     """Constant gain ``y = K · u``.
 
     ``K`` may be a full ``(p, m)`` matrix, a 1-D vector (diagonal gain), or a
-    scalar (needs ``dim`` to set the port size). The gain lives in
-    ``params["K"]`` so it can be tuned or differentiated.
+    scalar times the ``dim`` identity (``Gain(2.0)`` one channel, as ``Sum``,
+    ``Saturation`` and ``UnitDelay``). The gain lives in ``params["K"]`` so it
+    can be tuned or differentiated.
     """
 
-    def __init__(self, K, dim=None):
+    def __init__(self, K, dim=1):
         super().__init__()
 
         # Parameters: the gain as a (p, m) matrix
@@ -101,9 +100,9 @@ class Gain(System):
         # Ports: u in, y = K u out
         p, m = K.shape
         self.add_input_port("u", dim=m)
-        self.add_output_port("y", dim=p, function=self.compute, dependencies="all")
+        self.add_output_port("y", dim=p, function=self.h, dependencies="all")
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
         K = params["K"]
@@ -131,10 +130,10 @@ class Mux(System):
         for i, d in enumerate(self.dims):
             self.add_input_port(f"in{i}", dim=d)
         self.add_output_port(
-            "y", dim=sum(self.dims), function=self.compute, dependencies="all"
+            "y", dim=sum(self.dims), function=self.h, dependencies="all"
         )
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         return u
 
 
@@ -194,8 +193,6 @@ def gain_matrix(K, dim):
     """``K`` as a ``(p, m)`` matrix: a scalar times the ``dim`` identity, a vector on the diagonal."""
     K = np.asarray(K, dtype=float)
     if K.ndim == 0:
-        if dim is None:
-            raise ValueError("scalar gain needs an explicit dim")
         K = float(K) * np.eye(int(dim))
     elif K.ndim == 1:
         K = np.diag(K)
@@ -210,7 +207,7 @@ if __name__ == "__main__":
     print("Error:", error.compute(None, np.array([5.0, 2.0])))  # 3.0
 
     gain = Gain([2.0, 3.0])
-    print("Gain:", gain.compute(None, np.array([1.0, 1.0])))  # [2, 3]
+    print("Gain:", gain.h(None, np.array([1.0, 1.0])))  # [2, 3]
 
     split = Demux(dims=(2, 1))
     print("Demux u[2]:", split.outputs["u[2]"].compute(None, np.array([1.0, 2.0, 9.0])))

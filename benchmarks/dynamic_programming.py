@@ -36,25 +36,25 @@ class DPBenchmarkRow:
     build_s: float
     cold_solve_s: float
     best_solve_s: float
-    iterations: int
-    result: object  # DynamicProgrammingResult, for the cross-backend value check
+    n_iterations: int
+    tables: object  # ValueTables, for the cross-backend value check
 
 
 def pendulum_problem():
     """Pendulum swing-up problem (pyro SinglePendulum defaults)."""
     sys = Pendulum()
-    sys.state.lower_bound = np.array([-2.0 * np.pi, -2.0 * np.pi])
-    sys.state.upper_bound = np.array([2.0 * np.pi, 2.0 * np.pi])
-    sys.inputs["u"].lower_bound = np.array([-5.0])
-    sys.inputs["u"].upper_bound = np.array([5.0])
+    sys.state.lower = np.array([-2.0 * np.pi, -2.0 * np.pi])
+    sys.state.upper = np.array([2.0 * np.pi, 2.0 * np.pi])
+    sys.inputs["u"].lower = np.array([-5.0])
+    sys.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(sys, x_bar=UPRIGHT, R=np.eye(1))
     return PlanningProblem(sys, cost=cost, X=sys.state.box, U=sys.input_box)
 
 
 def benchmark_backend(
     backend: str,
-    x_grid_shape,
-    u_grid_shape,
+    x_grid,
+    u_grid,
     *,
     n_steps: int = 300,
     dt: float = 0.05,
@@ -72,23 +72,25 @@ def benchmark_backend(
     t0 = time.perf_counter()
     grid = StateSpaceGrid(
         problem,
-        x_grid_shape=x_grid_shape,
-        u_grid_shape=u_grid_shape,
+        x_grid=x_grid,
+        u_grid=u_grid,
         dt=dt,
         precompute=(backend != "loop"),
     )
     build_s = time.perf_counter() - t0
 
-    options = dict(backend=backend, gamma=alpha)
+    # The engine the row names: the loop (a method on NumPy), or the table on a backend
+    engine = dict(method="loop") if backend == "loop" else dict(backend=backend)
+    options = dict(**engine, gamma=alpha)
     planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
 
     cold_solve_s = None
     best_solve_s = np.inf
-    result = None
+    tables = None
     for _ in range(runs):
         t0 = time.perf_counter()
         planner.solve_steps(n_steps)
-        result = planner.result
+        tables = planner.tables
         elapsed = time.perf_counter() - t0
         if cold_solve_s is None:
             cold_solve_s = elapsed
@@ -96,12 +98,12 @@ def benchmark_backend(
 
     return DPBenchmarkRow(
         backend=backend,
-        grid=f"{tuple(x_grid_shape)}x{tuple(u_grid_shape)}",
+        grid=f"{tuple(x_grid)}x{tuple(u_grid)}",
         build_s=build_s,
         cold_solve_s=cold_solve_s,
         best_solve_s=best_solve_s,
-        iterations=result.iterations,
-        result=result,
+        n_iterations=tables.n_iterations,
+        tables=tables,
     )
 
 
@@ -122,7 +124,7 @@ def print_dp_benchmark(rows, *, reference: str = "loop") -> None:
         )
         print(
             f"{r.backend:8} {r.grid:18} {r.build_s:8.2f} {r.cold_solve_s:9.3f} "
-            f"{r.best_solve_s:9.3f} {r.iterations:6d} {speedup:8.1f}x"
+            f"{r.best_solve_s:9.3f} {r.n_iterations:6d} {speedup:8.1f}x"
         )
     print("-" * 73)
     print(
@@ -134,9 +136,9 @@ def print_dp_benchmark(rows, *, reference: str = "loop") -> None:
 def check_agreement(rows, *, atol: float = 1e-3) -> None:
     """Report the largest cost-to-go gap between backends on feasible nodes."""
     base = rows[0]
-    feasible = base.result.J < 1e5
+    feasible = base.tables.J < 1e5
     print(f"\ncross-backend value check (vs {base.backend}, feasible nodes):")
     for r in rows[1:]:
-        gap = float(np.max(np.abs(r.result.J[feasible] - base.result.J[feasible])))
+        gap = float(np.max(np.abs(r.tables.J[feasible] - base.tables.J[feasible])))
         status = "ok" if gap < atol else "DIFF"
         print(f"  {r.backend:8} max|dJ| = {gap:.2e}  [{status}]")

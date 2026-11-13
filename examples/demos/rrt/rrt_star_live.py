@@ -11,6 +11,7 @@ from minilink import (
     RRTStarPlanner,
 )
 from minilink.core.geometry import Sphere
+from minilink.planning import LiveSearchPlot
 from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import disc, mount
@@ -29,10 +30,10 @@ REPLAY_HISTORY = False
 HISTORY_STRIDE = 30
 
 sys = HolonomicMobileRobot()  # dx = u
-sys.state.lower_bound = np.array([-6.0, -6.0])
-sys.state.upper_bound = np.array([6.0, 6.0])
-sys.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
+sys.state.lower = np.array([-6.0, -6.0])
+sys.state.upper = np.array([6.0, 6.0])
+sys.inputs["u"].lower = np.array([-1.0, -1.0])
+sys.inputs["u"].upper = np.array([1.0, 1.0])
 
 scene = Scene(
     obstacles=(
@@ -59,7 +60,7 @@ extender = SteeringExtender(
     StraightLineSteering(speed=1.0), max_distance=0.55, resolution=0.05
 )
 
-live_ax = None
+live_plot = None
 if LIVE_PLOT:
     import matplotlib.pyplot as plt
 
@@ -74,6 +75,12 @@ if LIVE_PLOT:
         "Live RRT* convergence — blue path shortens as the tree rewires",
         fontsize=11,
     )
+    live_plot = LiveSearchPlot(
+        every=LIVE_PLOT_EVERY,
+        pause=LIVE_PLOT_PAUSE,
+        after_goal_only=LIVE_PLOT_AFTER_GOAL_ONLY,
+        ax=live_ax,
+    )
 
 
 planner = RRTStarPlanner(
@@ -81,56 +88,54 @@ planner = RRTStarPlanner(
     extender=extender,
     seed=SEED,
     goal_bias=0.08,
-    max_nodes=MAX_NODES,
+    max_iterations=MAX_NODES,
     optimize_after_goal=True,
     cost_tol=COST_TOL,
     convergence_patience=CONVERGENCE_PATIENCE,
-    record_history=REPLAY_HISTORY,
-    history_stride=HISTORY_STRIDE,
-    live_plot=LIVE_PLOT,
-    live_plot_ax=live_ax,
-    live_plot_every=LIVE_PLOT_EVERY,
-    live_plot_pause=LIVE_PLOT_PAUSE,
-    live_plot_after_goal_only=LIVE_PLOT_AFTER_GOAL_ONLY,
 )
 
 print("RRT* post-goal convergence demo")
 print(
-    f"  max_nodes={MAX_NODES}  patience={CONVERGENCE_PATIENCE}  "
+    f"  max_iterations={MAX_NODES}  patience={CONVERGENCE_PATIENCE}  "
     f"cost_tol={COST_TOL}  live_plot={LIVE_PLOT}"
 )
 if LIVE_PLOT:
     print(
-        f"  live_plot_after_goal_only={LIVE_PLOT_AFTER_GOAL_ONLY}  "
+        f"  after_goal_only={LIVE_PLOT_AFTER_GOAL_ONLY}  "
         f"every={LIVE_PLOT_EVERY}  pause={LIVE_PLOT_PAUSE}"
     )
 
 t0 = time.perf_counter()
-traj = planner.solve().trajectory
+solution = planner.solve(
+    record_history=REPLAY_HISTORY,
+    history_stride=HISTORY_STRIDE,
+    callback=live_plot,
+)
 elapsed = time.perf_counter() - t0
+traj, record = solution.trajectory, solution.record
 
 goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))
 stop_reason = (
     "converged"
-    if planner.converged
-    else ("max_nodes" if planner.iterations >= MAX_NODES else "first_goal")
+    if record.converged
+    else ("max_iterations" if record.n_iterations >= MAX_NODES else "first_goal")
 )
 
-print(f"  reached_goal={planner.reached_goal}  converged={planner.converged}")
-print(f"  extensions={planner.iterations}  tree nodes={len(planner.tree.nodes)}")
-print(f"  best path cost={planner.best_goal_cost:.3f}  goal error={goal_error:.3f} m")
+print(f"  reached_goal={record.reached_goal}  converged={record.converged}")
+print(f"  extensions={record.n_iterations}  tree nodes={len(planner.tree.nodes)}")
+print(f"  best path cost={record.path_cost:.3f}  goal error={goal_error:.3f} m")
 print(f"  elapsed={elapsed:.2f} s  stop reason: {stop_reason}")
 
-if REPLAY_HISTORY and planner.history:
-    first_goal = next((frame for frame in planner.history if frame.reached_goal), None)
+if REPLAY_HISTORY and record.history:
+    first_goal = next((frame for frame in record.history if frame.reached_goal), None)
     if first_goal is not None:
         print(
             f"  first goal at extension {first_goal.iteration}, "
-            f"cost={first_goal.best_cost:.3f}"
+            f"cost={first_goal.best_cost_to_come:.3f}"
         )
-        final_cost = planner.history[-1].best_cost
+        final_cost = record.history[-1].best_cost_to_come
         print(
-            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost - final_cost:.3f})"
+            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost_to_come - final_cost:.3f})"
         )
 
 if LIVE_PLOT:

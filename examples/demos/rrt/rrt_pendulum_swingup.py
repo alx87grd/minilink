@@ -6,10 +6,10 @@ from minilink import BallSet, Pendulum, PlanningProblem, RRTPlanner
 from minilink.planning.search.extenders import KinodynamicExtender
 
 sys = Pendulum()  # state [theta, dtheta]; theta=0 hangs down, theta=pi inverted
-sys.state.lower_bound = np.array([-2.0 * np.pi, -12.0])
-sys.state.upper_bound = np.array([2.0 * np.pi, 12.0])
-sys.inputs["u"].lower_bound = np.array([-5.0])
-sys.inputs["u"].upper_bound = np.array([5.0])
+sys.state.lower = np.array([-2.0 * np.pi, -12.0])
+sys.state.upper = np.array([2.0 * np.pi, 12.0])
+sys.inputs["u"].lower = np.array([-5.0])
+sys.inputs["u"].upper = np.array([5.0])
 
 x0 = np.array([0.0, 0.0])  # hanging down, at rest
 x_goal = np.array([np.pi, 0.0])  # inverted, at rest
@@ -24,15 +24,15 @@ problem = PlanningProblem(
 torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]
 planner = RRTPlanner(
     problem,
-    extender=KinodynamicExtender(controls=torques, horizon=0.3, n_substeps=6),
+    extender=KinodynamicExtender(controls=torques, horizon=0.3, n_steps=6),
     seed=0,
     goal_bias=0.05,
-    max_nodes=20000,
+    max_iterations=20000,
 )
 solution = planner.solve()
 print(solution.record)
 
 planner.plot_tree(x_axis=0, y_axis=1)
 planner.animate_search(x_axis=0, y_axis=1)
-planner.plot_solution(signals=("x", "u"))
-planner.animate_solution()
+planner.plot_trajectory(signals=("x", "u"))
+planner.animate()

@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
 
 import numpy as np
 
@@ -19,7 +18,11 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_finite_horizon,
+)
 
 ConstraintFunction = Callable[[np.ndarray], np.ndarray]
 
@@ -76,29 +79,31 @@ class Transcription(ABC):
         ...
 
 
-@dataclass
-class FixedGridOptions:
-    """Uniform fixed-grid options — knot count only; horizon is ``problem.horizon``."""
+class FixedGridTranscription(Transcription):
+    """A transcription on a uniform grid: ``n_steps`` intervals ``N`` on ``problem.horizon``, ``N + 1`` knots."""
 
-    n_steps: int
+    def __init__(self, *, n_steps: int):
+        require_interval_count(n_steps)
+        self.n_steps = int(n_steps)
 
-    def __post_init__(self) -> None:
-        require_knot_count(self.n_steps)
-        self.n_steps = int(self.n_steps)
+    @property
+    def n_knots(self) -> int:
+        """The knot count, ``N + 1``: the knots ``t_0 … t_N`` bound the ``N`` intervals."""
+        return self.n_steps + 1
 
     def t(self, problem: PlanningProblem) -> np.ndarray:
-        """The time grid on the horizon ``[t0, t0 + tf]``: ``t0`` plus ``linspace(0, tf, n_steps)``."""
-        t = problem.t0 + fixed_grid_t(problem.require_finite_horizon(), self.n_steps)
+        """The time grid on the horizon ``[t0, t0 + tf]``: ``t0`` plus ``linspace(0, tf, N + 1)``."""
+        t = problem.t0 + fixed_grid_t(require_finite_horizon(problem), self.n_steps)
 
         return t
 
     def offsets(self, problem: PlanningProblem) -> np.ndarray:
-        """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t0 + offset_k``."""
-        return fixed_grid_t(problem.require_finite_horizon(), self.n_steps)
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, N + 1)``: ``t_k = t0 + offset_k``."""
+        return fixed_grid_t(require_finite_horizon(problem), self.n_steps)
 
     def dt(self, problem: PlanningProblem) -> float:
-        """Step size from finite ``problem.horizon`` and ``n_steps``."""
-        return fixed_grid_dt(problem.require_finite_horizon(), self.n_steps)
+        """The step ``tf / N`` from the finite ``problem.horizon`` and the ``N`` intervals."""
+        return fixed_grid_dt(require_finite_horizon(problem), self.n_steps)
 
 
 # Shared transcription math: the textbook pieces every fixed-grid transcription
@@ -263,28 +268,28 @@ def stack_constraints(
     return stacked
 
 
-def require_knot_count(n_steps):
-    """Refuse a fixed grid of fewer than two knots."""
-    if n_steps < 2:
-        raise ValueError("n_steps must be at least 2")
+def require_interval_count(n_steps):
+    """Refuse a fixed grid of fewer than one interval (two knots)."""
+    if n_steps < 1:
+        raise ValueError("n_steps must be at least 1")
 
 
 def fixed_grid_t(tf: float, n_steps: int) -> np.ndarray:
-    """Uniform time knots: ``linspace(0, tf, n_steps)``."""
+    """Uniform time knots on ``N`` intervals: ``linspace(0, tf, N + 1)``."""
     tf = float(tf)
     require_fixed_grid_horizon(tf)
 
-    t = np.linspace(0.0, tf, int(n_steps))
+    t = np.linspace(0.0, tf, int(n_steps) + 1)
 
     return t
 
 
 def fixed_grid_dt(tf: float, n_steps: int) -> float:
-    """Uniform step: ``tf / (n_steps - 1)``."""
+    """Uniform step on ``N`` intervals: ``tf / N``."""
     tf = float(tf)
     require_fixed_grid_horizon(tf)
 
-    dt = tf / (int(n_steps) - 1)
+    dt = tf / int(n_steps)
 
     return dt
 

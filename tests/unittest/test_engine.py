@@ -101,7 +101,7 @@ def test_the_score_is_the_integral_plus_the_terminal_cost():
     row = score_run(problem, Trajectory(t, x, u))
 
     # ∫₀¹ x₁² dt = 1, plus h = x₁(1)² = 1
-    assert row["cost"] == pytest.approx(2.0)
+    assert row["raw_cost"] == pytest.approx(2.0)
     assert row["J"] == pytest.approx(2.0)
     assert not row["failed"] and row["reached"]
 
@@ -118,7 +118,7 @@ def test_the_failure_switch_charges_a_failed_or_missed_run():
         PlanningProblem(sys, cost=cost, horizon=1.0, Xf=goal, U=sys.input_box), run
     )
     assert off["failed"] and not off["reached"]
-    assert off["J"] == pytest.approx(off["cost"])
+    assert off["J"] == pytest.approx(off["raw_cost"])
     assert off["feasibility_margin"] == pytest.approx(-5.0)
     assert off["reachability_margin"] == pytest.approx(0.1 - np.pi)
 
@@ -135,7 +135,7 @@ def test_the_failure_switch_charges_a_failed_or_missed_run():
         ),
         run,
     )
-    assert on["J"] == pytest.approx(off["cost"] + 1000.0)
+    assert on["J"] == pytest.approx(off["raw_cost"] + 1000.0)
 
 
 def test_a_run_that_is_not_finite_costs_inf_or_the_failure_cost():
@@ -147,7 +147,7 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_failure_cost():
     run = Trajectory(t, x, np.zeros((1, t.size)))
 
     off = score_run(PlanningProblem(sys, cost=cost, horizon=1.0, U=sys.input_box), run)
-    assert off["failed"] and off["J"] == np.inf and off["cost"] == np.inf
+    assert off["failed"] and off["J"] == np.inf and off["raw_cost"] == np.inf
 
     problem = PlanningProblem(
         sys,
@@ -187,7 +187,7 @@ def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
     assert nan_row["failed"] and out_row["failed"]
     assert np.isfinite(nan_row["J"])
     assert nan_row["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
-    assert out_row["J"] == pytest.approx(out_row["cost"] + 50.0)
+    assert out_row["J"] == pytest.approx(out_row["raw_cost"] + 50.0)
     assert nan_row["J"] > out_row["J"]
 
 
@@ -230,7 +230,7 @@ def test_a_stochastic_problem_draws_its_trials(backend):
     with pytest.raises(ValueError, match="n_trials"):
         pe.evaluate()
 
-    report = pe.evaluate(n_trials=8, key=0, record=True)
+    report = pe.evaluate(n_trials=8, key=0, trajectories=True)
     assert report.x0.shape == (8, 2)
     assert len(np.unique(report.x0[:, 0])) == 8
     assert len(report.trajectories) == 8
@@ -246,7 +246,9 @@ def test_the_facade_is_compile_then_evaluate():
     assert isinstance(report, Evaluation) and report.n_trials == 4
 
 
-def test_the_facade_reads_a_sampled_controllers_clock_and_asks_a_continuous_one_for_dt():
+def test_the_facade_reads_a_sampled_controllers_clock_and_a_continuous_ones_automatic_step():
+    from minilink.core.system import automatic_step_of
+
     problem = upright_problem()
 
     # A sampled controller runs on its own clock
@@ -254,9 +256,15 @@ def test_the_facade_reads_a_sampled_controllers_clock_and_asks_a_continuous_one_
     assert isinstance(on_clock, Evaluation)
     assert on_clock.trajectories is None
 
-    # A continuous controller's loop needs the period it is integrated on
-    with pytest.raises(TypeError, match="needs dt"):
-        evaluate(problem, pid(), backend="numpy")
+    # A continuous controller with no dt runs on the loop's automatic step,
+    # Δt = 0.1 τ_min shortened to divide the run: dt = tf / ⌈tf / Δt⌉
+    pe = problem.compile(pid(), backend="numpy")
+    step = automatic_step_of(pe.loop.solver_info)
+    assert pe.dt <= step and pe.n_steps == int(np.ceil(pe.horizon / step - 1e-9))
+    np.testing.assert_allclose(pe.n_steps * pe.dt, pe.horizon, rtol=1e-12)
+    automatic = evaluate(problem, pid(), backend="numpy")
+    stated = evaluate(problem, pid(), dt=pe.dt, backend="numpy")
+    np.testing.assert_array_equal(automatic.J, stated.J)
 
 
 # --- the gradient and the program ---
@@ -305,7 +313,7 @@ def test_the_program_reads_the_same_objective_and_the_declared_rows():
     wrt = ["controller.Kp", "controller.Kd"]
 
     program = pe.program(wrt, bounds={"controller.Kp": (0.0, None)}, params=upright(pe))
-    z0 = program.metadata["z0"]
+    z0 = program.z0
 
     assert program.n_z == 2 and program.backend == "jax"
     assert program.lower.tolist() == [0.0, -np.inf]
@@ -368,6 +376,13 @@ def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
         )
     with pytest.raises(ValueError, match="plant's"):
         evaluate_trajectory(problem, Trajectory(traj.t, traj.x, traj.u))
+
+    # A plan that carries its own cost signals is scored by the line the refusal names
+    plan = traj.of("plant").with_cost(problem.cost)
+    with pytest.raises(ValueError, match=r"Trajectory\(traj.t, traj.x, traj.u\)"):
+        evaluate_trajectory(problem, plan)
+    bare = evaluate_trajectory(problem, Trajectory(plan.t, plan.x, plan.u)).J
+    np.testing.assert_array_equal(bare, logged)
 
 
 @pytest.mark.jax
@@ -512,7 +527,7 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
     bounds = {"controller.Kp": (1.0, 200.0), "controller.Kd": (0.0, 50.0)}
     program = pe.program(wrt, bounds=bounds, params=upright(pe))
     assert program.metadata["rows"] == ["feasibility_margin"]
-    result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 100}).solve()
+    result = Optimizer(program, method="slsqp", options={"maxiter": 100}).solve()
 
     tuned = pe.evaluate(pe.unpack(result.z, wrt, pe.merged(upright(pe))))
     assert not tuned.failed[0] and float(tuned.feasibility_margin[0]) >= 0.0
@@ -593,7 +608,7 @@ def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
     x0 = np.array(loop.x0, dtype=float)
     a, b = loop.state_index["plant"]
     x0[a:b] = [0.5, 0.0]
-    reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4_fixedsteps").solve()
+    reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4").solve()
     np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], rtol=1e-9)
 
     # An evaluation draws a seed per trial: a block's own seed is only its default
@@ -791,7 +806,7 @@ def test_the_gradient_reaches_an_observers_start():
     B = np.array([[0.0], [1.0]])
     C = np.array([[1.0, 0.0]])
     plant_ = LTISystem(A, B, C)
-    observer = StateObserver(A, B, C, np.array([[3.0], [2.0]]))
+    observer = StateObserver(plant_, np.array([[3.0], [2.0]]))
     loop = closed_loop(StateFeedback(np.array([[1.0, 1.5]])), plant_, observer=observer)
     problem = PlanningProblem(
         plant_, x0=[1.0, 0.0], cost=QuadraticCost.from_system(plant_), horizon=2.0
@@ -836,11 +851,94 @@ def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
     wrt = ["controller.values"]
     program = pe.program(wrt)
     assert program.n_z == 11 and program.metadata["rows"] == ["reachability_margin"]
-    result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 200}).solve()
+    result = Optimizer(program, method="slsqp", options={"maxiter": 200}).solve()
 
     # The goal reached to the solver's tolerance: the optimum sits on its boundary
     planned = pe.evaluate(pe.unpack(result.z, wrt, pe.params))
     assert result.success and float(planned.reachability_margin[0]) >= -1e-8
+
+
+def swing_up_plan():
+    """The pendulum swing-up's RRT plan (seed 0): a held open-loop plan that reaches the goal."""
+    from minilink.planning.search.rrt import RRTPlanner
+
+    sys = Pendulum()
+    cost = QuadraticCost.from_system(sys, Q=np.eye(2), R=np.eye(1))
+    problem = PlanningProblem(
+        sys,
+        x0=[0.0, 0.0],
+        cost=cost,
+        horizon=10.0,
+        X=sys.state.box,
+        U=sys.input_box,
+        Xf=BallSet([np.pi, 0.0], 0.3),
+    )
+
+    return problem, RRTPlanner(problem, seed=0).solve()
+
+
+def test_a_held_plan_is_scored_as_planned():
+    """Ruling 23a: a held plan's samples are the plant's input held over each step, as compute_trajectory(u=) holds them."""
+    problem, solution = swing_up_plan()
+    plan = solution.trajectory
+    dt = float(np.median(np.diff(plan.t)))
+    assert solution.record.success and problem.Xf.contains(plan.x[:, -1])
+
+    # The plan's own length and step: the evidence reproduces the plan
+    over_plan = problem.replace(horizon=float(plan.tf))
+    report = evaluate(over_plan, solution.controller, dt=dt, trajectories=True)
+    run = report.trajectories[0].of("plant")
+    np.testing.assert_allclose(run.x, plan.x, atol=1e-9)
+    np.testing.assert_allclose(run.u[:, :-1], plan.u[:, :-1], atol=0.0)
+    assert bool(report.reached[0])
+
+    # A finer step holds each sample over its own interval: the goal still reached
+    assert bool(evaluate(over_plan, solution.controller, dt=0.01).reached[0])
+
+    # The block handed out is unchanged: read at a step's end, it gives the next sample
+    no_signal = np.zeros(0)
+    t_1 = plan.t[1]
+    np.testing.assert_array_equal(
+        solution.controller.h(no_signal, no_signal, t_1), plan.u[:, 1]
+    )
+
+
+def test_a_plan_is_scored_over_the_problems_horizon():
+    """Ruling 23b: one judge, the problem's horizon; the plan's last input held after it ends."""
+    problem, solution = swing_up_plan()
+    plan = solution.trajectory
+    dt = float(np.median(np.diff(plan.t)))
+    assert plan.tf < problem.horizon
+
+    evidence = swing_up_evidence(problem)
+    report = evaluate(problem, solution.controller, dt=dt, backend="numpy")
+
+    np.testing.assert_array_equal(evidence.J, report.J)
+    assert solution.record.success and not bool(evidence.reached[0])
+
+
+def swing_up_evidence(problem):
+    """The swing-up's RRT evidence, ``solve(evaluate=True)``."""
+    from minilink.planning.search.rrt import RRTPlanner
+
+    return RRTPlanner(problem, seed=0).solve(evaluate=True).evaluation
+
+
+@pytest.mark.jax
+def test_a_held_plan_scores_alike_on_jax():
+    pytest.importorskip("jax")
+    problem, solution = swing_up_plan()
+    plan = solution.trajectory
+    over_plan = problem.replace(horizon=float(plan.tf))
+    dt = float(np.median(np.diff(plan.t)))
+
+    reports = [
+        evaluate(over_plan, solution.controller, dt=dt, backend=backend)
+        for backend in ("numpy", "jax")
+    ]
+
+    np.testing.assert_allclose(reports[1].J, reports[0].J, rtol=1e-10)
+    assert bool(reports[1].reached[0])
 
 
 # --- the problem's laws, sources and starts: the seam review's cases ---
@@ -915,7 +1013,8 @@ def test_a_point_start_reads_the_start_the_params_give():
 
 def test_a_start_set_that_cannot_draw_is_refused():
     with pytest.raises(ValueError, match="cannot draw a start"):
-        PlanningProblem(plant(), x0=BallSet(np.zeros(2), 1.0), horizon=1.0)
+        start = BallSet(np.zeros(2), 1.0) & BoxSet(-np.ones(2), np.ones(2))
+        PlanningProblem(plant(), x0=start, horizon=1.0)
 
 
 def test_the_failure_cost_follows_the_overridden_weights():
@@ -972,7 +1071,7 @@ def test_a_robust_gain_tuning_solves_the_sample_average_program(backend):
         key=4,
         n_trials=6,
     )
-    z0 = program.metadata["z0"]
+    z0 = program.z0
     result = Optimizer(program, method="auto", options={"maxiter": 60}).solve()
     assert float(program.J(result.z)) < float(program.J(z0))
     np.testing.assert_array_equal(program.J(z0), program.J(z0))  # one key, one value
@@ -1017,3 +1116,19 @@ def test_a_run_made_with_record_none_is_refused_by_name_when_scored():
     # The default run records the plant's input: it scores as it is
     recorded = loop.compute_trajectory(tf=0.5, dt=0.01)
     assert np.isfinite(evaluate_trajectory(problem, recorded).J).all()
+
+
+def test_scoring_a_problem_with_no_horizon_announces_the_length_it_runs():
+    """A default that sets what is scored is announced, and silent once the caller names it."""
+    import warnings
+
+    from minilink.planning.evaluator import evaluate
+
+    problem = upright_problem(horizon=None)
+
+    with pytest.warns(UserWarning, match="scored over 10 s"):
+        evaluate(problem, pid(), dt=0.05)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        evaluate(problem, pid(), dt=0.05, episode_length=2.0)

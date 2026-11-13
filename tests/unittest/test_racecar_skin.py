@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from minilink.catalog import UdeSRacecar, UdeSRacecarDyn, UdeSRacecarDyn3D
+from minilink.catalog import UdeSRacecar, UdeSRacecarDyn
 from minilink.core.geometry.paths import circuit_waypoints
 from minilink.graphical.catalog.racecar_skin import (
     ASSETS,
@@ -170,7 +170,7 @@ def test_the_hinges_are_turned_by_the_ackermann_angles():
 @pytest.mark.parametrize("look", [racecar_skin_2d, racecar_skin_3d])
 def test_every_look_draws_something_on_the_frames(look):
     """A skin is geometry keyed to the frames the placement returns."""
-    car = UdeSRacecarDyn3D()
+    car = UdeSRacecarDyn(wheel_angles=True)
 
     geometry = look(car)
 
@@ -183,7 +183,7 @@ def test_every_look_draws_something_on_the_frames(look):
 @pytest.mark.parametrize("look", [racecar_skin_2d, racecar_skin_3d])
 def test_the_plant_places_every_frame_its_look_needs(look):
     """The animator flattens the look against ``tf``: a missing frame is a KeyError."""
-    car = UdeSRacecarDyn3D()
+    car = UdeSRacecarDyn(wheel_angles=True)
     car.scene_bounds = (-2.0, 2.0, -1.0, 1.0)
 
     geometry = look(car)
@@ -195,8 +195,8 @@ def test_the_plant_places_every_frame_its_look_needs(look):
 
 def test_the_scene_is_optional_and_asked_for_by_the_plant():
     """No ``scene_bounds``, no ground: a look never invents a world around a plant."""
-    bare = UdeSRacecarDyn3D()
-    grounded = UdeSRacecarDyn3D()
+    bare = UdeSRacecarDyn(wheel_angles=True)
+    grounded = UdeSRacecarDyn(wheel_angles=True)
     grounded.scene_bounds = (-2.0, 2.0, -1.0, 1.0)
 
     assert "world" not in racecar_skin_3d(bare)
@@ -245,7 +245,7 @@ def test_the_scene_leaves_an_open_path_open():
     [
         (UdeSRacecar, np.array([1.0, 0.2])),
         (UdeSRacecarDyn, np.array([40.0, 0.2])),
-        (UdeSRacecarDyn3D, np.array([40.0, 0.2])),
+        (lambda: UdeSRacecarDyn(wheel_angles=True), np.array([40.0, 0.2])),
     ],
 )
 def test_the_3d_skin_attaches_to_both_plants(car_factory, u):
@@ -262,7 +262,7 @@ def test_the_3d_skin_attaches_to_both_plants(car_factory, u):
 
 def test_the_3d_plant_adds_only_the_wheel_angles():
     """Eleven states: the nine of the car, plus one rolling angle per axle."""
-    car = UdeSRacecarDyn3D()
+    car = UdeSRacecarDyn(wheel_angles=True)
     plain = UdeSRacecarDyn()
     x = np.array([1.0, 0.4, 0.2, 4.0, -0.3, 0.8, 85.0, 0.1, 30.0, 2.0, 3.0])
     u = np.array([40.0, 0.2])
@@ -277,7 +277,7 @@ def test_the_3d_plant_adds_only_the_wheel_angles():
 
 def test_the_3d_plant_places_its_own_skin():
     """``tf`` feeds the link frames from the state, wheel angles included."""
-    car = UdeSRacecarDyn3D()
+    car = UdeSRacecarDyn(wheel_angles=True)
     x = np.zeros(car.n)
     x[0], x[1], x[2], x[7], x[9] = 2.0, 1.0, 0.5, 0.2, 1.3
 

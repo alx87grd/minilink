@@ -8,8 +8,8 @@ import time
 from minilink.core.backends import BACKEND_JAX
 from minilink.core.compile.evaluators.base import (
     ContinuousEvaluator,
-    check_jax_compatible,
     outputs_from_ports,
+    require_jax_traceable,
 )
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.system import DynamicSystem
@@ -25,9 +25,7 @@ class DynamicEvaluator(ContinuousEvaluator):
     def __init__(self, system: DynamicSystem, backend="numpy", verbose=False):
         if not isinstance(system, DynamicSystem):
             raise TypeError("DynamicEvaluator requires a DynamicSystem")
-        super().__init__(
-            system.n, system.m, system.p, backend, system.get_u_from_input_ports()
-        )
+        super().__init__(system.n, system.m, system.p, backend, system.u_nominal)
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self.params_reader = lambda: system.params
@@ -73,12 +71,12 @@ def check_leaf_traces(evaluator, system, evolution, dummy_t, verbose):
     dummy_u = jnp.zeros(system.m)
     params = system.params
     if evolution is not None:
-        check_jax_compatible(
+        require_jax_traceable(
             evolution, system.name, dummy_x, dummy_u, dummy_t, params, jax
         )
     for port_id, port in system.outputs.items():
         label = f"{system.name}:{port_id}"
-        check_jax_compatible(
+        require_jax_traceable(
             port.compute, label, dummy_x, dummy_u, dummy_t, params, jax
         )
 

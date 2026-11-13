@@ -16,7 +16,7 @@ class LowPass(StepSystem):
     """``z_{k+1} = α z_k + (1 − α) u_k``, ``y = z``."""
 
     def __init__(self, alpha=0.6):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"alpha": float(alpha)}
 
     def step(self, x, u, k=0, params=None):
@@ -230,7 +230,7 @@ def test_the_problem_refuses_the_pure_mpc_naming_its_clock():
     problem = PlanningProblem(
         plant, cost=QuadraticCost.from_system(plant), x0=np.zeros(2), horizon=1.0
     )
-    planner = TrajectoryOptimizationPlanner(problem, n_steps=5, verbose=False)
+    planner = TrajectoryOptimizationPlanner(problem, n_steps=5)
     mpc = ModelPredictiveController(planner, warm_start=False)
     with pytest.raises(TypeError, match="% dt"):
         problem.compile(mpc, dt=0.1)
@@ -355,25 +355,23 @@ def test_a_static_box_joins_a_sampled_loop():
     np.testing.assert_allclose(ev.outputs(x, np.zeros(0), 0)["y"], [3.0])
 
 
-def test_a_loop_keeps_its_own_x0_held_outputs_included_on_refresh():
+def test_a_loop_keeps_its_own_x0_held_outputs_included():
     loop = multi_rate_computer_on_an_integrator()
     loop.x0 = np.array([0.5, 1.0, 0.0])
-    loop.refresh()
     np.testing.assert_array_equal(loop.x0, [0.5, 1.0, 0.0])
 
 
-def test_a_sampled_plant_reads_its_source_x0_again_on_refresh():
+def test_a_sampled_plant_reads_its_source_x0_live():
+    # The loop's x0 is a view of its blocks', the sampled plant's of its source's
     plant = Pendulum()
     loop = (PID() % 0.01) @ plant
     plant.x0 = np.array([0.3, 0.0])
-    loop.refresh()
     a, b = loop.state_index["plant"]
     np.testing.assert_array_equal(loop.x0[a:b], plant.x0)
 
     # An x0 set on the view itself stays
     view = discretize(Pendulum(), 0.01)
     view.x0 = np.array([1.0, 0.0])
-    view.refresh()
     np.testing.assert_array_equal(view.x0, [1.0, 0.0])
 
 
@@ -414,7 +412,7 @@ class TickCount(StepSystem):
     """A tick law whose output is its own count: ``y_k = k``."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def step(self, x, u, k=0, params=None):
         return x
@@ -489,11 +487,9 @@ def test_a_bare_tick_law_is_refused_where_a_nested_box_would_speed_it_up():
 
 
 def test_the_mpc_box_has_no_clock_operator_of_its_own():
-    from minilink.planning.trajectory_optimization.mpc.predictive import (
-        PredictiveController,
-    )
+    from minilink.control import ModelPredictiveController
 
-    assert "__mod__" not in vars(PredictiveController)
+    assert "__mod__" not in vars(ModelPredictiveController)
 
 
 def test_the_host_runner_lands_on_the_period_end_for_any_substep_count():
@@ -547,12 +543,40 @@ def test_a_sampled_data_law_takes_its_period_at_construction():
     from minilink.core.discrete.sampled_system import NativeSampledSystem
 
     with pytest.raises(TypeError, match="at construction"):
-        NativeSampledSystem(n=0)
-    law = NativeSampledSystem(n=0, sample_period=0.1)
+        NativeSampledSystem(state_dim=0)
+    law = NativeSampledSystem(state_dim=0, sample_period=0.1)
     with pytest.raises(TypeError, match="never by %"):
         law % 0.2
     with pytest.raises(TypeError, match="already on a clock"):
         discretize(law, 0.1)
+
+
+def test_a_sampled_data_law_takes_output_dim_and_writes_its_h():
+    """Ruling Q6: output_dim= like its siblings; an h that would read its own output port refused."""
+    from minilink.core.discrete.sampled_system import NativeSampledSystem
+
+    class Accumulator(NativeSampledSystem):
+        """x_{k+1} = x_k + Δ u_k, y = 2 x: an integrator written in seconds."""
+
+        def __init__(self):
+            super().__init__(1, sample_period=0.1, input_dim=1, output_dim=1)
+
+        def update(self, x, u, t, params=None):
+            return x + self.sample_period * u
+
+        def h(self, x, u, t=0.0, params=None):
+            return 2.0 * x
+
+    law = Accumulator()
+    assert law.p == 1 and "y" in law.outputs
+    run = law.compute_rollout(3, u=np.ones(1))
+    np.testing.assert_allclose(run.x[0], [0.0, 0.1, 0.2, 0.3])
+    np.testing.assert_allclose(
+        law.outputs["y"].compute(np.array([0.3]), np.ones(1), 0.3), [0.6]
+    )
+
+    with pytest.raises(TypeError, match="y would read itself"):
+        NativeSampledSystem(1, sample_period=0.1, output_dim=1)
 
 
 def test_the_held_outputs_start_is_a_leaf_of_the_run():

@@ -16,10 +16,10 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 def make_bounded_pendulum():
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-2.0 * np.pi, -12.0])
-    plant.state.upper_bound = np.array([+2.0 * np.pi, +12.0])
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([+1.0])
+    plant.state.lower = np.array([-2.0 * np.pi, -12.0])
+    plant.state.upper = np.array([+2.0 * np.pi, +12.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([+1.0])
     plant.x0 = np.array([-np.pi, 0.0])
     return plant
 
@@ -30,7 +30,7 @@ def make_unbounded_pendulum():
 
     class UnboundedPendulum(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
 
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], -np.sin(x[0]) + u[0]])
@@ -62,7 +62,7 @@ class TestSys2Gym(unittest.TestCase):
 
         plant = make_bounded_pendulum()
         cost = QuadraticCost.from_system(plant, x_bar=np.zeros(2))
-        return Sys2Gym(plant, cost, dt=0.05, tf=1.0, **kwargs)
+        return Sys2Gym(plant, cost, dt=0.05, episode_length=1.0, **kwargs)
 
     def test_env_checker(self):
         from gymnasium.utils.env_checker import check_env
@@ -119,7 +119,7 @@ class TestSys2Gym(unittest.TestCase):
                 plant,
                 cost,
                 dt=1e-3,
-                tf=1.0,
+                episode_length=1.0,
                 solver=name,
                 backend="numpy",
             )
@@ -144,7 +144,7 @@ class TestSys2Gym(unittest.TestCase):
 
         plant = make_bounded_pendulum()
         cost = QuadraticCost.from_system(plant, x_bar=np.zeros(2))
-        env = Sys2Gym(plant, cost, dt=0.1, tf=1.0)
+        env = Sys2Gym(plant, cost, dt=0.1, episode_length=1.0)
         env.reset()
 
         # tf = 1, dt = 0.1: the episode is 10 steps, the last one truncated
@@ -270,7 +270,7 @@ class TestSys2GymJax(unittest.TestCase):
 
         plant = make_bounded_pendulum()
         cost = QuadraticCost.from_system(plant, x_bar=np.zeros(2))
-        return Sys2Gym(plant, cost, dt=0.05, tf=1.0, **kwargs)
+        return Sys2Gym(plant, cost, dt=0.05, episode_length=1.0, **kwargs)
 
     def test_jax_is_picked_when_the_plant_traces(self):
         env = self._envs()
@@ -297,11 +297,11 @@ class TestSys2GymJax(unittest.TestCase):
             """A Python branch on the state value: NumPy only."""
 
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
-                self.state.lower_bound = np.array([-5.0])
-                self.state.upper_bound = np.array([5.0])
-                self.inputs["u"].lower_bound = np.array([-1.0])
-                self.inputs["u"].upper_bound = np.array([1.0])
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
+                self.state.lower = np.array([-5.0])
+                self.state.upper = np.array([5.0])
+                self.inputs["u"].lower = np.array([-1.0])
+                self.inputs["u"].upper = np.array([1.0])
 
             def f(self, x, u, t=0, params=None):
                 gain = 2.0 if x[0] > 0.0 else 1.0
@@ -309,12 +309,12 @@ class TestSys2GymJax(unittest.TestCase):
 
         plant = Branching()
         cost = QuadraticCost.from_system(plant, x_bar=np.zeros(plant.n))
-        env = Sys2Gym(plant, cost, dt=0.05, tf=1.0)
+        env = Sys2Gym(plant, cost, dt=0.05, episode_length=1.0)
         self.assertEqual(env.backend, "numpy")
         env.reset()
         env.step(np.zeros(plant.m))
         with self.assertRaises(RuntimeError):
-            Sys2Gym(plant, cost, dt=0.05, tf=1.0, backend="jax")
+            Sys2Gym(plant, cost, dt=0.05, episode_length=1.0, backend="jax")
 
 
 @pytest.mark.rl
@@ -330,7 +330,7 @@ class TestSB3Controller(unittest.TestCase):
         self.assertEqual(diagram.connections["controller"]["x"], ("plant", "x"))
         self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
 
-        traj = diagram.compute_trajectory(tf=0.5, n_steps=51, verbose=False)
+        traj = diagram.compute_trajectory(tf=0.5, n_samples=51, verbose=False)
         self.assertEqual(traj.x.shape[0], 2)
         np.testing.assert_allclose(ctl.action(np.zeros(2)), [0.2])
 

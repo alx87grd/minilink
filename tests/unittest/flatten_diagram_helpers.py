@@ -1,20 +1,17 @@
 """Nested diagram fixtures that expose flatten state-stack reorder bugs.
 
-Twin subnets plus a stateful top-level block (``sum``) mirror the benchmark
-topology; smaller chains keep CI fast.
+Twin dense subnets plus a stateful top-level block (``sum``) expose the reorder;
+smaller chains keep CI fast.
 """
 
 from __future__ import annotations
 
-from benchmarks.scenarios.nested_dense_network import (
-    make_twin_dense_network,
-    make_wrapped_dense_network,
-)
 from benchmarks.systems.network import (
     MultiInputNode,
     SimpleGain,
     SimpleIntegrator,
     build_deep_network,
+    make_dense_network,
 )
 from minilink.blocks.routing import Gain
 from minilink.control.siso import PID
@@ -22,12 +19,37 @@ from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
 
 
-def twin_dense_15():
-    return make_twin_dense_network(num_nodes_each=15, connections_per_node=5)
+def _dense_subnet(seed: int) -> DiagramSystem:
+    """A 15-node dense network, its last node's state exposed as ``y``."""
+    net = make_dense_network(num_nodes=15, connections_per_node=5, seed=seed)
+    net.connect_new_output_port("Node14", "x", "y")
+    return net
 
 
-def wrapped_dense_15():
-    return make_wrapped_dense_network(num_nodes=15, connections_per_node=5)
+def twin_dense_15() -> DiagramSystem:
+    """Two dense subnets nested, summed, then a post gain."""
+    outer = DiagramSystem()
+    outer.name = "TwinDense(n=15,c=5)"
+    outer.add_subsystem(_dense_subnet(seed=42), "net_a")
+    outer.add_subsystem(_dense_subnet(seed=1042), "net_b")
+    outer.add_subsystem(MultiInputNode("sum", 2), "sum")
+    outer.add_subsystem(SimpleGain("post", gain=0.5), "post")
+    outer.connect("net_a", "y", "sum", "u0")
+    outer.connect("net_b", "y", "sum", "u1")
+    outer.connect("sum", "x", "post", "u")
+    outer.connect_new_output_port("post", "y", "out")
+    return outer
+
+
+def wrapped_dense_15() -> DiagramSystem:
+    """One dense subnet nested under a post gain (boundary ``net:y`` to ``post:u``)."""
+    outer = DiagramSystem()
+    outer.name = "WrappedDense(n=15,c=5)"
+    outer.add_subsystem(_dense_subnet(seed=42), "net")
+    outer.add_subsystem(SimpleGain("post", gain=1.0), "post")
+    outer.connect("net", "y", "post", "u")
+    outer.connect_new_output_port("post", "y", "out")
+    return outer
 
 
 def _small_chain_subnet(

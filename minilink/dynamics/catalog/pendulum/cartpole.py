@@ -28,8 +28,8 @@ class CartPole(MechanicalSystem):
         super().__init__(dof=2, actuators=1)
 
         # The plant's own range: angles and rates within ±2π
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
 
         # Parameters
         self.params = {
@@ -45,8 +45,8 @@ class CartPole(MechanicalSystem):
         self.state.units = ["m", "rad", "m/s", "rad/s"]
         self.inputs["u"].labels = ["F"]
         self.inputs["u"].units = ["N"]
-        self.inputs["u"].lower_bound[0] = -10.0
-        self.inputs["u"].upper_bound[0] = 10.0
+        self.inputs["u"].lower[0] = -10.0
+        self.inputs["u"].upper[0] = 10.0
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
@@ -324,10 +324,10 @@ class RotatingCartPole(MechanicalSystem):
         super().__init__(dof=2, actuators=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -505,8 +505,8 @@ class UnderactuatedRotatingCartPole(RotatingCartPole):
             dim=1,
             labels=["tau1"],
             units=["Nm"],
-            lower_bound=[-5.0],
-            upper_bound=[5.0],
+            lower=[-5.0],
+            upper=[5.0],
         )
 
     def B(self, q, params=None):
@@ -525,7 +525,7 @@ if __name__ == "__main__":
     sys.x0 = np.array([1.0, 0.25, 0.0, 0.0])
     # sys.inputs["u"].nominal_value = np.array([1.0])
     sys.compute_trajectory(tf=12.0)
-    sys.animate(is_3d=True, time_factor_video=1.0)
+    sys.animate(is_3d=True, speed=1.0)
     # sys.animate()
     # sys.animate(renderer="meshcat")
 

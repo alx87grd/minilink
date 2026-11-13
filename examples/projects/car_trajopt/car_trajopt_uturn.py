@@ -18,11 +18,11 @@ Y_GOAL = 15.0
 W_REAR_MAX = 30.0
 DELTA_MAX = 0.8
 
-sys = DynamicBicycle()
-sys.inputs["w_rear"].lower_bound[0] = W_REAR_MAX
-sys.inputs["w_rear"].upper_bound[0] = W_REAR_MAX
-sys.inputs["delta"].lower_bound[0] = -DELTA_MAX
-sys.inputs["delta"].upper_bound[0] = DELTA_MAX
+sys = DynamicBicycle(named_ports=True)
+sys.inputs["w_rear"].lower[0] = W_REAR_MAX
+sys.inputs["w_rear"].upper[0] = W_REAR_MAX
+sys.inputs["delta"].lower[0] = -DELTA_MAX
+sys.inputs["delta"].upper[0] = DELTA_MAX
 
 x0 = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0])
 x_ref = np.array([-0.0, Y_GOAL, np.pi, U_TARGET, 0.0, 0.0])
@@ -57,7 +57,6 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     backend="jax",
     # method="ipopt",
-    verbose=PRINT_SOLVE_REPORT,
     options={
         "disp": SCIPY_DISP,
         "maxiter": 500,
@@ -65,8 +64,8 @@ planner = TrajectoryOptimizationPlanner(
     },
 )
 
-traj = planner.solve().trajectory
-planner.plot_solution(signals=("x", "u"))
+traj = planner.solve(verbose=PRINT_SOLVE_REPORT).trajectory
+planner.plot_trajectory(signals=("x", "u"))
 sys.traj = traj
 # sys.animate(renderer="meshcat")
 sys.animate()

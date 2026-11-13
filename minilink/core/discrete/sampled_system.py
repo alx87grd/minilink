@@ -137,18 +137,8 @@ class SampledSystem(StepSystem):
         # The System shell's defaults: the view's hints are its source's
         return
 
-    def refresh(self):
-        """Refresh the source, then read again the structure the view took from it: its size, state and ports."""
-        source = self.source
-        source.refresh()
-
-        self.n = source.n
-        self.state = source.state
-        self.inputs = source.inputs
-        self.outputs = source.outputs
-
     @property
-    def counts(self) -> bool:
+    def is_tick_law(self) -> bool:
         """Whether the block counts its own ticks: a tick source, which reads ``k``, never seconds."""
         return isinstance(self.source, StepSystem)
 
@@ -222,7 +212,7 @@ class SampledSystem(StepSystem):
         return x_next, c
 
     @property
-    def resolves(self) -> bool:
+    def is_integrated(self) -> bool:
         """Whether a continuous source is integrated inside the period, so its substeps can be kept: a model or a plant, never a law."""
         source = self.source
         continuous = isinstance(source, DynamicSystem) and source.n > 0
@@ -275,7 +265,7 @@ class SampledSystem(StepSystem):
 
         dt = self.sample_period
 
-        if self.counts:
+        if self.is_tick_law:
             return self.source.step(x, u, k, params)
 
         t_k = k * dt
@@ -291,7 +281,7 @@ class SampledSystem(StepSystem):
         h = self.source.h
         dt = self.sample_period
 
-        if self.counts:
+        if self.is_tick_law:
             return h(x, u, k, params)
 
         t_k = k * dt
@@ -326,10 +316,23 @@ class NativeSampledSystem(SampledSystem):
     update(x, u, k h)``. Its ``params``, ``x0`` and solver hints are its own.
     Its equation needs its period, so ``sample_period`` is set at
     construction, and ``law % dt`` is refused: it is already on its clock
-    (rule 1 of the loop's grammar).
+    (rule 1 of the loop's grammar). The keyword shortcuts create the standard
+    ports, as ``StepSystem`` does: the input ``u`` (``input_dim``), the output
+    ``y = h(x, u, t)`` (``output_dim``, ``h`` the subclass's, in seconds, its
+    inputs ``y_dependencies``) and the state output ``x`` (``expose_state``);
+    other outputs in seconds are declared with ``add_output_port``.
     """
 
-    def __init__(self, n=0, sample_period=None):
+    def __init__(
+        self,
+        state_dim=0,
+        *,
+        sample_period=None,
+        input_dim=None,
+        output_dim=None,
+        expose_state=False,
+        y_dependencies=(),
+    ):
         # No source: the clock alone, set at construction
         self.source = None
         self.solver = None
@@ -337,8 +340,17 @@ class NativeSampledSystem(SampledSystem):
         self.kind = "law"
         self.sample_period = positive_period(require_period(sample_period))
 
-        # The System shell: its own state, ports, parameters and hints
-        System.__init__(self, n)
+        # The System shell: its own state, ports, parameters and hints; the output
+        # y = h(x, u, t) the subclass's own h
+        require_own_output_map(self, output_dim)
+        System.__init__(
+            self,
+            state_dim,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            expose_state=expose_state,
+            y_dependencies=y_dependencies,
+        )
 
     @property
     def params(self) -> dict:
@@ -367,12 +379,8 @@ class NativeSampledSystem(SampledSystem):
     def solver_info(self, value: dict):
         self.__dict__["own_solver_info"] = value
 
-    def refresh(self):
-        """Nothing derived to refresh: the law owns its structure."""
-        return
-
     @property
-    def counts(self) -> bool:
+    def is_tick_law(self) -> bool:
         """A native law reads seconds, never its tick count."""
         return False
 
@@ -386,7 +394,7 @@ class NativeSampledSystem(SampledSystem):
         return self.params
 
     @property
-    def resolves(self) -> bool:
+    def is_integrated(self) -> bool:
         """A native law has no source integrated inside the period."""
         return False
 
@@ -456,29 +464,52 @@ def steps_per_period(sample_period, dt) -> int:
 ###############################################################################
 
 
+def require_own_output_map(law, output_dim):
+    """Refuse ``output_dim`` on a native law that writes no ``h``: its ``y`` would read its own output port."""
+    if output_dim is not None and type(law).h is NativeSampledSystem.h:
+        raise TypeError(
+            f"{type(law).__name__}: output_dim= declares the output y = h(x, u, t) "
+            "in seconds, and the law writes no h of its own: the inherited h reads "
+            "the law's first output port, so y would read itself; write "
+            "h(x, u, t, params) on the law, or declare the output with add_output_port"
+        )
+
+
 def exact_update(source, x, u, t, dt, params):
-    """``x(t + h) = A_d x + B_d u``, the exact hold of a linear model."""
+    """
+    The exact hold of a linear model over one period, about its nominal point ``(x̄, ū)``.
+
+    The point is the operating point of a linearization, whose drift
+    ``f(x̄, ū)`` the hold keeps, and the origin of an LTI model, where the drift
+    is zero.
+    """
     xp = array_module(x, u)
 
     n = source.n
     m = source.m
 
+    x_bar = xp.asarray(source.state.nominal_value)
+    u_bar = xp.asarray(source.u_nominal)
     A = xp.asarray(source.A(t, params))
     B = xp.asarray(source.B(t, params))
 
-    # [A_d B_d; 0 I] = exp([A B; 0 0] Δt)
+    # The drift at the point, zero at an equilibrium
+    dx_bar = xp.asarray(source.f(x_bar, u_bar, t, params))
+
+    # [A_d B_d Γ dx̄; 0 I 0; 0 0 1] = exp([A B dx̄; 0 0 0; 0 0 0] Δt)
     # fmt: off
     M = xp.block([
-        [A, B],
-        [xp.zeros((m, n)), xp.zeros((m, m))],
+        [A, B, dx_bar[:, None]],
+        [xp.zeros((m + 1, n)), xp.zeros((m + 1, m)), xp.zeros((m + 1, 1))],
     ])
     # fmt: on
     E = expm(M * dt)
     A_d = E[:n, :n]
-    B_d = E[:n, n:]
+    B_d = E[:n, n : n + m]
+    drift = E[:n, n + m]
 
-    # x_{k+1} = A_d x_k + B_d u_k
-    x_next = A_d @ x + B_d @ u
+    # x_{k+1} = x̄ + A_d (x_k − x̄) + B_d (u_k − ū) + Γ dx̄, Γ = ∫₀^Δt e^{Aτ} dτ
+    x_next = x_bar + A_d @ (x - x_bar) + B_d @ (u - u_bar) + drift
 
     return x_next
 
@@ -539,7 +570,7 @@ def require_kind(kind) -> None:
 
 def require_resolved(system) -> None:
     """Refuse the substeps of a block that integrates nothing inside its period."""
-    if not system.resolves:
+    if not system.is_integrated:
         raise TypeError(
             f"{system.name} integrates no continuous state inside its period: it has "
             "no substeps to keep"
@@ -548,7 +579,7 @@ def require_resolved(system) -> None:
 
 def require_seconds_face(system) -> None:
     """Refuse the seconds face of a tick source: it counts its ticks, it reads no seconds."""
-    if system.counts:
+    if system.is_tick_law:
         raise TypeError(
             f"{system.source.name} is a tick law: it reads its count k, never seconds; "
             "call step(x, u, k)"

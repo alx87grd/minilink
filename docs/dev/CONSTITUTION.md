@@ -65,7 +65,7 @@ one of these quantities takes or returns the object, never its arrays:
   goal ball, free space, a level set.
 - `Distribution` — a probability law over a vector, `sample(key)` and `mean`. Sets are
   support, distributions are probability; never one for the other.
-- `Field` (planned) — a scalar function on the model's `(x, u, t)`, the signature of `f` and `g`: a
+- `Field` — a scalar function on the model's `(x, u, t)`, the signature of `f` and `g`: a
   Lyapunov function `V(x)`, a cost-to-go `J(x, t)`, a Q-function `Q(x, u)`, a barrier `h(x)`,
   a clearance `d(x)`. Its sublevel and superlevel sets are `Set`s over `x`, or `InputSet`s
   over `u` at a given `x`; its shaping is a `CostFunction`.
@@ -73,7 +73,10 @@ one of these quantities takes or returns the object, never its arrays:
 - `PlanningProblem` — a system, its sets, a cost and a horizon, stochastic by its parts: a law
   where a number goes (the start, a parameter), and a disturbance a noise source block wired
   onto a port.
-- `PlanningSolution` — a policy, itself a `System`, and the evidence for it.
+- `PlanningSolution` — what a planner returns: the controller, itself a `System` (the block a
+  loop closes on, or the source of an open-loop plan), the plan it predicts, and the evidence
+  for them (the method's cost-to-go as a `Field`, its record, the score of that controller
+  over the problem's draws).
 - `MathematicalProgram` — the one NLP shape every transcription lowers to; its parametric
   form, with the problem's parameters as an input, is the same shape.
 
@@ -84,8 +87,9 @@ there, once.
 `(x, u, t; p)`, or the subset it reads; `t` is the time of the diagram the object sits in,
 seconds under a clock and the count without one, and a tick law's `k` is its own count. The
 methods: `f`, `h`, `tf` on a system; `g`, `h` on a cost;
-`margin` on a set; `value` on a field; `sdf` on a shape; `sample(key)` on a distribution. It
-is stateless, takes and returns native arrays on NumPy or JAX through one equation path, and
+`margin` on a set; `value` on a field; `sdf` on a shape; `sample(key)` on a distribution; and
+a set's `margin` takes its member first, then the arguments it depends on (`X.margin(x, t)`,
+`U.margin(u, x, t)`). It is stateless, takes and returns native arrays on NumPy or JAX through one equation path, and
 traces under JAX in every argument, `params` included — so `jit`, `grad`, `vmap` and a
 parameter family reach any object the way they reach `f`. An object that does not yet read
 `params` is a gap to close, not a design.

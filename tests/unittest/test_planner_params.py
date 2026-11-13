@@ -1,5 +1,7 @@
 """Every planner's numbers: one tree, overridden per solve (DESIGN §6, the four kinds of argument)."""
 
+from unittest import mock
+
 import numpy as np
 import pytest
 
@@ -22,8 +24,8 @@ X_UP = np.array([np.pi, 0.0])
 
 def bounded_pendulum():
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-np.pi, -6.0])
-    plant.state.upper_bound = np.array([np.pi, 6.0])
+    plant.state.lower = np.array([-np.pi, -6.0])
+    plant.state.upper = np.array([np.pi, 6.0])
     return plant
 
 
@@ -65,15 +67,18 @@ PLANNERS = {
     ),
     "tabular": (
         lambda **k: TabularLearningPlanner(regulation(), **GRID, **k),
-        {"eta": 0.5},
+        {"learning_rate": 0.5},
     ),
     "LQR": (
         lambda **k: LQRPlanner(reach().replace(Xf=None), **k),
         {"x_bar": X_UP},
     ),
-    "RRT": (lambda **k: RRTPlanner(reach(), max_nodes=60, **k), {"goal_bias": 0.3}),
+    "RRT": (
+        lambda **k: RRTPlanner(reach(), max_iterations=60, **k),
+        {"goal_bias": 0.3},
+    ),
     "RRT*": (
-        lambda **k: RRTStarPlanner(reach(), max_nodes=40, **k),
+        lambda **k: RRTStarPlanner(reach(), max_iterations=40, **k),
         {"radius_constant": 2.0},
     ),
 }
@@ -147,12 +152,8 @@ def test_the_shortcuts_read_the_solution_a_solve_at_a_tree_returned(name):
     x = np.array([0.5, 0.0])
 
     assert solution is planner.last_solution
-    assert planner.value_at(x) == solution.cost_to_go(x)
-    assert planner.get_controller() is solution.policy
-    np.testing.assert_array_equal(
-        planner.nominal_trajectory(1.0).x,
-        planner.nominal_trajectory(1.0, solution=solution).x,
-    )
+    assert planner.cost_to_go(x) == solution.cost_to_go(x)
+    assert planner.controller is solution.controller
 
 
 def test_every_planner_takes_params_by_keyword_only():
@@ -174,3 +175,133 @@ def test_every_planner_takes_params_by_keyword_only():
     for planner in planners:
         parameter = inspect.signature(planner.solve).parameters["params"]
         assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, planner.__name__
+
+
+WORKFLOW = {"verbose", "callback", "live_plot", "record_history", "history_stride"}
+
+
+@pytest.mark.parametrize("name", list(PLANNERS))
+def test_a_rebuilt_planner_inherits_no_display(name):
+    build, _ = PLANNERS[name]
+    kwargs = build().build_kwargs()
+
+    assert not {key for key in kwargs if key in WORKFLOW or key.startswith("live_plot")}
+
+
+def test_a_verbose_solve_at_a_tree_reports_once_from_the_verb(capsys):
+    """``solve(params=, verbose=True)``: the rebuilt planner gets no display keyword, its solve prints once."""
+    from unittest import mock
+
+    build, numbers = PLANNERS["value iteration"]
+    planner = build()
+    constructor = DynamicProgrammingPlanner.__init__
+    with mock.patch.object(
+        DynamicProgrammingPlanner, "__init__", autospec=True, side_effect=constructor
+    ) as built:
+        planner.solve(params=edited(planner.params, {"method": numbers}), verbose=True)
+
+    assert built.call_count == 1
+    assert not set(built.call_args.kwargs) & WORKFLOW
+    assert capsys.readouterr().out.count("Bellman equation solved!") == 1
+
+
+def test_the_grids_table_options_survive_a_discount_and_a_tree():
+    """A grid built with precompute=False keeps it through gamma= and solve(params=)."""
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+
+    problem = regulation()
+    grid = StateSpaceGrid(problem, x_grid=(9, 9), u_grid=(3,), dt=0.1, precompute=False)
+    planner = DynamicProgrammingPlanner(problem, grid=grid, gamma=0.9, max_iterations=5)
+    assert planner.grid is not grid and not planner.grid.precompute
+
+    with mock.patch.object(
+        DynamicProgrammingPlanner,
+        "__init__",
+        autospec=True,
+        side_effect=DynamicProgrammingPlanner.__init__,
+    ) as built:
+        planner.solve(params=edited(planner.params, {"method": {"gamma": 0.8}}))
+    rebuilt = built.call_args.args[0]
+    assert rebuilt.grid.precompute is False and rebuilt.grid.precomputed is False
+    assert rebuilt.gamma == 0.8
+
+
+def test_every_planner_takes_verbose_off_by_default():
+    """``verbose=False`` on every planner's solve (LQR, RRT, RRT* and MPPI included)."""
+    import inspect
+
+    from minilink import ReinforcementLearningPlanner, TrajectoryOptimizationPlanner
+    from minilink.planning import MPPIPlanner
+
+    planners = (
+        DynamicProgrammingPlanner,
+        LQRPlanner,
+        RRTPlanner,
+        RRTStarPlanner,
+        TabularLearningPlanner,
+        TrajectoryOptimizationPlanner,
+        MPPIPlanner,
+        ReinforcementLearningPlanner,
+    )
+    for planner in planners:
+        parameter = inspect.signature(planner.solve).parameters["verbose"]
+        assert parameter.default is False, planner.__name__
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, planner.__name__
+
+
+@pytest.mark.parametrize("name", ["LQR", "RRT", "RRT*"])
+def test_a_verbose_solve_prints_its_record_once(name, capsys):
+    build, numbers = PLANNERS[name]
+    planner = build()
+    solution = planner.solve(verbose=True)
+    assert capsys.readouterr().out == f"{solution.record}\n"
+    planner.solve(params=edited(planner.params, {"method": numbers}), verbose=True)
+    assert (
+        capsys.readouterr().out.count("\n")
+        == str(planner.last_solution.record).count("\n") + 1
+    )
+    planner.solve()
+    assert capsys.readouterr().out == ""
+
+
+def test_solve_steps_takes_a_tree_as_solve_does():
+    build, numbers = PLANNERS["value iteration"]
+    planner = build()
+    at_tree = planner.solve_steps(5, params=edited(planner.params, {"method": numbers}))
+    built_there = build(**numbers).solve_steps(5)
+    np.testing.assert_allclose(fingerprint(at_tree), fingerprint(built_there))
+    assert at_tree is planner.last_solution
+
+
+def test_the_learning_curve_and_a_sources_signal_take_show():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from minilink import Step
+
+    build, _ = PLANNERS["tabular"]
+    planner = build()
+    solve_of(planner)
+    # An interactive backend: the planning views leave Agg silent
+    with (
+        mock.patch("matplotlib.pyplot.show") as shown,
+        mock.patch("matplotlib.pyplot.get_backend", return_value="TkAgg"),
+    ):
+        ax = planner.plot_learning_curve(show=False)
+        source = Step()
+        source.compute_trajectory(tf=2.0)
+        source.plot_trajectory(show=False)
+        assert not shown.called
+        planner.plot_learning_curve()
+        assert shown.call_count == 1
+    assert ax.get_xlabel() == "episode"
+
+
+@pytest.mark.jax
+def test_an_mppi_solve_prints_its_record_when_verbose(capsys):
+    from minilink.planning import MPPIPlanner
+
+    problem = reach().replace(Xf=None, horizon=0.5)
+    planner = MPPIPlanner(problem, dt=0.1, n_rollouts=8, n_iterations=1)
+    solution = planner.solve(verbose=True)
+    assert capsys.readouterr().out == f"{solution.record}\n"

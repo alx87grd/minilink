@@ -42,7 +42,7 @@ class _JAXFriendlyPController(System):
             params = self.params
         Kp = params["Kp"]
         xp = array_module(u)
-        r, y_ = self.get_port_values_from_u(u, "r", "y")
+        r, y_ = self.ports(u, "r", "y")
         return xp.array([Kp * (r[0] - y_[0])])
 
 
@@ -50,7 +50,7 @@ class _JAXFriendlyIntegrator(DynamicSystem):
     """``dx = k u`` integrator; mirrors :class:`Integrator` with JAX-friendly arrays."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"k": 1.0}
         self.name = "Integrator"
 
@@ -69,7 +69,6 @@ class _JAXFriendlyIntegrator(DynamicSystem):
 def _build_small_closed_loop_jax():
     """Same wiring as :func:`_build_small_closed_loop` with JAX-traceable blocks."""
     diag = DiagramSystem()
-    diag.connection_verbose = False
     ctl = _JAXFriendlyPController()
     plant = _JAXFriendlyIntegrator()
     ctl.params["Kp"] = 2.5
@@ -91,7 +90,6 @@ def _build_closed_loop_with_external_output_jax():
 def _build_small_closed_loop():
     """Step → P → Integrator → feedback to controller."""
     diag = DiagramSystem()
-    diag.connection_verbose = False
     ctl = P(2.5, ports="reference")
     plant = Integrator()
     diag.add_subsystem(ctl, "controller")
@@ -124,7 +122,6 @@ def _build_feedthrough_loop():
             return u * 2
 
     diag = DiagramSystem()
-    diag.connection_verbose = False
     diag.add_subsystem(FeedthroughSystem("A"), "A")
     diag.add_subsystem(FeedthroughSystem("B"), "B")
     diag.add_subsystem(FeedthroughSystem("C"), "C")
@@ -270,7 +267,6 @@ class TestDiagramEvaluatorNumPy(unittest.TestCase):
     def test_f_zero_state(self):
         """Diagram with no dynamic subsystems should return empty dx."""
         diag = DiagramSystem()
-        diag.connection_verbose = False
 
         class Gain(System):
             def __init__(self):
@@ -385,7 +381,7 @@ class _JAXFriendlyStepIntegrator(StepSystem):
     """``x_{k+1} = x_k + k u_k``; the step twin of :class:`_JAXFriendlyIntegrator`."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"k": 1.0}
         self.x0 = np.zeros(1)
 
@@ -402,7 +398,6 @@ class _JAXFriendlyStepIntegrator(StepSystem):
 def _build_step_loop_jax():
     """r → P → step integrator → feedback to the controller, its command a boundary output."""
     diag = StepDiagramSystem()
-    diag.connection_verbose = False
     ctl = _JAXFriendlyPController()
     ctl.params["Kp"] = 2.5
     diag.add_subsystem(ctl, "controller")
@@ -748,7 +743,7 @@ from minilink.core.discrete.step_system import StepSystem
 
 class LinearStep(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1)
+        super().__init__(state_dim=1, input_dim=1)
         self.params = {"a": 0.5}
         self.x0 = np.array([1.0])
 
@@ -782,9 +777,10 @@ except ImportError:
 
 
 class TestEvaluatorApi(unittest.TestCase):
-    def test_dynamic_evaluator_has_no_h(self):
+    def test_dynamic_evaluator_h_is_the_y_port(self):
         ev = compile(Integrator())
-        self.assertFalse(hasattr(ev, "h"))
+        x = np.array([0.7])
+        np.testing.assert_allclose(ev.h(x), ev.outputs(x, ev.nominal_input)["y"])
         self.assertFalse(hasattr(ev, "h_p"))
 
     def test_static_evaluator_outputs_y(self):
@@ -806,7 +802,7 @@ class TestEvaluatorApi(unittest.TestCase):
 
         class IdentityStep(StepSystem):
             def __init__(self):
-                super().__init__(n=1)
+                super().__init__(state_dim=1)
 
             def step(self, x, u, k=0, params=None):
                 return x
@@ -816,7 +812,6 @@ class TestEvaluatorApi(unittest.TestCase):
         self.assertTrue(hasattr(ev, "rollout"))
         self.assertFalse(hasattr(ev, "f"))
         self.assertFalse(hasattr(ev, "integrate"))
-        self.assertFalse(hasattr(ev, "h"))
         self.assertFalse(isinstance(ev, ContinuousEvaluator))
 
 
@@ -921,7 +916,7 @@ class TestStepEvaluatorJax(unittest.TestCase):
 
         class ScaleStep(StepSystem):
             def __init__(self):
-                super().__init__(n=1)
+                super().__init__(state_dim=1)
                 self.params = {"a": 2.0}
 
             def step(self, x, u, k=0, params=None):
@@ -941,7 +936,7 @@ from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import MathematicalProgram
 
 
-def test_mathematical_program_is_pure_description_without_z0():
+def test_a_mathematical_program_without_a_start_has_none():
 
     def J(z: np.ndarray):
         return z @ z
@@ -949,8 +944,10 @@ def test_mathematical_program_is_pure_description_without_z0():
     program = MathematicalProgram(n_z=2, J=J, metadata={"source": "test"})
     assert program.backend == "numpy"
     assert program.n_z == 2
-    assert not hasattr(program, "z0")
+    assert program.z0 is None
     assert program.metadata == {"source": "test"}
+    with pytest.raises(ValueError, match=r"z0 must have shape \(2,\)"):
+        MathematicalProgram(n_z=2, J=J, z0=np.zeros(3))
 
 
 def test_mathematical_program_validates_bounds_dimension():
@@ -1062,7 +1059,7 @@ class TestEquationShapeValidation(unittest.TestCase):
     def _bad_f(self):
         class BadF(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, output_dim=2)
+                super().__init__(state_dim=2, input_dim=1, output_dim=2)
 
             def f(self, x, u, t=0, params=None):
                 return np.array([x[1]])  # (1,) instead of (2,)
@@ -1072,7 +1069,7 @@ class TestEquationShapeValidation(unittest.TestCase):
     def _bad_h(self):
         class BadH(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, output_dim=2)
+                super().__init__(state_dim=2, input_dim=1, output_dim=2)
 
             def f(self, x, u, t=0, params=None):
                 return np.array([x[1], -x[0]])
@@ -1091,7 +1088,7 @@ class TestEquationShapeValidation(unittest.TestCase):
     def test_scalar_f_is_accepted_for_a_first_order_plant(self):
         class FirstOrder(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
             def f(self, x, u, t=0, params=None):
                 return -x[0] + u[0]  # a bare scalar, as students write it
@@ -1100,7 +1097,7 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertEqual(traj.x.shape[0], 1)
 
     def test_wrong_x0_shape_is_reported_at_compile(self):
-        sys = DynamicSystem(n=2, input_dim=1, output_dim=2)
+        sys = DynamicSystem(state_dim=2, input_dim=1, output_dim=2)
         sys.x0 = np.array([0.1])
         with self.assertRaises(ValueError) as ctx:
             sys.compile(backend="numpy")
@@ -1113,7 +1110,7 @@ class TestEquationShapeValidation(unittest.TestCase):
 
         class BadStep(StepSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, output_dim=2)
+                super().__init__(state_dim=2, input_dim=1, output_dim=2)
 
             def step(self, x, u, k=0, params=None):
                 return np.array([x[1]])  # (1,) instead of (2,)
@@ -1135,7 +1132,7 @@ class TestEquationShapeValidation(unittest.TestCase):
 
         class CountingStep(StepSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
                 self.calls = {"step": 0, "h": 0}
 
             def step(self, x, u, k=0, params=None):
@@ -1194,7 +1191,7 @@ class TestRolloutBatch(unittest.TestCase):
         self.x0s = self.rng.standard_normal((4, 2))
         self.dt = 0.02
         self.n_steps = 15
-        self.u_nominal = np.tile(self.sys.get_u_from_input_ports(), (self.n_steps, 1))
+        self.u_nominal = np.tile(self.sys.u_nominal, (self.n_steps, 1))
 
     def test_family_of_initial_states_under_the_nominal_input(self):
         xs = np.asarray(
@@ -1263,7 +1260,7 @@ def test_rk4_rollout_is_the_textbook_scheme_step_by_step(backend, index):
     """``rollout`` is ``step`` repeated at ``t_k = t₀ + k dt``, and RK4 is the four-stage formula."""
     if backend == "jax":
         pytest.importorskip("jax")
-    ev = step_model_plants()[index].compile(backend)
+    ev = step_model_plants()[index].compile(backend=backend)
     x0 = np.linspace(0.1, 0.3, ev.n)
     us = held_inputs_of(ev)
     dt = 0.05
@@ -1287,12 +1284,12 @@ def test_rk4_rollout_is_the_textbook_scheme_step_by_step(backend, index):
 def test_the_two_backends_agree_on_every_knob():
     pytest.importorskip("jax")
     for plant in step_model_plants():
-        ev_np, ev_jax = plant.compile("numpy"), plant.compile("jax")
+        ev_np, ev_jax = plant.compile(backend="numpy"), plant.compile(backend="jax")
         x0 = np.linspace(0.1, 0.3, ev_np.n)
         us = held_inputs_of(ev_np)
         for solver in ("rk4", "euler"):
             for substeps in (1, 3):
-                for hold in ("zoh", "foh"):
+                for hold in ("zoh", "linear"):
                     seq = us if hold == "zoh" else np.vstack([us, us[-1:]])
                     a = ev_np.rollout(
                         x0, seq, 0.0, 0.05, solver=solver, substeps=substeps, hold=hold
@@ -1306,7 +1303,7 @@ def test_the_two_backends_agree_on_every_knob():
 def test_substeps_converge_to_the_fine_step():
     from minilink import Pendulum
 
-    ev = Pendulum().compile("numpy")
+    ev = Pendulum().compile(backend="numpy")
     x0, u = np.array([1.0, 0.0]), np.array([0.2])
     fine = ev.step(x0, u, 0.0, dt=0.4, substeps=40)
     errors = [
@@ -1320,7 +1317,7 @@ def test_params_reach_the_step_and_none_reads_the_compiled_ones():
     from minilink import Pendulum
 
     plant = Pendulum()
-    ev = plant.compile("numpy")
+    ev = plant.compile(backend="numpy")
     x0, u = np.array([0.5, 0.0]), np.array([0.0])
     heavy = {**plant.params, "m": 2.0 * plant.params["m"]}
     np.testing.assert_array_equal(
@@ -1336,7 +1333,7 @@ def test_a_rollout_without_inputs_holds_the_nominal_input():
 
     plant = Pendulum()
     plant.inputs["u"].nominal_value = np.array([0.7])
-    ev = plant.compile("numpy")
+    ev = plant.compile(backend="numpy")
     us = np.full((5, 1), 0.7)
     np.testing.assert_array_equal(
         ev.rollout(np.ones(2), None, 0.0, 0.1, n_steps=5),
@@ -1349,7 +1346,7 @@ def test_the_compiled_forms_are_built_once():
     pytest.importorskip("jax")
     from minilink import Pendulum
 
-    ev = Pendulum().compile("jax")
+    ev = Pendulum().compile(backend="jax")
     first = ev.rollout
     ev.rollout(np.ones(2), np.zeros((3, 1)), 0.0, 0.1)
     assert ev.rollout is first and ev.step is ev.step
@@ -1358,7 +1355,7 @@ def test_the_compiled_forms_are_built_once():
 def test_the_step_refuses_an_unknown_solver():
     from minilink import Pendulum
 
-    ev = Pendulum().compile("numpy")
+    ev = Pendulum().compile(backend="numpy")
     with pytest.raises(ValueError, match="solver"):
         ev.step(np.ones(2), np.zeros(1), 0.0, dt=0.1, solver="scipy")
 
@@ -1366,7 +1363,7 @@ def test_the_step_refuses_an_unknown_solver():
 def test_a_step_returning_a_bare_number_rolls_out():
     class HalfStep(StepSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1)
+            super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
         def step(self, x, u, k=0, params=None):
             x_next = 0.5 * x[0] + u[0]
@@ -1380,7 +1377,7 @@ def test_a_step_returning_a_bare_number_rolls_out():
 def test_a_diagram_hands_its_blocks_float_inputs():
     class Reciprocal(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1)
+            super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
         def f(self, x, u, t=0.0, params=None):
             dx = -x + u**-1
@@ -1497,10 +1494,10 @@ def test_every_jax_evaluator_applies_the_float64_policy():
     jax = pytest.importorskip("jax")
     from minilink import Pendulum
 
-    Pendulum().compile("jax")
+    Pendulum().compile(backend="jax")
     jax.config.update("jax_enable_x64", False)
     try:
-        ev = Pendulum().compile("jax")
+        ev = Pendulum().compile(backend="jax")
         dx = ev.f(np.ones(2), np.zeros(1))
     finally:
         jax.config.update("jax_enable_x64", True)
@@ -1533,7 +1530,7 @@ def test_connect_refuses_to_rewire_a_connected_input_and_disconnect_opens_it():
 def test_compile_refuses_an_output_that_reads_an_undeclared_input():
     class HiddenFeedthrough(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+            super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
         def f(self, x, u, t=0.0, params=None):
             return -x
@@ -1572,3 +1569,66 @@ def test_compile_probes_a_custom_port_function_for_an_undeclared_input():
     ):
         compile(Doubler(dependencies=()))
     compile(Doubler(dependencies=("u",)))
+
+
+def test_one_automatic_backend_rule_falls_back_on_a_block_that_does_not_trace():
+    """compile_auto and the simulators' backend="auto" read one rule: NumPy on a NotTraceableError only."""
+    pytest.importorskip("jax")
+    from minilink.core.compile.compiler import build_on_auto, compile, compile_auto
+    from minilink.core.compile.evaluators.base import NotTraceableError
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+    from minilink.simulation.simulator import Simulator
+    from minilink.simulation.static_simulator import StaticSimulator
+
+    class Untraceable(Pendulum):
+        def f(self, x, u, t=0, params=None):
+            return np.asarray(super().f(np.asarray(x), np.asarray(u), t, params))
+
+    # The verdict is typed: a NotTraceableError, a RuntimeError
+    with pytest.raises(NotTraceableError, match="is not JAX-traceable"):
+        compile(Untraceable(), backend="jax")
+    assert issubclass(NotTraceableError, RuntimeError)
+
+    # Every automatic backend takes NumPy for it, JAX for a block that traces
+    assert compile_auto(Untraceable())[0] == "numpy"
+    assert compile_auto(Pendulum())[0] == "jax"
+    assert Simulator(Untraceable(), tf=0.1, backend="auto").backend == "numpy"
+    assert Simulator(Pendulum(), tf=0.1, backend="auto").backend == "jax"
+    assert StaticSimulator(P(2.0), tf=0.1, backend="auto").backend == "jax"
+
+    # Any other error of the JAX build surfaces instead of falling back
+    def broken(backend):
+        if backend == "jax":
+            raise ValueError("a wrong shape")
+        return "numpy evaluator"
+
+    with pytest.raises(ValueError, match="a wrong shape"):
+        build_on_auto(broken)
+
+
+def test_verbose_compile_reads_its_steps_in_order_on_every_path(capsys):
+    """compile(verbose=True) names its steps in the order it runs them, and closes with Done on every backend."""
+    from minilink.core.compile.compiler import compile
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    backends = ("numpy", "jax")
+    loop = P(2.0) @ Pendulum()
+    for backend in backends:
+        if backend == "jax":
+            pytest.importorskip("jax")
+        compile(Pendulum(), backend=backend, verbose=True)
+        leaf = capsys.readouterr().out.splitlines()
+        assert leaf[-1].startswith("[compile] Done.")
+
+        compile(loop, backend=backend, verbose=True, flatten=True)
+        lines = capsys.readouterr().out.splitlines()
+        steps = [line.split("...")[0] for line in lines]
+        expected = [
+            "[compile] Flattening nested diagrams",
+            "[compile] Checking for algebraic loops",
+            "[compile] Building execution plan (6 ports, 1 states)",
+        ]
+        if backend == "jax":
+            expected.append("[compile] Checking JAX compatibility of 4 subsystems")
+        assert steps[:-1] == expected
+        assert lines[-1].startswith("[compile] Done.")

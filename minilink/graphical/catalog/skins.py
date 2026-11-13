@@ -12,6 +12,10 @@ from minilink.graphical.catalog.shapes import (
     link_pose_3d,
     plane_airframe_3d,
 )
+from minilink.graphical.meshes import TriangleMesh
+
+#: The colour of a terrain's relief under a car
+GROUND_COLOR = "#9aa3ad"
 
 ###############################################################################
 # Public API
@@ -60,12 +64,19 @@ def car_skin_3d(plant, color="#151922"):
 
     Frame keys: ``world`` (ground), ``body`` (chassis box plus the two rear wheel
     rods; fixed hub offsets are baked into each rod ``local_transform``), and
-    ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``).
+    ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``). On the 3-D car
+    (its body frame at the centre of gravity, ``h_cg`` above the ground) the rear
+    rods ride on their own ``wheel_rl`` / ``wheel_rr`` frames.
     """
-    # The axle offsets and the tire radii: the params', else the plant's, else 0.3 m
+    # The axle offsets and the tire radii: the params', else the plant's, else its
+    # drawn wheel radius, else 0.3 m
     a, b = axle_offsets(plant)
-    r_f = plant.params.get("r_f", getattr(plant, "r_f", 0.3))
-    r_r = plant.params.get("r_r", getattr(plant, "r_r", 0.3))
+    r_wheel = getattr(plant, "wheel_radius", 0.3)
+    r_f = plant.params.get("r_f", getattr(plant, "r_f", r_wheel))
+    r_r = plant.params.get("r_r", getattr(plant, "r_r", r_wheel))
+
+    # The ride height: the body frame's height above the ground (0 on a bicycle)
+    h = plant.params.get("h_cg", 0.0)
 
     # The drawing attributes, with the defaults of a bare plant
     track = getattr(plant, "track", 1.6)
@@ -74,8 +85,8 @@ def car_skin_3d(plant, color="#151922"):
     body_length_overhang = getattr(plant, "body_length_overhang", 0.26)
     body_ground_clearance = getattr(plant, "body_ground_clearance", 0.003)
     ground_size = getattr(plant, "ground_plane_size", 120.0)
-    tire_radius_ratio = getattr(plant, "_visual_tire_radius_ratio", 0.58)
-    wheel_width = getattr(plant, "_visual_wheel_width", 0.2)
+    tire_radius_ratio = getattr(plant, "visual_tire_radius_ratio", 0.58)
+    wheel_width = getattr(plant, "visual_wheel_width", 0.2)
 
     # The body spans the wheelbase plus an overhang; the drawn tire is a fraction
     # of the smaller tire radius, never under 4.5 cm
@@ -83,8 +94,13 @@ def car_skin_3d(plant, color="#151922"):
     body_length = (a + b) + body_length_overhang
     tire_radius = max(0.045, tire_radius_ratio * min(r_f, r_r))
 
-    # The ground, in the world frame
-    ground = ground_plane(ground_size)
+    # The ground, in the world frame: the terrain of a car that rides one, over its
+    # scene_bounds when it sets them; the flat plane otherwise
+    rides_terrain = "rl" in getattr(plant, "wheels", ())
+    if rides_terrain and getattr(plant, "scene_bounds", None) is not None:
+        ground = terrain_surface(plant, GROUND_COLOR)
+    else:
+        ground = [ground_plane(ground_size)]
 
     # The body box, at a fixed offset within the body frame (the c.g. sits at its
     # origin): lifted to ride height and shifted to the wheelbase's geometric center
@@ -97,7 +113,7 @@ def car_skin_3d(plant, color="#151922"):
         opacity=1.0,
     )
     cx_body = 0.5 * (a - b)
-    z_body = r_r + body_ground_clearance + 0.5 * body_height
+    z_body = r_r + body_ground_clearance + 0.5 * body_height - h
     body.local_transform = translation(cx_body, 0.0, z_body)
 
     # Every wheel: a dark cylinder of the drawn tire radius, as long as the wheel is wide
@@ -107,19 +123,29 @@ def car_skin_3d(plant, color="#151922"):
     # The rear wheels, fixed at their hubs in the body frame
     wheel_rl = wheel()
     wheel_rr = wheel()
-    wheel_rl.local_transform = translation(-b, 0.5 * track, r_r)
-    wheel_rr.local_transform = translation(-b, -0.5 * track, r_r)
+    wheel_rl.local_transform = translation(-b, 0.5 * track, r_r - h)
+    wheel_rr.local_transform = translation(-b, -0.5 * track, r_r - h)
 
     # The front wheels, placed and steered by their own frames
     wheel_fl = wheel()
     wheel_fr = wheel()
 
-    return {
-        "world": [ground],
+    look = {
+        "world": ground,
         "body": [body, wheel_rl, wheel_rr],
         "wheel_fl": [wheel_fl],
         "wheel_fr": [wheel_fr],
     }
+
+    # The 3-D car's rear wheels ride the suspension on frames of their own
+    if "rl" in getattr(plant, "wheels", ()):
+        wheel_rl.local_transform = np.eye(4)
+        wheel_rr.local_transform = np.eye(4)
+        look["body"] = [body]
+        look["wheel_rl"] = [wheel_rl]
+        look["wheel_rr"] = [wheel_rr]
+
+    return look
 
 
 def plane_skin_3d(plant, color="#2f6fed"):
@@ -253,6 +279,64 @@ def wheel_rectangle(wl, ww, color="black", linewidth=1):
     # fmt: on
 
     return Line(corners, color=color, linewidth=linewidth)
+
+
+def terrain_surface(plant, color, step=0.25, spacing=2.0):
+    """The plant's ground over ``plant.scene_bounds``: a grid, and the relief's mesh.
+
+    ``scene_bounds`` ``(x_min, x_max, y_min, y_max)`` [m] is the opt-in, as for the
+    racecar's scene; without it nothing is drawn. Grid lines every ``spacing`` metres
+    follow the height of ``plant.terrain`` (flat when the plant has none), so the
+    ground reads the same on flat and hilly terrain; where the ground has relief, a
+    mesh sampled every ``step`` metres fills the cells.
+    """
+    bounds = getattr(plant, "scene_bounds", None)
+    if bounds is None:
+        return []
+    x_min, x_max, y_min, y_max = bounds
+    terrain = getattr(plant, "terrain", None)
+
+    def height(X, Y):
+        if terrain is None:
+            return np.zeros_like(X)
+        return np.broadcast_to(np.asarray(terrain.height(X, Y)), X.shape)
+
+    # The grid: lines along x and along y, a centimetre above the ground
+    shapes = []
+    xs = np.arange(x_min, x_max + 1e-9, step * 4)
+    ys = np.arange(y_min, y_max + 1e-9, step * 4)
+    for y in np.arange(y_min, y_max + 1e-9, spacing):
+        Y = np.full_like(xs, y)
+        shapes.append(np.column_stack([xs, Y, height(xs, Y) + 0.01]))
+    for x in np.arange(x_min, x_max + 1e-9, spacing):
+        X = np.full_like(ys, x)
+        shapes.append(np.column_stack([X, ys, height(X, ys) + 0.01]))
+    grid = [Line(pts, color="#d4d4d8", linewidth=1, opacity=0.6) for pts in shapes]
+    for line in grid:
+        line.camera_fit = False
+
+    # The relief: a height grid, two triangles per cell; none on flat ground
+    xs = np.arange(x_min, x_max + 1e-9, step)
+    ys = np.arange(y_min, y_max + 1e-9, step)
+    X, Y = np.meshgrid(xs, ys, indexing="ij")
+    Z = height(X, Y)
+    if not np.any(Z):
+        return grid
+    vertices = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
+    n_y = ys.size
+    i, j = np.meshgrid(np.arange(xs.size - 1), np.arange(n_y - 1), indexing="ij")
+    k = (i * n_y + j).ravel()
+    faces = np.concatenate(
+        [
+            np.column_stack([k, k + n_y, k + n_y + 1]),
+            np.column_stack([k, k + n_y + 1, k + 1]),
+        ]
+    ).astype(np.uint32)
+
+    ground = TriangleMesh(vertices, faces, color=color, name="terrain", max_edges=0)
+    ground.camera_fit = False
+
+    return [ground, *grid]
 
 
 def ground_plane(size):

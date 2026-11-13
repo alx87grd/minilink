@@ -24,7 +24,7 @@ def test_time_cost_is_unity_off_target_zero_on_target():
 def test_time_cost_from_system_targets_the_nominal_state():
     from minilink.core.system import DynamicSystem
 
-    sys = DynamicSystem(n=2, input_dim=1)
+    sys = DynamicSystem(state_dim=2, input_dim=1)
     sys.state.nominal_value = np.array([np.pi, 0.0])
     cost = TimeCost.from_system(sys, radius=0.1)
     np.testing.assert_array_equal(cost.x_bar, [np.pi, 0.0])
@@ -285,11 +285,38 @@ def test_a_quadratic_cost_targets_the_operating_point_by_default():
     from minilink import Pendulum
 
     plant = Pendulum()
-    plant.state.set_nominal_value(np.array([np.pi, 0.0]))
-    plant.inputs["u"].set_nominal_value(np.array([0.2]))
+    plant.state.nominal_value = np.array([np.pi, 0.0])
+    plant.inputs["u"].nominal_value = np.array([0.2])
     cost = QuadraticCost.from_system(plant)
     np.testing.assert_allclose(cost.x_bar, [np.pi, 0.0])
     np.testing.assert_allclose(cost.u_bar, [0.2])
+
+
+def test_a_quadratic_cost_of_two_weights_regulates_the_origin():
+    """``QuadraticCost(Q, R)``: ``S``, ``x_bar``, ``u_bar`` zero, sized by ``Q`` and ``R``."""
+    Q = np.diag([2.0, 1.0])
+    R = np.array([[0.5]])
+    cost = QuadraticCost(Q, R)
+    np.testing.assert_array_equal(cost.S, np.zeros((2, 2)))
+    np.testing.assert_array_equal(cost.x_bar, np.zeros(2))
+    np.testing.assert_array_equal(cost.u_bar, np.zeros(1))
+    x = np.array([1.0, -2.0])
+    u = np.array([3.0])
+    # g = xᵀ Q x + uᵀ R u = 2 + 4 + 4.5, h = 0
+    assert cost.g(x, u) == 10.5
+    assert cost.h(x) == 0.0
+    full = QuadraticCost(Q, R, np.zeros((2, 2)), np.zeros(2), np.zeros(1))
+    assert cost.g(x, u) == full.g(x, u)
+
+
+def test_a_quadratic_cost_of_two_weights_on_jax():
+    pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    cost = QuadraticCost(np.diag([2.0, 1.0]), np.array([[0.5]]))
+    g = cost.g(jnp.array([1.0, -2.0]), jnp.array([3.0]))
+    assert isinstance(g, jnp.ndarray)
+    assert float(g) == 10.5
 
 
 def test_compute_cost_needs_a_trajectory_and_a_diagram_for_of():
@@ -337,7 +364,7 @@ def test_a_solve_always_records_the_backend_solves_wall_time():
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
     out = opt.solve()
@@ -351,7 +378,7 @@ def test_scipy_minimize_disp_prints_report(capsys):
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
     out = opt.solve(verbose=True)
@@ -371,7 +398,7 @@ def test_scipy_minimize_progress_callback_z_J_t():
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
 
@@ -389,12 +416,27 @@ def test_scipy_minimize_progress_callback_z_J_t():
     assert times == sorted(times)
 
 
+def test_the_optimizer_takes_a_list_of_callbacks():
+    opt = Optimizer(
+        _quadratic_program(),
+        z0=np.array([1.0]),
+        method="slsqp",
+        options={"disp": False, "maxiter": 50},
+    )
+    first, second = [], []
+    opt.solve(
+        callback=[lambda z, J, t: first.append(J), lambda z, J, t: second.append(J)]
+    )
+    assert len(first) >= 1
+    assert first == second
+
+
 def test_solve_accepts_one_off_initial_guess_without_recompiling():
     prog = _quadratic_program()
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
     program_evaluator = opt.program_evaluator
@@ -433,7 +475,7 @@ def test_ipopt_unconstrained_quadratic():
     out = Optimizer(prog, z0=np.zeros(2), method="ipopt", options=_IPOPT_QUIET).solve()
     assert out.success
     assert np.allclose(out.z, [1.0, 2.0], atol=1e-06)
-    assert out.cost is not None and out.cost < 1e-10
+    assert out.J is not None and out.J < 1e-10
 
 
 @pytest.mark.ipopt
@@ -565,7 +607,7 @@ def quadratic_program(**fields):
 
 
 def test_the_program_class_is_read_from_its_fields():
-    from minilink.optimization.optimizer import program_class
+    from minilink.optimization.mathematical_program import program_class
 
     assert program_class(quadratic_program()) == "unconstrained"
     assert program_class(quadratic_program(lower=[0.0, -np.inf])) == "bounded"
@@ -580,7 +622,7 @@ def test_auto_picks_by_class_and_a_method_the_class_refuses_is_refused():
         Optimizer(quadratic_program(), z0=np.zeros(2), method="auto").method == "l-bfgs"
     )
     constrained = quadratic_program(g=lambda z: z)
-    assert Optimizer(constrained, z0=np.zeros(2), method="auto").method == "scipy_slsqp"
+    assert Optimizer(constrained, z0=np.zeros(2), method="auto").method == "slsqp"
     with pytest.raises(ValueError, match="constrained"):
         Optimizer(constrained, z0=np.zeros(2), method="gd")
     with pytest.raises(ValueError, match="Unknown optimizer method"):
@@ -594,10 +636,9 @@ def test_each_method_reaches_the_minimum(method):
     from minilink.optimization.optimizer import Optimizer
 
     native = method in ("gd", "adam")
-    options = {"maxiter": 2000} if native else {}
-    numbers = {"learning_rate": 0.1} if native else {}
+    numbers = {"max_iterations": 2000, "learning_rate": 0.1} if native else {}
     result = Optimizer(
-        quadratic_program(), z0=np.zeros(2), method=method, options=options, **numbers
+        quadratic_program(), z0=np.zeros(2), method=method, **numbers
     ).solve()
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-4)
 
@@ -608,7 +649,7 @@ def test_gradient_descent_is_projected_on_the_box():
     program = quadratic_program(lower=[-np.inf, 0.0])
     result = Optimizer(program, z0=np.ones(2), method="gd", learning_rate=0.1).solve()
     np.testing.assert_allclose(result.z, [1.0, 0.0], atol=1e-6)
-    assert result.stats["algorithm"] == "gd"
+    assert result.stats["method"] == "gd"
 
     # The optimum on the face z₂ = 0: stationary on the box, though ∇J ≠ 0 there
     assert result.success and result.stats["nit"] < 1000
@@ -621,10 +662,10 @@ def test_gradient_descent_at_its_floating_point_fixed_point_is_a_success():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"maxiter": 3000},
+        max_iterations=3000,
         learning_rate=0.1,
     ).solve()
-    assert result.success and result.stats["nit"] < 3000
+    assert result.success and result.n_iterations == result.stats["nit"] < 3000
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-12)
 
 
@@ -635,7 +676,7 @@ def test_gradient_descent_out_of_steps_is_not_a_success():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"maxiter": 5},
+        max_iterations=5,
         learning_rate=0.1,
     ).solve()
     assert not result.success
@@ -656,7 +697,7 @@ def test_gradient_descent_steps_like_the_hand_loop():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"maxiter": 5},
+        max_iterations=5,
         learning_rate=0.1,
     ).solve()
     np.testing.assert_allclose(result.z, z, rtol=1e-12)
@@ -674,7 +715,7 @@ def test_a_first_order_method_needs_a_gradient():
 def test_the_start_defaults_to_the_programs_own():
     from minilink.optimization.optimizer import Optimizer
 
-    program = quadratic_program(metadata={"z0": np.array([3.0, 3.0])})
+    program = quadratic_program(z0=np.array([3.0, 3.0]))
     assert Optimizer(program).z0.tolist() == [3.0, 3.0]
     with pytest.raises(ValueError, match="z0"):
         Optimizer(quadratic_program())
@@ -689,7 +730,7 @@ def test_an_optimizer_returns_the_optimum_its_cost_and_its_record():
     # z*, J(z*), the verdict and the solver's own record
     assert isinstance(result, OptimizationResult)
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-6)
-    assert result.success and result.cost == pytest.approx(0.0, abs=1e-10)
+    assert result.success and result.J == pytest.approx(0.0, abs=1e-10)
     assert isinstance(result.message, str) and isinstance(result.stats, dict)
 
 
@@ -698,7 +739,7 @@ def test_one_method_table_builds_every_solve_paths_adapter():
     from minilink.optimization.optimizers.first_order import FirstOrderOptimizer
     from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 
-    slsqp = make_optimizer_backend("scipy_slsqp", options={"maxiter": 7})
+    slsqp = make_optimizer_backend("slsqp", options={"maxiter": 7})
     assert isinstance(slsqp, ScipyMinimizeOptimizer)
     assert slsqp.options == {
         "disp": False,
@@ -842,17 +883,16 @@ def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
 
     program = parametric_quadratic("numpy")
     program = type(program)(**{**program.__dict__, "grad_J": grad})
-    options = {"maxiter": 25}
     fixed = Optimizer(
         program,
         z0=[0.0, 0.0],
         method=method,
-        options=options,
+        max_iterations=25,
         learning_rate=0.05,
         n_iterations=25,
     )
     loop = Optimizer(
-        program, z0=[0.0, 0.0], method=method, options=options, learning_rate=0.05
+        program, z0=[0.0, 0.0], method=method, max_iterations=25, learning_rate=0.05
     )
     np.testing.assert_allclose(fixed.solve().z, loop.solve().z, rtol=1e-12)
 
@@ -884,7 +924,7 @@ def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
             z0=[0.0, 0.0],  # a list: the start is checked as on the host path
             method="adam",
             n_iterations=20,
-            options={"max_grad_norm": max_grad_norm},
+            max_grad_norm=max_grad_norm,
         )
         jacobian = jax.jacobian(
             lambda c: opt.solve(params=edited(opt.params, {"c": c})).z
@@ -892,3 +932,28 @@ def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
         assert np.all(np.isfinite(np.asarray(jacobian)))
     with pytest.raises(ValueError, match="shape"):
         opt.solve(z0=[0.0, 0.0, 0.0])
+
+
+class _RunningOnly(CostFunction):
+    """A running cost that writes ``g`` only: ``h`` is the base's zero."""
+
+    def g(self, x, u, t=0.0, params=None):
+        return x @ x + u @ u
+
+
+def test_a_running_cost_alone_charges_no_terminal_cost():
+    cost = _RunningOnly()
+    h = cost.h(np.array([1.0, 2.0]))
+    assert isinstance(h, np.ndarray) and h.shape == () and h == 0.0
+    assert cost.g(np.array([1.0, 2.0]), np.array([1.0])) == 6.0
+
+
+def test_the_default_terminal_cost_traces_on_jax():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    cost = _RunningOnly()
+    h = jax.jit(cost.h)(jnp.array([1.0, 2.0]))
+    assert isinstance(h, jnp.ndarray) and float(h) == 0.0
+    grad = jax.grad(lambda x: cost.g(x, jnp.zeros(1)) + cost.h(x))(jnp.ones(2))
+    np.testing.assert_allclose(np.asarray(grad), [2.0, 2.0])

@@ -7,46 +7,65 @@ from dataclasses import replace
 
 import numpy as np
 
-from minilink.core.backends import array_module
+from minilink.core.backends import BACKEND_NUMPY, COMPILE_BACKENDS, array_module
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import (
+    body_line,
+    format_inspect,
+    inspect_inline,
+    inspect_text,
+    repr_line,
+    repr_pretty,
+)
 from minilink.core.params import require_complete
+from minilink.core.reporting import (
+    DISP_RULE_DIV,
+    DISP_RULE_MAIN,
+    one_callback,
+    preview_vector,
+)
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.evaluators.program_evaluator import require_declared_params
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
+    program_class,
 )
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
 )
-from minilink.optimization.reporting import (
-    DISP_RULE_DIV,
-    DISP_RULE_MAIN,
-    preview_vector,
-)
 
 # User progress hook: current ``z``, objective ``J``, elapsed wall time ``t`` (seconds since solve start).
 OptimizationProgressCallback = Callable[[np.ndarray, float, float], None]
 
-# User-facing optimizer methods mapped to (backend_key, default_constructor_kwargs).
-_USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
+# The algorithms a method names, each mapped to (adapter_key, default_constructor_kwargs)
+PRESETS: dict[str, tuple[str, dict]] = {
     "gd": ("first_order", {"algorithm": "gd", "options": {}}),
     "adam": ("first_order", {"algorithm": "adam", "options": {}}),
     "l-bfgs": (
         "scipy_minimize",
         {"scipy_method": "L-BFGS-B", "options": {}},
     ),
-    "scipy_slsqp": (
+    "slsqp": (
         "scipy_minimize",
         {"scipy_method": "SLSQP", "options": {"disp": False}},
     ),
-    "scipy_trust_constr": (
+    "trust-constr": (
         "scipy_minimize",
         {"scipy_method": "trust-constr", "options": {}},
     ),
     "ipopt": ("ipopt", {"options": {}, "tol": 1e-8}),
+}
+
+# The one method table, keyed (method, backend): the algorithm and the array module of the
+# program it runs on select the implementation. An algorithm runs one implementation on
+# either backend: SciPy and Ipopt solve on the host, the first-order loop runs on the
+# program's own array module
+METHODS: dict[tuple[str, str], tuple[str, dict]] = {
+    (method, backend): preset
+    for method, preset in PRESETS.items()
+    for backend in COMPILE_BACKENDS
 }
 
 # The native methods: a pure law run by the optimizer, with a fixed count or to tolerance
@@ -59,19 +78,19 @@ PROGRAM_CLASSES: dict[str, tuple[str, ...]] = {
         "l-bfgs",
         "gd",
         "adam",
-        "scipy_slsqp",
-        "scipy_trust_constr",
+        "slsqp",
+        "trust-constr",
         "ipopt",
     ),
     "bounded": (
         "l-bfgs",
         "gd",
         "adam",
-        "scipy_slsqp",
-        "scipy_trust_constr",
+        "slsqp",
+        "trust-constr",
         "ipopt",
     ),
-    "constrained": ("scipy_slsqp", "scipy_trust_constr", "ipopt"),
+    "constrained": ("slsqp", "trust-constr", "ipopt"),
 }
 
 
@@ -89,7 +108,7 @@ class Optimizer:
     program from ``z0`` or a one-off override::
 
         program = MathematicalProgram(n_z=2, J=J, grad_J=grad_J)
-        opt = Optimizer(program, z0=[0.0, 0.0], method="scipy_slsqp")
+        opt = Optimizer(program, z0=[0.0, 0.0], method="slsqp")
         result = opt.solve(verbose=True)
 
     An optional progress hook ``callback(z, J, t)`` on :meth:`solve` receives
@@ -101,34 +120,41 @@ class Optimizer:
         Pure NLP description to compile and solve.
     z0 : array_like, optional
         Default initial decision vector for :meth:`solve`; unset, the program's
-        own start (``program.metadata["z0"]``, set by an exported program).
+        own start (``program.z0``, set by an exported program).
     method : str, optional
-        Optimizer method preset, named by algorithm: ``"gd"`` and ``"adam"``
-        (first-order, projected on the box), ``"l-bfgs"``, ``"scipy_slsqp"``,
-        ``"scipy_trust_constr"``, ``"ipopt"``; or ``"auto"``, the default of the
-        program's class (see :func:`program_class`): L-BFGS for an unconstrained
-        or box-bounded program, SLSQP for a constrained one. A method the class
-        does not admit is refused (``gd`` on a program with constraint rows).
+        The algorithm: ``"gd"`` and ``"adam"`` (first-order, projected on the
+        box), ``"l-bfgs"``, ``"slsqp"``, ``"trust-constr"`` (SciPy's
+        spellings), ``"ipopt"``; or ``"auto"``, the default of the
+        program's class (see
+        :func:`~minilink.optimization.mathematical_program.program_class`):
+        L-BFGS for an unconstrained or box-bounded program, SLSQP for a
+        constrained one. A method the class does not admit is refused (``gd``
+        on a program with constraint rows).
     backend : str, optional
-        Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
-        Defaults to ``program.backend`` (the native backend of the program's
-        callables).
+        The array module the program is evaluated on, ``"numpy"`` or
+        ``"jax"``; with ``method`` it selects the implementation (one table
+        keyed ``(method, backend)``, a missing pair refused with the methods
+        that run on that backend). Defaults to ``program.backend`` (the native
+        backend of the program's callables).
     use_hessian : bool, optional
         For JAX program evaluators, auto-generate a dense objective Hessian
         when no ``hess_J`` is supplied.
     options : dict, optional
         An external solver's own knobs (SciPy's ``maxiter``, ``ftol``; Ipopt's),
-        merged into the preset's ``options`` dict (user keys win). A native
-        method's numbers (``learning_rate``, ...) are keywords instead.
+        merged into the preset's ``options`` dict (user keys win). Refused for
+        a native method, whose numbers are keywords.
     n_iterations : int, optional
         For the native methods (``"gd"``, ``"adam"``): exactly this many steps,
         no tolerance. On a JAX program the solve is one ``lax.scan``,
         pure: ``solve(params=, z0=)`` traces under ``jit``, ``vmap`` and
-        ``grad``. ``None`` (default) runs to the method's tolerance, its
-        ``maxiter`` the cap. A size, structural: never a parameter.
-    **method_kwargs
-        Extra keyword arguments override the preset's top-level kwargs and are
-        forwarded to the backend constructor.
+        ``grad``. ``None`` (default) runs to the method's tolerance ``tol``,
+        ``max_iterations`` the cap. A size, structural: never a parameter.
+    **method_numbers
+        A native method's numbers, as keywords: ``max_iterations`` (the cap,
+        default 1000), ``tol`` (the projected gradient's tolerance, default
+        ``0``), ``learning_rate``, and Adam's ``b1``, ``b2``, ``eps``,
+        ``max_grad_norm``. For an external solver, keyword arguments that
+        override the preset's top-level kwargs of the backend constructor.
     """
 
     def __init__(
@@ -141,7 +167,7 @@ class Optimizer:
         use_hessian: bool = False,
         options: dict | None = None,
         n_iterations: int | None = None,
-        **method_kwargs,
+        **method_numbers,
     ):
         # The method: the class default for "auto", refused when the class does not admit it
         method = method_for(program, method)
@@ -149,7 +175,7 @@ class Optimizer:
 
         # The program, compiled once at the default start
         self.program = program
-        self.z0 = self.decision_vector(start_of(program, z0), program.n_z)
+        self.z0 = decision_vector(start_of(program, z0), program.n_z)
         self.method = method
         self.backend = program.backend if backend is None else backend
         self.program_evaluator = compile_program_evaluator(
@@ -159,13 +185,25 @@ class Optimizer:
             use_hessian=use_hessian,
         )
 
+        # A first-order method needs the gradient: refused here, not at the solve
+        if method in NATIVE_METHODS:
+            require_gradient(self.program_evaluator, method)
+
         # The solver adapter: the method's preset, the caller's keywords and options
-        # over it; a native law's own numbers may come as keywords (learning_rate=)
-        options, method_kwargs = method_options_of(method, options, method_kwargs)
-        self.adapter = make_optimizer_backend(method, options=options, **method_kwargs)
+        # over it; a native method's numbers come as keywords (max_iterations=, learning_rate=)
+        options, method_numbers = method_options_of(method, options, method_numbers)
+        self.adapter = make_optimizer_backend(
+            method,
+            backend=self.program_evaluator.backend,
+            options=options,
+            **method_numbers,
+        )
 
     def __str__(self):
-        return inspect_text(self)
+        return optimizer_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -182,7 +220,9 @@ class Optimizer:
         *,
         params=None,
         z0=None,
-        callback: OptimizationProgressCallback | None = None,
+        callback: OptimizationProgressCallback
+        | list[OptimizationProgressCallback]
+        | None = None,
         verbose: bool = False,
     ) -> OptimizationResult:
         """
@@ -191,17 +231,16 @@ class Optimizer:
         Parameters
         ----------
         params : dict, optional
-            The values of the program's parameters for this solve, a partial
-            tree merged once onto the program's defaults (a path the
-            program does not declare raises), and under ``"method"`` the
-            method's numbers (:attr:`params`). ``None`` solves at the
+            The values of the program's parameters for this solve, the complete
+            tree (a copy of :attr:`params`, edited; a missing or unknown path
+            raises), with the method's numbers under ``"method"``. ``None`` solves at the
             defaults. The compiled program is reused: a new value never
             recompiles.
         z0 : array_like, optional
             One-off initial decision vector, the warm start. If omitted, use
             the default ``z0`` supplied to :class:`Optimizer`.
-        callback : callable, optional
-            If not ``None``, called during the solve as ``callback(z, J, t)``:
+        callback : callable or list of callables, optional
+            If not ``None``, each called during the solve as ``callback(z, J, t)``:
             current decision ``z`` (1-D :class:`~numpy.ndarray`), objective
             :math:`J(z)`, and ``t`` elapsed wall time (seconds) since the
             backend solve started. Each invocation evaluates ``J(z)`` again
@@ -210,6 +249,8 @@ class Optimizer:
         verbose : bool, optional
             If True, print the framed solve panel (preamble and report).
         """
+        callback = one_callback(callback)
+
         # The program's values and the method's numbers of this solve, one complete tree
         if params is not None:
             require_tree_of(self, params)
@@ -220,13 +261,13 @@ class Optimizer:
             require_no_hook(callback)
             return self.solve_count(params, z0, method)
 
-        z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
+        z_start = self.z0 if z0 is None else decision_vector(z0, self.program.n_z)
 
         # The values of this solve, bound once at the boundary
         self.program_evaluator.bind(params)
 
         if verbose:
-            self.print_solve_preamble(z_start)
+            print_program_preamble(self, z_start)
         t0 = time.perf_counter()
 
         # The user's hook, fed (z, J(z), elapsed time) at each iterate of the backend
@@ -235,7 +276,7 @@ class Optimizer:
             t_cb0 = time.perf_counter()
 
             def backend_cb(z: np.ndarray) -> None:
-                z_arr = self.decision_vector(z, self.program.n_z)
+                z_arr = decision_vector(z, self.program.n_z)
                 J = self.program_evaluator.objective(z_arr)
                 t_elapsed = time.perf_counter() - t_cb0
                 callback(z_arr.copy(), J, t_elapsed)
@@ -254,7 +295,7 @@ class Optimizer:
         result = replace(result, solve_time_s=elapsed)
 
         if verbose:
-            self.print_solve_report(result)
+            print_program_report(result)
 
         return result
 
@@ -283,7 +324,7 @@ class Optimizer:
 
         # The start and the tree, merged once, bound to nothing
         tree = evaluator.merged(params)
-        z_start = self.z0 if z0 is None else self.start_vector(z0)
+        z_start = self.z0 if z0 is None else start_vector(self, z0)
 
         # z_K = S^K(z0; p), and J(z_K; p)
         z, J = self.adapter.run(evaluator, z_start, tree, K, method)
@@ -291,61 +332,27 @@ class Optimizer:
         return OptimizationResult(
             z=host_or_traced(z),
             success=True,
-            cost=host_or_traced(J, float),
+            J=host_or_traced(J, float),
             message=f"{K} steps taken",
-            stats={"nit": K, "algorithm": self.method},
+            stats={"nit": K, "method": self.method},
         )
 
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
 
-    def start_vector(self, z0):
-        """A start checked as :meth:`decision_vector` when it has values, a traced one by its shape."""
-        n_z = self.program.n_z
-        try:
-            return self.decision_vector(z0, n_z)
-        except TypeError:  # a tracer has no value
-            require_start_shape(z0, n_z)
-            return z0
-
-    @staticmethod
-    def decision_vector(z, n_z: int) -> np.ndarray:
-        """``z`` as a flat float array of shape ``(n_z,)``."""
-        arr = np.asarray(z, dtype=float).reshape(-1)
-        if arr.shape != (int(n_z),):
-            raise ValueError(f"decision vector must have shape ({int(n_z)},)")
-        return arr
-
-    def print_solve_preamble(self, z0: np.ndarray) -> None:
-        """Open the solve panel: the program, the start and the method."""
-        print()
-        print(DISP_RULE_MAIN)
-        print("===               Optimization Program                   ===")
-        print(DISP_RULE_MAIN)
-        for line in inspect_text(self).splitlines():
-            print(line)
-        print("z0:", preview_vector(z0))
-        print("options:", getattr(self.adapter, "options", {}))
-        print(DISP_RULE_DIV)
-        print("Running solver...")
-
-    def print_solve_report(self, result: OptimizationResult) -> None:
-        """Print the **After solve** section and close the solve panel."""
-        print(DISP_RULE_DIV)
-        for line in inspect_text(result).splitlines():
-            print(line)
-        print("stats:", result.stats)
-        print(DISP_RULE_MAIN)
-
-
-def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs):
+def make_optimizer_backend(
+    method: str,
+    *,
+    backend: str = BACKEND_NUMPY,
+    options: dict | None = None,
+    **kwargs,
+):
     """
-    The solver adapter of a method preset: the one method table of every solve path.
+    The solver adapter of a method on a backend: the one method table of every solve path.
 
-    ``method`` names a preset of :class:`Optimizer` (``"scipy_slsqp"``,
+    ``method`` names an algorithm of :class:`Optimizer` (``"slsqp"``,
     ``"ipopt"``, ``"adam"``, …; not ``"auto"``, which needs the program's
-    class); ``options`` are merged over the preset's solver options and
+    class) and ``backend`` the array module of the program it solves; the
+    pair selects the implementation, and a pair the table lacks is refused.
+    ``options`` are merged over the preset's solver options and
     ``kwargs`` over its constructor keywords. The adapter solves any program
     evaluator from a start, ``adapter.solve(evaluator, z0)``, whether the
     evaluator came from one transcription or a compiled program with
@@ -353,7 +360,7 @@ def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs
     """
     require_method(method)
     require_named_method(method)
-    adapter_key, preset = _USER_OPTIMIZER_METHODS[method]
+    adapter_key, preset = preset_of(method, backend)
     backend_kwargs = backend_kwargs_of(preset, kwargs, options)
 
     return adapter_of(adapter_key, backend_kwargs)
@@ -457,6 +464,47 @@ class IterationSystem(StepSystem):
         return state
 
 
+def start_vector(optimizer, z0):
+    """A start checked as :func:`decision_vector` when it has values, a traced one by its shape."""
+    n_z = optimizer.program.n_z
+    try:
+        return decision_vector(z0, n_z)
+    except TypeError:  # a tracer has no value
+        require_start_shape(z0, n_z)
+        return z0
+
+
+def decision_vector(z, n_z: int) -> np.ndarray:
+    """``z`` as a flat float array of shape ``(n_z,)``."""
+    arr = np.asarray(z, dtype=float).reshape(-1)
+    if arr.shape != (int(n_z),):
+        raise ValueError(f"decision vector must have shape ({int(n_z)},)")
+    return arr
+
+
+def print_program_preamble(optimizer, z0: np.ndarray) -> None:
+    """Open the solve panel: the program, the start and the method."""
+    print()
+    print(DISP_RULE_MAIN)
+    print("===               Optimization Program                   ===")
+    print(DISP_RULE_MAIN)
+    for line in inspect_text(optimizer).splitlines():
+        print(line)
+    print("z0:", preview_vector(z0))
+    print("options:", getattr(optimizer.adapter, "options", {}))
+    print(DISP_RULE_DIV)
+    print("Running solver...")
+
+
+def print_program_report(result: OptimizationResult) -> None:
+    """Print the **After solve** section and close the solve panel."""
+    print(DISP_RULE_DIV)
+    for line in inspect_text(result).splitlines():
+        print(line)
+    print("stats:", result.stats)
+    print(DISP_RULE_MAIN)
+
+
 def method_params_of(method: str, options: dict | None = None) -> dict:
     """The numbers of a method preset with ``options`` over it: a native law's (``learning_rate``, …), ``{}`` for a host method or ``"auto"``."""
     if method not in NATIVE_METHODS:
@@ -532,18 +580,6 @@ def require_no_hook(callback):
         )
 
 
-def program_class(program) -> str:
-    """The program's class from its fields: ``"constrained"`` (rows ``g`` or ``h``), ``"bounded"`` (a finite box face) or ``"unconstrained"``."""
-    if program.g is not None or program.h is not None:
-        return "constrained"
-
-    faces = [side for side in (program.lower, program.upper) if side is not None]
-    if any(np.any(np.isfinite(side)) for side in faces):
-        return "bounded"
-
-    return "unconstrained"
-
-
 def method_for(program, method):
     """The preset to run: the class default for ``"auto"``; refuse one the class does not admit."""
     require_method(method)
@@ -562,21 +598,41 @@ def method_for(program, method):
 
 
 def start_of(program, z0):
-    """The default start: ``z0`` given, else the program's own (``metadata["z0"]``)."""
+    """The default start: ``z0`` given, else the program's own (``program.z0``)."""
     if z0 is not None:
         return z0
-    if "z0" in program.metadata:
-        return program.metadata["z0"]
+    if program.z0 is not None:
+        return program.z0
 
-    raise ValueError(
-        "Optimizer needs z0: this program carries no start (metadata['z0'])"
-    )
+    raise ValueError("Optimizer needs z0: this program carries no start (program.z0)")
+
+
+def require_gradient(program_evaluator, method):
+    """Refuse a first-order method on a program without the objective's gradient."""
+    if not program_evaluator.has_gradient:
+        raise ValueError(
+            f"method {method!r} needs the objective's gradient: give the program "
+            "grad_J, or compile it on JAX (backend='jax')"
+        )
+
+
+def preset_of(method, backend):
+    """The adapter key and preset of ``(method, backend)``; refuse a pair the table lacks, naming the methods that run on that backend."""
+    preset = METHODS.get((method, backend))
+    if preset is None:
+        valid = ", ".join(sorted(m for m, b in METHODS if b == backend))
+        raise ValueError(
+            f"method {method!r} has no implementation on the {backend!r} backend; "
+            f"the methods on {backend!r} are: {valid or 'none'}."
+        )
+
+    return preset
 
 
 def require_method(method):
-    """Refuse a method that names no preset."""
-    if method != "auto" and method not in _USER_OPTIMIZER_METHODS:
-        valid = ", ".join(["auto", *sorted(_USER_OPTIMIZER_METHODS)])
+    """Refuse a method that names no algorithm."""
+    if method != "auto" and method not in PRESETS:
+        valid = ", ".join(["auto", *sorted(PRESETS)])
         raise ValueError(
             f"Unknown optimizer method {method!r}. Expected one of: {valid}."
         )
@@ -591,32 +647,52 @@ def require_named_method(method):
         )
 
 
-def method_options_of(method, options, method_kwargs):
-    """``(options, rest)``: the keywords that are the native law's own numbers moved into its options, the others kept; refuse such a number given in ``options``."""
-    numbers = method_params_of(method) if method in NATIVE_METHODS else {}
-    hidden = sorted(key for key in (options or {}) if key in numbers)
-    if hidden:
+def method_options_of(method, options, method_numbers):
+    """``(options, rest)``: a native method's keywords as its backend's options, nothing left; an external solver's ``options`` and keywords as given. Refuse ``options=`` for a native method, and a keyword it does not take."""
+    if method not in NATIVE_METHODS:
+        return options, method_numbers
+
+    require_no_options(method, options)
+    require_native_numbers(method, method_numbers)
+
+    return dict(method_numbers), {}
+
+
+def native_numbers():
+    """The keywords a native method takes: its cap, its tolerance and its law's numbers."""
+    # Lazy import: the first-order backend loads on first use
+    from minilink.optimization.optimizers.first_order import FirstOrderOptimizer
+
+    return tuple(FirstOrderOptimizer.DEFAULTS)
+
+
+def require_no_options(method, options):
+    """Refuse an external solver's options on a native method: its numbers are keywords."""
+    if options:
         raise ValueError(
-            f"{hidden} are the {method!r} method's own numbers: pass them as keywords "
-            f"(Optimizer(..., {hidden[0]}=...)); options= holds an external solver's knobs"
+            f"options= holds an external solver's knobs; the {method!r} method takes "
+            f"its numbers as keywords (max_iterations=, tol=, learning_rate=), not "
+            f"{sorted(options)} in options"
         )
-    own = {key: value for key, value in method_kwargs.items() if key in numbers}
-    rest = {key: value for key, value in method_kwargs.items() if key not in numbers}
-    if not own:
-        return options, rest
-
-    merged = {**(options or {}), **own}
-
-    return merged, rest
 
 
-def backend_kwargs_of(preset, method_kwargs, options):
+def require_native_numbers(method, method_numbers):
+    """Refuse a keyword that is not a native method's number."""
+    unknown = sorted(set(method_numbers) - set(native_numbers()))
+    if unknown:
+        raise TypeError(
+            f"method {method!r} got unexpected keyword(s) {unknown}; it takes "
+            f"{list(native_numbers())}"
+        )
+
+
+def backend_kwargs_of(preset, method_numbers, options):
     """The backend's constructor keywords: the preset's, then the caller's keywords, then the merged options."""
     # A copy of each preset dict, so a backend never edits the shared preset
     kwargs = {}
     for key, value in preset.items():
         kwargs[key] = dict(value) if isinstance(value, dict) else value
-    kwargs.update(method_kwargs)
+    kwargs.update(method_numbers)
 
     # The caller's options win over the preset's
     if options is not None:
@@ -624,6 +700,18 @@ def backend_kwargs_of(preset, method_kwargs, options):
         kwargs["options"] = {**existing, **options}
 
     return kwargs
+
+
+def optimizer_text(opt):
+    """The print text of an optimizer: its method, program, start and backend."""
+    headline = f"Optimizer, method={opt.method!r}"
+    body = [
+        body_line("program", inspect_inline(opt.program)),
+        body_line("z0", preview_vector(opt.z0)),
+        body_line("backend", opt.backend),
+    ]
+
+    return format_inspect(headline, body)
 
 
 if __name__ == "__main__":
@@ -648,7 +736,7 @@ if __name__ == "__main__":
     opt = Optimizer(
         prog,
         z0=np.array([0.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "disp": False,
             "maxiter": 200,

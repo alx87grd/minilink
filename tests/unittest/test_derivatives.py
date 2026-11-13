@@ -42,7 +42,7 @@ class _Affine(DynamicSystem):
     c = np.array([0.5, -1.0])
 
     def __init__(self):
-        super().__init__(n=2)
+        super().__init__(state_dim=2)
         self.name = "Affine"
         self.params = {"gain": 1.0}
         self.add_input_port("force")
@@ -66,7 +66,7 @@ class _Counter(StepSystem):
     """x_{k+1} = a x_k + b u_k."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.params = {"a": 0.9, "b": 0.2}
 
     def step(self, x, u, k=0, params=None):
@@ -129,11 +129,11 @@ class TestJacobianValues(unittest.TestCase):
 
     def test_defaults_are_the_nominal_point(self):
         plant = self.plant
-        plant.state.set_nominal_value(np.array([1.0, 2.0]))
+        plant.state.nominal_value = np.array([1.0, 2.0])
         plant.x0 = np.array([-3.0, 4.0])  # the simulation start plays no part
-        plant.inputs["bias"].set_nominal_value(np.array([0.7]))
+        plant.inputs["bias"].nominal_value = np.array([0.7])
         expected = plant.jacobian(
-            "f", "params", plant.state.nominal_value, plant.get_u_from_input_ports()
+            "f", "params", plant.state.nominal_value, plant.u_nominal
         )
         np.testing.assert_allclose(
             plant.jacobian("f", "params")["gain"], expected["gain"]
@@ -177,7 +177,7 @@ class TestJacobianSelectors(unittest.TestCase):
     def test_dynamic_block_with_clashing_port_is_refused(self):
         class Clash(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, output_dim=1)
+                super().__init__(state_dim=1, output_dim=1)
                 self.add_input_port("x")
 
             def f(self, x, u, t=0, params=None):
@@ -360,7 +360,7 @@ class TestEvaluatorArrayForm(unittest.TestCase):
 
     def test_numpy_evaluator_returns_the_array_and_keeps_the_built_derivative(self):
         plant = _Affine()
-        ev = plant.compile("numpy")
+        ev = plant.compile(backend="numpy")
         A = ev.jacobian("f", "x", np.zeros(2), np.zeros(2), 0.0, plant.params)
         np.testing.assert_allclose(A, _Affine.A, atol=1e-6)
 
@@ -376,7 +376,7 @@ class TestEvaluatorArrayForm(unittest.TestCase):
         import jax.numpy as jnp
 
         plant = _Affine()
-        dfdx = jax.jit(partial(plant.compile("jax").jacobian, "f", "x"))
+        dfdx = jax.jit(partial(plant.compile(backend="jax").jacobian, "f", "x"))
         J = dfdx(jnp.zeros(2), jnp.zeros(2), 0.0, plant.params)
         np.testing.assert_allclose(np.asarray(J), _Affine.A, atol=1e-6)
 
@@ -393,7 +393,9 @@ class TestFamilyPattern(unittest.TestCase):
         np.testing.assert_allclose(D, _Affine.D, atol=1e-6)
         lti = plant.linearize([0.1, 0.2], [0.3, 0.4])
         np.testing.assert_allclose(lti.A(), A)
-        self.assertEqual(lti.state.labels[0], "Delta x[0]")
+        # the plant's own labels; the deviation model's carry a Δ
+        self.assertEqual(lti.state.labels[0], "x[0]")
+        self.assertEqual(lti.deviation_model().state.labels[0], "Δx[0]")
 
     def test_the_linear_model_carries_its_operating_point(self):
         plant = _Affine()
@@ -407,14 +409,14 @@ class TestFamilyPattern(unittest.TestCase):
         np.testing.assert_allclose(part.u_bar, [0.4])
         np.testing.assert_allclose(part.y_bar, [x_bar[0], plant.h(x_bar, u_bar)[0]])
         # the nominal state is the default point; a model from arrays sits at the origin
-        plant.state.set_nominal_value(x_bar)
+        plant.state.nominal_value = np.array(x_bar, dtype=float)
         np.testing.assert_allclose(plant.linearize().x_bar, x_bar)
-        from minilink.dynamics.abstraction.state_space import LTISystem
+        from minilink.dynamics.abstraction.state_space import LTISystem, design_point
 
         origin = LTISystem(_Affine.A, _Affine.B, _Affine.C, _Affine.D)
-        np.testing.assert_allclose(origin.x_bar, 0.0)
-        np.testing.assert_allclose(origin.u_bar, 0.0)
-        np.testing.assert_allclose(origin.y_bar, 0.0)
+        self.assertFalse(hasattr(origin, "x_bar"))
+        for component in design_point(origin):
+            np.testing.assert_allclose(component, 0.0)
 
     def test_linearize_selects_rows_and_columns(self):
         plant = _Affine()
@@ -428,7 +430,7 @@ class TestFamilyPattern(unittest.TestCase):
     def test_linearize_without_y_port_uses_the_state(self):
         class Bare(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1)
+                super().__init__(state_dim=2, input_dim=1)
 
             def f(self, x, u, t=0, params=None):
                 return np.array([x[1], -x[0] + u[0]])
@@ -467,6 +469,15 @@ class TestFamilyPattern(unittest.TestCase):
         self.assertEqual(poles.size, 0)
         np.testing.assert_allclose(gain, -2.0)
 
+    def test_a_static_block_linearizes_to_its_feedthrough(self):
+        """A block with no state is the model D alone: no drift, y = ȳ + D (u − ū)."""
+        from minilink import Gain
+
+        model = linearize(Gain(2.0, dim=1))
+        np.testing.assert_allclose(model.D(), [[2.0]])
+        self.assertEqual(model.A().shape, (0, 0))
+        np.testing.assert_allclose(model.h(np.zeros(0), np.array([1.5])), [3.0])
+
     def test_methods_on_the_system_mirror_the_functions(self):
         plant = Pendulum()
         x_bar = [0.0, 0.0]
@@ -477,23 +488,23 @@ class TestFamilyPattern(unittest.TestCase):
             plant.find_equilibrium([0.3, 0.0]), [0.0, 0.0], atol=1e-6
         )
 
-    def test_a_point_given_with_a_linear_model_is_refused(self):
+    def test_a_point_given_with_a_linearization_reads_it_there(self):
         from minilink.analysis.derivatives import jacobian
         from minilink.analysis.modal import modal_analysis
 
-        lti = InvertedPendulum().linearize([0.0, 0.0])
-        for name, call in (
-            ("linearize", lambda: linearize(lti, [0.0, 0.0])),
-            ("bode", lambda: bode(lti, u_bar=[0.0], w=[1.0])),
-            ("modal_analysis", lambda: modal_analysis(lti, [0.0, 0.0])),
-            ("lqr", lambda: lqr(lti, np.eye(2), [[1.0]], x_bar=[0.0, 0.0])),
-            ("shortcut", lambda: lti.linearize([0.0, 0.0])),
-        ):
-            with self.subTest(name):
-                with self.assertRaisesRegex(ValueError, "carries its operating point"):
-                    call()
-        # the raw derivative evaluates where it is told: trajectory_lqr reads it along x(t)
-        np.testing.assert_allclose(jacobian(lti, "f", "x", [0.1, 0.0]), lti.A())
+        lin = InvertedPendulum().linearize([0.0, 0.0])
+        moved = linearize(lin, [0.1, 0.0])
+        # the same Jacobians, about the new point: f there is the model's drift
+        np.testing.assert_allclose(moved.A(), lin.A())
+        np.testing.assert_allclose(moved.x_bar, [0.1, 0.0])
+        np.testing.assert_allclose(
+            moved.params["dx_bar"], lin.A() @ np.array([0.1, 0.0])
+        )
+        np.testing.assert_allclose(lin.linearize([0.1, 0.0]).A(), lin.A())
+        poles, _ = modal_analysis(lin, [0.1, 0.0])
+        np.testing.assert_allclose(np.sort(poles), np.sort(np.linalg.eigvals(lin.A())))
+        # the raw derivative evaluates where it is told: lqr_trajectory reads it along x(t)
+        np.testing.assert_allclose(jacobian(lin, "f", "x", [0.1, 0.0]), lin.A())
 
     def test_the_operating_point_size_is_checked_by_name(self):
         plant = Pendulum()

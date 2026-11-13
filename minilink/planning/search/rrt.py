@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable
 
@@ -9,14 +11,19 @@ import numpy as np
 
 from minilink.core.sets import SingletonSet, is_finite_box
 from minilink.core.trajectory import Trajectory
-from minilink.planning.planner import Planner, planner_at, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    open_loop_controller_of,
+    planner_at,
+    planner_evidence,
+)
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.tree import (
-    NEAREST_BACKENDS,
     NEAREST_KD_TREE,
+    NEAREST_METHODS,
     Node,
     Tree,
 )
@@ -47,18 +54,15 @@ class RRTPlanner(Planner):
         Pairwise nearest-neighbour distance ``metric(a, b) -> float``.
     Notes
     -----
-    The search's settings are keywords, read back as attributes: ``max_nodes``,
+    The search's settings are keywords, read back as attributes: ``max_iterations``,
     ``goal_bias``, ``seed``, ``edge_resolution``,
-    ``max_sample_attempts``, ``return_best_effort``, ``callback``,
-    ``live_plot``, ``live_plot_every``, ``live_plot_pause``,
-    ``live_plot_after_goal_only``, ``live_plot_ax``, ``nearest_backend``.
+    ``max_sample_attempts``, ``return_best_effort``, ``nearest_method``.
+    The workflow, ``callback`` (the live figure one of its hooks), is a keyword of :meth:`solve`.
 
     Provisional tool: maintainer review before assigning for coursework.
 
     Attributes
     ----------
-    reached_goal : bool
-        Set by :meth:`solve`; ``True`` only when the goal region is reached.
     solution_node : Node or None
         Tree node whose parent chain defines the returned trajectory.
     """
@@ -71,19 +75,13 @@ class RRTPlanner(Planner):
         extender=None,
         *,
         metric=euclidean,
-        max_nodes: int = 5000,
+        max_iterations: int = 5000,
         goal_bias: float = 0.1,
         seed: int = 0,
         edge_resolution: float | None = None,
         max_sample_attempts: int = 100,
         return_best_effort: bool = True,
-        callback: Callable | None = None,
-        live_plot: bool = False,
-        live_plot_every: int = 5,
-        live_plot_pause: float = 0.001,
-        live_plot_after_goal_only: bool = False,
-        live_plot_ax: object | None = None,
-        nearest_backend: str = "brute_force",
+        nearest_method: str = "brute_force",
     ) -> None:
         super().__init__(problem)
 
@@ -94,53 +92,61 @@ class RRTPlanner(Planner):
         self.extender = extender
         self.metric = metric
 
-        # The search's structure and numbers, and its workflow
-        self.max_nodes = int(max_nodes)
+        # The search's structure and numbers
+        self.max_iterations = int(max_iterations)
         self.goal_bias = float(goal_bias)
         self.seed = int(seed)
         self.edge_resolution = edge_resolution
         self.max_sample_attempts = int(max_sample_attempts)
         self.return_best_effort = bool(return_best_effort)
-        self.nearest_backend = nearest_backend
-        self.callback = callback
-        self.live_plot = bool(live_plot)
-        self.live_plot_every = int(live_plot_every)
-        self.live_plot_pause = float(live_plot_pause)
-        self.live_plot_after_goal_only = bool(live_plot_after_goal_only)
-        self.live_plot_ax = live_plot_ax
+        self.nearest_method = nearest_method
 
         # The search, refreshed by every solve
         self.tree: Tree | None = None
-        self.reached_goal: bool = False
         self.solution_node: Node | None = None
-        self.iterations: int = 0
-        self.search_callback = None  # The solve's step callback, when it has one
 
         # The box free states are drawn from by rejection: the box of X, or the
         # state bounds when X has no finite one
         box = problem.X.bounding_box()
         self.sample_box = problem.sys.state.box if not is_finite_box(box) else box
 
-    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(
+        self,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        verbose=False,
+        callback: Callable | list[Callable] | None = None,
+    ) -> PlanningSolution:
         """
         Grow the tree until the goal region is reached or the budget is spent.
 
-        The solution's policy is the path's input held by a source block,
-        ``policy >> plant``; ``evaluate=True`` replays it over the problem's
-        draws when the problem declares a cost.
+        The solution's controller is the path's input held by a source block,
+        ``controller >> plant``; ``evaluate=True`` replays it over the problem's
+        draws and horizon (the path's last input held after it ends) when the
+        problem declares a cost; the record's "goal reached" is the search's.
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
-        """
 
+        The workflow: ``callback`` (a callable or a list of callables) sees
+        every successful extension as an
+        :class:`~minilink.planning.search.live_plot.TreeSearchIteration`; each
+        hook filters for itself. The live figure is one such hook,
+        ``callback=LiveSearchPlot(every=10)``
+        (:class:`~minilink.planning.search.live_plot.LiveSearchPlot`);
+        ``verbose`` prints the record at the end.
+        """
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                evaluate=evaluate, n_trials=n_trials
+                evaluate=evaluate, n_trials=n_trials, verbose=verbose, callback=callback
             )
             return self.store_solution(solution)
 
         metric = self.metric
-        self.require_nearest_backend()
+        self.require_nearest_method()
+        started = time.perf_counter()
 
         rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
@@ -148,15 +154,16 @@ class RRTPlanner(Planner):
 
         # The tree, rooted at the start
         self.tree = Tree(
-            Node(x=x0, parent=None, edge=None, cost=0.0),
-            nearest_backend=self.nearest_backend,
+            Node(x=x0, parent=None, edge=None, cost_to_come=0.0),
+            nearest_method=self.nearest_method,
         )
-        self.reached_goal = False
         self.solution_node = None
-        self.iterations = 0
-        self.search_callback = self.resolve_search_callback()
+        report = self.build_search_report(callback)
 
-        for _ in range(self.max_nodes):
+        # The extensions so far, and whether one reached the goal: the record's counts
+        n_iterations = 0
+        reached_goal = False
+        for _ in range(self.max_iterations):
             # Sample a state, and extend the nearest node toward it
             x_rand = self.sample_state(rng)
             near = self.tree.nearest(x_rand, metric)
@@ -165,62 +172,73 @@ class RRTPlanner(Planner):
                 continue
 
             # The new node, with its cost-to-come
-            cost = near.cost + edge.cost
-            node = self.tree.add(Node(x=edge.x_end, parent=near, edge=edge, cost=cost))
-            self.iterations += 1
+            cost = near.cost_to_come + edge.cost
+            node = self.tree.add(
+                Node(x=edge.x_end, parent=near, edge=edge, cost_to_come=cost)
+            )
+            n_iterations += 1
 
             # Stop at the first node inside the goal region
             if goal_region.contains(node.x):
-                self.reached_goal = True
+                reached_goal = True
                 self.solution_node = node
-                self.on_search_step(phase="explore")
+                report("explore", n_iterations, reached_goal)
                 return self.finish_trajectory(
-                    self.tree.extract_trajectory(node), evaluate, n_trials
+                    self.tree.extract_trajectory(node, self.problem.t0),
+                    evaluate,
+                    n_trials,
+                    self.search_record(
+                        reached_goal, n_iterations, time.perf_counter() - started
+                    ),
+                    verbose=verbose,
                 )
 
-            self.on_search_step(phase="explore")
+            report("explore", n_iterations, reached_goal)
 
         # The budget is spent: the node closest to the goal, when best effort is allowed
         goal_point = self.goal_point(goal_region)
         closest = self.tree.nearest(goal_point, metric)
         self.solution_node = closest
         if not self.return_best_effort:
-            raise RuntimeError("RRT failed to reach goal within max_nodes")
+            raise RuntimeError("RRT failed to reach goal within max_iterations")
 
         return self.finish_trajectory(
-            self.tree.extract_trajectory(closest), evaluate, n_trials
+            self.tree.extract_trajectory(closest, self.problem.t0),
+            evaluate,
+            n_trials,
+            self.search_record(
+                reached_goal, n_iterations, time.perf_counter() - started
+            ),
+            verbose=verbose,
         )
 
     def build_kwargs(self) -> dict:
         """The keywords that rebuild this planner on another problem: the extender and metric, the search's settings and numbers."""
         kwargs = dict(extender=self.extender, metric=self.metric)
-        kwargs["max_nodes"] = self.max_nodes
+        kwargs["max_iterations"] = self.max_iterations
         kwargs["goal_bias"] = self.goal_bias
         kwargs["seed"] = self.seed
         kwargs["edge_resolution"] = self.edge_resolution
         kwargs["max_sample_attempts"] = self.max_sample_attempts
         kwargs["return_best_effort"] = self.return_best_effort
-        kwargs["callback"] = self.callback
-        kwargs["live_plot"] = self.live_plot
-        kwargs["live_plot_every"] = self.live_plot_every
-        kwargs["live_plot_pause"] = self.live_plot_pause
-        kwargs["live_plot_after_goal_only"] = self.live_plot_after_goal_only
-        kwargs["live_plot_ax"] = self.live_plot_ax
-        kwargs["nearest_backend"] = self.nearest_backend
+        kwargs["nearest_method"] = self.nearest_method
 
         return kwargs
 
-    def search_record(self) -> TreeSearchRecord:
-        """The search's account: goal reached or not, the budget it took, the path's cost-to-come."""
+    def search_record(
+        self, reached_goal, n_iterations, solve_time_s=None
+    ) -> TreeSearchRecord:
+        """The search's account: goal reached or not, the budget it took (``n_iterations`` extensions, ``solve_time_s`` seconds), the path's cost-to-come."""
         node = self.solution_node
 
         return TreeSearchRecord(
-            reached_goal=bool(self.reached_goal),
-            iterations=int(self.iterations),
-            nodes=len(self.tree.nodes),
-            cost=float("nan") if node is None else float(node.cost),
+            reached_goal=bool(reached_goal),
+            n_iterations=int(n_iterations),
+            n_nodes=len(self.tree.nodes),
+            path_cost=float("nan") if node is None else float(node.cost_to_come),
             converged=False,
             history=[],
+            solve_time_s=solve_time_s,
         )
 
     def plot_tree(self, **kwargs):
@@ -241,28 +259,21 @@ class RRTPlanner(Planner):
 
         return animate_search(self, **kwargs)
 
-    def show_live_search(self, **kwargs):
-        """Build a :class:`~minilink.planning.search.live_plot.LiveSearchPlotCallback`."""
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.search.live_plot import LiveSearchPlotCallback
-
-        return LiveSearchPlotCallback(self, **kwargs)
-
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
-    def require_nearest_backend(self) -> None:
-        """Refuse an unknown backend, and the k-d tree under a non-Euclidean metric."""
-        backend = self.nearest_backend
-        if backend not in NEAREST_BACKENDS:
+    def require_nearest_method(self) -> None:
+        """Refuse an unknown nearest-neighbour method, and the k-d tree under a non-Euclidean metric."""
+        method = self.nearest_method
+        if method not in NEAREST_METHODS:
             raise ValueError(
-                f"nearest_backend must be one of {NEAREST_BACKENDS}, got {backend!r}"
+                f"nearest_method must be one of {NEAREST_METHODS}, got {method!r}"
             )
-        if backend == NEAREST_KD_TREE and self.metric is not euclidean:
+        if method == NEAREST_KD_TREE and self.metric is not euclidean:
             raise ValueError(
-                "nearest_backend='kd_tree' requires metric=euclidean "
-                "(Euclidean L2 only; use nearest_backend='brute_force' otherwise)"
+                "nearest_method='kd_tree' requires metric=euclidean "
+                "(Euclidean L2 only; use nearest_method='brute_force' otherwise)"
             )
 
     def goal_region(self):
@@ -276,23 +287,28 @@ class RRTPlanner(Planner):
 
         return Xf
 
-    def resolve_search_callback(self):
-        """The solve's step callback: the option's, a live plot, or ``None``."""
-        if self.callback is not None:
-            return self.callback
-        if not self.live_plot:
-            return None
+    def build_search_report(self, callback=None):
+        """
+        The solve's report of one extension, ``report(phase, n_iterations, reached_goal)``: the search as it stands, handed to every hook.
 
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.search.live_plot import LiveSearchPlotCallback
+        ``callback`` is a callable or a list of callables; each filters for
+        itself. A no-op when the solve asks for none.
+        """
+        if callback is None:
+            hooks = []
+        elif isinstance(callback, (list, tuple)):
+            hooks = list(callback)
+        else:
+            hooks = [callback]
 
-        return LiveSearchPlotCallback(
-            self,
-            ax=self.live_plot_ax,
-            every=self.live_plot_every,
-            pause=self.live_plot_pause,
-            after_goal_only=self.live_plot_after_goal_only,
-        )
+        def report(phase, n_iterations, reached_goal):
+            if not hooks:
+                return
+            step = self.search_step(phase, n_iterations, reached_goal)
+            for hook in hooks:
+                hook(step)
+
+        return report
 
     def sample_state(self, rng):
         """The goal region's point with probability ``goal_bias``, otherwise a free state."""
@@ -393,51 +409,47 @@ class RRTPlanner(Planner):
 
         return np.asarray(dense)
 
-    def on_search_step(self, *, phase: str) -> None:
-        """Hand the step to the solve's callback, every ``live_plot_every`` extensions."""
-        callback = self.search_callback
-        if callback is None:
-            return
-        if self.live_plot_after_goal_only and not self.reached_goal:
-            return
-        if self.iterations % max(1, self.live_plot_every) != 0:
-            return
-
+    def search_step(self, phase: str, n_iterations: int, reached_goal: bool):
+        """The search as it stands after ``n_iterations`` extensions, one :class:`~minilink.planning.search.live_plot.TreeSearchIteration` for the solve's hooks."""
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.search.live_plot import RRSearchIteration
+        from minilink.planning.search.live_plot import TreeSearchIteration
 
-        best_cost = None
-        if self.reached_goal and self.solution_node is not None:
-            best_cost = float(self.solution_node.cost)
+        best_cost_to_come = None
+        if reached_goal and self.solution_node is not None:
+            best_cost_to_come = float(self.solution_node.cost_to_come)
 
-        callback(
-            RRSearchIteration(
-                iteration=self.iterations,
-                phase=phase,
-                reached_goal=self.reached_goal,
-                best_cost=best_cost,
-                tree_nodes=len(self.tree.nodes),
-                planner=self,
-            )
+        return TreeSearchIteration(
+            iteration=n_iterations,
+            phase=phase,
+            reached_goal=reached_goal,
+            best_cost_to_come=best_cost_to_come,
+            n_nodes=len(self.tree.nodes),
+            planner=self,
         )
 
     def finish_trajectory(
-        self, trajectory: Trajectory, evaluate, n_trials
+        self, trajectory: Trajectory, evaluate, n_trials, record, *, verbose=False
     ) -> PlanningSolution:
-        """The path as a solution: its input held by a source block, the search's record, scored when asked."""
-        policy = self.open_loop_policy(trajectory, interpolation="previous")
+        """The path as a solution: its input held by a source block, the search's ``record`` (printed when ``verbose``), scored when asked."""
+        controller = open_loop_controller_of(trajectory, self.problem.sys, hold="zoh")
 
-        # Scored over the problem's draws, on the path's median time step
+        # Scored over the problem's draws and its horizon (the path's last input
+        # held after it ends), on the path's median time step
         evaluation = None
         if evaluate:
             dt = float(np.median(np.diff(trajectory.t)))
-            evaluation = planner_evidence(
-                self, policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
-            )
+            evaluation = planner_evidence(self, controller, dt=dt, n_trials=n_trials)
 
         solution = PlanningSolution(
-            self.problem, policy, self.search_record(), trajectory, evaluation
+            problem=self.problem,
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
+            evaluation=evaluation,
+            params=deepcopy(self.params),
         )
+        if verbose:
+            print(record)
 
         return self.store_solution(solution)
 
@@ -467,14 +479,15 @@ class RRTPlanner(Planner):
 
 @dataclass(frozen=True)
 class TreeSearchRecord:
-    """Whether the goal was reached, how much of the budget the search took, and the path's cost-to-come."""
+    """Whether the goal was reached, how much of the budget and of the wall clock (``solve_time_s``) the search took, and the path's cost-to-come, ``path_cost``."""
 
     reached_goal: bool
-    iterations: int
-    nodes: int
-    cost: float
+    n_iterations: int
+    n_nodes: int
+    path_cost: float
     converged: bool
     history: list
+    solve_time_s: float | None = None
 
     @property
     def success(self) -> bool:
@@ -486,12 +499,12 @@ class TreeSearchRecord:
     def __str__(self) -> str:
         outcome = "goal reached" if self.reached_goal else "goal not reached"
         text = (
-            f"{outcome} after {self.iterations} extensions ({self.nodes} nodes), "
-            f"path cost {self.cost:.4g}"
+            f"{outcome} after {self.n_iterations} extensions ({self.n_nodes} nodes), "
+            f"path cost {self.path_cost:.4g}"
         )
         if self.converged:
             text += ", converged"
-        return text
+        return text + solve_time_text(self.solve_time_s)
 
 
 ###############################################################################

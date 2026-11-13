@@ -132,6 +132,29 @@ performance) goes to docs/dev/QUESTIONS.md in its format; a detail (a version, a
 an implementation choice) goes in its TODO row as an **[ask]** with its options. The chat names
 it; show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
 
+In the chat, put decisions **one at a time**, each in this order:
+1. **Context:** what the thing is, where it sits in the plan, and why it is a decision now.
+2. **Code, before and after** (when relevant): one short snippet of the call today and under
+   each option.
+3. **Math or numbers** (when relevant): the equation the choice touches, or measured times and
+   values, with how they were measured.
+4. **Options:** each with what it changes and what it costs.
+5. **Recommendation:** the agent's pick and the one-line reason.
+
+Wait for the answer before the next decision; record each ruling where it lands (above). When
+the maintainer asks to decide a batch first, collect the rulings one at a time and implement
+them together at the end. A question the maintainer reopens or clarifies ("I meant…") replaces
+the earlier ruling: record the new one and say which it supersedes.
+
+**A core object's shape** (`PlanningSolution`, `Trajectory`, the problem, a record every planner
+fills): before proposing it, brief two independent design reviewers with the code and the
+maintainer's constraints, not the agent's design; present where they converge and the details
+where they differ, then decide one at a time.
+
+**Measure before claiming.** A cost, a speed-up or "nothing moved" is stated with the number and
+how it was measured (machine, median of N, warm or cold). A speed comparison against `dev`
+alternates the two sides and repeats a borderline line before calling it a regression.
+
 **Behavior-preserving refactor runs** (readability and textbook passes, restructures):
 
 1. Read the tests first; they are the output contract. Keep every asserted name working (a property can replace an attribute).
@@ -140,6 +163,44 @@ it; show the context before the options: the code as it stands, the evidence, an
 4. Before redesigning a shape callers consume, count what they actually read across the library, examples, tests and benchmarks. Before naming a domain object, check the course notes' own vocabulary.
 5. Never edit modules while a background sweep imports them; write the next edit as a script in the scratchpad and apply it once the sweep reports.
 6. Finish with lint, full `pytest`, the affected demos, and the notebook checks.
+
+A baseline script run from a worktree imports that worktree's code only with its path first
+(`PYTHONPATH=$PWD`, or the script's `sys.path` repointed): a script that inserts the main
+checkout's path silently measures the wrong tree.
+
+**Automatic runs** (several phases of the plan in one go, on the maintainer's approval of a
+written plan):
+
+1. One feature branch, one commit per row, one PR at the end; never merge it.
+2. The plan names when to stop and ask: a behaviour-preserving step moves a number; speed is
+   slower than `dev` beyond noise and cannot be fixed; a CONSTITUTION change; a rebase conflict;
+   an ambiguous ruling that would change a public name. Every other open choice takes the
+   recommended option and is logged ("decisions taken during the run") in the plan doc and the PR.
+3. The run ends with a review pass, then two independent reviewers (below), then the gates on
+   the final tree.
+
+**Reviews.**
+
+- **Review pass** (at the end of a run, or when asked): re-read CONSTITUTION (§1, the vision)
+  and RULES first; review every file the branch changed against `dev`, top rung of the review
+  ladder first; fix with the seeded baselines byte-identical; report what moved and why.
+- **Independent reviewers**: two, each briefed with the code and the rules, never the agent's
+  conclusions: one hunts correctness bugs and reproduces each before reporting it; one judges
+  architecture and simplicity against CONSTITUTION and RULES and splits its findings into fixes
+  that keep names and behaviour (an agent applies them) and proposals that change a public name
+  or behaviour (decisions for the maintainer).
+- **A reviewer's claim is checked before it is applied**: against the code, and against the
+  maintainer's recorded rulings. A reviewer that does not know a ruling may "fix" it back.
+- **"Fails on the base too"** is checked on the commit the run started from (or `dev`), not on
+  a commit of the same run.
+
+**Parallel agents.** Agents that edit run in their own worktrees on disjoint files; their commits
+are cherry-picked onto the branch, and conflicts resolved by the ruling that decided them. Work
+whose files overlap runs one agent after another. Never edit, and never commit, files an agent is
+still editing: its half-done work waits until it reports and its tests pass.
+
+**After a merge into `dev`:** the rows marked "in review" leave TODO and ROADMAP, the landed plan
+docs are deleted, and a docs sweep (with an independent double-check against the code) follows.
 
 **Notebooks:** skip review unless updating renamed imports or user asks; outputs and
 volatile metadata are stripped by the `nbstripout` git filter and pre-commit hook (one
@@ -175,6 +236,7 @@ is set up (tests/README.md, "Setup").
 | Any change touching math | the textbook check against `dp.py` (above), stated in the report, plus the row that fits |
 | Narrow module + tests already updated | "Narrow module change" |
 | Cross-cutting or before handoff/push | "Cross-cutting or handoff" |
+| A change to what a slow test covers (`@pytest.mark.slow`), or before a release | "Slow tests" |
 | Compile backend, simulator, trajopt, MPC or value-iteration changes | "Regression gates, CI flags" |
 | Big review pass (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes) | "Regression gates, full local" (its `--update` rule included) |
 | Teaching notebooks | "Notebook change" |

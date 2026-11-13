@@ -89,7 +89,7 @@ def operating_point(sys, x_bar=None, u_bar=None, params=None):
     and plays no part here. A point of the wrong size is refused by name, so
     it never surfaces as a broadcast error inside the evaluator.
     """
-    nominal_u = sys.get_u_from_input_ports()
+    nominal_u = sys.u_nominal
 
     # The nominal point and the mean parameters, where none is given
     x_bar = sys.state.nominal_value if x_bar is None else x_bar

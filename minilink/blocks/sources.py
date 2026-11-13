@@ -26,15 +26,15 @@ class Source(System):
     ``WhiteNoise(port="d")``), which is how ``autowire`` finds it.
     """
 
-    def __init__(self, p, *, port="y"):
+    def __init__(self, dim, *, port="y"):
         super().__init__()
 
         # Parameters
-        self.params = {"value": np.zeros(p)}
+        self.params = {"value": np.zeros(dim)}
 
         # Ports: the one output, ``y`` by default, or the input it drives (``port="r"``)
         self.port = port
-        self.add_output_port(port, dim=p, function=self.h)
+        self.add_output_port(port, dim=dim, function=self.h)
 
     @property
     def dim(self):
@@ -48,105 +48,24 @@ class Source(System):
 
         return value
 
-    def show_signal(self, t0=None, tf=None, n_pts=1000, ax=None):
-        """
-        Plot the source output signal over a time range.
-
-        Parameters
-        ----------
-        t0 : float, optional
-            Start time (default 0.0).
-        tf : float, optional
-            End time (default 10.0).
-        n_pts : int, optional
-            Number of evaluation points used for plotting.
-        ax : matplotlib.axes.Axes, optional
-            Existing axis to draw on. If None, a new figure is created and shown
-            (same policy as
-            :func:`minilink.graphical.signals.plot_time_signals`);
-            if an axis is passed, the caller controls display.
-        """
-        import matplotlib.pyplot as plt
-
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.common.environment import (
-            allow_tall_stacked_figures,
-            is_blocking_needed,
-        )
-        from minilink.graphical.common.matplotlib_style import (
-            DPI_FIGURE,
-            FONT_SIZE,
-            signal_stack_figsize,
-            style_trajectory_subplot,
-        )
-
-        # The time range, 0 to 10 s by default
-        if t0 is None:
-            t0 = 0.0
-        if tf is None:
-            tf = 10.0
-        require_plot_points(n_pts)
-
-        # The signal sampled on the time grid, one row per channel
-        p = self.dim
-        t = np.linspace(t0, tf, int(n_pts))
-        y = np.zeros((p, t.size), dtype=float)
-        empty_x = np.array([])
-        empty_u = np.array([])
-        for i, ti in enumerate(t):
-            y_i = self.h(empty_x, empty_u, ti)
-            y[:, i] = np.asarray(y_i, dtype=float).reshape(p)
-
-        # A new figure when no axis is given, titled after the block
-        created = ax is None
-        if created:
-            fig, ax = plt.subplots(
-                1,
-                1,
-                figsize=signal_stack_figsize(
-                    1, allow_tall=allow_tall_stacked_figures()
-                ),
-                dpi=DPI_FIGURE,
-                frameon=True,
-            )
-            manager = getattr(fig.canvas, "manager", None)
-            set_window_title = getattr(manager, "set_window_title", None)
-            if callable(set_window_title):
-                set_window_title("Signal: " + self.name)
-        else:
-            fig = ax.figure
-
-        # One curve per channel
-        for i in range(p):
-            label = f"{self.name}[{i}]" if p > 1 else self.name
-            ax.plot(t, y[i, :], "b", linewidth=1.5, alpha=0.8, label=label)
-
-        ax.set_ylabel("value", fontsize=FONT_SIZE, multialignment="center")
-        style_trajectory_subplot(ax)
-        ax.legend(loc="upper right")
-        ax.set_xlabel("Time [s]", fontsize=FONT_SIZE)
-        ax.set_title(f"{self.name} signal", fontsize=FONT_SIZE)
-
-        # A figure made here is shown here; a passed axis leaves display to the caller
-        if created:
-            plt.show(block=is_blocking_needed())
-
-        return fig, ax
-
 
 class Step(Source):
-    """Step source: ``y = initial_value`` if ``t < step_time``, else ``final_value``."""
+    """Step source: ``y = initial_value`` if ``t < step_time``, else ``final_value``.
 
-    def __init__(
-        self, initial_value=None, final_value=None, step_time=1.0, *, port="y"
-    ):
-        # The levels before and after the step: flat vectors of one shape, zero by default
-        if initial_value is None:
-            initial_value = np.zeros(1)
-        if final_value is None:
-            final_value = np.zeros(1)
-        initial_value = np.asarray(initial_value, dtype=float).reshape(-1)
+    ``Step()`` is the unit step at ``t = 1 s``; ``Step(2.0)`` steps to 2. A
+    scalar level is broadcast to the other level's size, which sets the
+    dimension.
+    """
+
+    def __init__(self, final_value=1.0, initial_value=0.0, step_time=1.0, *, port="y"):
+        # The levels after and before the step: flat vectors of one size
         final_value = np.asarray(final_value, dtype=float).reshape(-1)
+        initial_value = np.asarray(initial_value, dtype=float).reshape(-1)
+        size = max(final_value.shape[0], initial_value.shape[0])
+        if final_value.shape[0] == 1:
+            final_value = as_channels(final_value[0], size)
+        if initial_value.shape[0] == 1:
+            initial_value = as_channels(initial_value[0], size)
         require_matching_levels(initial_value, final_value)
 
         p = initial_value.shape[0]
@@ -177,8 +96,11 @@ class Sine(Source):
     """Sine source: ``y = offset + amplitude sin(omega t + phase)``, ``omega`` in rad/s.
 
     ``amplitude`` sets the dimension; ``omega``, ``phase`` and ``offset`` are
-    scalars or arrays of the same shape. A frequency ``f`` in hertz is
-    ``omega = 2 * np.pi * f``.
+    scalars or arrays of the same shape. ``omega`` is the number in the
+    equation, in rad/s, as the textbook writes ``sin(ω t)``; a frequency ``f``
+    in hertz is ``omega = 2 * np.pi * f`` (a
+    :class:`~minilink.blocks.filters.LowPassFilter` takes ``cutoff_hz``, the
+    unit of its datasheet).
     """
 
     def __init__(self, amplitude=1.0, omega=1.0, phase=0.0, offset=0.0, *, port="y"):
@@ -318,21 +240,21 @@ class WhiteNoise(NoiseSource):
     """
 
     def __init__(
-        self, p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
+        self, dim=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
     ):
         require_one_of("hold", hold, self.HOLDS)
         require_seed(seed)
         require_positive_period(sample_period)
 
         # The per-sample law is derived in h from the intensity: the shell is Source's
-        Source.__init__(self, p, port=port)
+        Source.__init__(self, dim, port=port)
         self.hold = hold
 
         # Parameters: the realization's seed, the sample period Δ and the intensity W
         self.params = {
             "seed": seed,
             "sample_period": float(sample_period),
-            "psd": as_intensity(psd, p),
+            "psd": as_intensity(psd, dim),
         }
 
     @property
@@ -379,40 +301,41 @@ class TrajectorySource(Source):
 
     The open-loop policy ``u = pi(t)``: feed a planned input trajectory into a
     diagram, ``source >> plant``. Between samples the signal is interpolated
-    linearly (``interpolation="linear"``, what a collocation or shooting
+    linearly (``hold="linear"``, what a collocation or shooting
     transcription assumes) or held at the previous sample
-    (``"previous"``, the zero-order hold of a sampled controller). Values
+    (``hold="zoh"``, the zero-order hold of a sampled controller), the two
+    holds of :class:`NoiseSource` and of the step model. Values
     outside ``[t[0], t[-1]]`` hold the nearest endpoint. ``values`` has shape
     ``(p, N)`` (or ``(N,)`` for a scalar signal) aligned with the ``N``
     sample times in ``t``. The times and the values are the block's ``params``
     (``{"t": ..., "values": ...}``), so a planned input is a leaf of a problem's
-    tree (``controller.values``); the rule is its structure.
+    tree (``controller.values``); the hold is its structure.
     """
 
-    INTERPOLATIONS = ("linear", "previous")
+    HOLDS = ("zoh", "linear")
 
-    def __init__(self, t, values, *, interpolation="linear", port="y"):
+    def __init__(self, t, values, *, hold="linear", port="y"):
         # The samples: N times, and a (p, N) array of values
         t = np.asarray(t, dtype=float).reshape(-1)
         values = np.asarray(values, dtype=float)
         if values.ndim == 1:
             values = values.reshape(1, -1)
         require_sample_shape(values, t)
-        require_one_of("interpolation", interpolation, self.INTERPOLATIONS)
+        require_one_of("hold", hold, self.HOLDS)
 
         Source.__init__(self, values.shape[0], port=port)
 
-        # The samples: the rule is structure, the times and the values parameters
-        self.interpolation = interpolation
+        # The samples: the hold is structure, the times and the values parameters
+        self.hold = hold
         self.params = {"t": t, "values": values}
 
     @classmethod
-    def from_trajectory(cls, traj, signal="u", *, interpolation="linear"):
+    def from_trajectory(cls, traj, signal="u", *, hold="linear"):
         """Build a source that replays a :class:`Trajectory` signal (``u`` or ``x``)."""
-        return cls(traj.t, getattr(traj, signal), interpolation=interpolation)
+        return cls(traj.t, getattr(traj, signal), hold=hold)
 
     def h(self, x, u, t=0, params=None):
-        """The sample at ``t``: linear between samples, or the previous one; endpoints held (traces on JAX)."""
+        """The sample at ``t``: linear between samples, or the previous one held; endpoints held (traces on JAX)."""
         params = self.params if params is None else params
         xp = array_module(x, u, t, params["values"])
 
@@ -420,10 +343,10 @@ class TrajectorySource(Source):
         y_k = xp.asarray(params["values"])
 
         # Linear: y(t) = y_k + (t − t_k) (y_{k+1} − y_k) / (t_{k+1} − t_k), clamped at the ends
-        if self.interpolation == "linear":
+        if self.hold == "linear":
             y = xp.stack([xp.interp(t, t_k, y_k[i]) for i in range(self.dim)])
 
-        # Previous: y(t) = y_k for t_k ≤ t < t_{k+1}, clamped at the ends
+        # Zero-order hold: y(t) = y_k for t_k ≤ t < t_{k+1}, clamped at the ends
         else:
             k = xp.clip(xp.searchsorted(t_k, t, side="right") - 1, 0, t_k.size - 1)
             y = y_k[:, k]
@@ -434,12 +357,6 @@ class TrajectorySource(Source):
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def require_plot_points(n_pts):
-    """Refuse a time grid of fewer than two points."""
-    if n_pts < 2:
-        raise ValueError("n_pts must be >= 2")
 
 
 def require_matching_levels(initial_value, final_value):
@@ -499,15 +416,3 @@ def require_sample_shape(values, t):
     """Refuse values that do not hold one column per sample time."""
     if values.shape[1] != t.size:
         raise ValueError("values must have shape (p, len(t))")
-
-
-if __name__ == "__main__":
-    noise = WhiteNoise(1, psd=0.01, sample_period=0.01, seed=1)
-    fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
-    ax.set_title("Baseline")
-
-    # The intensity is fixed: a longer period holds smaller samples for longer
-    for period in (0.05, 0.2, 1.0):
-        noise.params["sample_period"] = period
-        fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
-        ax.set_title(f"sample_period = {period}")

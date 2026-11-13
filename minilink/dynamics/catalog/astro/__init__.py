@@ -1,5 +1,5 @@
 """Celestial-mechanics catalog systems."""
 
-from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
+from minilink.dynamics.catalog.astro.three_body import ThreeBody
 
-__all__ = ["ThreeBodyProblem"]
+__all__ = ["ThreeBody"]

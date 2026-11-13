@@ -6,12 +6,21 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.sets import is_finite_box
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import ProblemEvaluator
-from minilink.planning.plotting import maybe_show
+from minilink.planning.plotting import (
+    controller_law_figure,
+    cost_to_go_heatmap,
+    maybe_show,
+    plot_result_of,
+    sample_field,
+)
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import (
+    PlanningSolution,
+    drawn_trajectory_of,
+    require_cost_to_go,
+)
 
 # Matplotlib is imported inside each view, so the planning layer stays importable
 # without a display backend until a plot is requested.
@@ -43,6 +52,10 @@ def compare(
     one backend for all, so the trials are paired): an entry is a
     :class:`~minilink.planning.results.PlanningSolution`, a controller block, or
     an :class:`~minilink.planning.evaluation.Evaluation` already computed.
+    ``dt`` follows :func:`~minilink.planning.evaluator.evaluate`: a sampled
+    controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
+    continuous one runs on ``dt``, the period its loop is integrated on, and
+    with ``dt`` omitted on the evaluator's automatic step.
     """
     problem, named = split_entries(args, entries)
 
@@ -52,8 +65,8 @@ def compare(
         require_solutions(named)
         return Comparison(named)
 
-    # Every entry scored on the same draws, its solution kept for the overlays
-    require_dt(dt)
+    # Every entry scored on the same draws, its solution kept for the overlays (each
+    # loop's period as evaluate reads it: a sampled one's own clock, else dt)
     evaluations = score_entries(
         problem,
         named,
@@ -120,23 +133,64 @@ class Comparison:
 
         return dJ
 
-    def plot_control_law(self, *, show=True, **kwargs):
-        """One panel per feedback law, side by side, one colour scale from the problem's inputs."""
+    def plot_control_law(
+        self,
+        *,
+        x_axis=None,
+        y_axis=None,
+        u_axis=0,
+        bounds=None,
+        grid_shape=(101, 101),
+        t=0.0,
+        show=True,
+    ):
+        """One panel per feedback law, side by side, one colour scale from the problem's inputs: a :class:`PlotResult` (``.figure``, ``.axes``)."""
         import matplotlib.pyplot as plt
 
-        # One panel per law, titled by its name
+        # One panel per law, each the controller's own, titled by its name
         fig, axes = panels(plt, len(self))
         for ax, (name, solution) in zip(axes, self.items()):
-            solution.plot_control_law(ax=ax, show=False, **kwargs)
+            solution.require_feedback_law()
+            controller_law_figure(
+                solution,
+                x_axis=x_axis,
+                y_axis=y_axis,
+                u_axis=u_axis,
+                bounds=bounds,
+                grid_shape=grid_shape,
+                t=t,
+                ax=ax,
+                show=False,
+            )
             ax.set_title(name)
 
         maybe_show(plt, show)
 
-        return fig, axes
+        return plot_result_of((fig, axes))
 
-    def plot_cost_to_go(self, *, jmax=None, show=True, **kwargs):
-        """One panel per cost-to-go field, side by side, one colour scale (``jmax`` or the largest finite value)."""
+    def plot_cost_to_go(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        bounds=None,
+        grid_shape=(51, 51),
+        t=0.0,
+        jmax=None,
+        show=True,
+    ):
+        """One panel per cost-to-go field, side by side, one colour scale (``jmax`` or the largest finite value): a :class:`PlotResult`."""
         import matplotlib.pyplot as plt
+
+        sweep = dict(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+        )
 
         # The solutions that carry a cost-to-go field
         fields = {
@@ -146,25 +200,28 @@ class Comparison:
         }
         require_some_cost_to_go(fields)
 
-        # One colour scale: jmax, else the largest value sampled over every field
+        # Each field sampled on one mesh; one colour scale: jmax, else the largest value
+        samples = {
+            name: sample_cost_to_go(solution, **sweep)
+            for name, solution in fields.items()
+        }
         if jmax is None:
-            jmax = max(
-                float(np.nanmax(sample_cost_to_go(solution, **kwargs)[2]))
-                for solution in fields.values()
-            )
+            jmax = max(float(np.nanmax(J)) for _, _, J in samples.values())
 
         # One panel per field, titled by its name
         fig, axes = panels(plt, len(fields))
-        for ax, (name, solution) in zip(axes, fields.items()):
-            plot_cost_to_go(solution, ax=ax, show=False, jmax=jmax, **kwargs)
-            ax.set_title(name)
+        for ax, (name, (x_level, y_level, J)) in zip(axes, samples.items()):
+            problem = fields[name].problem
+            cost_to_go_heatmap(
+                problem, x_level, y_level, J, x_axis, y_axis, jmax, name, ax
+            )
 
         maybe_show(plt, show)
 
-        return fig, axes
+        return plot_result_of((fig, axes))
 
     def plot_trajectory(self, *, signals=("x", "u"), show=True):
-        """The plans and nominal rollouts overlaid, one row per signal component, legend by name."""
+        """The plans and the controllers' runs overlaid, one row per signal component, legend by name: a :class:`PlotResult`."""
         import matplotlib.pyplot as plt
 
         # Lazy import: the graphics load on first use, not with the core
@@ -175,7 +232,7 @@ class Comparison:
         sys = first.problem.sys
         specs = {
             name: build_signal_plot_spec(
-                sys, solution.require_trajectory(), signals=signals
+                sys, drawn_trajectory_of(solution), signals=signals
             )
             for name, solution in self.items()
         }
@@ -196,12 +253,12 @@ class Comparison:
             ax.set_ylabel(trace.label + unit)
             ax.grid(True, alpha=0.3)
         axes[0].legend(loc="upper right", fontsize=8)
-        axes[0].set_title("plans and nominal rollouts")
+        axes[0].set_title("plans and runs")
         axes[-1].set_xlabel("Time [s]")
 
         maybe_show(plt, show)
 
-        return fig, axes
+        return plot_result_of((fig, axes))
 
     # Display
 
@@ -235,148 +292,29 @@ class Comparison:
         return "\n".join(lines)
 
 
-def plot_cost_to_go(
+def sample_cost_to_go(
     solution,
     *,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     anchor=None,
     bounds=None,
     grid_shape=(51, 51),
-    jmax=None,
     t=0.0,
-    cmap="YlOrRd",
-    ax=None,
-    title=None,
-    show=True,
 ):
-    """
-    Heatmap of a solution's ``cost_to_go`` over two state axes, the others pinned at ``anchor``.
-
-    ``bounds`` (``((xlo, xhi), (ylo, yhi))``) defaults to the problem's
-    constraint box, else the plant's state box; ``anchor`` to the goal,
-    else the start; ``jmax`` clips the colour scale.
-    """
-    import matplotlib.pyplot as plt
-
-    # The field sampled on a mesh over the two axes
-    x_level, y_level, J = sample_cost_to_go(
-        solution, axes=axes, anchor=anchor, bounds=bounds, grid_shape=grid_shape, t=t
-    )
-
-    # A new figure, or the one that holds the given axes
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = ax.figure
-
-    # The heatmap on the colour scale 0 ≤ J ≤ jmax, and its colour bar
-    mesh = ax.pcolormesh(x_level, y_level, J.T, shading="gouraud", cmap=cmap)
-    mesh.set_clim(vmin=0.0, vmax=jmax)
-    fig.colorbar(mesh, ax=ax)
-
-    # The state labels and the title
-    labels = state_labels(solution.problem.sys)
-    ax.set_xlabel(labels[axes[0]])
-    ax.set_ylabel(labels[axes[1]])
-    ax.set_title(f"cost-to-go ({solution.method})" if title is None else title)
-    ax.grid(True, alpha=0.3)
-
-    maybe_show(plt, show)
-
-    return fig, ax
-
-
-def sample_cost_to_go(
-    solution, *, axes=(0, 1), anchor=None, bounds=None, grid_shape=(51, 51), t=0.0
-):
-    """``(x_level, y_level, J)``: the cost-to-go sampled on a mesh over two state axes."""
+    """``(x_level, y_level, J)``: the cost-to-go sampled on a mesh over the state axes ``x_axis`` and ``y_axis``."""
     field = require_cost_to_go(solution)
-    problem = solution.problem
-    box = state_box(problem)
 
-    # The sweep's bounds: the state box over the two axes, unless given
-    if bounds is None:
-        require_bounded_state_box(box)
-        i, j = axes
-        bounds = ((box.lower[i], box.upper[i]), (box.lower[j], box.upper[j]))
-
-    # The other axes pinned at the anchor: the goal, else the start
-    if anchor is None:
-        anchor = problem.goal_point()
-    anchor = np.asarray(anchor, dtype=float)
-
-    # The mesh levels of the two axes
-    x_level = np.linspace(bounds[0][0], bounds[0][1], int(grid_shape[0]))
-    y_level = np.linspace(bounds[1][0], bounds[1][1], int(grid_shape[1]))
-
-    # J(x) at every mesh point, J(x, t) away from t = 0
-    J = np.empty((x_level.size, y_level.size))
-    x = anchor.copy()
-    for i, xi in enumerate(x_level):
-        for j, yj in enumerate(y_level):
-            x[axes[0]], x[axes[1]] = xi, yj
-            J[i, j] = float(field(x) if t == 0.0 else field(x, t))
-
-    return x_level, y_level, J
-
-
-def plot_solution_trajectory(solution, *, signals, backend, show):
-    """The solution's trajectory on its system, the figure titled as plan or nominal rollout."""
-    # Lazy import: the graphics load on first use, not with the core
-    from minilink.graphical.signals.time_signals import plot_time_signals
-
-    # The trajectory on the solution's system, shown once it is titled
-    result = plot_time_signals(
-        solution.problem.sys,
-        solution.require_trajectory(),
-        signals=signals,
-        backend=backend,
-        show=False,
+    return sample_field(
+        solution.problem,
+        field,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        anchor=anchor,
+        bounds=bounds,
+        grid_shape=grid_shape,
+        t=t,
     )
-
-    # The title says which: the plan of an open-loop policy, or the nominal rollout
-    kind = "plan" if solution.open_loop else "nominal rollout"
-    if backend == "matplotlib":
-        import matplotlib.pyplot as plt
-
-        result.figure.suptitle(f"{kind} ({solution.method})")
-        maybe_show(plt, show)
-
-    return result
-
-
-def control_law_kwargs(solution, kwargs) -> dict:
-    """Fill ``bounds`` from the problem's box and the colour limits from its inputs, unless given."""
-    kwargs = dict(kwargs)
-    problem = solution.problem
-    box = state_box(problem)
-    n = int(problem.sys.n)
-
-    # The sweep the policy's verb picks by default: x[0] against x[1], x[0] alone on
-    # a scalar state
-    x_axis = kwargs.get("x_axis")
-    y_axis = kwargs.get("y_axis")
-    x_axis = 0 if x_axis is None else x_axis
-    y_axis = (1 if n >= 2 else None) if y_axis is None else y_axis
-
-    # The sweep's bounds from the state box, unless given
-    if "bounds" not in kwargs and box is not None:
-        if y_axis is None:
-            kwargs["bounds"] = (box.lower[x_axis], box.upper[x_axis])
-        else:
-            kwargs["bounds"] = (
-                (box.lower[x_axis], box.upper[x_axis]),
-                (box.lower[y_axis], box.upper[y_axis]),
-            )
-
-    # The colour limits from the input set's box when it is finite, unless given
-    u_box = problem.U.bounding_box()
-    u_axis = kwargs.get("u_axis", 0)
-    if is_finite_box(u_box):
-        kwargs.setdefault("vmin", float(u_box.lower[u_axis]))
-        kwargs.setdefault("vmax", float(u_box.upper[u_axis]))
-
-    return kwargs
 
 
 ###############################################################################
@@ -385,7 +323,7 @@ def control_law_kwargs(solution, kwargs) -> dict:
 
 
 @dataclass(frozen=True)
-class GivenPolicy:
+class GivenController:
     """The record of a controller compared as given: no planner solved it."""
 
     success: bool = True
@@ -444,27 +382,15 @@ def solution_of(problem, entry):
     if isinstance(entry, PlanningSolution):
         return entry
 
-    return PlanningSolution(
-        problem=problem,
-        policy=entry,
-        record=GivenPolicy(),
-        trajectory=None,
-        evaluation=None,
-    )
+    return PlanningSolution(problem=problem, controller=entry, record=GivenController())
 
 
 def require_no_scoring(dt, n_trials):
     """Refuse scoring settings without a problem to score on."""
     if dt is not None or n_trials is not None:
         raise TypeError(
-            "compare scores its entries only on a problem: compare(problem, ..., dt=)"
+            "compare scores its entries only on a problem: compare(problem, ...)"
         )
-
-
-def require_dt(dt):
-    """Refuse a scored comparison without the sample period."""
-    if dt is None:
-        raise TypeError("compare(problem, ...) needs dt, the period of the runs")
 
 
 def require_scores(evaluations, names):
@@ -472,7 +398,7 @@ def require_scores(evaluations, names):
     missing = [name for name in names if not evaluations or name not in evaluations]
     if missing:
         raise ValueError(
-            f"{missing} carry no evaluation: compare(problem, ..., dt=) scores them"
+            f"{missing} carry no evaluation: compare(problem, ...) scores them"
         )
 
 
@@ -491,7 +417,10 @@ def require_solutions(named):
         raise ValueError("compare needs at least one solution")
     for name, solution in named.items():
         if not isinstance(solution, PlanningSolution):
-            raise TypeError(f"{name!r} is not a PlanningSolution")
+            raise TypeError(
+                f"{name!r} is not a PlanningSolution: to score a controller, pass the "
+                "problem first, compare(problem, name=controller, ...)"
+            )
 
 
 def panels(plt, n):
@@ -506,47 +435,7 @@ def require_some_cost_to_go(fields):
         raise ValueError("no solution carries a cost_to_go")
 
 
-def state_labels(sys) -> list:
-    """The state's axis labels with their units, ``x[i]`` where the state names none."""
-    labels = getattr(sys.state, "labels", None)
-    units = getattr(sys.state, "units", None)
-    n = int(sys.n)
-    return [
-        (labels[i] if labels else f"x[{i}]")
-        + (f" [{units[i]}]" if units and units[i] else "")
-        for i in range(n)
-    ]
-
-
-def require_cost_to_go(solution):
-    """Refuse a solution that carries no cost-to-go field; return the field."""
-    field = solution.cost_to_go
-    if field is None:
-        raise ValueError(f"this {solution.method} solution carries no cost_to_go")
-
-    return field
-
-
-def state_box(problem):
-    """The finite box to sweep: the problem's constraint set, else the plant's state box, else ``None``."""
-    box = problem.X.bounding_box()
-    if is_finite_box(box):
-        return box
-    box = problem.sys.state.box
-    return box if is_finite_box(box) else None
-
-
-def require_bounded_state_box(box):
-    """Refuse a sweep without ``bounds`` over an unbounded state box."""
-    if box is None:
-        raise ValueError(
-            "the problem's state box is unbounded; pass bounds=((xlo, xhi), (ylo, yhi))"
-        )
-
-
 __all__ = [
     "compare",
     "Comparison",
-    "plot_cost_to_go",
-    "sample_cost_to_go",
 ]

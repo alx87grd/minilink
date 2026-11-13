@@ -4,7 +4,9 @@ import numpy as np
 import pytest
 
 from minilink import KinematicBicycle
-from minilink.catalog import UdeSRacecar, UdeSRacecarDyn
+from minilink.catalog import DrivetrainBicycle, UdeSRacecar, UdeSRacecarDyn
+from minilink.core.backends import configure_jax
+from minilink.core.system import automatic_step_of
 from minilink.dynamics.catalog.vehicles.racecar import stiff_tires
 
 
@@ -25,44 +27,52 @@ def test_kinematic_scale_matches_the_public_params():
 
     assert car.n == 3
     assert car.params["a"] == pytest.approx(car.params["b"])
-    assert car.params["length"] == pytest.approx(car.params["a"] + car.params["b"])
+    assert "length" not in car.params  # The wheelbase is a + b, one owner
     assert list(car.inputs["u"].labels) == ["speed", "steering"]
 
 
 def test_ports_and_state_layout():
     """Nine states, two bounded commands, and the sensor ports the demos read."""
     car = UdeSRacecarDyn()
+    named = UdeSRacecarDyn(named_ports=True)
 
     assert car.n == 9
-    assert list(car.inputs) == ["P_cmd", "delta_cmd"]
-    assert car.inputs["P_cmd"].upper_bound == pytest.approx(car.params["P_max"])
-    assert car.inputs["delta_cmd"].lower_bound == pytest.approx(
-        -car.params["delta_max"]
+    assert list(car.inputs) == ["u"]  # One stacked port, the bicycle rungs' convention
+    assert car.inputs["u"].upper == pytest.approx(
+        [car.params["P_max"], car.params["delta_max"]]
     )
+    assert list(named.inputs) == ["P_cmd", "delta_cmd"]
+    assert named.inputs["P_cmd"].upper == pytest.approx(car.params["P_max"])
+    assert named.inputs["delta_cmd"].lower == pytest.approx(-car.params["delta_max"])
     assert set(car.outputs) == {"y", "speed", "slip", "grip", "imu", "power"}
     assert car.h(car.x0, np.zeros(car.m)).shape == (9,)
 
 
 @pytest.mark.jax
-def test_solver_hint_is_under_the_fastest_mode():
-    """The hint is shorter than the fastest time constant of the linearized plant.
+@pytest.mark.parametrize(
+    "make", [UdeSRacecarDyn, DrivetrainBicycle], ids=lambda m: m.__name__
+)
+def test_the_automatic_step_keeps_euler_stable_at_rest(make):
+    """The hint's step, ``Δt = 0.1 τ``, keeps ``|λ| Δt < 2`` on the plant's stiffest mode.
 
-    Measured on the Jacobian itself rather than on a restatement of the formula that
-    produced the hint, so that a mode the estimate forgets shows up here.
+    Measured on the Jacobian at rest, where the slip denominators sit on their floor
+    and the tire modes are stiffest, rather than on the formula that produced the
+    hint, so that a mode the estimate forgets shows up here.
     """
     jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
     jnp = jax.numpy
-    car = UdeSRacecarDyn(named_ports=False)
-    hint = car.solver_info["smallest_time_constant"]
+    car = make(named_ports=False)
+    dt = automatic_step_of(car.solver_info)
 
-    # at rest: the slip denominators sit on their floor, so the tire modes are stiffest
     A = np.asarray(jax.jacfwd(car.f)(jnp.zeros(car.n), jnp.zeros(2)))
-    fastest = 1.0 / np.abs(np.linalg.eigvals(A).real).max()
+    fastest_rate = np.abs(np.linalg.eigvals(A)).max()
 
-    assert 0.0 < hint <= fastest
-    assert hint < car.params["engine_tau"]
+    assert fastest_rate * dt < 2.0
+    assert 10.0 * dt <= min(car.params["engine_tau"], car.params["steering_tau"])
 
 
+@pytest.mark.slow
 def test_rigid_tires_reproduce_the_kinematic_bicycle():
     """With no slip left, the rear axle follows the textbook bicycle path."""
     car = UdeSRacecarDyn()
@@ -75,13 +85,13 @@ def test_rigid_tires_reproduce_the_kinematic_bicycle():
     car.x0[5] = speed * np.tan(delta) / L
 
     u = np.vstack([np.full(n, 8.0), np.full(n, delta)])
-    traj = car.compute_trajectory(u=u, tf=tf, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=tf, n_samples=n, verbose=False)
 
     kinematic = KinematicBicycle()
-    kinematic.params = {"a": car.params["a"], "b": car.params["b"], "length": 0.34}
+    kinematic.params = {"a": car.params["a"], "b": car.params["b"]}
     kinematic.x0 = np.zeros(3)
     kin_traj = kinematic.compute_trajectory(
-        u=np.vstack([traj.x[3], np.full(n, delta)]), tf=tf, n_steps=n, verbose=False
+        u=np.vstack([traj.x[3], np.full(n, delta)]), tf=tf, n_samples=n, verbose=False
     )
 
     # the plant carries its pose at the centre of gravity; the bicycle at the rear axle
@@ -98,12 +108,12 @@ def test_steady_cornering_matches_the_understeer_formula():
     car = UdeSRacecarDyn()
     p = car.params
     L = p["a"] + p["b"]
-    K_us = 1.0 / p["c_alpha_f"] - 1.0 / p["c_alpha_r"]
+    K_us = 1.0 / p["tire"]["f"]["c_alpha"] - 1.0 / p["tire"]["r"]["c_alpha"]
     speed, delta, n = 3.0, 0.06, 1201
     car.x0 = cruise_state(car, speed, delta, power=7.0)
 
     u = np.vstack([np.full(n, 7.0), np.full(n, delta)])
-    traj = car.compute_trajectory(u=u, tf=6.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=6.0, n_samples=n, verbose=False)
 
     vx, yaw_rate = traj.x[3, -1], traj.x[5, -1]
     radius = vx / yaw_rate
@@ -122,13 +132,15 @@ def test_understeer_gradient_is_the_stiffness_difference():
     for delta in (0.03, 0.06):
         car.x0 = cruise_state(car, speed, delta, power=7.0)
         u = np.vstack([np.full(n, 7.0), np.full(n, delta)])
-        traj = car.compute_trajectory(u=u, tf=6.0, n_steps=n, verbose=False)
+        traj = car.compute_trajectory(u=u, tf=6.0, n_samples=n, verbose=False)
         vx, yaw_rate = traj.x[3, -1], traj.x[5, -1]
         extra.append(delta - L * yaw_rate / vx)
         lateral.append(vx * yaw_rate / p["gravity"])
 
     K_us = (extra[1] - extra[0]) / (lateral[1] - lateral[0])
-    assert K_us == pytest.approx(1.0 / p["c_alpha_f"] - 1.0 / p["c_alpha_r"], rel=0.25)
+    assert K_us == pytest.approx(
+        1.0 / p["tire"]["f"]["c_alpha"] - 1.0 / p["tire"]["r"]["c_alpha"], rel=0.25
+    )
 
 
 def test_top_speed_is_set_by_the_power_and_the_drag():
@@ -139,7 +151,7 @@ def test_top_speed_is_set_by_the_power_and_the_drag():
     car.x0 = np.zeros(car.n)
 
     u = np.vstack([np.full(n, p["P_max"]), np.zeros(n)])
-    traj = car.compute_trajectory(u=u, tf=25.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=25.0, n_samples=n, verbose=False)
 
     top_speed = traj.x[3, -1]
     assert 9.0 < top_speed < 12.0
@@ -157,11 +169,11 @@ def test_launch_is_traction_limited_and_spins_the_rear_wheel():
     car.x0 = np.zeros(car.n)
 
     u = np.vstack([np.full(n, p["P_max"]), np.zeros(n)])
-    traj = car.compute_trajectory(u=u, tf=1.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=1.0, n_samples=n, verbose=False)
 
     slips = np.array([car.slips(traj.x[:, k], np.zeros(2)) for k in range(n)])
     imu = np.array([car.imu(traj.x[:, k], np.zeros(2)) for k in range(n)])
-    grip_limit = p["mu"] * p["gravity"] * p["a"] / (p["a"] + p["b"])
+    grip_limit = p["tire"]["r"]["mu"] * p["gravity"] * p["a"] / (p["a"] + p["b"])
     assert slips[:, 0].max() > 0.1
     assert imu[:, 0].max() < grip_limit * 1.02
     assert traj.x[6, 10] * p["r_r"] > traj.x[3, 10]
@@ -187,7 +199,7 @@ def test_steering_is_rate_limited_and_stops_at_the_end_stop():
     car.x0 = np.zeros(car.n)
 
     u = np.vstack([np.zeros(n), np.full(n, 2.0)])
-    traj = car.compute_trajectory(u=u, tf=1.5, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=1.5, n_samples=n, verbose=False)
 
     rate = np.diff(traj.x[7]) / (traj.t[1] - traj.t[0])
     assert rate.max() <= p["steer_rate_max"] * 1.001
@@ -219,7 +231,7 @@ def test_coasting_never_gains_energy():
     car.x0 = cruise_state(car, 6.0, delta=0.05)
 
     u = np.zeros((2, n))
-    traj = car.compute_trajectory(u=u, tf=8.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=8.0, n_samples=n, verbose=False)
 
     energy = (
         0.5 * p["mass"] * (traj.x[3] ** 2 + traj.x[4] ** 2)

@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
+from minilink.core.inspect import inspect_text, latex_inspect, repr_line, repr_pretty
 from minilink.core.params import (
     held_params,
     own_params,
@@ -23,8 +23,9 @@ class CostFunction(ABC):
     """
     Mother class for deterministic planning cost functions.
 
-    Subclasses define a running cost ``g(x, u, t)`` and a terminal cost
-    ``h(x, t)`` of the objective ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
+    Subclasses define a running cost ``g(x, u, t)`` and, when there is one, a
+    terminal cost ``h(x, t)`` (zero by default) of the objective
+    ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
     The horizon is the planning problem's: a finite ``horizon`` ends the integral
     and charges ``h`` there, an infinite one never does. Leaving the allowed
     set is charged by the problem (``failure_cost``), not by the cost.
@@ -52,10 +53,18 @@ class CostFunction(ABC):
         """Return the native scalar running cost density ``g(x, u, t)``."""
         ...
 
-    @abstractmethod
     def h(self, x, t=0.0, params=None):
-        """Return the native scalar terminal cost ``h(x, t)``."""
-        ...
+        """Return the native scalar terminal cost ``h(x, t)``: zero unless a subclass charges one.
+
+        A running cost alone writes :meth:`g` only. The zero is a 0-d array on
+        ``x``'s array module, so it traces under JAX like a written ``h``.
+        """
+        xp = array_module(x)
+
+        # h(x, t) = 0: no terminal charge
+        h = xp.zeros(())
+
+        return h
 
     def g_max(self, X, U, params=None):
         """
@@ -87,12 +96,13 @@ class CostFunction(ABC):
 
     def integrate(self, traj: Trajectory, *, discount_rate=0.0, params=None, t0=0.0):
         """
-        The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
+        The run's discounted running cost: ``(dJ, running)``, both shape ``(N,)``.
 
-        ``cost_rate`` is the integrand ``e^{−ρ (t_k − t0)} g(x_k, u_k, t_k)``
+        ``dJ`` is the integrand ``e^{−ρ (t_k − t0)} g(x_k, u_k, t_k)``
         at each sample, the discount counted from the horizon's start,
-        and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
-        ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
+        and ``running`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
+        ``running[0] = 0``; the terminal cost ``h`` is not included
+        (:meth:`~minilink.core.trajectory.Trajectory.with_cost` adds it). On the
         trajectory's array module, so it traces under JAX.
         """
         xp = array_module(traj.x)
@@ -107,13 +117,13 @@ class CostFunction(ABC):
         g_k = per_sample(g, x.T, u.T, t, params)
 
         # dJ_k = e^{−ρ (t_k − t0)} g_k
-        cost_rate = xp.exp(-rho * (t - t0)) * g_k
+        dJ = xp.exp(-rho * (t - t0)) * g_k
 
         # J(t_k) = Σ_{i<k} ½ (dJ_i + dJ_{i+1}) (t_{i+1} − t_i), J(t_0) = 0
-        increments = 0.5 * (cost_rate[:-1] + cost_rate[1:]) * (t[1:] - t[:-1])
-        cost = xp.concatenate([xp.zeros(1), xp.cumsum(increments)])
+        increments = 0.5 * (dJ[:-1] + dJ[1:]) * (t[1:] - t[:-1])
+        running = xp.concatenate([xp.zeros(1), xp.cumsum(increments)])
 
-        return cost_rate, cost
+        return dJ, running
 
     # Cost algebra
 
@@ -139,6 +149,9 @@ class CostFunction(ABC):
     def __str__(self):
         return inspect_text(self)
 
+    def __repr__(self):
+        return repr_line(self)
+
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
 
@@ -155,15 +168,29 @@ class QuadraticCost(CostFunction):
     ``"x_bar"``, ``"u_bar"``), the System pattern: ``params=None`` in :meth:`g`
     and :meth:`h` reads them, a dictionary replaces them, so ``jax.grad``
     reaches ``Q``. The attributes ``cost.Q`` … are views of the dictionary.
+
+    ``QuadraticCost(Q, R)`` is the regulator about the origin: ``S``, ``x_bar``
+    and ``u_bar`` default to zero, sized by ``Q`` (``n × n``) and ``R``
+    (``m × m``); :meth:`from_system` takes the plant's operating point instead.
     """
 
-    def __init__(self, Q, R, S, x_bar, u_bar):
-        # The weights and the targets as float copies, the targets flat
+    def __init__(self, Q, R, S=None, x_bar=None, u_bar=None):
+        # The weights as float copies; S, x̄, ū zero unless given, sized by Q and R
         Q = np.asarray(Q, dtype=float).copy()
         R = np.asarray(R, dtype=float).copy()
-        S = np.asarray(S, dtype=float).copy()
-        x_bar = np.asarray(x_bar, dtype=float).reshape(-1).copy()
-        u_bar = np.asarray(u_bar, dtype=float).reshape(-1).copy()
+        n = Q.shape[0] if Q.ndim == 2 else 0
+        m = R.shape[0] if R.ndim == 2 else 0
+        S = np.zeros((n, n)) if S is None else np.asarray(S, dtype=float).copy()
+        x_bar = (
+            np.zeros(n)
+            if x_bar is None
+            else np.asarray(x_bar, dtype=float).reshape(-1).copy()
+        )
+        u_bar = (
+            np.zeros(m)
+            if u_bar is None
+            else np.asarray(u_bar, dtype=float).reshape(-1).copy()
+        )
 
         # The weights sized by the targets: Q and S are n × n, R is m × m
         check_weights(Q, R, S, x_bar.size, u_bar.size)
@@ -204,7 +231,7 @@ class QuadraticCost(CostFunction):
         if x_bar is None:
             x_bar = sys.state.nominal_value
         if u_bar is None:
-            u_bar = sys.get_u_from_input_ports()
+            u_bar = sys.u_nominal
 
         return cls(
             Q=np.eye(n) if Q is None else Q,
@@ -326,8 +353,8 @@ class SumCost(CostFunction):
     obstacle or traversability term to a base objective. The terms are keyed
     by id, as a diagram keys its blocks (:meth:`of`): ``terms`` is
     ``{term_id: cost}`` and :attr:`params` the live view
-    ``{term_id: cost.params}``, its setter routing each entry to its term, so
-    a partial dictionary changes only the terms it names. A sum holds each cost
+    ``{term_id: cost.params}``, its setter routing each entry to its term (a
+    complete tree: every term's id). A sum holds each cost
     object once: ``q + 10 * q`` is refused, ``11 * q`` is the same cost.
     """
 
@@ -401,8 +428,7 @@ class SumCost(CostFunction):
         params = self.params if params is None else params
 
         return sum(
-            cost.g_max(X, U, params.get(term_id))
-            for term_id, cost in self.terms.items()
+            cost.g_max(X, U, params[term_id]) for term_id, cost in self.terms.items()
         )
 
     def h_max(self, X, params=None):
@@ -410,7 +436,7 @@ class SumCost(CostFunction):
         params = self.params if params is None else params
 
         return sum(
-            cost.h_max(X, params.get(term_id)) for term_id, cost in self.terms.items()
+            cost.h_max(X, params[term_id]) for term_id, cost in self.terms.items()
         )
 
 
@@ -508,6 +534,9 @@ class StepCost(ABC):
 
     def __str__(self):
         return inspect_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)

@@ -24,10 +24,10 @@ class Pendulum(MechanicalSystem):
         super().__init__(dof=1, actuators=1)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -143,7 +143,7 @@ class Pendulum(MechanicalSystem):
 
         length = params["l"]
         torque = u[0]
-        max_torque = self.inputs["u"].upper_bound[0]
+        max_torque = self.inputs["u"].upper[0]
 
         # A third of a turn at the torque limit
         sweep = torque * (2.0 * np.pi / 3.0) / max_torque
@@ -238,10 +238,10 @@ class TwoIndependentPendulums(MechanicalSystem):
         super().__init__(dof=2, actuators=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -335,7 +335,7 @@ class TwoIndependentPendulums(MechanicalSystem):
 
         length = params["l"]
         torque_radius = length / 5.0
-        max_torque = self.inputs["u"].upper_bound[0]
+        max_torque = self.inputs["u"].upper[0]
 
         # A third of a turn at the torque limit
         sweep_scale = 2.0 * np.pi / 3.0 / max_torque
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     sys.compute_trajectory(
         u=lambda t: np.array([2.0 * np.sin(t)]),
         tf=5.0,
-        n_steps=160,
+        n_samples=160,
         show=True,
         verbose=False,
     )

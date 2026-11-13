@@ -1,15 +1,25 @@
-"""Linearization of a ``System`` about an operating point: the Jacobians ``(A, B, C, D)`` and an ``LTISystem``."""
+"""Linearization of a ``System`` about an operating point: the Jacobians ``(A, B, C, D)`` and a ``LinearizedSystem``."""
 
 from __future__ import annotations
+
+import warnings
 
 import numpy as np
 
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.options import caller_stacklevel
 from minilink.core.roles import command_port
+from minilink.core.signals import InputPort
 from minilink.core.system import System
-from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
+from minilink.dynamics.abstraction.state_space import (
+    LINEAR_MODELS,
+    LINEARIZATIONS,
+    DiscreteLTISystem,
+    LinearizedStepSystem,
+    LinearizedSystem,
+)
 from minilink.graphical.control import style
 
 ###############################################################################
@@ -58,7 +68,6 @@ def linearize_matrices(
     eps : float, optional
         Central-difference step.
     """
-    require_own_point(sys, x_bar, u_bar)
     n = sys.n
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
@@ -66,6 +75,14 @@ def linearize_matrices(
 
     point = (x_bar, u_bar, t, params)
     at = dict(method=method, eps=eps)
+
+    # A linearization's drift is not in (A, B, C, D): one off an equilibrium is
+    # announced. At its own point it is read as stored, exactly on every method
+    if isinstance(sys, LINEARIZATIONS):
+        warn_off_equilibrium(sys, x_bar, u_bar, t, params)
+        stored = stored_matrices(sys, x_bar, u_bar, t, params, inputs, outputs)
+        if stored is not None:
+            return stored
 
     # A = ∂f/∂x and B = ∂f/∂u at the operating point (∂step/∂x and ∂step/∂u on a
     # step system); a static block has no state
@@ -101,42 +118,55 @@ def linearize(
     method="auto",
     eps=1e-6,
 ):
-    """Linearize ``sys`` about ``(x_bar, u_bar)`` and return an ``LTISystem``.
+    """Linearize ``sys`` about ``(x_bar, u_bar)`` and return a ``LinearizedSystem``.
 
     Same arguments as :func:`linearize_matrices`; ``x_bar=None`` defaults to
-    the nominal state like every tool of the analysis family. The model
-    carries the operating point it was taken at (``x_bar``, ``u_bar`` for the
-    selected inputs, ``y_bar`` for the selected outputs), so a design made on
-    it (``lqr``, ``kalman``) knows where it applies. A step or sampled system
-    gives a :class:`~minilink.dynamics.abstraction.state_space.DiscreteLTISystem`,
-    ``x_{k+1} = A_d x_k + B_d u_k``, with the period it runs at (``None`` for a
-    tick law): its poles sit in ``z``, stable inside the unit circle.
+    the nominal state like every tool of the analysis family. The model is
+    ``ẋ = f(x̄, ū) + A (x − x̄) + B (u − ū)``, ``y = h(x̄, ū) + C (x − x̄) +
+    D (u − ū)`` in the system's own coordinates: its state, inputs (the
+    selected ones) and output (the selected rows) carry the system's labels
+    and units, its nominal point is ``(x̄, ū)``, its ``x0`` the system's, so
+    a design made on it (``lqr``, ``kalman``) regulates to ``x̄`` and a run of
+    it is the linear prediction of the system's. A step or sampled system
+    gives a :class:`~minilink.dynamics.abstraction.state_space.LinearizedStepSystem`,
+    ``x_{k+1} = F(x̄, ū) + A_d (x_k − x̄) + B_d (u_k − ū)``, a tick law (a
+    sampled system's period stays on its clock: ``model % Δ`` reads seconds):
+    its poles sit in ``z``, stable inside the unit circle. ``model.deviation_model()`` is the pure linear model in
+    the deviations from the point.
     """
     # The Jacobians at the operating point
     A, B, C, D = linearize_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
 
-    # The point the model carries: the one given, else the nominal, on the
-    # selected channels
+    # The point: the one given, else the nominal; the selected inputs and outputs there
     x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
     u_selected = point_inputs(sys, u_bar, inputs)
     y_bar = point_outputs(sys, outputs, x_bar, u_bar, t, params)
 
-    # The model, its state the deviation from the point: a difference equation
-    # with its period for a step system
-    point = dict(
-        name=f"Linearized {sys.name}", x_bar=x_bar, u_bar=u_selected, y_bar=y_bar
-    )
+    # The model about the point: the drift f(x̄, ū) on a continuous system (none
+    # on a static block), the next state F(x̄, ū) on a step system, per tick
+    point = dict(x_bar=x_bar, u_bar=u_selected, y_bar=y_bar)
+    name = f"Linearized {sys.name}"
     if isinstance(sys, StepSystem):
-        lti = DiscreteLTISystem(A, B, C, D, period=period_of(sys), **point)
+        x_next_bar = np.asarray(sys.step(x_bar, u_bar, t, params), dtype=float)
+        model = LinearizedStepSystem(
+            A, B, C, D, x_next_bar=x_next_bar, name=name, **point
+        )
     else:
-        lti = LTISystem(A, B, C, D, **point)
-    lti.state.labels = [f"Delta {label}" for label in sys.state.labels]
+        dx_bar = (
+            np.asarray(sys.f(x_bar, u_bar, t, params), dtype=float)
+            if sys.n > 0
+            else np.zeros(0)
+        )
+        model = LinearizedSystem(A, B, C, D, dx_bar=dx_bar, name=name, **point)
 
-    return lti
+    # The system's own signals: its labels and units, its ports, its start
+    copy_signals(model, sys, inputs, outputs, u_selected)
+
+    return model
 
 
 def design_model(
@@ -150,29 +180,34 @@ def design_model(
     eps=1e-6,
     measured=False,
 ):
-    """The linear model a design verb reads: ``sys`` itself when it is an ``LTISystem``, else ``sys`` linearized about its command port.
+    """The linear model a design verb reads: ``sys`` itself when it is a linear model and no point is given, else ``sys`` linearized about its command port.
 
-    An ``LTISystem`` carries the operating point it was taken at, so a point
-    given here is refused: linearize the plant at ``x_bar`` instead. Any other
-    system is linearized at ``(x_bar, u_bar)``, the nominal state and inputs
-    by default, with ``B`` over the command port alone (``u``, else the one
-    input that is not a disturbance ``d`` or a noise ``n``; every other input
-    is held at its nominal value) and ``C`` over the measured output ``y``
-    alone, so a plant with noise ports gives a gain over its command and a box
-    exposing its state is measured through ``y``. ``measured=True`` (the
-    observer designs) refuses a plant without ``y`` rather than reading its
-    state as the measurement.
+    A linear model (an ``LTISystem``, a ``LinearizedSystem`` and their
+    discrete twins) is read as is, with its operating point (the origin of an
+    ``LTISystem``, the ``x̄``, ``ū`` a linearization carries). Any other system,
+    or a linear model given a point, is linearized at ``(x_bar, u_bar)``, the
+    nominal state and inputs by default, with ``B`` over the command port
+    alone (``u``, else the one input that is not a disturbance ``d`` or a
+    noise ``n``; every other input is held at its nominal value) and ``C``
+    over the measured output ``y`` alone, so a plant with noise ports gives a
+    gain over its command and a box exposing its state is measured through
+    ``y``. ``measured=True`` (the observer designs) refuses a plant without
+    ``y`` rather than reading its state as the measurement.
     """
     require_design_system(sys)
-    require_own_point(sys, x_bar, u_bar)
 
-    # A linear model is read as is, with the operating point it carries
-    if isinstance(sys, LTISystem):
+    # A linear model is read as is, with the operating point it carries; the
+    # drift of one taken off an equilibrium is announced
+    if isinstance(sys, LINEAR_MODELS) and x_bar is None and u_bar is None:
+        warn_off_equilibrium(sys, None, None, t, params)
         return sys
 
     # An observer design reads the measured output y, never the state
     if measured:
         require_measured_output(sys)
+
+    # The linear model drops f(x̄, ū): a point the plant does not rest at is announced
+    warn_off_equilibrium(sys, x_bar, u_bar, t, params)
 
     # B over the command port: "u" alone names every input stacked, so a plant
     # with several inputs picks the components of the port named u
@@ -202,23 +237,167 @@ def design_model(
 ###############################################################################
 
 
-def period_of(sys):
-    """The sample period ``Δ`` a step system runs at, in seconds; ``None`` for a tick law."""
-    if isinstance(sys, DiscreteLTISystem):
-        return sys.period
+def stored_matrices(sys, x_bar, u_bar, t, params, inputs, outputs):
+    """A linearization's ``(A, B, C, D)`` on the selected rows and columns, read at its own point; ``None`` at another point or on a diagram wire."""
+    if x_bar is not None or u_bar is not None:
+        return None
+    columns = selected_columns(sys, inputs)
+    rows = selected_rows(sys, outputs)
+    if columns is None or rows is None:
+        return None
+    n = sys.n
 
-    return getattr(sys, "sample_period", None)
+    A = np.asarray(sys.A(t, params), dtype=float)
+    B = np.asarray(sys.B(t, params), dtype=float)[:, columns]
+
+    # The rows of y = ȳ + C (x − x̄) + D (u − ū), and of the state output x (C = I, D = 0)
+    C_y = np.asarray(sys.C(t, params), dtype=float)
+    D_y = np.asarray(sys.D(t, params), dtype=float)[:, columns]
+    C_x = np.eye(n)
+    D_x = np.zeros((n, len(columns)))
+    C = np.vstack([C_y[i] if port == "y" else C_x[i] for port, i in rows]).reshape(
+        -1, n
+    )
+    D = np.vstack([D_y[i] if port == "y" else D_x[i] for port, i in rows]).reshape(
+        -1, len(columns)
+    )
+
+    return A, B, C, D
 
 
-def require_own_point(sys, x_bar, u_bar):
-    """Refuse a point given with a linear model: an ``LTISystem`` carries the one it was taken at."""
-    linear_model = isinstance(sys, (LTISystem, DiscreteLTISystem))
-    if linear_model and (x_bar is not None or u_bar is not None):
-        raise ValueError(
-            f"{sys.name!r} is a linear model and carries its operating point "
-            f"(x_bar = {sys.x_bar}); linearize the plant at x_bar instead of passing "
-            "it here"
+def selected_columns(sys, inputs):
+    """The entries of the stacked ``u`` the ``wrt`` selectors pick; ``None`` for a diagram wire."""
+    columns = []
+    for name, index in inputs:
+        if name == "u":
+            entries = range(sys.m)
+        elif name in sys.inputs:
+            entries = range(sys.m)[sys.get_input_port_slice(name)]
+        else:
+            return None
+        columns += list(entries) if index is None else [entries[index]]
+    return columns
+
+
+def selected_rows(sys, outputs):
+    """``(port, entry)`` of each row the ``of`` selectors pick, on the ports ``y`` and ``x``; ``None`` otherwise."""
+    if outputs is None:
+        outputs = [("x", None)]
+    rows = []
+    for name, index in outputs:
+        if name not in ("x", "y") or name not in sys.outputs:
+            return None
+        entries = range(sys.outputs[name].dim)
+        rows += [(name, i) for i in (entries if index is None else [entries[index]])]
+    return rows
+
+
+def copy_signals(model, sys, inputs, outputs, u_bar):
+    """Give ``model`` the signals of ``sys``: the state's labels, units and ``x0``, the selected input ports at ``ū``, the selected outputs' labels and units on ``y``."""
+    # The state, and its start
+    model.state.labels = list(sys.state.labels)
+    model.state.units = list(sys.state.units)
+    model.x0 = np.asarray(sys.x0, dtype=float).reshape(-1).copy()
+    if "x" in model.outputs:
+        model.outputs["x"].labels = list(sys.state.labels)
+        model.outputs["x"].units = list(sys.state.units)
+
+    # The input ports the B columns select, each at its share of ū; a selection
+    # that is not a set of whole ports keeps the one port u
+    ports = selected_input_ports(sys, inputs, u_bar)
+    if ports is not None:
+        output = model.outputs["y"]
+        feedthrough = bool(output.dependencies)
+        model.inputs = {}
+        for port in ports:
+            model.inputs[port.id] = port
+        output.dependencies = tuple(model.inputs) if feedthrough else ()
+
+    # The output rows the C rows select
+    labels, units = selected_output_signal(sys, outputs)
+    model.outputs["y"].labels = labels
+    model.outputs["y"].units = units
+
+
+def selected_input_ports(sys, inputs, u_bar):
+    """The input ports of ``sys`` the ``wrt`` selectors pick, in the order of the ``B`` columns, at ``ū``; ``None`` when a selector is not on a port."""
+    # Each B column as (port id, component of that port)
+    entries = selected_columns(sys, inputs)
+    if entries is None:
+        return None
+    columns = [port_component_of(sys, i) for i in entries]
+
+    # The consecutive columns of one port make one port, each port once
+    groups = []
+    for port_id, i in columns:
+        if groups and groups[-1][0] == port_id:
+            groups[-1][1].append(i)
+        else:
+            groups.append((port_id, [i]))
+    ids = [port_id for port_id, _ in groups]
+    if len(set(ids)) < len(ids) or set(ids) & {"x", "y"}:
+        return None
+
+    # Each port restricted to its components, at its share of ū
+    ports = []
+    start = 0
+    for port_id, components in groups:
+        source = sys.inputs[port_id]
+        stop = start + len(components)
+        ports.append(
+            InputPort(
+                port_id,
+                dim=len(components),
+                nominal_value=u_bar[start:stop],
+                labels=[source.labels[i] for i in components],
+                units=[source.units[i] for i in components],
+                lower=source.lower[components],
+                upper=source.upper[components],
+            )
         )
+        start = stop
+
+    return ports
+
+
+def port_component_of(sys, i):
+    """``(port id, component)`` of the entry ``i`` of the stacked input ``u``."""
+    for port_id in sys.inputs:
+        columns = sys.get_input_port_slice(port_id)
+        if columns.start <= i < columns.stop:
+            return port_id, i - columns.start
+    raise IndexError(f"{sys.name!r} has {sys.m} inputs; got the input {i}")
+
+
+def selected_output_signal(sys, outputs):
+    """The labels and units of the rows the ``of`` selectors pick (the state's when ``None``)."""
+    if outputs is None:
+        return list(sys.state.labels), list(sys.state.units)
+
+    labels = []
+    units = []
+    for name, index in outputs:
+        if name in sys.outputs:
+            signal = sys.outputs[name]
+        else:
+            block, port_id = name.split(":", 1)
+            signal = sys.subsystems[block].outputs[port_id]
+        components = range(signal.dim) if index is None else [index]
+        labels += [signal.labels[i] for i in components]
+        units += [signal.units[i] for i in components]
+
+    return labels, units
+
+
+def discrete_period(sys):
+    """``Δ`` of a step system's model (1 per tick for a tick law), ``None`` for a continuous one."""
+    if not isinstance(sys, StepSystem):
+        return None
+
+    # The clock's period in seconds; a tick law has none
+    period = getattr(sys, "sample_period", None)
+
+    return 1.0 if period is None else period
 
 
 def input_selectors(sys, wrt):
@@ -382,6 +561,48 @@ def require_design_system(sys):
             f"not {type(sys).__name__}; on arrays the gains are lqr_gain(A, B, Q, R), "
             "place_gain(A, B, poles), kalman_gain(A, C, Q_n, R_n) and "
             "luenberger_gain(A, C, poles)"
+        )
+
+
+# ‖f(x̄, ū)‖ above this, relative to 1 + ‖x̄‖, is not an equilibrium
+EQUILIBRIUM_TOL = 1e-6
+
+
+def warn_off_equilibrium(sys, x_bar, u_bar, t, params):
+    """Warn when a continuous plant, or a linearization, does not rest at the design point ``(x̄, ū)``: the linear model drops its drift."""
+    stepped = isinstance(sys, LinearizedStepSystem)
+    if (isinstance(sys, StepSystem) and not stepped) or sys.n == 0:
+        return
+    x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
+
+    # The drift ẋ = f(x̄, ū), zero at an equilibrium; x⁺ − x̄ = F(x̄, ū) − x̄ on a step model
+    if stepped:
+        drift = "F(x_bar, u_bar) - x_bar"
+        dx = np.asarray(sys.step(x_bar, u_bar, t, params), dtype=float) - x_bar
+    else:
+        drift = "f(x_bar, u_bar)"
+        dx = np.asarray(sys.f(x_bar, u_bar, t, params), dtype=float)
+    rate = float(np.linalg.norm(dx))
+
+    if rate > EQUILIBRIUM_TOL * (1.0 + float(np.linalg.norm(x_bar))):
+        warnings.warn(
+            f"{sys.name!r} does not rest at the design point: |{drift}| = {rate:.3g}. "
+            "The linear model (A, B, C, D) drops that term: its poles and responses "
+            "are those of the deviations, and a loop designed on it will not hold "
+            "x_bar. Linearize where the plant rests: pass the input that holds it "
+            "(u_bar=), or find the point with find_equilibrium(sys, x_guess)",
+            stacklevel=caller_stacklevel(),
+        )
+
+
+def require_continuous_model(model, verb):
+    """Refuse a Riccati design on a discrete-time model, naming the design that runs on a clock."""
+    if isinstance(model, (StepSystem, DiscreteLTISystem)):
+        raise ValueError(
+            f"{verb} solves the continuous-time Riccati equation, and {model.name!r} is "
+            "a discrete-time model: design on the continuous plant, and put the law on "
+            "a clock (law % dt). place reads its poles in z on a discrete-time "
+            "model, and luenberger_gain the observer's"
         )
 
 

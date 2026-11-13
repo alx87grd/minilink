@@ -11,11 +11,11 @@ from minilink.core.compile.evaluators.base import (
     ContinuousEvaluator,
     added,
     assigned,
-    blocks_params,
-    check_jax_compatible,
-    every_block,
+    every_subsystem,
     gather_u,
     gathered_on_host,
+    require_jax_traceable,
+    subsystems_params,
 )
 from minilink.core.compile.evaluators.compiled import compiled
 from minilink.core.compile.evaluators.stepping import held_inputs, iterate, step_body
@@ -36,11 +36,9 @@ class DiagramEvaluator(ContinuousEvaluator):
 
     def __init__(self, plan: ExecutionPlan, diagram, backend="numpy", verbose=False):
         p = sum(diagram.outputs[pid].dim for pid in plan.external_output_slices)
-        super().__init__(
-            plan.state_dim, diagram.m, p, backend, diagram.get_u_from_input_ports()
-        )
+        super().__init__(plan.state_dim, diagram.m, p, backend, diagram.u_nominal)
         self.plan = plan
-        self._frozen_params = every_block(
+        self._frozen_params = every_subsystem(
             {
                 op.sys_id: op.bound_params
                 for op in (*plan.port_ops, *plan.state_ops)
@@ -48,11 +46,11 @@ class DiagramEvaluator(ContinuousEvaluator):
             },
             diagram,
         )
-        self.params_reader = lambda: blocks_params(diagram, self._frozen_params)
+        self.params_reader = lambda: subsystems_params(diagram, self._frozen_params)
         self._subsystem_ids = tuple(diagram.subsystems)
 
         if backend == BACKEND_JAX:
-            check_blocks_trace(self, diagram, verbose)
+            check_subsystems_trace(self, diagram, verbose)
 
         self._jac_setup(diagram, "dynamic", state_fn=None, outputs_fn=None, plan=plan)
 
@@ -125,7 +123,7 @@ class DiagramEvaluator(ContinuousEvaluator):
 
         return values
 
-    def f_and_block(self, x, u, t, params, sys_id):
+    def f_and_subsystem(self, x, u, t, params, sys_id):
         """``(dx, x_b, u_b)``: the loop's ``dx`` and one block's own state and input, from one signal pass."""
         self.require_params(params)
         xp = self.xp
@@ -145,7 +143,7 @@ class DiagramEvaluator(ContinuousEvaluator):
         xp = self.xp
 
         def f_aug(z, u, t):
-            dx, x_b, u_b = self.f_and_block(z[:-1], u, t, params, sys_id)
+            dx, x_b, u_b = self.f_and_subsystem(z[:-1], u, t, params, sys_id)
             c_dot = xp.reshape(rate(x_b, u_b, t), (1,))
             z_dot = xp.concatenate([dx, c_dot])
             return z_dot
@@ -330,14 +328,14 @@ class DiagramEvaluator(ContinuousEvaluator):
 ###############################################################################
 
 
-def check_blocks_trace(evaluator, diagram, verbose):
+def check_subsystems_trace(evaluator, diagram, verbose):
     """Refuse a diagram holding a block whose ``f`` or an output port does not trace."""
     jax, jnp = evaluator.jax, evaluator.jnp
     if verbose:
         t0 = time.perf_counter()
-        n_blocks = len(diagram.subsystems)
+        n_subsystems = len(diagram.subsystems)
         print(
-            f"[compile] Checking JAX compatibility of {n_blocks} blocks...",
+            f"[compile] Checking JAX compatibility of {n_subsystems} subsystems...",
             end="",
             flush=True,
         )
@@ -348,10 +346,10 @@ def check_blocks_trace(evaluator, diagram, verbose):
         params = sys.params
         if isinstance(sys, DynamicSystem):
             label = f"{sys_id} ({sys.name})"
-            check_jax_compatible(sys.f, label, dummy_x, dummy_u, 0.0, params, jax)
+            require_jax_traceable(sys.f, label, dummy_x, dummy_u, 0.0, params, jax)
         for port_id, port in sys.outputs.items():
             label = f"{sys_id}:{port_id} ({sys.name})"
-            check_jax_compatible(
+            require_jax_traceable(
                 port.compute, label, dummy_x, dummy_u, 0.0, params, jax
             )
 

@@ -23,7 +23,7 @@ class ConstantSpeedKinematicCar(DynamicSystem):
     """Kinematic car with constant speed and steering-angle input."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
+        super().__init__(state_dim=3, input_dim=1, output_dim=3, expose_state=True)
         self.name = "Constant Speed Kinematic Car"
 
         # Parameters: a full-size wheelbase, driven at a fixed forward speed
@@ -112,7 +112,7 @@ class DynamicHolonomicMobileRobot(DynamicSystem):
     """
 
     def __init__(self):
-        super().__init__(n=4, input_dim=2, output_dim=4, expose_state=True)
+        super().__init__(state_dim=4, input_dim=2, output_dim=4, expose_state=True)
         self.name = "Dynamic Holonomic Mobile Robot"
 
         # Signal labels and units
@@ -167,7 +167,7 @@ class HolonomicMobileRobot3D(DynamicSystem):
     """Holonomic 3D point robot."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=3, output_dim=3, expose_state=True)
+        super().__init__(state_dim=3, input_dim=3, output_dim=3, expose_state=True)
         self.name = "Holonomic 3D Mobile Robot"
 
         # Signal labels and units

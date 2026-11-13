@@ -10,7 +10,7 @@ from minilink.core.facades.analysis import DynamicAnalysis, SystemAnalysis
 from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
 from minilink.core.facades.plotting import DynamicPlotting, SystemPlotting
 from minilink.core.facades.simulation import DynamicSimulation, SystemSimulation
-from minilink.core.inspect import inspect_text
+from minilink.core.inspect import inspect_text, repr_line
 from minilink.core.params import own_params
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
@@ -61,7 +61,7 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
       expression still draws the Graphviz block.
     - **Names**: :attr:`name` is the display name, the class name unless the
       block sets its own; :attr:`id` is the key the block takes in a diagram
-      built by ``+``, ``>>`` or a loop (``None``: its name in snake case; in
+      built by ``+``, ``>>`` or a loop (``None``: its name; in
       ``@`` the role names ``plant``, ``controller`` and ``observer`` win).
 
     Overridden :meth:`h` and port ``compute`` functions are functions of
@@ -86,16 +86,30 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     #: Whether the block draws random numbers from a seed in its ``params``.
     is_random = False
 
-    def __init__(self, n=0):
+    def __init__(
+        self,
+        state_dim=0,
+        *,
+        input_dim=None,
+        output_dim=None,
+        expose_state=False,
+        y_dependencies=None,
+    ):
         """
-        Initialize the system with ``n`` continuous states (default 0).
+        Initialize the system with ``state_dim`` states (default 0), :attr:`n`.
 
-        Static blocks use ``n = 0``. Systems start with no input or output ports.
-        Add ports with :meth:`add_input_port` and :meth:`add_output_port`; the
-        input and output dimensions :attr:`m` and :attr:`p` are derived from ports.
+        Static blocks use ``state_dim = 0``. The keyword shortcuts create the
+        standard ports, as :class:`DynamicSystem` and ``StepSystem`` do: the
+        input ``u`` (``input_dim``), the output ``y = h(x, u, t)``
+        (``output_dim``) and the state output ``x`` (``expose_state``). A
+        static map feeds its input through by definition, so ``y_dependencies``
+        defaults to ``("u",)`` when an input is given (``()`` otherwise). Add
+        other ports with :meth:`add_input_port` and :meth:`add_output_port`;
+        the input and output dimensions :attr:`m` and :attr:`p` are totals over
+        the ports.
         """
-        # Structural model description
-        self.n = int(n)
+        # Structural model description: the state dimension n
+        self.n = int(state_dim)
         require_nonnegative_dimension(self.n)
 
         # The display name, the class name unless a subclass sets its own, and
@@ -104,11 +118,15 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         self.id = None
 
         # State metadata
-        self.state = VectorSignal("x", dim=n)
+        self.state = VectorSignal("x", dim=self.n)
 
-        # Ports
+        # Ports, each when asked: the input u, the output y = h(x, u), the state x; a
+        # static map's output reads its input, y = h(u, t)
         self.inputs = {}
         self.outputs = {}
+        if y_dependencies is None:
+            y_dependencies = ("u",) if input_dim is not None else ()
+        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
 
         # Model defaults: the initial condition of a simulation (the operating
         # point the analysis tools read is the nominal state,
@@ -197,14 +215,6 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         """Output helper returning the state vector directly (``y = x``)."""
         return x
 
-    def refresh(self):
-        """
-        Recompute derived internals from current parameters/topology.
-
-        Base implementation is a no-op and can be overridden by subclasses.
-        """
-        return
-
     def realize(self, key):
         """
         The params of one realization of the block's randomness under ``key``.
@@ -227,8 +237,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Add a new input port to the system.
@@ -250,8 +260,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     def add_output_port(
@@ -264,8 +274,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Add a new output port to the system.
@@ -294,8 +304,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     def rename_ports(self, **names):
@@ -335,12 +345,14 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         return self
 
-    def get_u_from_input_ports(self):
+    @property
+    def u_nominal(self):
         """
-        Concatenated default values of all input ports.
+        The input ports' nominal values, concatenated in port order (read-only).
 
-        This is the disconnected / nominal fallback used for standalone
-        systems and for the evaluator IVP tier.
+        This is what an unconnected port reads: the input of a standalone
+        system and of the evaluator's IVP tier. It is not an operating point
+        (``u_bar``, which a linearization carries in its ``params``).
         """
         u = np.zeros(self.m)
 
@@ -348,12 +360,12 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         # unconnected port contributes
         i = 0
         for port in self.inputs.values():
-            u[i : i + port.dim] = port.get_default_value()
+            u[i : i + port.dim] = port.nominal_value
             i += port.dim
 
         return u
 
-    def get_port_values_from_u(self, u, *port_ids):
+    def ports(self, u, *port_ids):
         """
         Extract named port signals from the concatenated input vector ``u``.
 
@@ -497,6 +509,9 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     def __str__(self):
         return inspect_text(self)
 
+    def __repr__(self):
+        return repr_line(self)
+
     def _repr_pretty_(self, p, cycle):
         p.text("..." if cycle else str(self))
 
@@ -569,7 +584,7 @@ class DynamicSystem(
 
     def __init__(
         self,
-        n,
+        state_dim,
         *,
         input_dim=None,
         output_dim=None,
@@ -581,8 +596,8 @@ class DynamicSystem(
 
         Parameters
         ----------
-        n : int
-            Number of continuous states.
+        state_dim : int
+            Number of continuous states, :attr:`n`.
         input_dim : int, optional
             If provided, create a standard input port named ``u``.
         output_dim : int, optional
@@ -593,10 +608,15 @@ class DynamicSystem(
         y_dependencies : tuple or "all", optional
             Direct-feedthrough dependencies for the standard ``y`` output.
         """
-        System.__init__(self, n)
-
         # Ports, each when asked: the input u, the output y = h(x, u), the state x
-        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
+        System.__init__(
+            self,
+            state_dim,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            expose_state=expose_state,
+            y_dependencies=y_dependencies,
+        )
 
     def f(self, x, u, t=0, params=None):
         """
@@ -740,7 +760,7 @@ def require_initialized(system, name):
     if "inputs" not in vars(system):
         raise AttributeError(
             f"{type(system).__name__}.__init__() must call "
-            f"super().__init__(n=...) before the system is used "
+            f"super().__init__(state_dim=...) before the system is used "
             f"(missing attribute {name!r})"
         )
 
@@ -761,7 +781,7 @@ if __name__ == "__main__":
     # Hello world: a double integrator dx = [x[1], u[0]]
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2)
 
         def f(self, x, u, t=0, params=None):
             xp = array_module(x)

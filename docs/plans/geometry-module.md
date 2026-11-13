@@ -1,9 +1,8 @@
 # Workspace geometry module
 
-**Status:** core contract — design agreed 2026-09-21. Landed 2026-11-06: the `core/geometry/` package with the shapes and the paths (step 1, the paths of step 2, step 5); the rest not started.  
+**Status:** core contract — design agreed 2026-09-21. Landed: the `core/geometry/` package with the shapes and the paths (2026-11-06; the path names left `planning.spatial` 2026-11-07), the path-tracking laws reading a path, and the `Field` the spatial fields subclass (v0.3, DESIGN §4). The rest is open.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Rung:** v0.5, step A3 of [TODO.md](TODO.md) §4, a feature on the core; the `Field` it needs is a v0.3 core pillar ([TODO.md](TODO.md) §1.9).  
-**Depends on:** the `Field` ABC (`core/fields.py`, DESIGN §4) (landed in v0.3, `StateField` renamed `Field`).
+**Rung:** v0.5, step A3 of [TODO.md](TODO.md) §4, a feature on the core.
 
 Workspace math is split today: SDF solids and paths in [`core/geometry/`](../../minilink/core/geometry/), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2); the path-tracking laws of [`control/geometric.py`](../../minilink/control/geometric.py) read a path from core. Demos rebuild the same oval and cones by hand.
 
@@ -105,14 +104,19 @@ minilink/dynamics/           # plants that emit tf
 minilink/graphical/          # drawing only
 ```
 
-## Implementation (later)
+## Implementation, what is left
 
-1. `geometry.py` → `core/geometry/shapes.py` (landed).
-2. Move Path (landed), Track, Scene, probes, `mount`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
-3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../dev/RULES.md) 3.4).
-4. Catalog factories; switch the two UdeS racecar demos and the RRT forest demo.
-5. The path-tracking laws accept a `Path` (landed; a `Track`, once it moves).
-6. The minimal `Field` (landed in v0.3): spatial subclasses already live in geometry when `Field` lands.
+Landed: the shapes (`core/geometry/shapes.py`), the paths (`core/geometry/paths.py`; every
+caller imports the path names from `minilink.core.geometry`, or from the `minilink.planning`
+facade that exports two of them), the path-tracking laws reading a `Path`, and the minimal
+`Field`. Left, in order:
+
+1. Move Track, Scene, probes, `mount`, the spatial fields (subclasses of `Field`) and the grid;
+   plots and overlays under `graphical/` with lazy methods on Scene/Track.
+2. `planning.spatial` deleted in the same change as its call sites ([RULES.md](../dev/RULES.md)
+   3.4); the scene names stay there until they move.
+3. The catalog factories; the two UdeS racecar demos and the RRT forest demo switched to them.
+4. The path-tracking laws accept a `Track` once it moves.
 
 ## Out of scope
 

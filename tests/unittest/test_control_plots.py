@@ -27,6 +27,7 @@ from minilink.analysis.time_response import (
     step_info,
     step_response,
 )
+from minilink.dynamics.abstraction.state_space import DiscreteLTISystem
 from minilink.graphical.common import PlotResult
 
 PLOTLY = pytest.importorskip
@@ -201,9 +202,9 @@ class TestChannelTools(unittest.TestCase):
         self.assertAlmostEqual(k, 0.5)
         gains, roots = root_locus(plant, x_bar)
         self.assertEqual(roots.shape[1], 2)
-        w_n, G_n = nyquist(plant, x_bar, n=50)
+        w_n, G_n = nyquist(plant, x_bar, n_samples=50)
         self.assertEqual(G_n.shape, (50,))
-        time, y = step_response(plant, x_bar, n=200)
+        time, y = step_response(plant, x_bar, n_samples=200)
         self.assertEqual(time.shape, y.shape)
         self.assertIsInstance(margins(plant, x_bar), linear.Margins)
         G_tf = transfer_function(plant, x_bar)
@@ -217,7 +218,7 @@ class TestChannelTools(unittest.TestCase):
         from minilink.analysis.frequency import margins_text
 
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
-        coarse, fine = margins(L, n=60), margins(L, n=4000)
+        coarse, fine = margins(L, n_samples=60), margins(L, n_samples=4000)
         # L(s) = 1 / (s (s + 1)(s + 2)): Gm = 20 log10(6) at sqrt(2) rad/s, exactly
         self.assertAlmostEqual(coarse.gain_margin_db, 20 * np.log10(6.0), places=9)
         self.assertAlmostEqual(coarse.w_phase_crossover, np.sqrt(2.0), places=9)
@@ -262,6 +263,70 @@ class TestChannelTools(unittest.TestCase):
         # through infinity there
         gains, roots = root_locus(tf, gains=[-3.0, -0.9])
         np.testing.assert_allclose(gains, [-3.0, -0.9])
+
+
+class TestInZ(unittest.TestCase):
+    """The root locus and the step response of a difference equation, in ``z``."""
+
+    def setUp(self):
+        # x_{k+1} = a x_k + u_k, y_k = x_k: G(z) = 1 / (z − a), Δ = 0.1 s
+        self.a = 0.5
+        self.G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]]) % 0.1
+
+    def tearDown(self):
+        import matplotlib.pyplot as plt
+
+        plt.close("all")
+
+    def test_the_step_response_is_the_geometric_sum_at_the_ticks(self):
+        # y_k = Σ_{i<k} aⁱ = (1 − aᵏ) / (1 − a), at t_k = k Δ
+        time, y = step_response(self.G, tf=1.0)
+        k = np.arange(11)
+        np.testing.assert_allclose(time, 0.1 * k)
+        np.testing.assert_allclose(y, (1.0 - self.a**k) / (1.0 - self.a))
+
+    def test_the_default_horizon_is_eight_time_constants_of_the_pole_in_z(self):
+        # σ = −ln a / Δ, the horizon 8 / σ = 1.154 s: the ticks 0 to 11
+        time, _ = step_response(self.G)
+        self.assertEqual(time[-1], 0.1 * 11)
+
+    def test_a_deadbeat_system_shows_a_few_ticks_not_ten_seconds(self):
+        # Its pole at z = 0 settles in n = 1 tick: the horizon spans n + 1 ticks
+        G = DiscreteLTISystem([[0.0]], [[1.0]], [[1.0]], [[0.0]]) % 0.001
+        time, y = step_response(G)
+        np.testing.assert_allclose(time, [0.0, 0.001, 0.002])
+        np.testing.assert_allclose(y, [0.0, 1.0, 1.0])
+
+    def test_a_tick_law_steps_once_per_unit_of_time(self):
+        G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]])
+        time, y = step_response(G, tf=4.0)
+        np.testing.assert_allclose(time, np.arange(5.0))
+        np.testing.assert_allclose(y[-1], (1.0 - self.a**4) / (1.0 - self.a))
+
+    def test_the_root_locus_is_the_closed_loop_pole_in_z(self):
+        # 1 + K G(z) = 0 at z = a − K
+        gains, roots = root_locus(self.G, gains=[0.0, 0.5, 1.5, 2.0])
+        np.testing.assert_allclose(roots[:, 0], self.a - gains)
+
+    def test_a_held_continuous_channel_steps_as_its_continuous_response(self):
+        from minilink import discretize
+
+        # The zero-order hold is exact under a step: the two agree at the ticks
+        G = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        time, y = step_response(discretize(G, 0.1, solver="exact"), tf=2.0)
+        time_c, y_c = step_response(G, tf=2.0, n_samples=21)
+        np.testing.assert_allclose(time, time_c)
+        np.testing.assert_allclose(y, y_c, atol=1e-12)
+
+    def test_the_plots_draw_the_unit_circle_and_the_samples(self):
+        r = plot_root_locus(self.G, show=False)
+        circle = r.axes.lines[0]
+        np.testing.assert_allclose(
+            np.hypot(circle.get_xdata(), circle.get_ydata()), 1.0, atol=1e-12
+        )
+        r = plot_step_response(self.G, show=False)
+        self.assertEqual(r.figure._suptitle.get_text(), "Linear Step Response")
+        self.assertEqual(r.axes.lines[0].get_linestyle(), "None")
 
 
 class TestPlots(unittest.TestCase):
@@ -309,6 +374,10 @@ class TestPlots(unittest.TestCase):
         self.assertEqual(r.axes.get_xlabel(), "Time (seconds)")
         r = self.plant.plot_step_response(self.x_bar, show=False)
         self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
+        # a linearization's response is the deviation Δy, never titled "Linear"
+        r = self.plant.linearize(self.x_bar).plot_step_response(show=False)
+        self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
+        self.assertEqual(r.axes.get_ylabel(), "Deviation Δy")
 
     def test_radius_frames_the_slow_roots_of_a_stiff_channel(self):
         stiff = TransferFunction([1.0], [1.0, 101.0, 100.0])  # poles at -1 and -100
@@ -353,20 +422,20 @@ class TestPlots(unittest.TestCase):
             (plot_nyquist, self.loop, 3),
             (plot_step_response, self.loop, 2),
         ):
-            r = plot(sys, backend="plotly", show=False)
-            self.assertEqual(r.backend, "plotly")
+            r = plot(sys, renderer="plotly", show=False)
+            self.assertEqual(r.renderer, "plotly")
             self.assertEqual(len(r.figure.data), expected, plot.__name__)
-        r = plot_bode(self.plant, backend="plotly", show=False)
+        r = plot_bode(self.plant, renderer="plotly", show=False)
         self.assertEqual(r.figure.layout.xaxis.type, "log")
         self.assertIn("Bode Diagram", r.figure.layout.title.text)
         self.assertIn("From: tau", r.figure.layout.title.text)
         self.assertTrue(r.figure.data[0].hovertext[0].startswith("ω ="))
-        r = plot_root_locus(self.plant, backend="plotly", show=False)
+        r = plot_root_locus(self.plant, renderer="plotly", show=False)
         self.assertIn("K =", r.figure.data[0].hovertext[1])
 
     def test_unknown_backend_is_refused(self):
-        with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
-            plot_bode(self.plant, backend="bokeh", show=False)
+        with self.assertRaisesRegex(ValueError, "Unknown renderer"):
+            plot_bode(self.plant, renderer="bokeh", show=False)
 
     def test_a_short_trace_draws_its_three_arrows_on_both_backends(self):
         from minilink.graphical.control import (
@@ -390,7 +459,7 @@ class TestPlots(unittest.TestCase):
             spec = ControlFigure(title="arrows", panels=(panel,))
             for backend in backends:
                 with self.subTest(n=n, backend=backend):
-                    r = render_control_figure(spec, backend=backend, show=False)
+                    r = render_control_figure(spec, renderer=backend, show=False)
                     if backend == "plotly":
                         arrows = r.figure.layout.annotations
                     else:
@@ -401,12 +470,14 @@ class TestPlots(unittest.TestCase):
         pytest.importorskip("plotly")
         self.plant.x0 = np.array([0.5, 0.0])
         traj = self.plant.compute_trajectory(tf=1.0, verbose=False)
-        r = self.plant.plot_phase_plane(traj, backend="plotly", show=False)
-        self.assertEqual(r.backend, "plotly")
+        r = self.plant.plot_phase_plane(traj, renderer="plotly", show=False)
+        self.assertEqual(r.renderer, "plotly")
         names = [trace.name for trace in r.figure.data]
         self.assertTrue({"trajectory", "start", "end"} <= set(names), names)
-        r = self.plant.plot_phase_plane(backend="plotly", streamplot=True, show=False)
-        self.assertEqual(r.backend, "plotly")  # the cached trajectory is overlaid again
+        r = self.plant.plot_phase_plane(renderer="plotly", streamplot=True, show=False)
+        self.assertEqual(
+            r.renderer, "plotly"
+        )  # the cached trajectory is overlaid again
 
 
 if __name__ == "__main__":

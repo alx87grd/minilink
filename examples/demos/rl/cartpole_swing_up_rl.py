@@ -19,10 +19,10 @@ DT = 0.05
 # The state bounds are the training box; leaving it truncates the episode.
 # The angle is unbounded: the policy sees it through periodic features.
 plant = CartPole()
-plant.inputs["u"].lower_bound = np.array([-10.0])
-plant.inputs["u"].upper_bound = np.array([10.0])
-plant.state.lower_bound = np.array([-5.0, -5.0, -20.0, -30.0])
-plant.state.upper_bound = np.array([5.0, 5.0, 20.0, 30.0])
+plant.inputs["u"].lower = np.array([-10.0])
+plant.inputs["u"].upper = np.array([10.0])
+plant.state.lower = np.array([-5.0, -5.0, -20.0, -30.0])
+plant.state.upper = np.array([5.0, 5.0, 20.0, 30.0])
 
 
 # Cost: periodic angle term, small cart, velocity and effort penalties (the
@@ -61,16 +61,16 @@ planner = ReinforcementLearningPlanner(
     features=features,
     hidden=(64, 64),
     method="ppo",
-    n_envs=16,
-    n_steps=256,
+    n_rollouts=16,
+    n_steps_per_update=256,
     batch_size=512,
     gamma=0.99,
 )
-solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)
 planner.plot_learning_curve()
 
-ppo_ctl = planner.get_controller()
+ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=1, y_axis=3, u_axis=0)  # force vs (theta, dtheta)
 
 report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)

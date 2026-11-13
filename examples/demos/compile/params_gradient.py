@@ -19,7 +19,7 @@ class TraceablePendulum(DynamicSystem):
     """Pendulum with all physical constants in ``params`` (JAX-traceable)."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, y_dependencies=())
         self.name = "TraceablePendulum"
         self.params = {"m": 1.0, "l": 1.0, "gravity": 9.81, "d": 0.2}
         self.state.labels = ["theta", "dtheta"]
@@ -59,7 +59,7 @@ class TraceableImpedanceController(System):
         Kp = params["Kp"]
         Kd = params["Kd"]
         xp = array_module(u)
-        r, y = self.get_port_values_from_u(u, "r", "y")
+        r, y = self.ports(u, "r", "y")
 
         # PD law on the angle with rate damping: tau = Kp (r - q) - Kd dq
         tau = Kp * (r[0] - y[0]) - Kd * y[1]
@@ -85,7 +85,6 @@ print("Finite-difference check passed.")
 # Part 2: closed-loop diagram, identify gravity and damping by equation error
 
 diagram = DiagramSystem()
-diagram.connection_verbose = False
 diagram.add_subsystem(TraceableImpedanceController(), "controller")
 diagram.add_subsystem(TraceablePendulum(), "plant")
 diagram.add_input_port("r", dim=1)
@@ -101,7 +100,7 @@ n_samples = 400
 ts = dt * jnp.arange(n_samples)
 rs = 1.2 * jnp.sin(0.8 * ts).reshape(-1, 1)
 x0 = jnp.array([0.5, 0.0])
-xs = true_evaluator.rollout(x0, rs, 0.0, dt, hold="foh")
+xs = true_evaluator.rollout(x0, rs, 0.0, dt, hold="linear")
 
 # "Measured" state derivatives (in practice: numerical differentiation of
 # logged states; here taken from the true model).

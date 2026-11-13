@@ -96,8 +96,8 @@ def test_a_closed_path_wraps_round_its_closing_segment():
     s, c = loop.project(middle)
 
     assert L == pytest.approx(line.total_length + gap, rel=1e-12)
-    assert loop.sample(L + 0.3) == pytest.approx(loop.sample(0.3), abs=1e-12)
-    assert loop.sample(-0.3) == pytest.approx(loop.sample(L - 0.3), abs=1e-12)
+    assert loop.at(L + 0.3) == pytest.approx(loop.at(0.3), abs=1e-12)
+    assert loop.at(-0.3) == pytest.approx(loop.at(L - 0.3), abs=1e-12)
     assert c == pytest.approx(middle, abs=1e-12)
     assert s == pytest.approx(L - 0.5 * gap, rel=1e-12)
 
@@ -106,8 +106,21 @@ def test_an_open_path_holds_its_ends():
     """Past either end of an open path, the point is that end."""
     line = straight_path()
 
-    assert line.sample(-1.0) == pytest.approx([0.0, 0.0])
-    assert line.sample(15.0) == pytest.approx([10.0, 0.0])
+    assert line.at(-1.0) == pytest.approx([0.0, 0.0])
+    assert line.at(15.0) == pytest.approx([10.0, 0.0])
+
+
+def test_the_laws_are_named_by_their_class():
+    """Each law's display name is its class name (RULES 2.6)."""
+    path = straight_path()
+    laws = [
+        PurePursuit(path, wheelbase=WHEELBASE, lookahead=LOOKAHEAD),
+        Stanley(path),
+        LineOfSight(path),
+        HeadingController(),
+    ]
+
+    assert [law.name for law in laws] == [type(law).__name__ for law in laws]
 
 
 # Pure pursuit
@@ -511,7 +524,7 @@ def test_the_pursuit_arc_runs_from_the_rear_axle_to_the_target(rear_offset):
         [np.cos(state[2]), np.sin(state[2])]
     )
     s, _ = path.project(rear_axle)
-    target = path.sample(s + LOOKAHEAD + 0.25 * 2.0)
+    target = path.at(s + LOOKAHEAD + 0.25 * 2.0)
     assert abs(law.ctl(np.zeros(0), state)[0]) < law.params["delta_max"]
     assert arc.pts[0, :2] == pytest.approx(rear_axle, abs=1e-12)
     assert arc.pts[-1, :2] == pytest.approx(target, abs=1e-9)

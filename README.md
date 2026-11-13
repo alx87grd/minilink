@@ -80,7 +80,7 @@ from minilink import DynamicSystem
 
 class MassSpringDamper(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=1)
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
         m, k, b = 1.0, 4.0, 0.3
@@ -130,7 +130,7 @@ Because a composite diagram is itself a `DynamicSystem`, **every analysis verb w
 - **Real-Time Wall-Clock Play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame).
 - **Decoupled Geometry:** Body poses $T = \mathrm{tf}(x, u, t; p)$ describe kinematics without cluttering the differential equations with rendering code.
 - **Hardware-Accelerated 3D WebGL:** `plant.animate(traj, renderer="meshcat")` opens an interactive 3D browser viewer with orbit, pan, and playback controls.
-- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), quadrotors (`Drone2D`, `Drone3D`), and aerospace vehicles (`Rocket`).
+- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), drones (`Drone2D`), and aerospace vehicles (`Rocket`).
 
 ```python
 from minilink import UR5Manipulator
@@ -150,7 +150,7 @@ The exact same equation $f(x, u, t; p)$ traces under JAX without rewriting physi
 
 - **Exact Machine-Precision Sensitivities:** Analytical Jacobians:
   $$A = \frac{\partial f}{\partial x}, \quad B = \frac{\partial f}{\partial u}, \quad S_p = \frac{\partial f}{\partial p}$$
-- **Parallel GPU-Batched Rollouts:** Vectorized simulation across parameter sweeps via JAX `vmap` (1,000 rollouts in 27 ms vs. 32 s in pure Python).
+- **Parallel GPU-Batched Rollouts:** Vectorized simulation across parameter sweeps via JAX `vmap` (1,000 rollouts in 0.12–0.16 s on a cloud CPU vs. 32 s in pure Python).
 - **Plant & Controller Co-Design:** Compute closed-loop objective gradients $\nabla_\theta J$ to optimize control gains and physical parameters simultaneously.
 - **Opt-In Acceleration:** Pure NumPy remains the default classroom engine; JAX is activated with a single flag (`backend="jax"`).
 
@@ -214,7 +214,7 @@ The identical problem definition is handed to completely different solver paradi
 - **Trajectory Optimization (TrajOpt):** Direct collocation and multiple shooting NLP.
 - **Reinforcement Learning (RL):** PPO / SAC neural policy optimization.
 
-Every planner returns a `PlanningSolution` whose policy is itself a `System` that closes the loop via `policy @ plant`:
+Every planner returns a `PlanningSolution` whose controller is itself a `System`: a feedback law closes the loop via `controller @ plant`, an open-loop plan drives it via `controller >> plant`, and the solution's score and plots are of that controller as it is:
 
 ```python
 import numpy as np
@@ -232,16 +232,17 @@ problem = PlanningProblem(
     X=plant.state.box, U=plant.input_box,
 )
 
-vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
+# The infinite-horizon law: on the 4 s horizon itself, the best plan is to stay down
+vi = DynamicProgrammingPlanner(problem.replace(horizon=None), x_grid=(101, 101), u_grid=(11,), dt=0.05)
 rrt = RRTPlanner(problem, seed=0)
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
 
-vi_sol  = vi.solve()   # policy is a lookup controller
+vi_sol  = vi.solve()   # the controller is a lookup table
 rrt_sol = rrt.solve()  # kinodynamic trajectory
 opt_sol = opt.solve()  # continuous trajectory solution
 
-# Closed-loop composition: policy is a standard System
-loop = vi_sol.policy @ plant
+# Closed-loop composition: the controller is a standard System
+loop = vi_sol.controller @ plant
 
 # Objective benchmark across solver paradigms
 print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))

@@ -18,10 +18,10 @@ TORQUE = 4.0  # Nm, below m g l = 9.81 Nm: the pendulum must pump energy
 
 # Plant: catalog pendulum, theta = 0 hanging, theta = pi upright, torque limited
 plant = Pendulum()
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
-plant.state.lower_bound = np.array([-4 * np.pi, -20.0])
-plant.state.upper_bound = np.array([4 * np.pi, 20.0])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
+plant.state.lower = np.array([-4 * np.pi, -20.0])
+plant.state.upper = np.array([4 * np.pi, 20.0])
 
 
 # Cost: J = int g dt with g zero upright, two hanging, periodic in the angle
@@ -59,18 +59,18 @@ planner = ReinforcementLearningPlanner(
     features=features,
     hidden=(32, 32),
     method="ppo",
-    n_envs=64,
-    n_steps=32,
+    n_rollouts=64,
+    n_steps_per_update=32,
     batch_size=256,
     learning_rate=3e-3,
     gamma=0.97,
 )
-solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)
 planner.plot_learning_curve()
 
 # The learned law is a controller block: draw it, score it, close the loop
-ppo_ctl = planner.get_controller()
+ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=0, y_axis=1, u_axis=0)  # torque vs (theta, dtheta)
 
 report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)

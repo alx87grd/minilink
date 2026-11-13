@@ -12,7 +12,13 @@ import numpy as np
 from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, child_seed, split_keys, tiled_mean
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import (
+    body_line,
+    format_inspect,
+    inspect_inline,
+    repr_pretty,
+)
+from minilink.core.options import caller_stacklevel
 from minilink.core.params import (
     flatten,
     lookup,
@@ -117,8 +123,8 @@ class PlanningProblem:
         Continuous planning horizon length in seconds, measured from
         ``t0``. ``None`` means unset (RRT / some DP tasks). ``+inf`` means
         infinite-horizon. Finite trajopt / MPC grids require a finite
-        ``horizon`` — demos should always set it explicitly. Knot count ``N``
-        lives on transcription options.
+        ``horizon`` — demos should always set it explicitly. The interval count
+        ``N`` lives on the transcription (``n_steps=``).
     t0 : float, optional
         The start time of the horizon, ``[t0, t0 + horizon]``: a run
         starts at ``t0``, its costs, sets and references read absolute
@@ -128,7 +134,7 @@ class PlanningProblem:
     discount_rate : float, optional
         The continuous discount rate ``ρ ≥ 0`` of the objective
         ``∫ e^{−ρ(t − t0)} g dt + e^{−ρ T} h`` (``T`` the horizon), applied by every consumer (value
-        iteration's ``α`` and reinforcement learning's ``γ`` are
+        iteration's and reinforcement learning's ``γ`` are
         :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
     penalize_failure : bool, optional
         Whether an evaluation charges a run that fails (leaves ``X`` or ``U``, or
@@ -191,6 +197,7 @@ class PlanningProblem:
     def __init__(
         self,
         sys: System,
+        *,
         x0=None,
         cost: CostFunction | None = None,
         X: Set | None = None,
@@ -232,14 +239,14 @@ class PlanningProblem:
         n = int(self.sys.n)
 
         # The horizon and the discount rate, and the failure's switch and cost
-        horizon = self.coerce_horizon(self.horizon)
+        horizon = coerce_horizon(self.horizon)
         self.discount_rate = coerce_rate(self.discount_rate)
         self.penalize_failure = coerce_switch(self.penalize_failure)
         self.failure_cost = coerce_failure_cost(self.failure_cost)
 
         # The evaluation start: the point given, else the law's mean, else X0's
-        x0 = self.coerce_state(
-            self.default_x0(),
+        x0 = coerce_state(
+            default_x0_of(self),
             label="x0",
             required=True,
         )
@@ -254,15 +261,15 @@ class PlanningProblem:
         Xf = self.Xf
 
         # The sets' types
-        self.require_type("X", X, Set)
-        self.require_type("U", U, InputSet)
-        self.require_type("X0", X0, Set)
+        require_type("X", X, Set)
+        require_type("U", U, InputSet)
+        require_type("X0", X0, Set)
         if Xf is not None:
-            self.require_type("Xf", Xf, Set)
+            require_type("Xf", Xf, Set)
 
         # The start: a state of size n inside X0
-        self.check_state_shape("x0", x0, n)
-        self.require_member(
+        check_state_shape("x0", x0, n)
+        require_member(
             X0,
             x0,
             set_label="X0",
@@ -300,7 +307,7 @@ class PlanningProblem:
         ``problem.params = {"plant": {...}}`` sets the plant's parameters.
         """
         tree = self.held_params
-        parts = self.part_trees()
+        parts = part_trees_of(self)
         own = {key: tree.get(key) for key in OWN_LEAVES}
 
         # The parts' trees, refreshed when a part was replaced, in the roles' order
@@ -327,13 +334,13 @@ class PlanningProblem:
             elif role == "cost":
                 self.cost.params = entry
             elif role == "x0":
-                self.move_start(entry)
+                self.x0 = entry
             elif role == "t0":
                 self.t0 = coerce_start_time(entry)
             elif role == "discount_rate":
                 self.discount_rate = coerce_rate(entry)
-            elif role in self.sources_by_id():
-                self.sources_by_id()[role].params = entry
+            elif role in sources_of(self):
+                sources_of(self)[role].params = entry
             else:
                 # A set's numbers in place, its one home
                 getattr(self, role).params = entry
@@ -358,20 +365,16 @@ class PlanningProblem:
 
     @property
     def x0(self) -> np.ndarray:
-        """The evaluation start's point (a law's mean): the one leaf ``params["x0"]``; assigning it moves a singleton ``X0`` with it (:meth:`move_start`)."""
+        """The evaluation start's point (a law's mean): the one leaf ``params["x0"]``; assigning it moves a singleton ``X0`` with it, any other ``X0`` must hold it."""
         return self.held_params.get("x0")
 
     @x0.setter
     def x0(self, value):
-        self.move_start(value)
-
-    def move_start(self, x0):
-        """Set ``x0``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
-        start = self.coerce_state(x0, label="x0", required=True)
-        self.check_state_shape("x0", start, int(self.sys.n))
+        start = coerce_state(value, label="x0", required=True)
+        check_state_shape("x0", start, int(self.sys.n))
         if isinstance(self.X0, SingletonSet):
             self.X0 = SingletonSet(start)
-        self.require_member(self.X0, start, set_label="X0", point_label="x0")
+        require_member(self.X0, start, set_label="X0", point_label="x0")
 
         self.held_params["x0"] = start
 
@@ -433,14 +436,11 @@ class PlanningProblem:
 
         # Each law's leaf n times, in its number's shape, from the stream named by
         # its path (the tree copied along the path: the parts' dicts stay untouched)
-        for path, law in flatten(self.distributions):
-            nominal = np.shape(lookup(tree, path))
-            values = law.sample(stream_of(key, ".".join(path)), n)
-            tree = with_leaf(tree, path, values.reshape((n, *nominal)))
+        tree = with_law_draws(tree, self.distributions, key, n)
 
         # Each random source's seeds, n times, named by its block id and the trial;
         # without a key, every seed None (the mean signal)
-        for sys_id, block in self.sources_by_id().items():
+        for sys_id, block in sources_of(self).items():
             if block.is_random:
                 if key is None:
                     seeds = seeds_of(block, block.realize(None))
@@ -454,7 +454,7 @@ class PlanningProblem:
         """The paths of the leaves :meth:`realize` draws with a trial axis."""
         paths = [("x0",)]
         paths.extend(path for path, _ in flatten(self.distributions))
-        for sys_id, block in self.sources_by_id().items():
+        for sys_id, block in sources_of(self).items():
             if block.is_random:
                 seeds = seeds_of(block, block.realize(0))
                 paths.extend((sys_id, *path) for path, _ in flatten(seeds))
@@ -471,17 +471,7 @@ class PlanningProblem:
 
     def sample_params(self, key):
         """One draw of each law, at its path in the problem's tree (empty when nothing is drawn)."""
-        paths = [path for path, _ in flatten(self.distributions)]
-        keys = split_keys(key, len(paths))
-        view = self.parts_view()
-
-        draws = {}
-        for path, k in zip(paths, keys):
-            # One draw, in the nominal entry's shape, at its path
-            value = lookup(self.distributions, path).sample(k)
-            set_leaf(draws, path, value.reshape(np.shape(lookup(view, path))))
-
-        return draws
+        return law_draws(self.distributions, self.parts_view(), key)
 
     def nominal(self) -> PlanningProblem:
         """
@@ -505,7 +495,7 @@ class PlanningProblem:
             nominal.params = merge_tree(nominal.parts_view(), means)
 
         # Each random source at its mean signal: its seed None
-        for block in nominal.sources_by_id().values():
+        for block in sources_of(nominal).values():
             if block.is_random:
                 block.params = block.realize(None)
 
@@ -535,44 +525,15 @@ class PlanningProblem:
         return type(self)(**fields)
 
     @property
-    def has_goal(self) -> bool:
-        """Return ``True`` when a terminal goal or boundary set is available."""
-        return self.Xf is not None
-
-    @property
-    def has_cost(self) -> bool:
-        """Return ``True`` when the problem has a cost function."""
-        return self.cost is not None
-
-    @property
     def is_stochastic(self) -> bool:
         """``True`` when a part is random: a law on the start or a parameter, a random source."""
         random_source = any(block.is_random for block in self.disturbances.values())
 
         return self.start_law is not None or bool(self.distributions) or random_source
 
-    def sources_by_id(self) -> dict:
-        """The disturbance sources by the id of their block in the evaluated loop (``d`` → ``disturbance``, ``n`` → ``noise``)."""
-        return {source_id(port): block for port, block in self.disturbances.items()}
-
     def parts_view(self) -> dict:
         """:attr:`params` copied at its top level: the parts' own trees by role and the problem's own numbers, for a caller that sets entries."""
         return dict(self.params)
-
-    def part_trees(self) -> dict:
-        """Each part's own tree by role, in the roles' order: the start's singleton left out (its point is ``x0``, one home)."""
-        trees = {"plant": self.sys.params}
-        if self.cost is not None:
-            trees["cost"] = self.cost.params
-        for role in ("X", "U", "X0", "Xf"):
-            set_ = getattr(self, role)
-            if set_ is None or (role == "X0" and isinstance(set_, SingletonSet)):
-                continue
-            trees[role] = getattr(set_, "params", None)
-        for port, block in getattr(self, "disturbances", {}).items():
-            trees[source_id(port)] = block.params
-
-        return trees
 
     def discount_factor(self, dt) -> float:
         """The per-step factor ``γ = e^{−ρ dt}`` of a planner stepping ``dt``."""
@@ -598,7 +559,7 @@ class PlanningProblem:
         a warning naming ``failure_cost``. ``params`` are the cost's numbers to
         bound (an evaluation's overridden weights); ``None`` reads its own.
         """
-        cost = self.require_cost()
+        cost = require_cost(self)
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
         T = (
             (self.horizon if self.horizon_kind() == "finite" else np.inf)
@@ -654,7 +615,7 @@ class PlanningProblem:
 
     def compile(
         self,
-        controller=None,
+        controller,
         dt=None,
         *,
         solver="rk4",
@@ -663,28 +624,18 @@ class PlanningProblem:
         episode_length=None,
     ):
         """
-        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem, or its step face.
+        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem.
 
         The controller closed on the plant (or a built loop with a ``plant`` block),
         compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
         parameter of the run, ``pe.program(wrt)`` exports the tuning program.
         A sampled controller (``pid % 0.01``) runs the sampled loop on its own
-        clock: ``dt`` omitted reads its base period. With no controller,
-        ``problem.compile(dt=)`` is the step face
-        (:class:`~minilink.planning.step_face.StepFace`):
-        ``transition(x, u, k, params) -> (x_next, c_k)`` on the plant's
-        ``solver`` and ``substeps`` (1 by default). On a sampled loop
+        clock: ``dt`` omitted reads its base period. On a sampled loop
         ``substeps`` is the plant's steps per base period, ``None`` the
-        automatic step (``problem.compile(mpc % 0.2, substeps=20)``).
+        automatic step (``problem.compile(mpc % 0.2, substeps=20)``). The
+        problem on a clock is its discretization, ``problem.discretize(dt)``,
+        whose ``transition`` and ``rollout`` answer its step equations.
         """
-        # No controller: the step face, the problem at its period
-        if controller is None:
-            # Lazy import: the face loads with its first compile
-            from minilink.planning.step_face import StepFace
-
-            substeps = 1 if substeps is None else substeps
-            return StepFace(self, dt=dt, solver=solver, substeps=substeps)
-
         # Lazy import: the engine loads with its first evaluator
         from minilink.planning.evaluator import ProblemEvaluator
 
@@ -703,8 +654,8 @@ class PlanningProblem:
         The problem on its plant sampled at ``dt``: a :class:`~minilink.planning.step_problems.StepPlanningProblem`.
 
         Its cost is the :class:`~minilink.core.costs.SampledCost` of this one,
-        ``N = horizon / dt``, ``γ = e^{−ρ dt}``; its face equals
-        ``self.compile(dt=dt, solver=solver, substeps=substeps)``'s.
+        ``N = horizon / dt``, ``γ = e^{−ρ dt}``; it answers its own equations,
+        ``transition(x, u, k, params) -> (x_next, c_k)``, ``terminal`` and ``rollout``.
         """
         # Lazy import: the step problem imports this module
         from minilink.planning.step_problems import discretize_problem
@@ -719,137 +670,154 @@ class PlanningProblem:
             else "finite"
         )
 
-    def require_cost(self) -> CostFunction:
-        """Refuse a problem without a cost; return the cost."""
-        if self.cost is None:
-            raise ValueError("This planner requires problem.cost")
-
-        return self.cost
-
-    def require_goal(self) -> Set:
-        """Refuse a problem without a terminal set; return it."""
-        if self.Xf is None:
-            raise ValueError(
-                "This planner requires a terminal set: give the problem Xf"
-            )
-
-        return self.Xf
-
-    def require_finite_horizon(self) -> float:
-        """Refuse an unset or infinite horizon; return ``horizon`` as a float."""
-        if self.horizon is None:
-            raise ValueError("This planner requires a finite problem.horizon")
-        if not np.isfinite(self.horizon):
-            raise ValueError(
-                "This planner requires a finite problem.horizon "
-                "(got +inf for infinite-horizon)"
-            )
-
-        return float(self.horizon)
-
     # Display
 
     def __str__(self):
-        return inspect_text(self)
+        horizon = (
+            f"horizon={planning_horizon_text(self.horizon)}, rho={self.discount_rate:g}"
+        )
+        if self.is_stochastic:
+            return stochastic_problem_text(self, horizon)
+
+        return problem_text(self, horizon)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
-
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    @staticmethod
-    def coerce_horizon(horizon: object) -> float | None:
-        """The horizon as a float: positive or ``+inf``, ``None`` when unset."""
-        if horizon is None:
-            return None
-
-        value = float(horizon)
-        if np.isnan(value) or value <= 0.0:
-            raise ValueError(
-                "horizon must be positive, None (unset), or +inf (infinite-horizon)"
-            )
-        if not (np.isfinite(value) or np.isposinf(value)):
-            raise ValueError(
-                "horizon must be positive, None (unset), or +inf (infinite-horizon)"
-            )
-
-        return value
-
-    def default_x0(self):
-        """
-        The start given, else its law's mean, else ``X0``'s: a singleton's point, a region's bounding-box centre when finite and inside, else ``sys.x0``.
-
-        With no ``X0`` the start is ``sys.x0``; a region holding neither its
-        centre nor ``sys.x0`` is refused.
-        """
-        if self.held_params.get("x0") is not None:
-            return self.held_params["x0"]
-        if self.start_law is not None:
-            return self.start_law.mean
-        X0 = self.X0
-        if X0 is None:
-            return self.sys.x0
-        if isinstance(X0, SingletonSet):
-            return X0.point
-
-        # A region: the centre of its bounding box, else the plant's own start
-        centre = region_centre(X0)
-        if centre is not None and bool(X0.contains(centre)):
-            return centre
-        x0 = np.asarray(self.sys.x0, dtype=float).reshape(-1)
-        if x0.size == int(self.sys.n) and bool(X0.contains(x0)):
-            return x0
-
-        raise ValueError(
-            f"X0 ({type(X0).__name__}) holds neither its bounding box's centre nor "
-            "sys.x0: give x0, a point of X0 or a law over it"
-        )
-
-    @staticmethod
-    def coerce_state(
-        x: object,
-        *,
-        label: str,
-        required: bool,
-    ) -> np.ndarray | None:
-        """A flat float copy of the point, ``None`` when it is optional and missing."""
-        if x is None:
-            if required:
-                raise ValueError(f"{label} is required")
-            return None
-
-        return np.asarray(x, dtype=float).reshape(-1).copy()
-
-    @staticmethod
-    def require_type(label: str, value: object, expected_type: type) -> None:
-        """Refuse a value that is not an instance of ``expected_type``."""
-        if not isinstance(value, expected_type):
-            raise TypeError(f"{label} must be a {expected_type.__name__} instance")
-
-    @staticmethod
-    def check_state_shape(label: str, x: np.ndarray, n: int) -> None:
-        """Validate a representative point as a flat state of size ``n``."""
-        if x.shape != (n,):
-            raise ValueError(f"{label} must have shape ({n},)")
-
-    @staticmethod
-    def require_member(
-        set_: Set,
-        point: np.ndarray,
-        *,
-        set_label: str,
-        point_label: str,
-    ) -> None:
-        """Refuse a representative point outside its boundary set."""
-        if not set_.contains(point):
-            raise ValueError(f"{point_label} must belong to {set_label}")
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def coerce_horizon(horizon: object) -> float | None:
+    """The horizon as a float: positive or ``+inf``, ``None`` when unset."""
+    if horizon is None:
+        return None
+
+    value = float(horizon)
+    if np.isnan(value) or value <= 0.0:
+        raise ValueError(
+            "horizon must be positive, None (unset), or +inf (infinite-horizon)"
+        )
+    if not (np.isfinite(value) or np.isposinf(value)):
+        raise ValueError(
+            "horizon must be positive, None (unset), or +inf (infinite-horizon)"
+        )
+
+    return value
+
+
+def coerce_state(
+    x: object,
+    *,
+    label: str,
+    required: bool,
+) -> np.ndarray | None:
+    """A flat float copy of the point, ``None`` when it is optional and missing."""
+    if x is None:
+        if required:
+            raise ValueError(f"{label} is required")
+        return None
+
+    return np.asarray(x, dtype=float).reshape(-1).copy()
+
+
+def require_type(label: str, value: object, expected_type: type) -> None:
+    """Refuse a value that is not an instance of ``expected_type``."""
+    if not isinstance(value, expected_type):
+        raise TypeError(f"{label} must be a {expected_type.__name__} instance")
+
+
+def check_state_shape(label: str, x: np.ndarray, n: int) -> None:
+    """Validate a representative point as a flat state of size ``n``."""
+    if x.shape != (n,):
+        raise ValueError(f"{label} must have shape ({n},)")
+
+
+def require_member(
+    set_: Set,
+    point: np.ndarray,
+    *,
+    set_label: str,
+    point_label: str,
+) -> None:
+    """Refuse a representative point outside its boundary set."""
+    if not set_.contains(point):
+        raise ValueError(f"{point_label} must belong to {set_label}")
+
+
+def default_x0_of(problem):
+    """
+    The start given, else its law's mean, else ``X0``'s: a singleton's point, a region's bounding-box centre when finite and inside, else ``sys.x0``.
+
+    With no ``X0`` the start is ``sys.x0``; a region holding neither its
+    centre nor ``sys.x0`` is refused.
+    """
+    if problem.held_params.get("x0") is not None:
+        return problem.held_params["x0"]
+    if problem.start_law is not None:
+        return problem.start_law.mean
+    X0 = problem.X0
+    if X0 is None:
+        return problem.sys.x0
+    if isinstance(X0, SingletonSet):
+        return X0.point
+
+    # A region: the centre of its bounding box, else the plant's own start
+    centre = region_centre(X0)
+    if centre is not None and bool(X0.contains(centre)):
+        return centre
+    x0 = np.asarray(problem.sys.x0, dtype=float).reshape(-1)
+    if x0.size == int(problem.sys.n) and bool(X0.contains(x0)):
+        return x0
+
+    raise ValueError(
+        f"X0 ({type(X0).__name__}) holds neither its bounding box's centre nor "
+        "sys.x0: give x0, a point of X0 or a law over it"
+    )
+
+
+def part_trees_of(problem) -> dict:
+    """Each part's own tree by role, in the roles' order: the start's singleton left out (its point is ``x0``, one home)."""
+    trees = {"plant": problem.sys.params}
+    if problem.cost is not None:
+        trees["cost"] = problem.cost.params
+    for role in ("X", "U", "X0", "Xf"):
+        set_ = getattr(problem, role)
+        if set_ is None or (role == "X0" and isinstance(set_, SingletonSet)):
+            continue
+        trees[role] = getattr(set_, "params", None)
+    for port, block in getattr(problem, "disturbances", {}).items():
+        trees[source_id(port)] = block.params
+
+    return trees
+
+
+def sources_of(problem) -> dict:
+    """The disturbance sources by the id of their block in the evaluated loop (``d`` → ``disturbance``, ``n`` → ``noise``)."""
+    return {source_id(port): block for port, block in problem.disturbances.items()}
+
+
+def require_cost(problem) -> CostFunction:
+    """Refuse a problem, continuous or step, without a cost; return the cost."""
+    if problem.cost is None:
+        raise ValueError("This planner requires problem.cost")
+
+    return problem.cost
+
+
+def require_finite_horizon(problem) -> float:
+    """Refuse an unset or infinite horizon; return ``horizon`` as a float."""
+    if problem.horizon is None:
+        raise ValueError("This planner requires a finite problem.horizon")
+    if not np.isfinite(problem.horizon):
+        raise ValueError(
+            "This planner requires a finite problem.horizon "
+            "(got +inf for infinite-horizon)"
+        )
+
+    return float(problem.horizon)
 
 
 class SetStart(Distribution):
@@ -885,7 +853,8 @@ def require_samplable_start(set_, box):
     """Refuse a start set that cannot draw: no finite bounding box, or no ``sample`` of its own."""
     if type(set_).sample is Set.sample:
         raise ValueError(
-            f"x0 {type(set_).__name__} cannot draw a start (only a box samples): "
+            f"x0 {type(set_).__name__} cannot draw a start (a box, a ball, an ellipsoid "
+            "and a singleton sample): "
             "give a law (a Distribution), or a box"
         )
     if not is_finite_box(box):
@@ -992,6 +961,30 @@ def stream_of(key, name):
     require_integer_key(key)
 
     return child_seed(int(key), name)
+
+
+def with_law_draws(tree, laws, key, n):
+    """The tree with each law's leaf drawn ``n`` times in its number's shape, from the stream named by its path (copied along the path)."""
+    for path, law in flatten(laws):
+        nominal = np.shape(lookup(tree, path))
+        values = law.sample(stream_of(key, ".".join(path)), n)
+        tree = with_leaf(tree, path, values.reshape((n, *nominal)))
+
+    return tree
+
+
+def law_draws(laws, view, key):
+    """One draw of each law, at its path, in the shape of its number in the tree ``view`` (empty when nothing is drawn)."""
+    paths = [path for path, _ in flatten(laws)]
+    keys = split_keys(key, len(paths))
+
+    draws = {}
+    for path, k in zip(paths, keys):
+        # One draw, in the nominal entry's shape, at its path
+        value = lookup(laws, path).sample(k)
+        set_leaf(draws, path, value.reshape(np.shape(lookup(view, path))))
+
+    return draws
 
 
 def source_seeds(block, key, sys_id, n):
@@ -1155,8 +1148,9 @@ def finite_box_or(box, fallback):
 def fallback_bound(reason):
     """``1e6``, announced with the reason and the line that sets the failure's cost."""
     warnings.warn(
-        f"{reason}: a failure costs 1e6; set failure_cost on the problem to choose it",
-        stacklevel=4,
+        f"{reason}: a failure costs 1e6; set failure_cost on the problem to choose "
+        "it, or a discount_rate, which bounds the cost of an infinite horizon",
+        stacklevel=caller_stacklevel(),
     )
 
     return 1.0e6
@@ -1194,3 +1188,61 @@ def require_input_box(U):
         )
 
     return U
+
+
+def problem_text(problem, horizon):
+    """The print text of a deterministic problem (continuous or step): its headline, ``horizon`` its horizon and discount as printed, its sets and cost."""
+    headline, body = problem_parts(problem, horizon)
+    return format_inspect(headline, body)
+
+
+def stochastic_problem_text(problem, horizon):
+    """The print text of a stochastic problem: the deterministic one with its criterion and laws."""
+    headline, body = problem_parts(problem, horizon)
+    criterion = problem.criterion
+    if isinstance(criterion, tuple):
+        criterion_s = f"cvar, alpha={criterion[1]:g}"
+    else:
+        criterion_s = str(criterion)
+    headline = f"{headline}, criterion={criterion_s}"
+
+    if problem.start_law is not None:
+        body.append(body_line("x0", inspect_inline(problem.start_law)))
+    if problem.distributions:
+        paths = [".".join(path) for path, _ in flatten(problem.distributions)]
+        body.append(
+            body_line("params", f"{len(paths)} laws ({', '.join(sorted(paths))})")
+        )
+    if problem.disturbances:
+        body.append(body_line("disturbances", ", ".join(sorted(problem.disturbances))))
+
+    return format_inspect(headline, body)
+
+
+def problem_parts(problem, horizon):
+    """``(headline, body)`` shared by both problem texts, ``horizon`` the headline's horizon and discount."""
+    sys = problem.sys
+    name = getattr(sys, "name", type(sys).__name__)
+    headline = f"{type(problem).__name__}, {name}, {horizon}"
+    body = []
+    for label, item in (
+        ("X", problem.X),
+        ("X0", problem.X0),
+        ("Xf", problem.Xf),
+        ("U", problem.U),
+        ("cost", problem.cost),
+    ):
+        if item is not None:
+            body.append(body_line(label, inspect_inline(item)))
+
+    return headline, body
+
+
+def planning_horizon_text(horizon):
+    """The horizon as printed: ``None``, ``inf`` or its number."""
+    if horizon is None:
+        return "None"
+    if not np.isfinite(horizon):
+        return "inf"
+
+    return f"{horizon:g}"

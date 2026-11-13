@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.roles import block_roles, plot_space_of, require_command
+from minilink.core.roles import plot_space_of, require_command, subsystem_roles
 from minilink.graphical.common import PlotResult
 from minilink.graphical.phase_plane.phase_plane import (
     format_axis_label,
@@ -33,7 +33,7 @@ def plot_input_output_map(
     out_axis=0,
     bounds=None,
     grid_shape=(101, 101),
-    show_3d=False,
+    is_3d=False,
     params=None,
     t=0.0,
     title=None,
@@ -46,7 +46,7 @@ def plot_input_output_map(
     """Plot one output component of ``block`` over swept input components.
 
     Sweeps one component of an input port (a line) or two (a heatmap, or a
-    3-D surface with ``show_3d=True``) through the output port's ordinary
+    3-D surface with ``is_3d=True``) through the output port's ordinary
     ``compute``: no special block API is required.
 
     Parameters
@@ -63,7 +63,7 @@ def plot_input_output_map(
     bounds : optional
         Sweep ranges: ``(lo, hi)`` for a line, ``((xlo, xhi), (ylo, yhi))``
         for a surface. Defaults to the port bounds when finite, else ±10.
-    show_3d : bool, optional
+    is_3d : bool, optional
         ``True`` draws a 3-D surface instead of a heatmap.
     params : dict, optional
         Alternative parameter set passed through to the port compute.
@@ -114,9 +114,7 @@ def plot_input_output_map(
         vmax=vmax,
     )
 
-    return render_port_map_matplotlib(
-        spec, show_3d=show_3d, cmap=cmap, ax=ax, show=show
-    )
+    return render_port_map_matplotlib(spec, is_3d=is_3d, cmap=cmap, ax=ax, show=show)
 
 
 def plot_control_law(
@@ -129,7 +127,7 @@ def plot_control_law(
     space=None,
     bounds=None,
     grid_shape=(101, 101),
-    show_3d=False,
+    is_3d=False,
     params=None,
     t=0.0,
     title=None,
@@ -142,7 +140,7 @@ def plot_control_law(
     """Plot the textbook slice of a controller block's control law.
 
     The block's port names say what it reads
-    (:func:`minilink.core.roles.block_roles`): the measurement ``y`` or
+    (:func:`minilink.core.roles.subsystem_roles`): the measurement ``y`` or
     ``x``, or the error entry of a compensator. The zero-argument call picks
     the sweep space (:func:`minilink.core.roles.plot_space_of`: error
     space for error-driven laws, absolute measurement/state otherwise),
@@ -173,7 +171,7 @@ def plot_control_law(
         block's ``plot_space``.
     bounds : optional
         Sweep ranges, as in :func:`plot_input_output_map`.
-    show_3d : bool, optional
+    is_3d : bool, optional
         ``True`` draws a 3-D surface instead of a heatmap.
     params : dict, optional
         Alternative parameter set (gain sweeps, trained vs. untrained).
@@ -206,7 +204,7 @@ def plot_control_law(
     # The command component, with every input at its nominal value and r pinned
     output = block.outputs[roles.control]
     u_axis = require_axis(u_axis, output.dim, "u_axis")
-    u_base = block.get_u_from_input_ports().astype(float)
+    u_base = block.u_nominal.astype(float)
     if roles.ref is not None:
         u_base[block.get_input_port_slice(roles.ref)] = rbar
 
@@ -225,9 +223,7 @@ def plot_control_law(
         u_base=u_base,
     )
 
-    return render_port_map_matplotlib(
-        spec, show_3d=show_3d, cmap=cmap, ax=ax, show=show
-    )
+    return render_port_map_matplotlib(spec, is_3d=is_3d, cmap=cmap, ax=ax, show=show)
 
 
 @dataclass(frozen=True)
@@ -270,7 +266,7 @@ class PortMapSpec:
 def render_port_map_matplotlib(
     spec: PortMapSpec,
     *,
-    show_3d: bool = False,
+    is_3d: bool = False,
     cmap: str = "bwr",
     ax=None,
     show: bool = True,
@@ -296,7 +292,7 @@ def render_port_map_matplotlib(
     matplotlib.rcParams["ps.fonttype"] = 42
 
     # A new figure, 3-D for a surface, or the one that holds the given axes
-    surface = spec.y_values is not None and show_3d
+    surface = spec.y_values is not None and is_3d
     owns_figure = ax is None
     if owns_figure:
         fig = plt.figure(
@@ -359,7 +355,7 @@ def render_port_map_matplotlib(
             plt.pause(pause)
 
     return PlotResult(
-        backend="matplotlib",
+        renderer="matplotlib",
         payload=(fig, ax),
         figure=fig,
         axes=ax,
@@ -399,8 +395,8 @@ def require_axis(axis, dim, name) -> int:
 
 def component_bounds(signal, i, fallback=_DEFAULT_BOUNDS) -> tuple[float, float]:
     """The bounds of component ``i`` when finite and ordered, else ``fallback``."""
-    lo = float(signal.lower_bound[i])
-    hi = float(signal.upper_bound[i])
+    lo = float(signal.lower[i])
+    hi = float(signal.upper[i])
     if np.isfinite(lo) and np.isfinite(hi) and lo < hi:
         return lo, hi
     return fallback
@@ -460,7 +456,7 @@ def build_spec(
 ) -> PortMapSpec:
     """The spec of ``output[out_axis]`` swept over ``axes``, with its labels and limits."""
     # The pinned point: the nominal inputs (or u_base) and the block's x0
-    u_base = block.get_u_from_input_ports().astype(float) if u_base is None else u_base
+    u_base = block.u_nominal.astype(float) if u_base is None else u_base
     x_base = np.asarray(block.x0, dtype=float).copy()
 
     x_values, y_values, U = evaluate_axes(
@@ -476,10 +472,10 @@ def build_spec(
     )
 
     # The color limits: the output's finite bounds, unless given
-    if vmin is None and np.isfinite(output.lower_bound[out_axis]):
-        vmin = float(output.lower_bound[out_axis])
-    if vmax is None and np.isfinite(output.upper_bound[out_axis]):
-        vmax = float(output.upper_bound[out_axis])
+    if vmin is None and np.isfinite(output.lower[out_axis]):
+        vmin = float(output.lower[out_axis])
+    if vmax is None and np.isfinite(output.upper[out_axis]):
+        vmax = float(output.upper[out_axis])
 
     # The second axis' label and unit, on a two-axis sweep only
     y_axis = axes[1] if len(axes) == 2 else None
@@ -558,7 +554,7 @@ class _LawRoles:
 
 def law_roles_of(block):
     """The swept port (a measurement, else a compensator's entry), the reference and the command."""
-    roles = block_roles(block)
+    roles = subsystem_roles(block)
     measurement = roles.measurement or roles.entry
     outputs = list(getattr(block, "outputs", {}))
     if measurement is None or not outputs:
@@ -701,8 +697,8 @@ def indexed_label(stem, i, dim) -> str:
 
 def error_bounds(port, i, base, fallback=_DEFAULT_BOUNDS) -> tuple[float, float]:
     """Error range implied by the measurement bounds: e = base - y."""
-    lo = float(port.lower_bound[i])
-    hi = float(port.upper_bound[i])
+    lo = float(port.lower[i])
+    hi = float(port.upper[i])
     if np.isfinite(lo) and np.isfinite(hi) and lo < hi:
         return base - hi, base - lo
     return fallback

@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.analysis.linearization import design_model
 from minilink.core.system import System
+from minilink.dynamics.abstraction.state_space import require_arrays
 
 # Relative singular-value threshold of every rank decision: the Kalman matrices raise
 # A to the power n − 1, so their rounding sits far above machine precision
@@ -22,6 +23,7 @@ def controllability_matrix(A, B):
 
     The arrays twin of :func:`controllability`, as ``lqr_gain`` is ``lqr``'s.
     """
+    require_arrays(A=A, B=B)
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     n = A.shape[0]
@@ -40,6 +42,7 @@ def observability_matrix(A, C):
 
     The arrays twin of :func:`observability`.
     """
+    require_arrays(A=A, C=C)
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
     n = A.shape[0]
@@ -67,7 +70,7 @@ def controllability(
     """Return the controllability test of ``sys``'s linear model.
 
     The pair ``(A, B)`` is controllable when its Kalman controllability matrix
-    has full row rank ``n``. ``sys`` is an ``LTISystem``, read as is, or any
+    has full row rank ``n``. ``sys`` is a linear model, read as is, or any
     plant, linearized at ``(x_bar, u_bar)`` about its command port alone (the
     nominal point by default), as ``lqr`` and ``place`` read it. ``tol`` is
     the relative singular-value threshold below which a direction counts as
@@ -88,7 +91,7 @@ def controllability(
     sigma = np.linalg.svd(ctrb, compute_uv=False)
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
-    return StructuralResult(matrix=ctrb, rank=r, n=n)
+    return StructuralProperties(matrix=ctrb, rank=r, n=n)
 
 
 def observability(
@@ -105,7 +108,7 @@ def observability(
     """Return the observability test of ``sys``'s linear model.
 
     The pair ``(A, C)`` is observable when its Kalman observability matrix has
-    full column rank ``n``. ``sys`` is an ``LTISystem``, read as is, or any
+    full column rank ``n``. ``sys`` is a linear model, read as is, or any
     plant, linearized at ``(x_bar, u_bar)`` with ``C`` over its measured
     output ``y`` (a plant without ``y`` is refused), as ``luenberger`` and
     ``kalman`` read it; ``tol`` as in :func:`controllability`. On arrays,
@@ -127,11 +130,11 @@ def observability(
     sigma = np.linalg.svd(obsv, compute_uv=False)
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
-    return StructuralResult(matrix=obsv, rank=r, n=n)
+    return StructuralProperties(matrix=obsv, rank=r, n=n)
 
 
 @dataclass(frozen=True)
-class StructuralResult:
+class StructuralProperties:
     """Result of a controllability or observability test."""
 
     matrix: np.ndarray  # The stacked Kalman matrix
@@ -146,7 +149,7 @@ class StructuralResult:
     def __str__(self):
         verdict = "full rank" if self.is_full_rank else "rank deficient"
 
-        return f"StructuralResult: rank {self.rank} of n = {self.n}, {verdict}"
+        return f"StructuralProperties: rank {self.rank} of n = {self.n}, {verdict}"
 
 
 ###############################################################################

@@ -17,11 +17,14 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_cost,
+)
 from minilink.planning.trajectory_optimization.transcription import (
     ConstraintFunction,
-    FixedGridOptions,
-    Transcription,
+    FixedGridTranscription,
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
@@ -35,20 +38,13 @@ from minilink.planning.trajectory_optimization.transcription import (
 ###############################################################################
 
 
-class ShootingOptions(FixedGridOptions):
-    """Grid options for fixed-step single shooting."""
-
-
-class ShootingTranscription(Transcription):
+class ShootingTranscription(FixedGridTranscription):
     """
     Fixed-grid single-shooting transcription.
 
     The decision vector contains input knots only:
     ``z = [u[0, :], ..., u[m-1, :]]``. States are reconstructed by RK4 rollout.
     """
-
-    def __init__(self, options: ShootingOptions):
-        self.options = options
 
     def transcribe(
         self,
@@ -62,7 +58,7 @@ class ShootingTranscription(Transcription):
         if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
             return self.transcribe_jax(problem, backend=backend)
 
-        problem.require_cost()
+        require_cost(problem)
 
         # The states are not decision variables: each function of z rolls them out
         rollout = self.make_rollout(problem, backend, dynamics)
@@ -114,11 +110,11 @@ class ShootingTranscription(Transcription):
 
         # ẋ_k = f(x_k, u_k, t_k) at every knot
         dx = np.zeros_like(x)
-        for k, t_k in enumerate(self.options.t(problem)):
+        for k, t_k in enumerate(self.t(problem)):
             dx[:, k] = dynamics(x[:, k], u[:, k], float(t_k))
 
         # The trajectory, with the cost's signals when the problem has a cost
-        traj = Trajectory(t=self.options.t(problem), x=x, u=u, signals={"dx": dx})
+        traj = Trajectory(t=self.t(problem), x=x, u=u, signals={"dx": dx})
         if problem.cost is not None:
             traj = traj.with_cost(
                 problem.cost,
@@ -131,11 +127,11 @@ class ShootingTranscription(Transcription):
 
     def initial_guess_time_grid(self, problem: PlanningProblem) -> np.ndarray:
         """Return the shooting input-knot grid."""
-        return self.options.t(problem)
+        return self.t(problem)
 
     def decision_dimension(self, problem: PlanningProblem) -> int:
         """Return the input-only decision-vector dimension."""
-        return int(problem.sys.m * self.options.n_steps)
+        return int(problem.sys.m * self.n_knots)
 
     def pack(self, u: np.ndarray, problem: PlanningProblem) -> np.ndarray:
         """Pack sampled input knots into one decision vector."""
@@ -143,14 +139,14 @@ class ShootingTranscription(Transcription):
 
     def unpack(self, z: np.ndarray, problem: PlanningProblem) -> np.ndarray:
         """Unpack a decision vector into sampled input knots."""
-        return z.reshape(problem.sys.m, self.options.n_steps)
+        return z.reshape(problem.sys.m, self.n_knots)
 
     def decision_bounds(
         self, problem: PlanningProblem
     ) -> tuple[np.ndarray, np.ndarray]:
         """Build box bounds for input-knot decision variables."""
         n_z = self.decision_dimension(problem)
-        n_steps = self.options.n_steps
+        n_knots = self.n_knots
 
         # Unbounded, unless the input set has a bounding box
         lower = np.full(n_z, -np.inf)
@@ -159,8 +155,8 @@ class ShootingTranscription(Transcription):
         # u_min ≤ u_k ≤ u_max at every knot: each input's bound along its row of z
         U_box = problem.U.bounding_box()
         if U_box is not None:
-            lower[:] = np.repeat(U_box.lower, n_steps)
-            upper[:] = np.repeat(U_box.upper, n_steps)
+            lower[:] = np.repeat(U_box.lower, n_knots)
+            upper[:] = np.repeat(U_box.upper, n_knots)
 
         return lower, upper
 
@@ -174,7 +170,7 @@ class ShootingTranscription(Transcription):
 
         # A trajectory gives its inputs, resampled on the knots
         if isinstance(guess, Trajectory):
-            resampled = guess.resample(t_new=self.options.t(problem))
+            resampled = guess.resample(t_new=self.t(problem))
             return self.pack(resampled.u, problem)
 
         return guess.reshape(-1)
@@ -201,15 +197,15 @@ class ShootingTranscription(Transcription):
         jax = ensure_jax_x64()
         jnp = jax.numpy
 
-        cost = problem.require_cost()
-        grid = jnp.asarray(self.options.offsets(problem))
-        dt = jnp.asarray(self.options.dt(problem))
-        n_steps = int(self.options.n_steps)
+        cost = require_cost(problem)
+        grid = jnp.asarray(self.offsets(problem))
+        dt = jnp.asarray(self.dt(problem))
+        n_knots = int(self.n_knots)
         m = int(problem.sys.m)
 
         # The input knots packed in z, one input's row after another
         def unpack_jax(z):
-            return z.reshape(m, n_steps)
+            return z.reshape(m, n_knots)
 
         # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0 = x0, scanned over the intervals
         def rollout(u, params):
@@ -276,7 +272,7 @@ class ShootingTranscription(Transcription):
             "x0": np.asarray(problem.x0, dtype=float),
             "t0": float(problem.t0),
             "plant": problem.sys.params if plant is None else plant,
-            "cost": problem.require_cost().params,
+            "cost": require_cost(problem).params,
             "discount_rate": float(problem.discount_rate),
         }
         for role in shooting_roles(problem):
@@ -358,11 +354,11 @@ class ShootingTranscription(Transcription):
             params = None  # the plant's frozen form, on its own numbers
 
             def rollout(u):
-                t0 = float(self.options.t(problem)[0])
-                dt = self.options.dt(problem)
+                t0 = float(self.t(problem)[0])
+                dt = self.dt(problem)
 
                 # x_{k+1} = RK4(x_k, u_k, u_{k+1}), one row per knot, turned to columns
-                x_samples = evaluator.rollout(x0, u.T, t0, dt, params, hold="foh")
+                x_samples = evaluator.rollout(x0, u.T, t0, dt, params, hold="linear")
                 x = x_samples.T
 
                 return x
@@ -382,14 +378,14 @@ class ShootingTranscription(Transcription):
         xp = array_module(u)
 
         n = int(problem.sys.n)
-        n_steps = self.options.n_steps
-        t = self.options.t(problem)
-        dt = self.options.dt(problem)
+        N = self.n_steps
+        t = self.t(problem)
+        dt = self.dt(problem)
 
-        # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0
+        # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0, k = 0 … N − 1
         x_k = xp.asarray(x0).reshape(n)
         x_samples = [x_k]
-        for k in range(n_steps - 1):
+        for k in range(N):
             x_k = step_body(f, x_k, u[:, k], u[:, k + 1], float(t[k]), dt, "rk4", 1)
             x_samples.append(x_k)
 
@@ -426,7 +422,7 @@ class ShootingTranscription(Transcription):
             x = rollout(self.unpack(z, problem))
             return boundary.margin(
                 x[:, -1],
-                t=float(self.options.t(problem)[-1]),
+                t=float(self.t(problem)[-1]),
                 params=None,
             )
 
@@ -447,7 +443,7 @@ class ShootingTranscription(Transcription):
             def state_margins(z):
                 x = rollout(self.unpack(z, problem))
                 margins = []
-                for k, t_k in enumerate(self.options.t(problem)):
+                for k, t_k in enumerate(self.t(problem)):
                     margin = problem.X.margin(
                         x[:, k],
                         t=float(t_k),
@@ -466,7 +462,7 @@ class ShootingTranscription(Transcription):
                 u = self.unpack(z, problem)
                 x = rollout(u)
                 margins = []
-                for k, t_k in enumerate(self.options.t(problem)):
+                for k, t_k in enumerate(self.t(problem)):
                     margin = problem.U.margin(
                         u[:, k],
                         x=x[:, k],
@@ -485,11 +481,11 @@ class ShootingTranscription(Transcription):
         rollout,
     ):
         """Bolza objective ``J(z)`` of the input knots, the states rolled out."""
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         u = self.unpack(z, problem)
         x = rollout(u)
-        t = self.options.t(problem)
-        dt = self.options.dt(problem)
+        t = self.t(problem)
+        dt = self.dt(problem)
         cost_params = problem.cost.params
 
         # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t0)}

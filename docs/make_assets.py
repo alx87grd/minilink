@@ -21,7 +21,7 @@ from minilink.core.sets import SingletonSet  # noqa: E402
 
 
 def save_gif(
-    sys_or_diagram, traj, name: str, *, time_factor_video: float = 2.0, camera=None
+    sys_or_diagram, traj, name: str, *, speed: float = 2.0, camera=None
 ) -> None:
     out = STATIC / name
     sys_or_diagram.animate(
@@ -31,7 +31,7 @@ def save_gif(
         show=False,
         save=True,
         file_name=str(out.with_suffix("")),
-        time_factor_video=time_factor_video,
+        speed=speed,
         camera=camera,
     )
     shrink_gif(out)
@@ -85,7 +85,7 @@ class MassSpringDamper(DynamicSystem):
     """The README's model, kept in step with its "Write a model" section."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=1)
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
         m, k, b = 1.0, 4.0, 0.3
@@ -143,7 +143,9 @@ def tool_montage() -> None:
     swing.x0[0] = 2.0
     swing.compute_trajectory(tf=10.0)
     loop = lqr(plant, np.eye(2), np.eye(1), x_bar=x_up) @ plant
-    vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
+    vi = DynamicProgrammingPlanner(
+        problem.replace(horizon=None), x_grid=(101, 101), u_grid=(11,), dt=0.05
+    )
     vi.solve()
     rrt = RRTPlanner(problem, seed=0)
     rrt.solve()
@@ -186,8 +188,8 @@ def gif_cartpole() -> None:
     from minilink.graphical.catalog import camera_matrix
 
     plant = CartPole()
-    plant.inputs["u"].lower_bound[0] = -10.0
-    plant.inputs["u"].upper_bound[0] = 10.0
+    plant.inputs["u"].lower[0] = -10.0
+    plant.inputs["u"].upper[0] = 10.0
     x_goal = np.array([0.0, np.pi, 0.0, 0.0])
     problem = PlanningProblem(
         sys=plant,
@@ -204,14 +206,13 @@ def gif_cartpole() -> None:
         n_steps=40,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
-        verbose=False,
+        method="slsqp",
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
     camera = camera_matrix(
         target=(-1.0, 0.75, 0.0), scale=3.6
     )  # the cart's run and the pole
-    save_gif(plant, traj, "cartpole_swingup.gif", time_factor_video=1.0, camera=camera)
+    save_gif(plant, traj, "cartpole_swingup.gif", speed=1.0, camera=camera)
 
 
 def ur5_impedance() -> None:
@@ -250,7 +251,7 @@ def ur5_impedance() -> None:
     ctl.task_force_scale = 0.08  # [m/N]
 
     diagram = ref >> ctl @ arm
-    traj = diagram.compute_trajectory(tf=TF, n_steps=int(30 * TF) + 1)
+    traj = diagram.compute_trajectory(tf=TF, n_samples=int(30 * TF) + 1)
     # the eye on the hand's side of the base: the target ball and the force in view
     camera = oblique_camera(
         [-0.33, 0.08, 0.4], azimuth_deg=160.0, elevation_deg=18.0, distance=0.95
@@ -260,7 +261,7 @@ def ur5_impedance() -> None:
         traj,
         "ur5_impedance.html",
         "ur5_meshcat.gif",
-        time_factor_video=1.0,
+        speed=1.0,
         camera=camera,
     )
 
@@ -268,6 +269,7 @@ def ur5_impedance() -> None:
 def racecar_mpc() -> None:
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
     from minilink.catalog import UdeSRacecarDyn
+    from minilink.control import ModelPredictiveController
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
     from minilink.planning import (
         ReferenceTrack,
@@ -282,7 +284,6 @@ def racecar_mpc() -> None:
         quadratic_hinge,
     )
     from minilink.planning.trajectory_optimization.mpc import (
-        ModelPredictiveController,
         mpc_animation_overlays,
         plant_run,
     )
@@ -309,13 +310,13 @@ def racecar_mpc() -> None:
     scene = Scene(obstacles=[Sphere(c, CONE_RADIUS + CONE_MARGIN) for c in cones])
 
     design = UdeSRacecarDyn(named_ports=False)
-    design.params["mu"] = PLANNER_MU
-    design.state.lower_bound[6] = 0.0
-    design.state.upper_bound[6] = 3.0 * V_TARGET / design.params["r_r"]
-    design.state.lower_bound[7] = -design.params["delta_max"]
-    design.state.upper_bound[7] = design.params["delta_max"]
-    design.state.lower_bound[8] = -design.params["P_max"]
-    design.state.upper_bound[8] = design.params["P_max"]
+    design.params["terrain"]["friction"] = PLANNER_MU
+    design.state.lower[6] = 0.0
+    design.state.upper[6] = 3.0 * V_TARGET / design.params["r_r"]
+    design.state.lower[7] = -design.params["delta_max"]
+    design.state.upper[7] = design.params["delta_max"]
+    design.state.lower[8] = -design.params["P_max"]
+    design.state.upper[8] = design.params["P_max"]
 
     centre = mount(point_probe(), on=design)
     body = mount(
@@ -376,13 +377,13 @@ def racecar_mpc() -> None:
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 60, "ftol": 1.0},
     )
     mpc = ModelPredictiveController(planner, delay=True)
 
     car = UdeSRacecarDyn(named_ports=False)
-    car.params["mu"] = PLANT_MU
+    car.params["terrain"]["friction"] = PLANT_MU
     car.x0 = x0.copy()
     car.camera_scale = CAMERA_SCALE
     car.skin = racecar_skin_3d
@@ -400,7 +401,7 @@ def racecar_mpc() -> None:
         frames,
         "racecar_mpc.html",
         "racecar_mpc.gif",
-        time_factor_video=PLAYBACK,
+        speed=PLAYBACK,
         overlays=overlays,
     )
 
@@ -426,10 +427,10 @@ def gif_rocket() -> None:
     plant = Rocket()
     plant.params["inertia"] = 1000.0
     weight = plant.params["mass"] * plant.params["gravity"]
-    plant.inputs["u"].lower_bound = np.array([0.0, -GIMBAL])
-    plant.inputs["u"].upper_bound = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
-    plant.state.lower_bound = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
-    plant.state.upper_bound = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
+    plant.inputs["u"].lower = np.array([0.0, -GIMBAL])
+    plant.inputs["u"].upper = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
+    plant.state.lower = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
+    plant.state.upper = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
 
     class LandingCost(CostFunction):
         Q = 0.1 * np.diag([1.0, 1.0, 10.0, 0.1, 0.1, 1.0])
@@ -459,23 +460,23 @@ def gif_rocket() -> None:
         features=lambda x: (x - X_LANDED) * FEATURE_SCALE,
         hidden=(64, 64),
         method="ppo",
-        n_envs=64,
-        n_steps=32,
+        n_rollouts=64,
+        n_steps_per_update=32,
         batch_size=256,
         learning_rate=1e-3,
         gamma=0.995,
         log_std_init=-1.0,
         seed=0,
     )
-    planner.solve(timesteps=TRAINING_TIMESTEPS)
+    planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 
     plant.x0 = np.array([6.0, 14.0, 0.0, 0.0, 0.0, 0.0])
-    cl_sys = planner.get_controller() @ plant
+    cl_sys = planner.controller @ plant
     traj = cl_sys.compute_trajectory(tf=TF_SHOWN, dt=0.01)
     camera = camera_matrix(
         target=(3.0, 7.0, 0.0), scale=8.0
     )  # the whole descent, still
-    save_gif(cl_sys, traj, "rocket_landing.gif", time_factor_video=1.0, camera=camera)
+    save_gif(cl_sys, traj, "rocket_landing.gif", speed=1.0, camera=camera)
 
 
 def pipeline_map() -> None:

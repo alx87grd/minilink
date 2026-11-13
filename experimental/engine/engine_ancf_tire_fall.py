@@ -32,10 +32,10 @@ sys = ANCFTireSystem(
 traj = sys.compute_trajectory(
     tf=1.0,
     dt=0.0001,
-    solver="rk4_fixedsteps",
+    solver="rk4",
     backend="jax",
 )
 
 # sys.plot_trajectory(signals=("x"))
-# sys.animate(time_factor_video=0.1)
-sys.animate(traj, time_factor_video=0.1, renderer="meshcat", is_3d=True)
+# sys.animate(speed=0.1)
+sys.animate(traj, speed=0.1, renderer="meshcat", is_3d=True)

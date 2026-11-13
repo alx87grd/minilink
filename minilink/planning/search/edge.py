@@ -29,7 +29,8 @@ class Edge:
     times : np.ndarray
         Relative times with shape ``(k+1,)`` starting at ``0``.
     cost : float
-        Edge cost-to-come (integrated running cost / arc length).
+        The edge's own cost (integrated running cost / arc length); a node's
+        cost-to-come sums them from the root.
     """
 
     states: np.ndarray

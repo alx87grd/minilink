@@ -48,7 +48,7 @@ class ReferencePath(ABC):
         ...
 
     @abstractmethod
-    def sample(self, s, t=0.0, params=None):
+    def at(self, s, t=0.0, params=None):
         """Point at arc length ``s`` along the path."""
         ...
 
@@ -150,7 +150,7 @@ class PolylinePath(ReferencePath):
 
         return s, c
 
-    def sample(self, s, t=0.0, params=None):
+    def at(self, s, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(s)
 

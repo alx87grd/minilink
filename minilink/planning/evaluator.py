@@ -17,7 +17,7 @@ from minilink.core.backends import (
 from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.compile.plan import PLANT_INPUT
 from minilink.core.distributions import child_seed
-from minilink.core.options import require_one_of
+from minilink.core.options import caller_stacklevel, require_one_of
 from minilink.core.params import (
     Batched,
     canonical_tree,
@@ -31,7 +31,7 @@ from minilink.core.params import (
     split_path,
     with_leaf,
 )
-from minilink.core.sets import is_bounded
+from minilink.core.sets import has_finite_face
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import (
     RUNNING_COST,
@@ -43,10 +43,12 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
-from minilink.planning.problems import seeds_of, source_id, stack_leaves
+from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
-EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
+EPISODE_LENGTH = (
+    10.0  # s, the run of a problem with no finite horizon when none is named
+)
 
 
 ###############################################################################
@@ -62,7 +64,11 @@ class ProblemEvaluator:
     every free input held at its port's nominal value), or a built loop whose block
     ``plant`` is the problem's system. One run integrates the loop to the horizon on
     the fixed-step model (``solver``, ``dt``, ``substeps``), records every block
-    output, and scores the plant's run by the problem's formula::
+    output, and scores the plant's run by the problem's formula. A held plan (a
+    :class:`~minilink.blocks.sources.TrajectorySource` holding each sample, the
+    controller of RRT, RRT* and MPPI) enters by the simulator's held-input rule:
+    its sample is the plant's input, constant over each step, as
+    ``plant.compute_trajectory(u=plan.u, dt=…)`` holds it::
 
         pe = problem.compile(pid, dt=0.01)
         report = pe.evaluate()                                   # the Evaluation
@@ -75,14 +81,16 @@ class ProblemEvaluator:
         The task: plant, cost, sets, horizon, failure switch (and, for a stochastic
         problem, the draws and the criterion).
     controller : System or PlanningSolution
-        A controller block (or a solution's policy) closed on the plant, a source
+        A controller block (or a solution's controller) closed on the plant, a source
         block (no input) driving the plant's command, or a built loop with a
         ``plant`` block.
     dt : float, optional
         Sample period of the run: the free inputs are held over it and the run is
         recorded on its grid. A sampled controller (``pid % 0.01``, a loop on a
         clock) runs on its own base period: ``dt`` omitted reads it, and a ``dt``
-        that differs is refused.
+        that differs is refused. A continuous loop with ``dt`` omitted runs on
+        its automatic step, the continuous simulator's ``Δt = 0.1 τ_min``
+        shortened to divide the run.
     solver : {"rk4", "euler"}
         Integration formula of one step (a sampled loop: its plant's).
     substeps : int, optional
@@ -92,7 +100,8 @@ class ProblemEvaluator:
     backend : {"auto", "jax", "numpy"}
         ``"auto"`` is JAX when it is installed and the loop traces on it.
     episode_length : float, optional
-        Length of the run of an infinite-horizon problem (10 s by default).
+        Length of the run of an infinite-horizon problem (by default 10 s,
+        announced, rounded up to whole periods of ``dt``).
     """
 
     def __init__(
@@ -114,9 +123,13 @@ class ProblemEvaluator:
             backend = require_numpy_for_adaptive(backend)
 
         # The task and the loop that runs it: a continuous diagram, or a sampled
-        # loop on its own clock, its plant integrated at the step asked
+        # loop on its own clock, its plant integrated at the step asked; a held
+        # plan on a fixed step feeds the plant its samples, held over each step
         self.problem = problem
-        self.loop = closed_loop_of(problem, controller)
+        self.held_plan = self.adaptive is None and is_held_plan(
+            controller_of(controller)
+        )
+        self.loop = closed_loop_of(problem, controller, held_plan=self.held_plan)
         self.sampled = is_sampled(self.loop)
         if self.sampled:
             dt = sampled_dt_of(self.loop, dt)
@@ -125,10 +138,16 @@ class ProblemEvaluator:
         self.solver = solver
         self.substeps = 1 if substeps is None else int(substeps)
 
-        # The grid: N periods of dt to the horizon
-        self.dt = float(require_dt(dt))
-        self.tf = horizon_of(problem, episode_length)
-        self.n_steps = steps_of(self.tf, self.dt)
+        # The grid: N periods of dt to the horizon, a continuous loop that names
+        # no dt on its automatic step; the default run, announced, ends on a period
+        horizon = horizon_of(problem, episode_length)
+        if dt is None:
+            dt = automatic_dt_of(
+                self.loop, EPISODE_LENGTH if horizon is None else horizon
+            )
+        self.dt = float(dt)
+        self.horizon = default_horizon_of(self.dt) if horizon is None else horizon
+        self.n_steps = steps_of(self.horizon, self.dt)
 
         # The loop, compiled once on its backend
         self.backend, self.evaluator = compile_loop(self.loop, backend)
@@ -137,11 +156,11 @@ class ProblemEvaluator:
         # input, the recorded signals and the free inputs
         self.plant_slice = self.loop.state_index["plant"]
         self.plant_input = plant_input_sources(self.loop, self.evaluator, self.sampled)
-        self.block_ids = tuple(self.loop.subsystems)
-        self.start_ids = stateful_blocks_of(self.loop)
+        self.subsystem_ids = tuple(self.loop.subsystems)
+        self.start_ids = stateful_subsystems_of(self.loop)
         self.draws = problem.is_stochastic or self.loop.is_random
-        self.free_inputs = tuple(self.loop.inputs)
-        require_free_names(self.free_inputs, self.block_ids)
+        self.free_inputs = () if self.held_plan else tuple(self.loop.inputs)
+        require_free_names(self.free_inputs, self.subsystem_ids)
         require_no_x0_key(self.loop, self.start_ids)
 
         # The forms generated once: the run and the batched trial, jitted on JAX
@@ -156,10 +175,10 @@ class ProblemEvaluator:
         # The failure cost and the cost bound at the compile's numbers (a call at
         # other numbers computes its own)
         self.failure_cost = failure_cost_of(
-            problem, self.tf, None, problem.discount_rate
+            problem, self.horizon, None, problem.discount_rate
         )
         self.cost_bound = diverged_cost_of(
-            problem, self.tf, self.failure_cost, None, problem.discount_rate
+            problem, self.horizon, self.failure_cost, None, problem.discount_rate
         )
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
@@ -187,7 +206,7 @@ class ProblemEvaluator:
         loop = self.loop
         problem = self.problem
 
-        tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.block_ids}
+        tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.subsystem_ids}
         for sys_id in self.start_ids:
             block = loop.subsystems[sys_id]
             tree[sys_id] = {**(block.params or {}), "x0": block.x0}
@@ -223,15 +242,16 @@ class ProblemEvaluator:
 
         return self.run(params, x0)
 
-    def evaluate(self, params=None, key=0, n_trials=None, *, record=False):
+    def evaluate(self, params=None, key=0, n_trials=None, *, trajectories=False):
         """
         The :class:`Evaluation` of the loop on the problem: one run, or ``n_trials`` draws.
 
         A deterministic problem is one run (``n_trials`` 1 or unset); a stochastic
         problem draws ``n_trials`` starts and parameter overrides from ``key``. On
         JAX the whole evaluation traces, so ``jax.grad`` of ``.objective`` gives
-        the gradient with respect to every leaf of ``params``. ``record=True``
-        keeps the runs' trajectories (outside a trace).
+        the gradient with respect to every leaf of ``params``.
+        ``trajectories=True`` keeps the runs' trajectories in
+        :attr:`Evaluation.trajectories` (outside a trace).
         """
         params = self.merged(params)
         n_trials = trials_of(self.draws, n_trials)
@@ -240,14 +260,14 @@ class ProblemEvaluator:
         # then the runs and their scores, batched on JAX
         x0s, trial_params = self.realize(params, key, n_trials)
         failure_cost, bound = self.failure_cost_and_bound(params)
-        rows, trajectories = self.run_trials(
-            trial_params, x0s, record, failure_cost, bound
+        rows, runs = self.run_trials(
+            trial_params, x0s, trajectories, failure_cost, bound
         )
 
         return Evaluation(
             **rows,
             x0=x0s,
-            trajectories=trajectories,
+            trajectories=runs,
             criterion=criterion_of(self.problem),
         )
 
@@ -342,7 +362,8 @@ class ProblemEvaluator:
             upper=upper,
             grad_J=grad_J,
             backend=self.backend,
-            metadata={"wrt": wrt, "z0": z0, "rows": rows},
+            metadata={"wrt": wrt, "rows": rows},
+            z0=z0,
         )
 
     def pack(self, params, wrt) -> np.ndarray:
@@ -377,7 +398,7 @@ class ProblemEvaluator:
         signals=("x", "u"),
         every=1,
         pause=0.01,
-        backend="matplotlib",
+        renderer="matplotlib",
     ):
         """
         A progress callback ``callback(z, J, t)`` for :meth:`Optimizer.solve` that redraws the closed-loop trajectory every ``every``-th iterate.
@@ -397,7 +418,7 @@ class ProblemEvaluator:
             signals=signals,
             every=every,
             pause=pause,
-            backend=backend,
+            renderer=renderer,
         )
         step = 0
 
@@ -457,9 +478,9 @@ class ProblemEvaluator:
         if own_numbers or traced:
             return self.failure_cost, self.cost_bound
 
-        failure_cost = failure_cost_of(problem, self.tf, cost_params, float(rate))
+        failure_cost = failure_cost_of(problem, self.horizon, cost_params, float(rate))
         bound = diverged_cost_of(
-            problem, self.tf, failure_cost, cost_params, float(rate)
+            problem, self.horizon, failure_cost, cost_params, float(rate)
         )
 
         return failure_cost, bound
@@ -506,7 +527,7 @@ class ProblemEvaluator:
     def loop_start(self, params, x0, xp):
         """The loop's start ``x(0)``: the plant at ``x0``, every other stateful block at its ``x0`` leaf, the held outputs at the ``hold_x0`` leaf."""
         pieces = []
-        for sys_id in self.block_ids:
+        for sys_id in self.subsystem_ids:
             if sys_id == "plant":
                 pieces.append(xp.reshape(xp.asarray(x0, dtype=float), (-1,)))
             elif sys_id in self.start_ids:
@@ -529,19 +550,21 @@ class ProblemEvaluator:
         # The loop's start: each block's x0 leaf, the plant's slice at x0
         x0_loop = self.loop_start(params, x0, xp)
 
-        # The free inputs held at their parameters over every period
-        u = self.held_inputs(params, xp)
-        u_seq = xp.broadcast_to(u, (N, u.size))
+        # The loop's input at every sample: the free inputs held at their
+        # parameters, or a held plan's samples; row k is held over period k
+        t0 = params["t0"]
+        ts = t0 + xp.arange(N + 1) * dt
+        us = self.boundary_inputs(params, ts, xp)
+        u_seq = us[:N]
 
         # x_{k+1} = Φ(x_k, u, t_k), t_k = t0 + k dt, k = 0 … N − 1, with the
         # plant's stage cost integrated beside the state; or the adaptive
         # integral reported on that grid
         loop_params = {
-            sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
+            sys_id: subsystem_params_of(loop, params, sys_id)
+            for sys_id in self.subsystem_ids
         }
         loop_params = integer_seeds(loop, loop_params)
-        t0 = params["t0"]
-        ts = t0 + xp.arange(N + 1) * dt
         rate = self.cost_rate(params)
         if self.sampled:
             xs, running, signals = ev.rollout_with_cost(
@@ -562,9 +585,8 @@ class ProblemEvaluator:
         else:
             f_aug = ev.rhs_with_cost(loop_params, "plant", rate)
             z0 = xp.concatenate([xp.asarray(x0_loop, dtype=float), xp.zeros(1)])
-            zs = integrate_adaptive(f_aug, z0, u, ts, self.adaptive)
+            zs = integrate_adaptive(f_aug, z0, us[0], ts, self.adaptive)
             xs, running = zs[:, :-1], zs[:, -1]
-        us = xp.broadcast_to(u, (N + 1, u.size))
 
         # Every block output at every sample, and the plant's input among them: a
         # sampled loop's from the run's own signal pass
@@ -589,7 +611,7 @@ class ProblemEvaluator:
 
     def cost_rate(self, params):
         """The plant's discounted cost rate ``e^{−ρ(τ − t0)} g(x, u, τ)`` on the run's tree: the integrand the run carries."""
-        g = self.problem.require_cost().g
+        g = require_cost(self.problem).g
         cost_params = params["cost"]
         rho = params["discount_rate"]
         t0 = params["t0"]
@@ -610,8 +632,8 @@ class ProblemEvaluator:
 
         # An abstract trace of the run and its score: no compile, no numbers
         try:
-            failure_cost = failure_cost_of(self.problem, self.tf)
-            bound = diverged_cost_of(self.problem, self.tf, failure_cost)
+            failure_cost = failure_cost_of(self.problem, self.horizon)
+            bound = diverged_cost_of(self.problem, self.horizon, failure_cost)
             jax.eval_shape(
                 lambda p, x0: self.score(p, x0, False, failure_cost, bound)[0],
                 params,
@@ -631,31 +653,55 @@ class ProblemEvaluator:
             [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
         )
 
-    def score(self, params, x0, record, failure_cost, bound):
-        """One trial's row of the record (and its trajectory when ``record``)."""
+    def boundary_inputs(self, params, ts, xp):
+        """
+        The loop's input at the samples ``ts``, ``(N + 1, m)``: the free inputs held, or a held plan's samples.
+
+        A held plan's sample over the step ``[t_k, t_k + dt)`` is its value read
+        at the step's middle (so a rounding of ``t_k`` never reads the sample
+        before), the last at ``t_N``: on the plan's own grid, its ``u_k``.
+        """
+        if not self.held_plan:
+            u = self.held_inputs(params, xp)
+            us = xp.broadcast_to(u, (ts.shape[0], u.size))
+            return us
+
+        plan = self.loop.subsystems["controller"]
+        dt = self.dt
+        no_signal = xp.zeros(0)
+
+        # u_k = π(t_k + dt/2), k = 0 … N − 1, and u_N = π(t_N)
+        t_read = xp.concatenate([ts[:-1] + 0.5 * dt, ts[-1:]])
+        u = plan.h(no_signal, no_signal, t_read, params["controller"])
+        us = u.T
+
+        return us
+
+    def score(self, params, x0, trajectories, failure_cost, bound):
+        """One trial's row of the record (and its trajectory when ``trajectories``)."""
         traj = self.run(params, x0)
         plant_run = traj.of("plant")
 
         row = score_run(
             self.problem,
             plant_run,
-            tf=self.tf,
+            horizon=self.horizon,
             params=params,
             failure_cost=failure_cost,
             cost_bound=bound,
             running_cost=traj.signals[RUNNING_COST][0],
         )
 
-        return row, (traj if record else None)
+        return row, (traj if trajectories else None)
 
-    def run_trials(self, params, x0s, record, failure_cost, bound):
+    def run_trials(self, params, x0s, trajectories, failure_cost, bound):
         """The rows of every trial: a ``vmap`` on JAX, a loop on NumPy."""
         if self.backend == BACKEND_JAX:
-            return self.run_trials_jax(params, x0s, record, failure_cost, bound)
+            return self.run_trials_jax(params, x0s, trajectories, failure_cost, bound)
 
-        return self.run_trials_numpy(params, x0s, record, failure_cost, bound)
+        return self.run_trials_numpy(params, x0s, trajectories, failure_cost, bound)
 
-    def run_trials_jax(self, params, x0s, record, failure_cost, bound):
+    def run_trials_jax(self, params, x0s, trajectories, failure_cost, bound):
         """The trials as one ``vmap`` of the run, jitted once per batch layout."""
         jax = ensure_jax_x64()
         register_evaluation_pytree()
@@ -663,43 +709,43 @@ class ProblemEvaluator:
         # The batched axes: a drawn leaf carries the trial axis, the others are shared;
         # one jitted form per layout, a structure
         tree, axes = batch_axes(params)
-        layout = (record, tree_signature(axes))
+        layout = (trajectories, tree_signature(axes))
         if layout not in self.trials_fn:
             batched = jax.vmap(
-                lambda p, x0, c, b: self.score(p, x0, record, c, b),
+                lambda p, x0, c, b: self.score(p, x0, trajectories, c, b),
                 in_axes=(axes, 0, None, None),
             )
             self.trials_fn[layout] = jax.jit(batched)
 
         rows, trajs = self.trials_fn[layout](tree, x0s, failure_cost, bound)
 
-        return rows, unbatch(trajs, x0s.shape[0]) if record else None
+        return rows, unbatch(trajs, x0s.shape[0]) if trajectories else None
 
-    def run_trials_numpy(self, params, x0s, record, failure_cost, bound):
+    def run_trials_numpy(self, params, x0s, trajectories, failure_cost, bound):
         """The trials one at a time, stacked into the record's arrays."""
         rows, trajs = [], []
         for i, x0 in enumerate(x0s):
             row, traj = self.score(
-                take_trial(params, i), x0, record, failure_cost, bound
+                take_trial(params, i), x0, trajectories, failure_cost, bound
             )
             rows.append(row)
             trajs.append(traj)
 
         stacked = {name: np.stack([row[name] for row in rows]) for name in rows[0]}
 
-        return stacked, (trajs if record else None)
+        return stacked, (trajs if trajectories else None)
 
 
 def evaluate(
     problem,
     controller,
-    *,
     dt=None,
+    *,
     solver="rk4",
     substeps=None,
     n_trials=None,
     key=0,
-    record=False,
+    trajectories=False,
     backend="auto",
     episode_length=None,
 ) -> Evaluation:
@@ -709,8 +755,9 @@ def evaluate(
     One run for a deterministic problem, ``n_trials`` draws for a stochastic one;
     see :class:`ProblemEvaluator` for the loop, the run and the score. A sampled
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
-    continuous controller needs ``dt``, the period its loop is integrated and
-    recorded on.
+    continuous controller runs on ``dt``, the period its loop is integrated and
+    recorded on, and with ``dt`` omitted on its automatic step.
+    ``trajectories=True`` keeps the runs in :attr:`Evaluation.trajectories`.
     """
     pe = ProblemEvaluator(
         problem,
@@ -722,80 +769,28 @@ def evaluate(
         episode_length=episode_length,
     )
 
-    return pe.evaluate(key=key, n_trials=n_trials, record=record)
+    return pe.evaluate(key=key, n_trials=n_trials, trajectories=trajectories)
 
 
-def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
-    """
-    The planner's evidence: ``policy`` held over each period of ``dt`` from the problem's start.
-
-    ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
-    takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period), nominal
-    parameters, on NumPy, from ``t0``: the sampled loop a feedback planner
-    designs for (its grid, its model), reported beside its policy; the
-    planner's evaluation scores the same law held on the plant's own clock. A stochastic problem runs at its mean start; ``tf`` is the run's
-    length for an infinite horizon. ``u`` is the plant's command port. The run
-    carries the face's running cost, ``C_{k+1} = C_k + γᵏ c_k``, and the plant
-    role, so :func:`~minilink.planning.evaluation.evaluate_trajectory` scores
-    it on the face's own sum, ``J = Σ γᵏ c_k + γᴺ h``, not by the trapezoid.
-    """
-    # Lazy import: the loop roles load with the first rollout
-    from minilink.core.roles import command_port
-
-    nominal = problem.nominal() if problem.is_stochastic else problem
-    policy = policy_of(policy)
-    plant = nominal.sys
-    n_steps = steps_of(horizon_of(nominal, tf), float(dt))
-
-    # The face's step, the law on the grid, the command's slice of the plant input
-    face = nominal.compile(dt=float(dt))
-    t = nominal.t0 + float(dt) * np.arange(n_steps + 1)
-    law = held_law(policy, t)
-    command = plant.get_input_port_slice(command_port(plant))
-    u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
-
-    face_params = face.params
-    gamma = float(face.gamma_at(face_params))
-
-    # u_k = π(x_k, t_k) held over the period, one step to x_{k+1} with its stage cost
-    # c_k; C_{k+1} = C_k + γᵏ c_k; the last sample takes its input only
-    xs = np.zeros((plant.n, n_steps + 1))
-    us = np.zeros((command.stop - command.start, n_steps + 1))
-    running = np.zeros(n_steps + 1)
-    xs[:, 0] = nominal.x0
-    for k in range(n_steps + 1):
-        us[:, k] = law(xs[:, k], t[k])
-        if k == n_steps:
-            break
-        u_full[command] = us[:, k]
-        x_next, c = face.transition_at(xs[:, k], u_full, t[k], face_params)
-        xs[:, k + 1] = x_next
-        running[k + 1] = running[k] + gamma**k * float(c)
-
-    # The plant role and its running cost: the run scores on the face's own sum
-    roles = {"plant": {"x": (0, int(plant.n)), "u": PLANT_INPUT}}
-    signals = {PLANT_INPUT: us, RUNNING_COST: running.reshape(1, -1)}
-
-    return Trajectory(t=t, x=xs, u=us, signals=signals, roles=roles)
-
-
-def policy_of(controller):
-    """The block itself, or the policy of a :class:`~minilink.planning.results.PlanningSolution`."""
+def controller_of(controller):
+    """The block itself, or the controller of a :class:`~minilink.planning.results.PlanningSolution`."""
     # A real cycle: results imports Evaluation from this module
     from minilink.planning.results import PlanningSolution
 
     if isinstance(controller, PlanningSolution):
-        return controller.policy
+        return controller.controller
 
     return controller
 
 
-def closed_loop_of(problem, controller):
+def closed_loop_of(problem, controller, *, held_plan=False):
     """The loop a :class:`ProblemEvaluator` runs: ``controller`` closed on the problem's plant.
 
     A built loop (a diagram with a block ``plant`` of the plant's state size) is
-    taken as it is; a solution gives its policy; a source block (no input) drives
-    the plant's command; any other block is closed by ``controller @ plant``.
+    taken as it is; a solution gives its controller; a source block (no input) drives
+    the plant's command (a ``held_plan`` sits beside the plant, whose command is
+    the loop's input ``"plan"``, fed by the run); any other block is closed by
+    ``controller @ plant``.
     """
     # Lazy imports: the composition tools and the results load with the first loop
     from minilink.core.closed_loop import closed_loop
@@ -804,12 +799,12 @@ def closed_loop_of(problem, controller):
     from minilink.core.discrete.step_system import StepSystem
 
     plant = problem.sys
-    controller = policy_of(controller)
+    controller = controller_of(controller)
 
     require_continuous_or_clocked(controller)
     is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))
     if is_loop and "plant" in controller.subsystems:
-        require_plant_block(controller, plant)
+        require_plant_subsystem(controller, plant)
         require_no_problem_sources(problem)
         return controller
     if isinstance(plant, StepSystem):
@@ -819,7 +814,7 @@ def closed_loop_of(problem, controller):
         )
     sources = dict(problem.disturbances)
     if int(controller.m) == 0:
-        return with_sources(open_loop_of(controller, plant), sources)
+        return with_sources(open_loop_of(controller, plant, held_plan), sources)
 
     # The loop closed_loop builds with the same sources: d and n under its role names
     loop = closed_loop(
@@ -879,80 +874,6 @@ def integrate_adaptive(f, x0, u, ts, options):
     return solution.y.T
 
 
-def held_law(policy, t):
-    """``u = π(x, t)`` of a policy block on NumPy: a source by its table on the grid ``t``, a feedback block by its state law."""
-    if int(policy.m) == 0:
-        return time_law(policy, t)
-
-    return static_law(policy)
-
-
-def time_law(source, t):
-    """``u = π(t)`` of a source block, sampled on the grid ``t`` and held over each period."""
-    empty = np.zeros(0)
-
-    # u_k = π(t_k): the source's output at each sample of the grid
-    table = np.stack([np.asarray(source.h(empty, empty, float(t_k))) for t_k in t])
-    t_0 = float(t[0])
-    dt = float(t[1] - t[0])
-
-    # u(t) = u_k at the nearest sample, k = round((t − t_0) / dt)
-    return lambda x, t: table[int(round((t - t_0) / dt))]
-
-
-def static_law(controller):
-    """
-    ``u = π(x, t)`` of a static feedback block on NumPy: the state on its measurement port.
-
-    Every other input of the block holds its nominal value (an unconnected
-    reference its set point); the time reaches the block, so a time-varying
-    gain ``K(t)`` is read at each instant.
-    """
-    # Lazy import: the loop roles load with the first law
-    from minilink.core.roles import block_roles
-
-    roles = block_roles(controller)
-    require_feedback_roles(controller, roles)
-    require_static_law(controller)
-    ev = controller.compile(backend=BACKEND_NUMPY, verbose=False)
-
-    # The measurement's slice of the block's stacked input vector
-    start = 0
-    for port_id, port in controller.inputs.items():
-        if port_id == roles.measurement:
-            measurement = slice(start, start + port.dim)
-        start += port.dim
-    u_nominal = np.asarray(controller.get_u_from_input_ports(), dtype=float)
-    x_ctl = np.zeros(0)
-
-    # u = π(x, t): the state on the measurement port, every other input at nominal
-    def law(x, t=0.0):
-        u_in = u_nominal.copy()
-        u_in[measurement] = x
-        return np.asarray(ev.outputs(x_ctl, u_in, float(t))[roles.command])
-
-    return law
-
-
-def require_feedback_roles(controller, roles):
-    """Refuse a block that reads no state or commands no ``u``."""
-    if roles.measurement is None or roles.command is None:
-        raise ValueError(
-            "the policy must read the state on an input named 'x' (or 'y') "
-            f"and command 'u'; {controller.name!r} reads {list(controller.inputs)} "
-            f"and gives {list(controller.outputs)}"
-        )
-
-
-def require_static_law(controller):
-    """Refuse a policy with internal state for the held rollout: a sample holds none."""
-    if int(controller.n) > 0:
-        raise ValueError(
-            "the planner's rollout holds a static law u = pi(x, t); a controller "
-            "with internal state is scored by evaluate(problem, controller, dt=)"
-        )
-
-
 def compile_loop(loop, backend):
     """``(backend, evaluator)`` of the loop: JAX when asked, or when ``"auto"`` and it traces."""
     # Lazy import: the compiler loads with the first evaluator
@@ -968,8 +889,8 @@ def compile_loop(loop, backend):
     return backend, evaluator
 
 
-def open_loop_of(source, plant):
-    """A source block driving the plant's command: the loop ``{"controller", "plant"}``."""
+def open_loop_of(source, plant, held_plan=False):
+    """A source block driving the plant's command: the loop ``{"controller", "plant"}``; a held plan's command the loop's input ``"plan"``."""
     # Lazy imports: the diagram tools load with the first loop
     from minilink.core.diagram import DiagramSystem
     from minilink.core.roles import command_port
@@ -977,10 +898,23 @@ def open_loop_of(source, plant):
     loop = DiagramSystem()
     loop.add_subsystem(source, "controller")
     loop.add_subsystem(plant, "plant")
-    loop.connect("controller", next(iter(source.outputs)), "plant", command_port(plant))
+    if held_plan:
+        loop.expose_input("plan", [("plant", command_port(plant))])
+    else:
+        loop.connect(
+            "controller", next(iter(source.outputs)), "plant", command_port(plant)
+        )
     loop.name = f"{source.name} >> {plant.name}"
 
     return loop
+
+
+def is_held_plan(controller) -> bool:
+    """Whether ``controller`` is a held open-loop plan: a :class:`~minilink.blocks.sources.TrajectorySource` holding each sample."""
+    # Lazy import: the blocks load with the first loop
+    from minilink.blocks.sources import TrajectorySource
+
+    return isinstance(controller, TrajectorySource) and controller.hold == "zoh"
 
 
 def with_sources(loop, sources):
@@ -1055,18 +989,27 @@ def plant_stepped(loop, solver, substeps):
     return with_plant_steps(loop, substeps=substeps, solver=solver)
 
 
-def require_dt(dt):
-    """Refuse a continuous loop with no sample period: its run is recorded on the grid of ``dt``."""
-    if dt is None:
-        raise TypeError(
-            "a continuous loop needs dt, the sample period of its run: "
-            "problem.compile(controller, dt=0.01)"
-        )
+def automatic_dt_of(loop, horizon):
+    """
+    A continuous loop's period when it names none: its automatic step, shortened to divide the run.
+
+    ``Δt`` is the continuous simulator's automatic step of the loop
+    (:func:`~minilink.core.system.automatic_step_of`, ``0.1 τ_min``), and
+    ``dt = horizon / ⌈horizon / Δt⌉``, the largest step under it that ends on the horizon.
+    """
+    # A real cycle: the system module imports the compile chain, which loads after this one
+    from minilink.core.system import automatic_step_of
+
+    step = automatic_step_of(loop.solver_info)
+
+    # n = ⌈horizon / Δt⌉ periods, a multiple landing on its round despite the division
+    n = max(1, int(np.ceil(horizon / step - 1e-9)))
+    dt = horizon / n
 
     return dt
 
 
-def require_plant_block(loop, plant):
+def require_plant_subsystem(loop, plant):
     """Refuse a built loop whose ``plant`` block is not the problem's plant."""
     block = loop.subsystems["plant"]
     if block is not plant and int(block.n) != int(plant.n):
@@ -1164,22 +1107,47 @@ def is_concrete_number(value) -> bool:
 
 
 def horizon_of(problem, episode_length):
-    """The length of a run: the finite horizon, else ``episode_length`` (10 s by default)."""
+    """The length of a run: the finite horizon, else ``episode_length``; ``None`` when neither is given (the default run)."""
     if problem.horizon_kind() == "finite":
         return float(problem.horizon)
+    if episode_length is None:
+        return None
 
-    return EPISODE_LENGTH if episode_length is None else float(episode_length)
+    return float(episode_length)
 
 
-def steps_of(tf, dt):
-    """The number of periods of ``dt`` in ``tf``; refuse a ``dt`` that does not divide it."""
+def default_horizon_of(dt):
+    """The default run of a problem with no finite horizon, announced: 10 s, rounded up to whole periods of ``dt`` when ``dt`` does not divide it."""
+    # N = 10 s / dt periods when dt divides 10 s, else N = ⌈10 s / dt⌉ and T = N dt
+    n_steps = int(round(EPISODE_LENGTH / dt))
+    if abs(n_steps * dt - EPISODE_LENGTH) <= 1e-9 * EPISODE_LENGTH:
+        horizon = EPISODE_LENGTH
+        rounded = ""
+    else:
+        n_steps = int(np.ceil(EPISODE_LENGTH / dt))
+        horizon = n_steps * dt
+        rounded = f" ({EPISODE_LENGTH:g} s rounded up to whole periods of dt={dt:g} s)"
+
+    # A default that sets what is scored is announced
+    warnings.warn(
+        f"the problem has no finite horizon, so the evaluation uses a default "
+        f"horizon: the run is scored over {horizon:g} s{rounded}. Give the problem "
+        "a horizon to choose it (or pass episode_length= where the call takes it)",
+        stacklevel=caller_stacklevel(),
+    )
+
+    return horizon
+
+
+def steps_of(horizon, dt):
+    """The number of periods of ``dt`` in ``horizon``; refuse a ``dt`` that does not divide it."""
     if not dt > 0.0:
         raise ValueError(f"dt must be positive, got {dt!r}")
 
-    n_steps = int(round(tf / dt))
-    if n_steps < 1 or abs(n_steps * dt - tf) > 1e-9 * max(1.0, tf):
+    n_steps = int(round(horizon / dt))
+    if n_steps < 1 or abs(n_steps * dt - horizon) > 1e-9 * max(1.0, horizon):
         raise ValueError(
-            f"dt={dt!r} must divide the horizon tf={tf!r} into a whole number of periods"
+            f"dt={dt!r} must divide the horizon {horizon!r} into a whole number of periods"
         )
 
     return n_steps
@@ -1227,7 +1195,7 @@ def numbers_key(tree):
     return tuple(entries)
 
 
-def stateful_blocks_of(loop):
+def stateful_subsystems_of(loop):
     """The ids of the loop's blocks other than the plant that hold a state: each has an ``x0`` leaf."""
     return tuple(
         sys_id
@@ -1246,7 +1214,7 @@ def require_no_x0_key(loop, start_ids):
             )
 
 
-def block_params_of(loop, params, sys_id):
+def subsystem_params_of(loop, params, sys_id):
     """A block's entry of the run's tree as the block reads it: its ``x0`` leaf taken out."""
     entry = params[sys_id]
     if not isinstance(entry, dict) or "x0" not in entry:
@@ -1259,7 +1227,7 @@ def block_params_of(loop, params, sys_id):
     return rest
 
 
-def require_free_names(free_inputs, block_ids):
+def require_free_names(free_inputs, subsystem_ids):
     """Refuse a free input or a block named like another key of the tree (or a problem leaf)."""
     reserved = {
         "cost",
@@ -1272,8 +1240,8 @@ def require_free_names(free_inputs, block_ids):
         "hold_x0",
     }
     clash = sorted(
-        (set(free_inputs) & set(block_ids))
-        | ((set(free_inputs) | set(block_ids)) & reserved)
+        (set(free_inputs) & set(subsystem_ids))
+        | ((set(free_inputs) | set(subsystem_ids)) & reserved)
     )
     if clash:
         raise ValueError(
@@ -1286,7 +1254,9 @@ def require_free_names(free_inputs, block_ids):
 def declared_rows(problem):
     """The program's constraint rows: the feasibility margin for a bounded ``X`` or ``U``, the reachability margin for ``Xf``."""
     rows = []
-    if is_bounded(problem.X.bounding_box()) or is_bounded(problem.U.bounding_box()):
+    if has_finite_face(problem.X.bounding_box()) or has_finite_face(
+        problem.U.bounding_box()
+    ):
         rows.append("feasibility_margin")
     if problem.Xf is not None:
         rows.append("reachability_margin")

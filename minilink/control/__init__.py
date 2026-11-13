@@ -9,11 +9,12 @@ from minilink.core.exports import lazy_facade
 #
 # The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
 # derivative filtered) and ``Impedance``, ``IntegralImpedance`` (a
-# measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dof``
-# independent loops, actuator limits that are infinite by default.
+# measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dim``
+# independent loops (``dof`` joints on the impedances), actuator limits that are infinite
+# by default.
 #
 # The design verbs (``lqr``, ``place``, ``lqg``, ``lqr_finite_horizon``,
-# ``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,
+# ``lqr_trajectory``) take a linear model or a plant; their gains (``lqr_gain``,
 # ``place_gain``, ``lqr_gain_schedule``) take arrays. Both live in ``control.design``.
 #
 # The loop builders ``closed_loop`` and ``feedback`` close a controller around a plant;
@@ -53,7 +54,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "lqr_gain": ("minilink.control.design", "lqr_gain"),
     "lqr_gain_schedule": ("minilink.control.design", "lqr_gain_schedule"),
     "lqr_finite_horizon": ("minilink.control.design", "lqr_finite_horizon"),
-    "trajectory_lqr": ("minilink.control.design", "trajectory_lqr"),
+    "lqr_trajectory": ("minilink.control.design", "lqr_trajectory"),
     "place": ("minilink.control.design", "place"),
     "place_gain": ("minilink.control.design", "place_gain"),
     "lqg": ("minilink.control.design", "lqg"),

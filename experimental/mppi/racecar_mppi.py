@@ -15,6 +15,7 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
+from minilink.control import ModelPredictiveController
 from minilink.graphical.animation.drawables import Overlay, SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.animation.visualization import WORLD
@@ -31,10 +32,7 @@ from minilink.planning import (
     point_probe,
     quadratic_hinge,
 )
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    plant_run,
-)
+from minilink.planning.trajectory_optimization.mpc import plant_run
 
 V_REF = 3.5  # [m/s]
 TF = 10.0  # closed-loop run, s
@@ -60,8 +58,8 @@ scene = Scene(obstacles=[cone])
 car = UdeSRacecar()
 car.camera_follow_frame = None
 car.camera_scale = 4.0
-car.inputs["u"].lower_bound = np.array([0.0, -0.52])
-car.inputs["u"].upper_bound = np.array([5.0, 0.52])
+car.inputs["u"].lower = np.array([0.0, -0.52])
+car.inputs["u"].upper = np.array([5.0, 0.52])
 
 start = path[0]
 heading = np.arctan2(path[1, 1] - start[1], path[1, 0] - start[0])
@@ -167,7 +165,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=8,
     transcription="direct_collocation",
     backend="jax",
-    method="scipy_slsqp",
+    method="slsqp",
     options={"maxiter": 40, "ftol": 0.05},
 )
 mpc = ModelPredictiveController(planner)

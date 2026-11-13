@@ -19,21 +19,16 @@ from minilink.core.system import DynamicSystem
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
+from minilink.control import ModelPredictiveController, PlanFollower
 from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    PlanFollower,
     mpc_animation_overlays,
     mpc_plans_from_rollout,
     plant_run,
 )
 from minilink.core.compile.plan import nested_layout
-from minilink.planning.trajectory_optimization.mpc.predictive import (
-    PredictiveController,
-    warm_guess,
-)
+from minilink.planning.trajectory_optimization.mpc.predictive import warm_guess
 from minilink.planning.trajectory_optimization.compiled import (
     CompiledTrajectoryPlanner,
 )
@@ -47,11 +42,11 @@ DT = 0.2  # the MPC's period in the loop tests
 
 class JaxSingleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
+        self.state.lower = np.array([-10.0])
+        self.state.upper = np.array([10.0])
+        self.inputs["u"].lower = np.array([-10.0])
+        self.inputs["u"].upper = np.array([10.0])
 
     def f(self, x, u, t=0, params=None):
         jnp = require_jax_numpy()
@@ -83,9 +78,7 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         )
 
     def make_planner(self, problem):
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=5)
-        )
+        transcription = DirectCollocationTranscription(n_steps=5)
         return TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -98,8 +91,8 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         tree = edited(pv.params, {"x0": np.array([0.35])})
         z, status = pv.solve(tree)
         traj = pv.solution(z, params=tree, status=status).trajectory
-        self.assertEqual(traj.x.shape, (1, 5))
-        self.assertEqual(traj.u.shape, (1, 5))
+        self.assertEqual(traj.x.shape, (1, 6))
+        self.assertEqual(traj.u.shape, (1, 6))
         np.testing.assert_allclose(traj.x[:, 0], [0.35], atol=1e-05)
 
         # The next tick from the last plan, a new start
@@ -159,7 +152,7 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         plan = pv.solution(z, params=tree, status=status)
         rebuilt = self.make_planner(problem_of(0.5, t0=3.0)).solve()
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
-        np.testing.assert_allclose(plan.trajectory.t, 3.0 + np.linspace(0.0, 1.0, 5))
+        np.testing.assert_allclose(plan.trajectory.t, 3.0 + np.linspace(0.0, 1.0, 6))
         self.assertLessEqual(plan.trajectory.x.max(), 0.5 + 1e-6)
 
         # A moved ball takes its own bounds: none of the compile-time box stays
@@ -182,9 +175,7 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         pytest.importorskip("cyipopt")
         planner = TrajectoryOptimizationPlanner(
             self.make_problem(0.0),
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="jax",
             method="ipopt",
             options={"max_iter": 100},
@@ -215,11 +206,11 @@ class TestTwoReplanningRoutes(unittest.TestCase):
 
 class SingleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
+        self.state.lower = np.array([-10.0])
+        self.state.upper = np.array([10.0])
+        self.inputs["u"].lower = np.array([-10.0])
+        self.inputs["u"].upper = np.array([10.0])
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])
@@ -274,7 +265,7 @@ class TestTheDelayedMPC(unittest.TestCase):
 
     def test_the_delay_is_a_visible_unit_delay_before_the_command(self):
         mpc, pv = self.mpc, self.pv
-        assert isinstance(mpc, PredictiveController)
+        assert isinstance(mpc, ModelPredictiveController)
         assert list(mpc.subsystems) == ["solve", "command", "memory", "delay"]
         assert list(mpc.inputs) == ["y"]
         assert list(mpc.outputs) == ["u", "z", "x_ref", "u_ref"]
@@ -351,7 +342,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
 
     def test_it_is_a_solve_a_command_and_a_memory_holding_the_plan(self):
         mpc, pv = self.mpc, self.pv
-        assert isinstance(mpc, PredictiveController)
+        assert isinstance(mpc, ModelPredictiveController)
         assert list(mpc.subsystems) == ["solve", "command", "memory"]
         assert list(mpc.inputs) == ["y"]
         assert list(mpc.outputs) == ["u", "z", "x_ref", "u_ref"]
@@ -481,7 +472,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         z, _ = pv.solve(edited(pv.params, {"x0": np.array([0.5]), "t0": 0.0}))
 
         def failing(params=None, z0=None):
-            return z0 + 1.0, {"success": False, "iterations": 0, "cost": np.nan}
+            return z0 + 1.0, {"success": False, "n_iterations": 0, "J": np.nan}
 
         pv.solve = failing
         z_star = solve.compute_z(np.zeros(0), np.concatenate([[0.8], z]), 0.2)
@@ -502,7 +493,6 @@ class TestTheWarmStartedMPC(unittest.TestCase):
 def test_the_zero_delay_form_traces_on_a_native_planner():
     jax = pytest.importorskip("jax")
     from minilink.planning.trajectory_optimization.shooting import (
-        ShootingOptions,
         ShootingTranscription,
     )
 
@@ -516,7 +506,7 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=ShootingTranscription(ShootingOptions(n_steps=6)),
+        transcription=ShootingTranscription(n_steps=6),
         backend="jax",
         method="adam",
         n_iterations=20,
@@ -572,7 +562,7 @@ class TestThePureMPCAndTheFollower(unittest.TestCase):
         assert computer.sample_period == 0.05
         pe = planner.problem.compile(computer, backend="numpy")
         run = pe.trajectory()
-        u = run.get_signal("plant:u")[0]
+        u = run.signal("plant:u")[0]
 
         # The first slow period applies the guess (zero input); the plan solved at
         # t = 0 arrives at t = 0.2 and is read at the fast ticks
@@ -670,7 +660,7 @@ class TestTheMPCsSeamFixes(unittest.TestCase):
         assert not np.array_equal(block.compute_z(np.zeros(0), u, 0.2), z)
 
         def diverged(params=None, z0=None):
-            return z0 * np.nan, {"success": False, "iterations": 1, "cost": np.nan}
+            return z0 * np.nan, {"success": False, "n_iterations": 1, "J": np.nan}
 
         pv.solve = diverged
         np.testing.assert_array_equal(block.compute_z(np.zeros(0), u, 0.2), z)

@@ -14,7 +14,7 @@ PRINT_COMPILE_REPORT = True  # Print compile timing diagnostics.
 
 class Integrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "Integrator"
 
     def f(self, x, u, t=0, params=None):
@@ -35,7 +35,7 @@ class PController(System):
         self.add_output_port("u", dim=1, function=self.ctl, dependencies=("r", "y"))
 
     def ctl(self, x, u, t=0, params=None):
-        r, y = self.get_port_values_from_u(u, "r", "y")
+        r, y = self.ports(u, "r", "y")
 
         u_cmd = 10.0 * (r[0] - y[0])
         return [u_cmd]

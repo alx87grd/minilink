@@ -50,9 +50,10 @@ def test_require_jax_numpy_returns_module_when_jax_installed():
     assert jnp.zeros(2).shape == (2,)
 
 
-def test_simulator_re_exports_compile_backend_auto():
+def test_the_auto_backend_has_one_home():
     sim = importlib.import_module("minilink.simulation.simulator")
-    assert sim.COMPILE_BACKEND_AUTO == BACKEND_AUTO
+    assert not hasattr(sim, "COMPILE_BACKEND_AUTO")  # retired: core.backends holds it
+    assert BACKEND_AUTO == "auto"
 
 
 import numpy as np
@@ -101,7 +102,15 @@ def test_callable_set_margin_preserves_numpy_output():
 
 
 def test_callable_set_contains_reads_a_flat_point():
-    set_ = CallableSet(contains_fn=lambda z, t, params: z.shape == (2,) and z[1] > 1.0)
+    """Membership is the margin's sign, the margin read on a flat point (z₁ ≥ 1 here)."""
+
+    def margin(z, t, params):
+        assert z.shape == (2,)
+        return np.array([z[1] - 1.0])
+
+    set_ = CallableSet(margin)
+    with pytest.raises(TypeError, match="membership is margin >= 0"):
+        CallableSet(None)
     assert set_.contains(np.array([[1.0], [2.0]]))
     assert set_.contains([[1.0, 2.0]])
     assert not set_.contains(np.array([1.0, 0.5]))
@@ -117,8 +126,9 @@ def test_quadratic_cost_numpy_math_and_reporting_helpers():
         t=np.array([0.0, 1.0]), x=np.column_stack((x, x)), u=np.column_stack((u, u))
     )
     evaluated = traj.with_cost(cost)
-    np.testing.assert_allclose(evaluated.signals["cost_rate"], [[6.0, 6.0]])
-    np.testing.assert_allclose(evaluated.signals["cost"], [[0.0, 6.0]])
+    np.testing.assert_allclose(evaluated.signals["dJ"], [[6.0, 6.0]])
+    # J(t_1) = ∫ g dt + h(x(t_1)) = 6 + 10: the terminal cost at the last sample
+    np.testing.assert_allclose(evaluated.signals["J"], [[0.0, 16.0]])
 
 
 def test_set_margins_are_jax_jittable():
@@ -233,7 +243,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import TrajectoryOptimizationPlanner
 p = Pendulum()
-p.inputs["u"].lower_bound = np.array([-20.0]); p.inputs["u"].upper_bound = np.array([20.0])
+p.inputs["u"].lower = np.array([-20.0]); p.inputs["u"].upper = np.array([20.0])
 goal = np.array([np.pi, 0.0])
 problem = PlanningProblem(p, x0=np.zeros(2), horizon=3.0,
     cost=QuadraticCost.from_system(p, Q=np.eye(2), R=np.eye(1), x_bar=goal))
@@ -279,11 +289,11 @@ def test_intersection_flattens_nested_and():
 
 
 def test_intersection_accepts_a_member_whose_margin_is_a_scalar():
-    free = CallableSet(margin_fn=lambda z, t, params: 1.0 - float(z[0]))
+    free = CallableSet(margin=lambda z, t, params: 1.0 - float(z[0]))
     box = BoxSet([0.0], [2.0])
     np.testing.assert_allclose((box & free).margin(np.array([0.5])), [0.5, 1.5, 0.5])
     jax = pytest.importorskip("jax")
-    constant = CallableSet(margin_fn=lambda z, t, params: 1.0)
+    constant = CallableSet(margin=lambda z, t, params: 1.0)
     margin = (box & constant).margin(jax.numpy.array([0.5]))
     np.testing.assert_allclose(np.asarray(margin), [0.5, 1.5, 1.0])
 
@@ -341,7 +351,7 @@ def test_the_default_output_stub_is_on_the_arrays_module():
     jnp = pytest.importorskip("jax.numpy")
     from minilink.core.system import DynamicSystem
 
-    sys = DynamicSystem(n=2, input_dim=1, output_dim=1)
+    sys = DynamicSystem(state_dim=2, input_dim=1, output_dim=1)
     y = sys.h(jnp.zeros(2), jnp.zeros(1))
     assert type(y).__module__.startswith("jax") and y.shape == (1,)
 
@@ -360,3 +370,30 @@ def test_an_explicit_precision_choice_survives_the_next_jax_evaluator(monkeypatc
         assert jax.config.read("jax_enable_x64") is False
     finally:
         configure_jax(enable_x64=True)
+
+
+def test_simulation_band_loads_no_optimization_module():
+    """A verbose simulation reads its panel frame from core: the optimization band stays unloaded."""
+    probe = (
+        "import sys\n"
+        "from minilink.dynamics.catalog.pendulum.pendulum import Pendulum\n"
+        "from minilink.simulation.simulator import Simulator\n"
+        "Simulator(Pendulum(), tf=0.1, verbose=True).solve()\n"
+        "print(sorted(m for m in sys.modules if m.startswith('minilink.optimization')))"
+    )
+    assert _run_fresh_python(probe, {}) == "[]"
+
+
+def test_the_core_printer_loads_no_tool_band():
+    """print() on a core object reads core alone: each tool band writes its own objects' text."""
+    probe = (
+        "import sys\n"
+        "import numpy as np\n"
+        "from minilink.blocks.basic import Integrator\n"
+        "from minilink.core.inspect import inspect_text, latex_inspect\n"
+        "from minilink.core.sets import BoxSet\n"
+        "inspect_text(Integrator()); inspect_text(BoxSet([0.0], [1.0])); latex_inspect(1.0)\n"
+        "bands = ('minilink.optimization', 'minilink.planning', 'minilink.simulation')\n"
+        "print(sorted(m for m in sys.modules if m.startswith(bands)))"
+    )
+    assert _run_fresh_python(probe, {}) == "[]"

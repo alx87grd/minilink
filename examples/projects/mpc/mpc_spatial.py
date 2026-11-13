@@ -139,14 +139,14 @@ plot_bounds = (
 print(f"lap length = {track.path.total_length:.2f} m")
 
 sys_mpc = BicycleDynRate(named_ports=True)
-sys_mpc.state.lower_bound[6] = 0.0
-sys_mpc.state.upper_bound[6] = 90.0
-sys_mpc.state.lower_bound[7] = -0.55
-sys_mpc.state.upper_bound[7] = 0.55
-sys_mpc.inputs["w_rear_dot"].lower_bound[0] = -80.0
-sys_mpc.inputs["w_rear_dot"].upper_bound[0] = 80.0
-sys_mpc.inputs["delta_dot"].lower_bound[0] = -2.0
-sys_mpc.inputs["delta_dot"].upper_bound[0] = 2.0
+sys_mpc.state.lower[6] = 0.0
+sys_mpc.state.upper[6] = 90.0
+sys_mpc.state.lower[7] = -0.55
+sys_mpc.state.upper[7] = 0.55
+sys_mpc.inputs["w_rear_dot"].lower[0] = -80.0
+sys_mpc.inputs["w_rear_dot"].upper[0] = 80.0
+sys_mpc.inputs["delta_dot"].lower[0] = -2.0
+sys_mpc.inputs["delta_dot"].upper[0] = 2.0
 
 probe = mount(point_probe(), on=sys_mpc)
 body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
@@ -196,8 +196,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    method="scipy_slsqp",
-    verbose=False,
+    method="slsqp",
     options={"maxiter": 150, "ftol": 0.1},
 )
 print(f"planner ready (not solved): horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")

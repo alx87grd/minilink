@@ -86,15 +86,10 @@ def collect_discontinuous_solver_notes(
     ]
 
     # The risk of the solver the user forced
-    if user_solver == "rk4_fixedsteps":
+    if user_solver == "rk4":
         notes.append(
-            "Forced rk4_fixedsteps: sub-step torques may oscillate and cancel; "
+            "Forced rk4: sub-step torques may oscillate and cancel; "
             "controller:u on the output grid may not match the effective integrated torque."
-        )
-    elif user_solver == "euler_fixedsteps":
-        notes.append(
-            "Forced euler_fixedsteps: uses uniform-dt compiled rollouts; prefer "
-            "solver='euler' when the time grid is non-uniform."
         )
     elif user_solver is not None and (
         user_solver == "scipy" or user_solver.startswith("scipy_")
@@ -118,7 +113,7 @@ def collect_discontinuous_solver_notes(
             )
     elif user_solver is None and solver_mode == "euler" and verbose and dt is not None:
         notes.append(
-            f"Auto-selected Euler with dt={dt:g} (discontinuous default scale "
+            f"Auto-selected Euler with dt={dt:g} (the automatic step, "
             f"{AUTO_DT_SCALE:g} × smallest_time_constant)."
         )
 
@@ -150,7 +145,7 @@ def collect_held_signal_notes(
     ):
         notes.append(
             f"Forced {user_solver} on a signal held over {period:g} s: adaptive "
-            "stepping fights the jump at every sample; rk4_fixedsteps with a dt "
+            "stepping fights the jump at every sample; rk4 with a dt "
             "that divides the sample period is faster and more accurate."
         )
 

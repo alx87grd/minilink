@@ -20,13 +20,13 @@ the loop structure and I/O contracts may still move.
 
 from __future__ import annotations
 
-import logging
 import time
 import warnings
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.backends import BACKEND_AUTO, BACKEND_NUMPY
+from minilink.core.compile.compiler import build_on_auto
 from minilink.core.compile.evaluators.stepping import substeps_of
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
@@ -104,8 +104,8 @@ class RealtimeSimulator:
         names the signals to show. Uses
         :class:`~minilink.simulation.realtime.live_plot.LiveSignalPlotOutput`,
         published beside ``output`` when both are given.
-    plot_backend : str
-        Signal plotting backend of the live plot (``"matplotlib"`` or
+    plot_renderer : str
+        Signal plotting renderer of the live plot (``"matplotlib"`` or
         ``"plotly"``), as on every plotting verb.
     backend : str or None
         Evaluator backend. ``None`` or ``"auto"`` (default ``None``): try JAX
@@ -144,7 +144,7 @@ class RealtimeSimulator:
         input=None,
         output=None,
         plot=False,
-        plot_backend="matplotlib",
+        plot_renderer="matplotlib",
         backend=None,
         max_steps=None,
         tf=None,
@@ -175,8 +175,8 @@ class RealtimeSimulator:
         self.input = input
         require_plot_flag(plot)
         self.plot = plot
-        self.plot_backend = plot_backend
-        self.output = realtime_output_of(output, plot, plot_backend=plot_backend)
+        self.plot_renderer = plot_renderer
+        self.output = realtime_output_of(output, plot, plot_renderer=plot_renderer)
         self.max_steps = max_steps
         self.tf = tf
         self.verbose = bool(verbose)
@@ -185,7 +185,7 @@ class RealtimeSimulator:
         self._compile_s = 0.0
 
         t_compile = time.perf_counter()
-        self.backend, self.evaluator = self._resolve_and_build_evaluator(backend)
+        self.backend, self.evaluator = self.resolve_and_build_evaluator(backend)
         self._compile_s = time.perf_counter() - t_compile
 
         # Build the live view up front so bad renderer names fail fast; the
@@ -227,7 +227,7 @@ class RealtimeSimulator:
 
         x = np.asarray(sys.x0 if x0 is None else x0, dtype=float).reshape(evaluator.n)
         t = float(t0)
-        u = np.asarray(sys.get_u_from_input_ports(), dtype=float)
+        u = np.asarray(sys.u_nominal, dtype=float)
 
         t_warm = time.perf_counter()
         if self._auto_sim_dt:
@@ -387,25 +387,11 @@ class RealtimeSimulator:
 
     # Internal machinery
 
-    def _resolve_and_build_evaluator(self, backend):
-        """Compile with an explicit backend, or auto-try JAX then NumPy.
+    def resolve_and_build_evaluator(self, backend):
+        """Compile with an explicit backend, or for ``None`` and ``"auto"`` by the compiler's one rule (JAX, else NumPy)."""
+        backend = BACKEND_AUTO if backend is None else backend
 
-        ``None`` and ``"auto"`` share the same policy: prefer JAX when the
-        package is installed and the system is JAX-compatible.
-        """
-        if backend is None or backend == BACKEND_AUTO:
-            try:
-                import jax  # noqa: F401
-            except ImportError:
-                return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
-            try:
-                return BACKEND_JAX, self.sys.compile(backend=BACKEND_JAX)
-            except Exception:
-                logging.getLogger(__name__).debug(
-                    "JAX compile failed, falling back to numpy", exc_info=True
-                )
-                return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
-        return backend, self.sys.compile(backend=backend)
+        return build_on_auto(lambda backend: self.sys.compile(backend=backend), backend)
 
     def _auto_n_sub_max(self):
         """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.
@@ -556,21 +542,21 @@ class CompositeOutput(RealtimeOutput):
 
 
 def require_plot_flag(plot) -> None:
-    """Refuse a backend name as ``plot``: the backend is ``plot_backend``, ``plot`` is ``True`` or the signals."""
+    """Refuse a renderer name as ``plot``: the renderer is ``plot_renderer``, ``plot`` is ``True`` or the signals."""
     if isinstance(plot, str):
         raise ValueError(
             f"plot={plot!r}: pass plot=True or a sequence of signal names, and the "
-            "backend as plot_backend='matplotlib' or 'plotly'"
+            "renderer as plot_renderer='matplotlib' or 'plotly'"
         )
 
 
-def realtime_output_of(output, plot, *, plot_backend: str = "matplotlib"):
+def realtime_output_of(output, plot, *, plot_renderer: str = "matplotlib"):
     """The user's ``RealtimeOutput``, with a ``LiveSignalPlotOutput`` beside it when ``plot`` asks for one."""
     if plot is False or plot is None:
         return output
 
     signals = None if plot is True else tuple(plot)
-    plot_out = LiveSignalPlotOutput(signals=signals, backend=plot_backend)
+    plot_out = LiveSignalPlotOutput(signals=signals, renderer=plot_renderer)
     if output is None:
         return plot_out
     return CompositeOutput((plot_out, output))

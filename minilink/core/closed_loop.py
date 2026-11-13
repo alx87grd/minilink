@@ -21,9 +21,9 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.sampled_diagram import base_period_of
 from minilink.core.discrete.sampled_system import SampledSystem, sampled_substeps
 from minilink.core.roles import (
-    block_roles,
     command_port,
     require_command,
+    subsystem_roles,
 )
 from minilink.core.system import System
 
@@ -32,7 +32,7 @@ from minilink.core.system import System
 ###############################################################################
 
 
-def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSystem:
+def feedback(sys, filter=1, *, of=None, sign=-1.0) -> DiagramSystem:
     """Close ``sys`` on itself with an :class:`~minilink.blocks.routing.Error` block: ``r -> e = r - y -> sys -> y``, the textbook ``T = L / (1 + L H)``.
 
     Negative feedback (the default) inserts ``Error``, so the diagram shows
@@ -62,8 +62,8 @@ def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSyst
         mismatch is an error.
     sign : float
         ``-1.0`` for negative feedback (default), ``+1.0`` for positive.
-    validate : bool
-        Run algebraic-loop detection before returning.
+
+    The algebraic-loop check runs before the diagram is returned.
     """
     # The open loop: sys with its command entry free for the junction, and y out
     diagram, entries = open_loop(sys)
@@ -72,8 +72,7 @@ def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSyst
     close_on(diagram, entries, filter, of=of, sign=sign)
 
     diagram.name = f"feedback({sys.name})"
-    if validate:
-        diagram.check_algebraic_loops()
+    diagram.check_algebraic_loops()
 
     return diagram
 
@@ -87,11 +86,10 @@ def closed_loop(
     noise: bool | System = False,
     filter=None,
     observer: System | None = None,
-    validate: bool = True,
 ) -> DiagramSystem:
     """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
 
-    One rule, read from the port names (:func:`~minilink.core.roles.block_roles`):
+    One rule, read from the port names (:func:`~minilink.core.roles.subsystem_roles`):
     every controller input named ``y`` or ``x`` is wired to the plant output of
     the same name; a controller with neither (an error-driven block: a
     compensator, a transfer function, a plant, a series diagram) gets an
@@ -144,8 +142,6 @@ def closed_loop(
         ``x`` (the estimate) goes to the controller's ``x``, so the plant's
         own state is never read. A ``kalman`` or ``luenberger`` observer with a
         state-feedback gain is the LQG loop.
-    validate : bool, optional
-        If ``True``, run algebraic-loop detection before returning.
 
     Returns
     -------
@@ -156,7 +152,7 @@ def closed_loop(
     # A plant on the right; an error-driven controller takes the junction, any
     # other reads a measurement; the loop's inputs are flags or source blocks
     require_plant_on_right(plant)
-    roles = block_roles(controller)
+    roles = subsystem_roles(controller)
     if not roles.error_driven:
         require_measurement(controller, roles, "controller")
     require_loop_inputs(reference, disturbance, noise)
@@ -169,9 +165,9 @@ def closed_loop(
     # its own x; under a sampled controller, the plant on its base clock
     reads_plant_state = "x" in roles.measurements and observer is None
     plant_box = plant_box_with_state(plant) if reads_plant_state else plant
-    loop_blocks = (controller, observer, filter, reference, disturbance, noise)
-    require_clock_on_the_computer(loop_blocks, plant)
-    plant_box = on_the_loop_clock(loop_blocks, plant_box)
+    loop_subsystems = (controller, observer, filter, reference, disturbance, noise)
+    require_clock_on_the_computer(loop_subsystems, plant)
+    plant_box = on_the_loop_clock(loop_subsystems, plant_box)
 
     # The controller and the plant, each under its role name, in their algebra
     diagram = algebra_of(controller, plant_box)()
@@ -237,8 +233,7 @@ def closed_loop(
     # The loop's name and camera, then the algebraic-loop check
     diagram.name = f"{controller.name} @ {plant.name}"
     propagate_animation_camera(diagram, plant_box)
-    if validate:
-        diagram.check_algebraic_loops()
+    diagram.check_algebraic_loops()
 
     return diagram
 
@@ -252,14 +247,14 @@ def resolve_standard_feedback(
 ) -> StandardFeedbackWiring:
     """Choose the feedback port names shared by ``closed_loop`` and the sampled loop.
 
-    The controller's port names decide (:func:`minilink.core.roles.block_roles`):
+    The controller's port names decide (:func:`minilink.core.roles.subsystem_roles`):
     a block that reads ``y`` closes on the plant's ``y``, one that reads ``x`` on
     its ``x``, and one that reads both on the first the plant can serve. The
     command leaves on ``u`` (``u_ff`` for a solver, else the one output) and
     enters the plant on ``u`` (else its one input). Dimensions are a check,
     never a choice: a mechanical plant's ``y`` is its state ``[q; dq]``.
     """
-    roles = block_roles(controller)
+    roles = subsystem_roles(controller)
     require_measurement(controller, roles, controller_id)
 
     # The first measurement the plant serves
@@ -286,17 +281,6 @@ class StandardFeedbackWiring:
     measurement_in: str
     plant_in: str
     plant_out: str
-
-
-def default_computer_boundary_ports(controller) -> tuple[str, str]:
-    """Return ``(measurement_in, control_out)`` for step-diagram boundary expose."""
-    roles = block_roles(controller)
-
-    # The measurement y or x, else the error entry, else the default input
-    measurement_in = roles.measurement or roles.entry or default_input_port(controller)
-    control_out = default_control_out(controller)
-
-    return measurement_in, control_out
 
 
 ###############################################################################
@@ -337,7 +321,7 @@ def command_entry(sys) -> str:
     its first input would leave the measurement open and feed ``e = r - y``
     into ``r``; it is closed on its plant with ``@``.
     """
-    roles = block_roles(sys)
+    roles = subsystem_roles(sys)
     if roles.measurements:
         raise ValueError(
             f"{sys.name} reads its measurement on {roles.measurement!r}"

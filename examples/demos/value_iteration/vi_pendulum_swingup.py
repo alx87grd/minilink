@@ -10,10 +10,10 @@ TORQUE = 5.0
 X0 = np.array([-0.1, 0.0])
 
 plant = Pendulum()
-plant.state.lower_bound = np.array([-10.0, -10.0])
-plant.state.upper_bound = np.array([10.0, 10.0])
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
+plant.state.lower = np.array([-10.0, -10.0])
+plant.state.upper = np.array([10.0, 10.0])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
 
 cost = QuadraticCost.from_system(
     plant,
@@ -32,15 +32,14 @@ planner = DynamicProgrammingPlanner(
     tol=0.1,
     max_iterations=2000,
     out_of_bound_cost=INF,
-    verbose=True,
     # backend="jax",
 )
-planner.solve()
+planner.solve(verbose=True)
 
-planner.plot_cost_to_go(jmax=INF, show_3d=True)
+planner.plot_cost_to_go(jmax=INF, is_3d=True)
 planner.plot_control_law()
 
-controller = planner.get_controller()
+controller = planner.controller
 diagram = controller @ plant
 
 plant.x0 = X0

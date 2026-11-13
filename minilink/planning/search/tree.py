@@ -10,7 +10,7 @@ from minilink.planning.search.edge import Edge
 
 NEAREST_BRUTE_FORCE = "brute_force"
 NEAREST_KD_TREE = "kd_tree"
-NEAREST_BACKENDS = (NEAREST_BRUTE_FORCE, NEAREST_KD_TREE)
+NEAREST_METHODS = (NEAREST_BRUTE_FORCE, NEAREST_KD_TREE)
 
 
 ###############################################################################
@@ -20,12 +20,12 @@ NEAREST_BACKENDS = (NEAREST_BRUTE_FORCE, NEAREST_KD_TREE)
 
 @dataclass
 class Node:
-    """A tree node: a state, its parent, the reaching edge, and cost-to-come."""
+    """A tree node: a state, its parent, the reaching edge, and its cost-to-come."""
 
     x: np.ndarray
     parent: "Node | None"
     edge: Edge | None
-    cost: float
+    cost_to_come: float
     children: list = field(default_factory=list, repr=False)
 
 
@@ -40,18 +40,18 @@ class Tree:
     """
 
     def __init__(
-        self, root: Node, *, nearest_backend: str = NEAREST_BRUTE_FORCE
+        self, root: Node, *, nearest_method: str = NEAREST_BRUTE_FORCE
     ) -> None:
-        require_nearest_backend(nearest_backend)
+        require_nearest_method(nearest_method)
 
         # The root, and every node in insertion order
         self.root = root
         self.nodes: list[Node] = [root]
 
         # The nearest-neighbour index, rebuilt at the first query after a change
-        self.nearest_backend = nearest_backend
+        self.nearest_method = nearest_method
         self._kdtree = None
-        self._kdtree_dirty = nearest_backend == NEAREST_KD_TREE
+        self._kdtree_dirty = nearest_method == NEAREST_KD_TREE
 
     def add(self, node: Node) -> Node:
         """Append a node and return it."""
@@ -60,7 +60,7 @@ class Tree:
             node.parent.children.append(node)
 
         # The index no longer covers every node
-        if self.nearest_backend == NEAREST_KD_TREE:
+        if self.nearest_method == NEAREST_KD_TREE:
             self._kdtree_dirty = True
 
         return node
@@ -68,7 +68,7 @@ class Tree:
     def nearest(self, x, metric: Callable) -> Node:
         """Return the node minimising ``metric(node.x, x)``."""
         # Brute force: every node, under the caller's metric
-        if self.nearest_backend == NEAREST_BRUTE_FORCE:
+        if self.nearest_method == NEAREST_BRUTE_FORCE:
             return min(self.nodes, key=lambda node: metric(node.x, x))
 
         # The k-d tree: the Euclidean nearest neighbour
@@ -80,7 +80,7 @@ class Tree:
     def near(self, x, radius: float, metric: Callable) -> list[Node]:
         """Return all nodes within ``radius`` of ``x`` (for RRT*)."""
         # Brute force: every node, under the caller's metric
-        if self.nearest_backend == NEAREST_BRUTE_FORCE:
+        if self.nearest_method == NEAREST_BRUTE_FORCE:
             return [node for node in self.nodes if metric(node.x, x) <= radius]
 
         # The k-d tree: the Euclidean ball, a scalar answer read as a one-index list
@@ -104,18 +104,18 @@ class Tree:
         # Attach it under the new parent: c(node) = c(parent) + c(edge)
         node.parent = new_parent
         node.edge = new_edge
-        node.cost = new_parent.cost + new_edge.cost
+        node.cost_to_come = new_parent.cost_to_come + new_edge.cost
         new_parent.children.append(node)
 
     def propagate_cost(self, node: Node) -> None:
         """Refresh cost-to-come for ``node`` and all descendants."""
         # c(child) = c(node) + c(edge), down the whole subtree
         for child in node.children:
-            child.cost = node.cost + child.edge.cost
+            child.cost_to_come = node.cost_to_come + child.edge.cost
             self.propagate_cost(child)
 
-    def extract_trajectory(self, node: Node) -> Trajectory:
-        """Concatenate edges from the root to ``node`` into a `Trajectory`."""
+    def extract_trajectory(self, node: Node, t0: float = 0.0) -> Trajectory:
+        """Concatenate edges from the root to ``node`` into a `Trajectory` that starts at ``t0``."""
         # The parent chain, from the root's child down to the node
         chain = []
         current = node
@@ -127,15 +127,15 @@ class Tree:
         # Each edge's knots after its first (the parent's state), on one time axis
         states = [np.asarray(self.root.x, dtype=float)]
         inputs: list[np.ndarray] = []
-        times = [0.0]
-        t0 = 0.0
+        times = [float(t0)]
+        t_edge = float(t0)
         for nd in chain:
             edge = nd.edge
             for k in range(1, len(edge.states)):
                 states.append(np.asarray(edge.states[k], dtype=float))
-                times.append(t0 + float(edge.times[k]))
+                times.append(t_edge + float(edge.times[k]))
             inputs.extend(np.asarray(u, dtype=float) for u in edge.inputs)
-            t0 += float(edge.times[-1])
+            t_edge += float(edge.times[-1])
 
         # The control is piecewise constant: hold the last sample at the final knot
         inputs.append(inputs[-1] if inputs else np.zeros(0))
@@ -169,9 +169,9 @@ class Tree:
 ###############################################################################
 
 
-def require_nearest_backend(nearest_backend):
-    """Refuse a nearest-neighbour backend outside ``NEAREST_BACKENDS``."""
-    if nearest_backend not in NEAREST_BACKENDS:
+def require_nearest_method(nearest_method):
+    """Refuse a nearest-neighbour method outside ``NEAREST_METHODS``."""
+    if nearest_method not in NEAREST_METHODS:
         raise ValueError(
-            f"nearest_backend must be one of {NEAREST_BACKENDS}, got {nearest_backend!r}"
+            f"nearest_method must be one of {NEAREST_METHODS}, got {nearest_method!r}"
         )

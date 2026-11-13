@@ -59,10 +59,10 @@ HOLONOMIC_OBSTACLES = (
 def make_holonomic_problem(*, robot_radius=0.25):
     """18-sphere holonomic obstacle scene shared by sections A and B."""
     sys = HolonomicMobileRobot()
-    sys.state.lower_bound = np.array([-6.0, -6.0])
-    sys.state.upper_bound = np.array([6.0, 6.0])
-    sys.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-    sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
+    sys.state.lower = np.array([-6.0, -6.0])
+    sys.state.upper = np.array([6.0, 6.0])
+    sys.inputs["u"].lower = np.array([-1.0, -1.0])
+    sys.inputs["u"].upper = np.array([1.0, 1.0])
 
     scene = Scene(obstacles=HOLONOMIC_OBSTACLES)
     body = mount(disc(robot_radius), on=sys)
@@ -79,14 +79,12 @@ def make_steering_extender(*, max_distance=1.0, resolution=0.05, speed=1.0):
     )
 
 
-def make_kinodynamic_extender(*, horizon=0.6, n_substeps=6, n_primitives=8):
+def make_kinodynamic_extender(*, horizon=0.6, n_steps=6, n_primitives=8):
     primitives = [
         np.array([np.cos(a), np.sin(a)])
         for a in np.linspace(0.0, 2.0 * np.pi, n_primitives, endpoint=False)
     ]
-    return KinodynamicExtender(
-        controls=primitives, horizon=horizon, n_substeps=n_substeps
-    )
+    return KinodynamicExtender(controls=primitives, horizon=horizon, n_steps=n_steps)
 
 
 def run_scene_intro():
@@ -115,7 +113,7 @@ def run_scene_intro():
 
 
 def path_cost(planner) -> float:
-    return float(planner.solution_node.cost)
+    return float(planner.solution_node.cost_to_come)
 
 
 def path_hops(planner) -> int:
@@ -142,14 +140,14 @@ def run_rrt_vs_rrt_star():
         problem,
         extender,
         seed=SEED,
-        max_nodes=MAX_NODES,
+        max_iterations=MAX_NODES,
     )
     sol_rrt = rrt.solve()
     rrt_star = RRTStarPlanner(
         problem,
         extender,
         seed=SEED,
-        max_nodes=MAX_NODES,
+        max_iterations=MAX_NODES,
         optimize_after_goal=True,
         cost_tol=COST_TOL,
         convergence_patience=CONVERGENCE_PATIENCE,
@@ -169,8 +167,8 @@ def run_rrt_vs_rrt_star():
             ax=ax,
         )
         extra = ""
-        if title == "RRT*" and planner.reached_goal:
-            extra = f", converged={planner.converged}"
+        if title == "RRT*" and sol_rrt_star.record.reached_goal:
+            extra = f", converged={sol_rrt_star.record.converged}"
         planner.plot_tree(
             ax=ax,
             show=False,
@@ -194,7 +192,7 @@ def run_extender_comparison():
     problem = problem.replace(Xf=BallSet(X_GOAL, EXTENDER_GOAL_TOLERANCE))
     extenders = {
         "steering": make_steering_extender(max_distance=0.6, resolution=0.05),
-        "kinodynamic": make_kinodynamic_extender(horizon=0.6, n_substeps=6),
+        "kinodynamic": make_kinodynamic_extender(horizon=0.6, n_steps=6),
     }
 
     planners = {}
@@ -203,7 +201,7 @@ def run_extender_comparison():
             problem,
             extender,
             seed=SEED,
-            max_nodes=EXTENDER_MAX_NODES,
+            max_iterations=EXTENDER_MAX_NODES,
         )
         traj = planner.solve().trajectory
         goal_error = float(np.linalg.norm(traj.x[:, -1] - X_GOAL))

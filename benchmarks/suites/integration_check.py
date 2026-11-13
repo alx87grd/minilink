@@ -83,7 +83,7 @@ def _showcase_trajopt_metrics(cfg: IntegrationCheckSuiteConfig) -> list[MetricRe
             direction="lower_better",
             value=result.total_s,
             unit="s",
-            notes="showcase cart-pole swing-up, scipy_slsqp, backend=jax",
+            notes="showcase cart-pole swing-up, slsqp, backend=jax",
         ),
         MetricRecord(
             id=f"{prefix}.solve_s",
@@ -116,7 +116,7 @@ def _showcase_trajopt_metrics(cfg: IntegrationCheckSuiteConfig) -> list[MetricRe
             direction="lower_better",
             value=result.cost,
             unit="cost",
-            notes="optimum cost; current run must not exceed baseline value",
+            notes="optimum cost; the baseline's max_allowed sets the ceiling",
         ),
         MetricRecord(
             id=f"{prefix}.x_tf",

@@ -31,8 +31,8 @@ class UR5Manipulator(Manipulator):
         super().__init__(dof=6, actuators=6, task_dim=3)
 
         # The plant's own range: angles and rates within ±2π
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
 
         # Parameters: the DH chain, the published masses and centers of mass, and
         # cylinder inertias
@@ -74,8 +74,8 @@ class UR5Manipulator(Manipulator):
         self.state.units = ["rad"] * 6 + ["rad/s"] * 6
         self.inputs["u"].labels = [f"{name} torque" for name in names]
         self.inputs["u"].units = ["Nm"] * 6
-        self.inputs["u"].lower_bound = -np.array([150, 150, 150, 28, 28, 28])
-        self.inputs["u"].upper_bound = np.array([150, 150, 150, 28, 28, 28])
+        self.inputs["u"].lower = -np.array([150, 150, 150, 28, 28, 28])
+        self.inputs["u"].upper = np.array([150, 150, 150, 28, 28, 28])
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
@@ -599,7 +599,7 @@ if __name__ == "__main__":
     sys.compute_trajectory(
         u=lambda t: np.zeros(6),
         tf=3.0,
-        n_steps=120,
+        n_samples=120,
         backend="jax",
     )
     sys.animate(renderer="meshcat", is_3d=True)

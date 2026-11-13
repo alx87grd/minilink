@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -12,14 +13,21 @@ from minilink.core.params import checked
 from minilink.core.roles import command_port
 from minilink.core.trajectory import Trajectory
 from minilink.planning.environment import RolloutEnvironment
+from minilink.planning.evaluator import steps_of
 from minilink.planning.planner import (
     Planner,
+    host_copy,
     host_tree,
+    open_loop_controller_of,
     planner_evidence,
     problem_with,
 )
-from minilink.planning.problems import nominal_plant_params
-from minilink.planning.results import PlanningSolution
+from minilink.planning.problems import (
+    nominal_plant_params,
+    require_cost,
+    require_finite_horizon,
+)
+from minilink.planning.results import PlanningSolution, solve_time_text
 
 # A solve between two knots folds its offset in, in this many parts of dt
 SUB_TICKS = 1_000_000
@@ -56,7 +64,7 @@ class MPPIPlanner(Planner):
     problem : PlanningProblem
         A finite horizon, a cost, an input box ``U``.
     dt : float
-        Control period: ``N = tf / dt`` held inputs.
+        Control period: ``N = horizon / dt`` held inputs.
     n_rollouts : int
         ``K``, the sampled sequences per pass.
     temperature : float
@@ -89,11 +97,11 @@ class MPPIPlanner(Planner):
     ):
         require_jax()
         super().__init__(problem)
-        tf = problem.require_finite_horizon()
+        horizon = require_finite_horizon(problem)
 
         # The structure: the grid, the sample count, the passes, the scheme
         self.dt = float(dt)
-        self.n_steps = steps_of(tf, self.dt)
+        self.n_steps = steps_of(horizon, self.dt)
         self.n_rollouts = int(n_rollouts)
         self.n_iterations = int(n_iterations)
         self.solver = solver
@@ -105,7 +113,7 @@ class MPPIPlanner(Planner):
         Sigma = covariance_of(noise, lower, upper)
 
         # The method's numbers: the defaults of params["method"] and params["seed"]
-        self.method = {
+        self.method_numbers = {
             "temperature": float(temperature),
             "noise": Sigma,
             "control_cost": float(control_cost),
@@ -123,12 +131,12 @@ class MPPIPlanner(Planner):
             "plant": copy.deepcopy(
                 (problem.sys.params if plant is None else plant) or {}
             ),
-            "cost": copy.deepcopy(problem.require_cost().params),
+            "cost": copy.deepcopy(require_cost(problem).params),
             "discount_rate": float(problem.discount_rate),
         }
         if problem.X.params:
             tree["X"] = copy.deepcopy(problem.X.params)
-        tree["method"] = self.method
+        tree["method"] = self.method_numbers
         tree["seed"] = self.seed
 
         return tree
@@ -140,32 +148,40 @@ class MPPIPlanner(Planner):
 
         return CompiledMPPIPlanner(self)
 
-    def solve(self, *, params=None, guess=None, evaluate=False, n_trials=50):
+    def solve(
+        self, *, params=None, guess=None, evaluate=False, n_trials=50, verbose=False
+    ):
         """
         One path-integral solve from the problem's start: a :class:`~minilink.planning.results.PlanningSolution`.
 
         ``params`` is ``None`` (the problem as it is) or the complete tree of
         :attr:`params`, edited; ``guess`` (a trajectory or
-        a solution) seeds ``U``, else the ports' nominal input. The policy is the
-        held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``.
+        a solution) seeds ``U``, else the ports' nominal input. The controller is
+        the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate`` on
+        the problem it solved (at ``params``);
+        ``verbose`` prints the record.
         """
+        started = time.perf_counter()
         pv = self.compile()
         z0 = pv.initial(params) if guess is None else pv.pack(guess, params)
 
+        # The solve, timed until its plan is on the host
         z, status = pv.solve(params, z0)
         solution = pv.solution(z, params, status)
+        record = replace(solution.record, solve_time_s=time.perf_counter() - started)
+        solution = replace(solution, record=record)
 
         if evaluate:
             evaluation = planner_evidence(
-                self, solution.policy, dt=self.dt, n_trials=n_trials
+                self,
+                solution.controller,
+                dt=self.dt,
+                n_trials=n_trials,
+                problem=solution.problem,
             )
-            solution = PlanningSolution(
-                solution.problem,
-                solution.policy,
-                solution.record,
-                solution.trajectory,
-                evaluation,
-            )
+            solution = replace(solution, evaluation=evaluation)
+        if verbose:
+            print(solution.record)
 
         return self.store_solution(solution)
 
@@ -175,25 +191,29 @@ class MPPIRecord:
     """
     The account of one path-integral solve: what a user tunes ``λ`` and ``Σ`` against.
 
-    ``effective_samples`` is ``1 / Σ (w^k)²``: a few means ``λ`` is too small
+    ``effective_rollouts`` is ``1 / Σ (w^k)²``: a few means ``λ`` is too small
     (one sample decides), close to ``K`` too large (an unweighted average).
-    ``success`` is "the nominal rollout of the plan stays in ``X``".
+    ``success`` is "the nominal rollout of the plan stays in ``X``";
+    ``solve_time_s`` the solve's wall time (``None`` on the compiled face's
+    solves, which have no wall clock).
     """
 
-    cost: float
+    J: float
     S_min: float
     S_weighted: float
-    effective_samples: float
+    effective_rollouts: float
     exit_rate: float
-    iterations: int
+    n_iterations: int
     success: bool
+    solve_time_s: float | None = None
 
     def __str__(self) -> str:
         return (
-            f"MPPI: cost {self.cost:.6g} (nominal plan), S_min {self.S_min:.6g}, "
-            f"weighted {self.S_weighted:.6g}, effective samples "
-            f"{self.effective_samples:.1f}, exit rate {self.exit_rate:.0%}, "
+            f"MPPI: J = {self.J:.6g} (nominal plan), S_min {self.S_min:.6g}, "
+            f"weighted {self.S_weighted:.6g}, effective rollouts "
+            f"{self.effective_rollouts:.1f}, exit rate {self.exit_rate:.0%}, "
             f"{'stays in X' if self.success else 'leaves X'}"
+            f"{solve_time_text(self.solve_time_s)}"
         )
 
 
@@ -269,8 +289,8 @@ class CompiledMPPIPlanner:
         """
         The solve as a function: ``(z, status)`` from the plan ``z0`` (``None``: :meth:`initial`) on ``params``.
 
-        ``status`` is ``{"success", "iterations", "cost"}`` plus the softmin's
-        account (``S_min``, ``S_weighted``, ``effective_samples``, ``exit_rate``).
+        ``status`` is ``{"success", "n_iterations", "J"}`` plus the softmin's
+        account (``S_min``, ``S_weighted``, ``effective_rollouts``, ``exit_rate``).
         """
         P = self.merged(params)
         z0 = self.initial(P) if z0 is None else z0
@@ -280,7 +300,7 @@ class CompiledMPPIPlanner:
     def solve_body(self, P, z0):
         """One path-integral solve from ``P["x0"]``: :meth:`passes`, then the plan's own rollout and the status."""
         jnp = self.jnp
-        path_cost = self.path_cost
+        rollout_cost = self.rollout_cost
 
         x0 = P["x0"]
         t0 = P["t0"]
@@ -288,17 +308,17 @@ class CompiledMPPIPlanner:
         # U after n_iterations passes of sample, roll out, weigh, update
         U, last = self.passes(P, z0)
 
-        # The plan's own rollout: its cost and whether it stays in X
-        cost, left, _ = path_cost(x0, t0, U, P)
+        # The plan's own rollout: its J and whether it stays in X
+        J, left, _ = rollout_cost(x0, t0, U, P)
         S = last["S"]
         w = last["w"]
         status = {
             "success": ~left,
-            "iterations": self.n_iterations,
-            "cost": cost,
+            "n_iterations": self.n_iterations,
+            "J": J,
             "S_min": jnp.min(S),
             "S_weighted": w @ S,
-            "effective_samples": 1.0 / jnp.sum(w**2),
+            "effective_rollouts": 1.0 / jnp.sum(w**2),
             "exit_rate": jnp.mean(last["left_X"]),
         }
         z = jnp.concatenate([jnp.reshape(U, (-1,)), jnp.reshape(t0, (1,))])
@@ -316,7 +336,7 @@ class CompiledMPPIPlanner:
         t_origin = self.problem.t0
         u_lower = self.u_lower
         u_upper = self.u_upper
-        path_cost = self.path_cost
+        rollout_cost = self.rollout_cost
 
         # The start, the method's numbers, the plan
         x0 = P["x0"]
@@ -335,7 +355,7 @@ class CompiledMPPIPlanner:
             V = jnp.clip(U + eps, u_lower, u_upper)
 
             # Roll out and score: S^k = Σ_t γ^t c_t + γ^N h(x_N) + the cost of leaving X
-            S_path, left_X, X = jax.vmap(lambda V_k: path_cost(x0, t0, V_k, P))(V)
+            S_path, left_X, X = jax.vmap(lambda V_k: rollout_cost(x0, t0, V_k, P))(V)
 
             # The information term: λ (1 − α) Σ_t u_tᵀ Σ⁻¹ ε^k_t
             S = S_path + lam * (1.0 - alpha) * jnp.einsum(
@@ -455,22 +475,26 @@ class CompiledMPPIPlanner:
         trajectory = self.planned_trajectory(z, params)
 
         record = MPPIRecord(
-            cost=float(status.get("cost", np.nan)),
+            J=float(status.get("J", np.nan)),
             S_min=float(status.get("S_min", np.nan)),
             S_weighted=float(status.get("S_weighted", np.nan)),
-            effective_samples=float(status.get("effective_samples", np.nan)),
+            effective_rollouts=float(status.get("effective_rollouts", np.nan)),
             exit_rate=float(status.get("exit_rate", np.nan)),
-            iterations=int(status.get("iterations", self.n_iterations)),
+            n_iterations=int(status.get("n_iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
-        policy = self.planner.open_loop_policy(trajectory, interpolation="previous")
+        controller = open_loop_controller_of(
+            trajectory, self.planner.problem.sys, hold="zoh"
+        )
 
         return PlanningSolution(
-            problem_with(self.problem, host_tree(problem_part(self.merged(params)))),
-            policy,
-            record,
-            trajectory,
-            None,
+            problem=problem_with(
+                self.problem, host_tree(problem_part(self.merged(params)))
+            ),
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
+            params=host_copy(self.merged(params)),
         )
 
     def planned_trajectory(self, z, params=None) -> Trajectory:
@@ -516,21 +540,23 @@ class CompiledMPPIPlanner:
 
         return xp.reshape(z[:-1], (self.N, self.m))
 
-    def path_cost(self, x0, t0, V, P):
+    def rollout_cost(self, x0, t0, V, P):
         """``(S, left_X, x_path)`` of one held sequence ``V`` from ``x0`` at ``t0``: the discounted cost, whether it left ``X``, the states ``(N + 1, n)``."""
         jax = self.jax
         jnp = self.jnp
         env = self.env
-        episode = problem_leaves(P)
-        gamma = env.face.gamma_at(episode)
+        episode = episode_leaves(P)
+        gamma = env.model.gamma_at(episode)
 
         def period(carry, v):
             x, t, S, alive, discount = carry
             x_next, t_next, reward, terminated, _ = env.step(
-                x, t, v, None, episode, t_origin=t0
+                x, v, t, None, episode, t_origin=t0
             )
+            c = -reward  # the environment's reward is the stage cost negated
+
             # S += γ^t c_t while alive; a failure is charged once, its state then frozen
-            S = S - jnp.where(alive, discount * reward, 0.0)
+            S = S + jnp.where(alive, discount * c, 0.0)
             ended = alive & terminated
             x_next = jnp.where(alive & ~terminated, x_next, x)
             return (x_next, t_next, S, alive & ~ended, discount * gamma), (
@@ -554,11 +580,11 @@ class CompiledMPPIPlanner:
         jax = self.jax
         jnp = self.jnp
         env = self.env
-        episode = problem_leaves(P)
+        episode = episode_leaves(P)
 
         def period(carry, u):
             x, t = carry
-            x_next, t_next, _, _, _ = env.step(x, t, u, None, episode, t_origin=P["t0"])
+            x_next, t_next, _, _, _ = env.step(x, u, t, None, episode, t_origin=P["t0"])
             return (x_next, t_next), x_next
 
         x0 = jnp.asarray(P["x0"], dtype=float)
@@ -568,7 +594,7 @@ class CompiledMPPIPlanner:
         return x_path
 
 
-def problem_leaves(P):
+def episode_leaves(P):
     """The episode tree a rollout reads from the planner's tree: the plant's, the cost's, the discount and ``X``'s numbers."""
     leaves = {
         "plant": P["plant"],
@@ -579,17 +605,6 @@ def problem_leaves(P):
         leaves["X"] = P["X"]
 
     return leaves
-
-
-def steps_of(tf, dt) -> int:
-    """``N = tf / dt``, refused unless whole."""
-    N = int(round(tf / dt))
-    if N < 1 or abs(N * dt - tf) > 1e-9 * max(1.0, tf):
-        raise ValueError(
-            f"the horizon tf = {tf:g} s is not a whole number of periods dt = {dt:g} s"
-        )
-
-    return N
 
 
 def action_box(problem):

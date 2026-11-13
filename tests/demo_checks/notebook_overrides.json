@@ -141,16 +141,6 @@
     "smoke": false,
     "nightly": false
   },
-  "examples/teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb": {
-    "requires": [
-      "jax"
-    ]
-  },
-  "examples/teaching/topics/reinforcement_learning/drone_ppo.ipynb": {
-    "requires": [
-      "jax"
-    ]
-  },
   "examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_rl.ipynb": {
     "requires": [
       "jax"

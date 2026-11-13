@@ -6,7 +6,7 @@ import copy
 
 import numpy as np
 
-from minilink.control.siso import as_dof_vector
+from minilink.control.siso import as_axis_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
@@ -54,8 +54,8 @@ class ComputedTorque(System):
 
         # Parameters: the outer PD gains, per joint, and the model's numbers
         self.params = {
-            "Kp": as_dof_vector(25.0 if Kp is None else Kp, n),
-            "Kd": as_dof_vector(8.0 if Kd is None else Kd, n),
+            "Kp": as_axis_vector(25.0 if Kp is None else Kp, n),
+            "Kd": as_axis_vector(8.0 if Kd is None else Kd, n),
             "model": copy.deepcopy(plant.params),
         }
 
@@ -66,7 +66,7 @@ class ComputedTorque(System):
             "y",
             dim=2 * n,
             nominal_value=np.zeros(2 * n),
-            labels=[f"q{i}" for i in range(n)] + [f"dq{i}" for i in range(n)],
+            labels=[f"q{i + 1}" for i in range(n)] + [f"dq{i + 1}" for i in range(n)],
         )
         ctl_fn = self.ctl_tracking if tracking_ref else self.ctl_regulation
         self.add_output_port(
@@ -158,9 +158,9 @@ class SlidingMode(ComputedTorque):
         # Parameters: the surface slope λ, the switching gain, and the switching gain
         # scaled by the inertia, per joint, and the model's numbers
         self.params = {
-            "lam": as_dof_vector(1.0 if lam is None else lam, n),
-            "gain": as_dof_vector(1.0 if gain is None else gain, n),
-            "nab": as_dof_vector(0.1 if nab is None else nab, n),
+            "lam": as_axis_vector(1.0 if lam is None else lam, n),
+            "gain": as_axis_vector(1.0 if gain is None else gain, n),
+            "nab": as_axis_vector(0.1 if nab is None else nab, n),
             "model": copy.deepcopy(plant.params),
         }
 

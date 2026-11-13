@@ -64,13 +64,13 @@ scene = Scene(obstacles=[Sphere(c, CONE_RADIUS + CONE_MARGIN) for c in cones])
 # The model the plan runs on: the same car with grip to spare. Nothing else changes, so
 # what the plan gets wrong at the limit is the plant's own behaviour, not other physics.
 design = UdeSRacecarDyn(named_ports=False)
-design.params["mu"] = PLANNER_MU
-design.state.lower_bound[6] = 0.0
-design.state.upper_bound[6] = 3.0 * V_TARGET / design.params["r_r"]
-design.state.lower_bound[7] = -design.params["delta_max"]
-design.state.upper_bound[7] = design.params["delta_max"]
-design.state.lower_bound[8] = -design.params["P_max"]
-design.state.upper_bound[8] = design.params["P_max"]
+design.params["terrain"]["friction"] = PLANNER_MU
+design.state.lower[6] = 0.0
+design.state.upper[6] = 3.0 * V_TARGET / design.params["r_r"]
+design.state.lower[7] = -design.params["delta_max"]
+design.state.upper[7] = design.params["delta_max"]
+design.state.lower[8] = -design.params["P_max"]
+design.state.upper[8] = design.params["P_max"]
 
 # What the car is asked for: hold the target speed, keep its centre on the line, keep
 # its whole footprint inside the lane and clear of the cones. The quadratic part says
@@ -137,13 +137,13 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    method="scipy_slsqp",
+    method="slsqp",
     options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
 )
 mpc = ModelPredictiveController(planner, delay=False, verbose=True)
 
 car = UdeSRacecarDyn(named_ports=False)
-car.params["mu"] = PLANT_MU
+car.params["terrain"]["friction"] = PLANT_MU
 car.x0 = x0.copy()  # the whole circuit, not the car
 car.camera_scale = 2.0
 

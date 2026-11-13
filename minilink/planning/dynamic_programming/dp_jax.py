@@ -6,9 +6,11 @@ import numpy as np
 
 from minilink.core.backends import ensure_jax_x64
 from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
-from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
+from minilink.planning.dynamic_programming.dp import (
+    ValueTables,
+    stage_schedule,
+)
 from minilink.planning.dynamic_programming.progress import (
-    SweepLog,
     maybe_print_build_progress,
     print_build_complete,
 )
@@ -18,61 +20,85 @@ from minilink.planning.dynamic_programming.progress import (
 ###############################################################################
 
 
-def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgrammingResult:
+def value_iteration(
+    planner, max_sweeps, stop_on_tol=True, keep_stages=False
+) -> ValueTables:
     """
     The planner's value iteration, run on device.
 
     The same backward sweeps as
     :meth:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.value_iteration`
-    over the lookup tables, with the whole loop compiled as one ``lax`` loop.
-    With ``verbose`` or ``record_history`` the sweeps run one at a time from
-    Python instead, so each one can be reported or recorded.
+    over the lookup tables, with the whole loop compiled as one ``lax`` loop
+    (``keep_stages``: one ``lax.scan`` over the ``max_sweeps`` sweeps, every
+    stage stacked). A reported or recorded solve runs the planner's own loop
+    instead, one jitted step at a time (:func:`device_step`).
 
-    Warning: a solve builds the device tables once, at ``final_time``, and reuses
+    Warning: a solve builds the device tables once, at ``tf``, and reuses
     them for every sweep, so the dynamics ``f``, the running cost ``g`` and a
     callable ``out_of_bound_cost`` must not depend on time. Use the ``"numpy"`` backend on
     a grid with ``precompute=False`` for a time-varying problem.
     """
     jax = ensure_jax_x64()
 
-    opt = planner
-
     # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner)
-    J0 = jax.numpy.asarray(terminal_cost(planner, opt.final_time))
-    gamma = float(planner.gamma)
-    tol = float(planner.tol)
+    J0 = jax.numpy.asarray(terminal_cost(planner, planner.tf))
 
-    # Reported or recorded: one jitted step at a time, driven from Python
-    if opt.verbose or opt.record_history:
-        return sweep_by_sweep(
-            planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol
-        )
+    # A finite horizon: its N sweeps in one compiled scan, every stage kept
+    if keep_stages:
+        return finite_sweeps(planner, J0, G, coords, in_bounds, max_sweeps)
 
     # All the backward sweeps in one compiled call, the numbers its arguments
+    gamma = float(planner.gamma)
+    tol = float(planner.tol)
     run = compiled_loop(planner, stop_on_tol, max_sweeps)
     J, pi, k, delta = run(J0, G, coords, in_bounds, gamma, tol)
     jax.block_until_ready(J)
 
-    return DynamicProgrammingResult(
+    return ValueTables(
         grid=planner.grid,
         J=np.array(J),
         pi=np.array(pi, dtype=int),
-        iterations=int(k),
+        n_iterations=int(k),
         delta=float(delta),
         history=None,
     )
 
 
-def terminal_cost(planner, t) -> np.ndarray:
-    """Terminal cost at every grid node (JAX vmap over N nodes)."""
+def device_step(planner, verbose=False):
+    """
+    ``(step, J, pi)``: the jitted backup bound to this solve's device tables, ``J, pi = step(J_next)``, and the sweeps' start.
+
+    The device tables and the cost-to-go at the final time are built here
+    (``verbose``: their builds' progress), the policy starting at action 0;
+    the planner's own loop then drives the step one sweep at a time.
+    """
+    jax = ensure_jax_x64()
+    jnp = jax.numpy
+
+    # Device tables and the cost-to-go at the final time, built for this solve
+    G, coords, in_bounds = device_tables(planner, verbose)
+    J0 = jnp.asarray(terminal_cost(planner, planner.tf, verbose))
+    pi0 = jnp.zeros(planner.grid.n_nodes, dtype=jnp.int32)
+
+    gamma = float(planner.gamma)
+    step = jitted_step(planner)
+
+    # One Bellman backup on device from the cost-to-go one step ahead
+    def bound_step(J_next):
+        return step(J_next, G, coords, in_bounds, gamma)
+
+    return bound_step, J0, pi0
+
+
+def terminal_cost(planner, t, verbose=False) -> np.ndarray:
+    """Terminal cost at every grid node (JAX vmap over N nodes; ``verbose``: the build's progress)."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
     grid = planner.grid
-    face = grid.face
-    N = grid.nodes_n
-    verbose = planner.verbose
+    model = grid.model
+    N = grid.n_nodes
 
     states = jnp.asarray(grid.states)
 
@@ -81,7 +107,7 @@ def terminal_cost(planner, t) -> np.ndarray:
 
     # Final cost of one node
     def node(s):
-        return face.terminal(states[s], t)
+        return model.terminal(states[s], t)
 
     try:
         J = build_jax_node_chunks(
@@ -101,17 +127,16 @@ def terminal_cost(planner, t) -> np.ndarray:
     return J
 
 
-def running_cost_table(planner, t) -> np.ndarray:
-    """Running cost of every (node, action) pair over one step, with the out-of-bound penalty (JAX vmap)."""
+def running_cost_table(planner, t, verbose=False) -> np.ndarray:
+    """Running cost of every (node, action) pair over one step, with the out-of-bound penalty (JAX vmap; ``verbose``: the build's progress)."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
     grid = planner.grid
-    face = grid.face
-    params = face.params
-    N = grid.nodes_n
-    A = grid.actions_n
-    verbose = planner.verbose
+    model = grid.model
+    params = model.params
+    N = grid.n_nodes
+    A = grid.n_actions
     failure_cost = planner.out_of_bound_cost
 
     states = jnp.asarray(grid.states)
@@ -120,9 +145,9 @@ def running_cost_table(planner, t) -> np.ndarray:
     if verbose:
         print(f"Computing g(x,u,t) look-up table.. {N * A:,} pairs", flush=True)
 
-    # The stage cost of one pair over one step: the face's c (g dt under Euler)
+    # The stage cost of one pair over one step: the model's c (g dt under Euler)
     def pair(s, a):
-        return face.stage_cost_at(states[s], inputs[a], t, params)
+        return model.stage_cost_at(states[s], inputs[a], t, params)
 
     try:
         G = build_jax_sa_chunks(
@@ -178,12 +203,12 @@ def running_cost_table(planner, t) -> np.ndarray:
 ###############################################################################
 
 
-def device_tables(planner):
+def device_tables(planner, verbose=False):
     """Device copies of the running-cost table and of the successors as fractional grid indices, at the final time."""
     jnp = ensure_jax_x64().numpy
 
     grid = planner.grid
-    tf = planner.final_time
+    tf = planner.tf
     interpolation = planner.interpolation
     n = grid.n
 
@@ -191,7 +216,7 @@ def device_tables(planner):
 
     # Successors of every pair, and the running-cost table on device
     x_next, _, _ = grid.transition(tf)
-    G = jnp.asarray(running_cost_table(planner, tf))
+    G = jnp.asarray(running_cost_table(planner, tf, verbose))
 
     # Successors as fractional grid indices, (x_next − x_lb) / Δx, shape (n, N*A)
     x_lb = jnp.asarray(grid.x_lb)
@@ -212,56 +237,63 @@ def require_device_interpolation(interpolation):
         raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
 
 
-def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
-    """The backward sweeps one jitted step at a time, so each can be reported or recorded."""
+def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> ValueTables:
+    """A finite horizon's ``N`` backward sweeps in one compiled scan, the stages stacked forward in time."""
     jax = ensure_jax_x64()
-    jnp = jax.numpy
 
-    opt = planner
-    tf = opt.final_time
+    tf = planner.tf
     dt = planner.grid.dt
-    N = planner.grid.nodes_n
-    tol = float(opt.tol)
-    gamma = float(opt.gamma)
+    gamma = float(planner.gamma)
+
+    # J_{N−1} … J_0 and π_{N−1} … π_0, the sweeps' order
+    run = compiled_scan(planner, N)
+    J_swept, pi_swept = run(J0, G, coords, in_bounds, gamma)
+    jax.block_until_ready(J_swept)
+    J_swept = np.array(J_swept)
+    pi_swept = np.array(pi_swept, dtype=int)
+
+    # The last sweep's largest change of the cost-to-go
+    J_before = np.array(J0) if N == 1 else J_swept[-2]
+    delta = float(np.max(np.abs(J_swept[-1] - J_before)))
+
+    # The stages forward in time: J_0 … J_N (J_N = h) and π_0 … π_{N−1}
+    schedule = stage_schedule(tf, dt, [np.array(J0), *J_swept], list(pi_swept))
+
+    return ValueTables(
+        grid=planner.grid,
+        J=np.array(J_swept[-1]),
+        pi=np.array(pi_swept[-1], dtype=int),
+        n_iterations=N,
+        delta=delta,
+        history=None,
+        schedule=schedule,
+    )
+
+
+def compiled_scan(planner, N):
+    """The jitted scan of a finite horizon's ``N`` sweeps, compiled once per ``N``; the discount is its argument."""
+    key = ("finite", int(N))
+    compiled = planner.compiled.get(key)
+    if compiled is not None:
+        return compiled
+
+    jax = ensure_jax_x64()
     step = jitted_step(planner)
 
-    log = SweepLog(opt, max_sweeps, stop_on_tol)
+    def run(J0, G, coords, in_bounds, gamma):
+        # One sweep: the Bellman backup from the cost-to-go one step ahead, its
+        # tables kept
+        def sweep(J_next, _):
+            J, pi = step(J_next, G, coords, in_bounds, gamma)
+            return J, (J, pi)
 
-    # Cost-to-go at the final time
-    J = J0
-    pi = jnp.zeros(N, dtype=jnp.int32)
-    log.start(tf, J, pi)
+        _, (J_swept, pi_swept) = jax.lax.scan(sweep, J0, None, length=N)
 
-    # Backward sweeps: at most max_sweeps of them, and with stop_on_tol
-    # only until the largest change of the cost-to-go falls under tol
-    k = 0
-    delta = np.inf
+        return J_swept, pi_swept
 
-    while k < max_sweeps and (not stop_on_tol or delta > tol):
-        # One step back in time
-        k = k + 1
-        t = tf - k * dt
+    planner.compiled[key] = jax.jit(run)
 
-        # Bellman backup from the cost-to-go one step ahead, on device
-        J_next = J
-        J, pi = step(J_next, G, coords, in_bounds, gamma)
-        jax.block_until_ready(J)
-
-        # Largest change of the cost-to-go: the convergence measure
-        delta = float(jnp.max(jnp.abs(J - J_next)))
-
-        log.sweep(k, t, J, J_next, pi)
-
-    log.done(k, delta)
-
-    return DynamicProgrammingResult(
-        grid=planner.grid,
-        J=np.array(J),
-        pi=np.array(pi, dtype=int),
-        iterations=k,
-        delta=delta,
-        history=log.history,
-    )
+    return planner.compiled[key]
 
 
 def compiled_loop(planner, stop_on_tol, max_sweeps):
@@ -274,7 +306,7 @@ def compiled_loop(planner, stop_on_tol, max_sweeps):
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
-    N = planner.grid.nodes_n
+    N = planner.grid.n_nodes
     step = jitted_step(planner)
 
     def run(J0, G, coords, in_bounds, gamma, tol):
@@ -318,26 +350,25 @@ def jitted_step(planner):
     map_coordinates = jax.scipy.ndimage.map_coordinates
 
     shape = tuple(int(s) for s in planner.grid.x_grid_shape)
-    N = planner.grid.nodes_n
-    A = planner.grid.actions_n
+    N = planner.grid.n_nodes
+    A = planner.grid.n_actions
     order = 0 if planner.interpolation == "nearest" else 1
 
     def step(J_next, G, coords, in_bounds, gamma):
-        # Estimated (interpolation) cost-to-go of all the arrival states, zero off
-        # the grid
+        # The cost-to-go one step ahead at every pair's successor (zero off the grid)
         J_arrival = map_coordinates(
             J_next.reshape(shape), coords, order=order, mode="constant", cval=0.0
         )
-        J_arrival = jnp.where(in_bounds, J_arrival, 0.0)
+        J_arrival = jnp.where(in_bounds, J_arrival, 0.0).reshape(N, A)
 
-        # Q(x, u) = g(x, u) dt + γ J_next(x_next), for every pair at once
-        Q = G + gamma * J_arrival.reshape(N, A)
+        # Q(x, u) = c(x, u) + γ J_next(x_next)
+        Q = G + gamma * J_arrival
 
-        # Best action at every node
+        # J(x) = min_u Q(x, u), π(x) = argmin_u Q(x, u)
         J = Q.min(axis=1)
-        pi = Q.argmin(axis=1).astype(jnp.int32)
+        pi = Q.argmin(axis=1)
 
-        return J, pi
+        return J, pi.astype(jnp.int32)
 
     planner.compiled["step"] = jax.jit(step)
 

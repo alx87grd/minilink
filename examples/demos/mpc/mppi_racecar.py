@@ -40,8 +40,8 @@ scene = Scene(obstacles=[Sphere((0.0, 2.0), 0.15)])
 car = UdeSRacecar()
 car.camera_follow_frame = None
 car.camera_scale = 4.0
-car.inputs["u"].lower_bound = np.array([0.0, -0.52])
-car.inputs["u"].upper_bound = np.array([5.0, 0.52])
+car.inputs["u"].lower = np.array([0.0, -0.52])
+car.inputs["u"].upper = np.array([5.0, 0.52])
 car.inputs["u"].nominal_value = np.array([V_REF, 0.0])  # the plan starts at speed
 start = path[0]
 heading = np.arctan2(path[1, 1] - start[1], path[1, 0] - start[0])

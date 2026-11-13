@@ -22,10 +22,10 @@ THRUST_TO_WEIGHT = 2.0
 plant = Rocket()
 plant.params["inertia"] = 1000.0  # catalog: 100, which tumbles at a 0.05 rad gimbal
 weight = plant.params["mass"] * plant.params["gravity"]
-plant.inputs["u"].lower_bound = np.array([0.0, -GIMBAL])
-plant.inputs["u"].upper_bound = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
-plant.state.lower_bound = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
-plant.state.upper_bound = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
+plant.inputs["u"].lower = np.array([0.0, -GIMBAL])
+plant.inputs["u"].upper = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
+plant.state.lower = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
+plant.state.upper = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
 
 X_LANDED = np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0])  # upright on the pad, at rest
 
@@ -67,18 +67,18 @@ planner = ReinforcementLearningPlanner(
     features=lambda x: (x - X_LANDED) * FEATURE_SCALE,
     hidden=(64, 64),
     method="ppo",
-    n_envs=64,
-    n_steps=32,
+    n_rollouts=64,
+    n_steps_per_update=32,
     batch_size=256,
     learning_rate=1e-3,
     gamma=0.995,
     log_std_init=-1.0,  # gentle exploration: a twitchy attitude loop
 )
-solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)
 planner.plot_learning_curve()
 
-ppo_ctl = planner.get_controller()
+ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=1, y_axis=4, u_axis=0)  # thrust vs (altitude, vy)
 
 report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)

@@ -20,10 +20,10 @@ UPRIGHT = np.array([0.0, np.pi, 0.0, 0.0])
 # The state bounds are the grid box; leaving it is charged INF.
 # Theta is a finite mesh (VI has no periodic features), denser on the pole.
 plant = CartPole()
-plant.inputs["u"].lower_bound = np.array([-10.0])
-plant.inputs["u"].upper_bound = np.array([10.0])
-plant.state.lower_bound = np.array([-5.0, -1.0 * np.pi, -5.0, -10.0])
-plant.state.upper_bound = np.array([5.0, +3.0 * np.pi, 5.0, 10.0])
+plant.inputs["u"].lower = np.array([-10.0])
+plant.inputs["u"].upper = np.array([10.0])
+plant.state.lower = np.array([-5.0, -1.0 * np.pi, -5.0, -10.0])
+plant.state.upper = np.array([5.0, +3.0 * np.pi, 5.0, 10.0])
 
 
 # Cost: periodic angle term, small cart, velocity and effort penalties (the
@@ -51,8 +51,8 @@ problem = PlanningProblem(
 
 grid = StateSpaceGrid(
     problem,
-    x_grid_shape=(31, 51, 31, 51),
-    u_grid_shape=(5,),
+    x_grid=(31, 51, 31, 51),
+    u_grid=(5,),
     dt=DT,
     precompute=False,
     verbose=True,
@@ -63,15 +63,14 @@ planner = DynamicProgrammingPlanner(
     backend="jax",
     gamma=1.0,
     out_of_bound_cost=INF,
-    verbose=True,
 )
-solution = planner.solve_steps(N_STEPS)
+solution = planner.solve_steps(N_STEPS, verbose=True)
 print(solution.record)
 
 # planner.plot_cost_to_go(jmax=INF, axes=(1, 3), anchor=UPRIGHT)
 # planner.plot_control_law(axis=0, axes=(1, 3), anchor=UPRIGHT)
 
-vi_ctl = planner.get_controller()
+vi_ctl = planner.controller
 vi_ctl.plot_control_law(x_axis=1, y_axis=3, u_axis=0)  # force vs (theta, dtheta)
 
 # report = evaluate(problem, vi_ctl, dt=DT, backend="numpy")

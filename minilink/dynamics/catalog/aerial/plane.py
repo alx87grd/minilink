@@ -29,10 +29,10 @@ class Plane2D(MechanicalSystem):
         super().__init__(dof=3, actuators=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -197,7 +197,7 @@ class Plane2D(MechanicalSystem):
         l_t = params["l_t"]
 
         # Without u, the control surfaces read the input port's nominal value
-        u = self.get_u_from_input_ports() if u is None else u
+        u = self.u_nominal if u is None else u
         speed, gamma, alpha = self.velocity_vector(q, dq)
         delta = u[1]
         L_w, D_w, M_w, L_t, D_t, M_t = self.aerodynamic_forces(
@@ -430,10 +430,10 @@ class Plane3D(GeneralizedMechanicalSystem):
         super().__init__(dof=6, pos=6, actuators=4)
 
         # The plant's own range: positions and velocities within ±10, forces within ±5
-        self.state.lower_bound = np.full(self.n, -10.0)
-        self.state.upper_bound = np.full(self.n, 10.0)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -10.0)
+        self.state.upper = np.full(self.n, 10.0)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -737,7 +737,7 @@ class Plane3D(GeneralizedMechanicalSystem):
         xp = array_module(v)
 
         # Without u, the control surfaces read the input port's nominal value
-        u = self.get_u_from_input_ports() if u is None else u
+        u = self.u_nominal if u is None else u
         speed, alpha, beta = self.velocity_angles(v)
         delta_e = u[1]
         delta_a = u[2]
@@ -805,9 +805,9 @@ if __name__ == "__main__":
     # Absolute (hold) commands: pressed key → port bound, release → 0.
     # W/S thrust, UP/DOWN elevator, LEFT/RIGHT aileron, A/D rudder. ESC quits.
     u = sys.inputs["u"]
-    u.lower_bound[:] = [0.0, -0.12, -0.12, -0.12]
-    u.upper_bound[:] = [T_max, 0.12, 0.12, 0.12]
-    u.set_nominal_value(np.array([T_trim, 0.0, 0.0, 0.0]))
+    u.lower[:] = [0.0, -0.12, -0.12, -0.12]
+    u.upper[:] = [T_max, 0.12, 0.12, 0.12]
+    u.nominal_value = np.array([T_trim, 0.0, 0.0, 0.0])
 
     # sys.compute_trajectory()
 

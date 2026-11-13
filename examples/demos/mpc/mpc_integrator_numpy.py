@@ -14,11 +14,11 @@ from minilink.control import ModelPredictiveController
 
 class SingleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
+        self.state.lower = np.array([-10.0])
+        self.state.upper = np.array([10.0])
+        self.inputs["u"].lower = np.array([-10.0])
+        self.inputs["u"].upper = np.array([10.0])
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])

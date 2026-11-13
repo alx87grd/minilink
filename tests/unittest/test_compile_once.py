@@ -38,7 +38,7 @@ jax.monitoring.register_event_duration_secs_listener(
     )
 )
 
-SIM = dict(tf=2.0, n_steps=201, solver="rk4_fixedsteps", verbose=False, backend="jax")
+SIM = dict(tf=2.0, n_samples=201, solver="rk4", verbose=False, backend="jax")
 X0 = np.array([0.1, 0.2, 0.0, 0.0])
 
 
@@ -71,7 +71,7 @@ def test_a_held_simulation_compiles_nothing_on_a_repeat():
     plant = cartpole()
     loop = lqr(plant, np.eye(4), np.eye(1)) @ plant
     sampled = (P(2.0) % 0.05) @ Integrator()
-    options = dict(tf=2.0, n_steps=201, solver="rk4_fixedsteps", backend="jax")
+    options = dict(tf=2.0, n_samples=201, solver="rk4", backend="jax")
     held = [
         Simulator(plant, **options),
         Simulator(plant, tf=2.0, solver="scipy", backend="jax"),
@@ -122,7 +122,7 @@ def test_a_repeated_compiled_solve_compiles_nothing():
         n_steps=20,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 20},
     ).compile()
     native = TrajectoryOptimizationPlanner(
@@ -222,7 +222,7 @@ class Decay(DynamicSystem):
     """``dx = −a x``, ``a`` written as an integer, as a student writes it."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.params = {"a": 1}
         self.x0 = np.array([1.0])
 
@@ -233,7 +233,7 @@ class Decay(DynamicSystem):
 
 def test_a_float_for_an_integer_default_is_never_truncated():
     plant = Decay()
-    run = dict(tf=1.0, n_steps=11, solver="rk4_fixedsteps", verbose=False)
+    run = dict(tf=1.0, n_samples=11, solver="rk4", verbose=False)
     plant.compute_trajectory(**run, backend="jax")
     plant.params["a"] = 2.5
     jax_x = plant.compute_trajectory(**run, backend="jax").x[0, -1]
@@ -256,7 +256,7 @@ class Weighted(DynamicSystem):
     """``dx = −x + mean(w) u``: a block with a large parameter, as a network's weights."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"w": np.ones(5_000)}
 
     def f(self, x, u, t=0.0, params=None):
@@ -303,7 +303,7 @@ class Leak(DynamicSystem):
 
 
 def final(sys, backend):
-    run = dict(SIM, backend=backend, tf=1.0, n_steps=101)
+    run = dict(SIM, backend=backend, tf=1.0, n_samples=101)
     return float(np.asarray(sys.compute_trajectory(**run).x)[0, -1])
 
 
@@ -346,7 +346,7 @@ def test_an_embedded_models_numbers_are_seen_by_the_next_call():
     plant.x0 = np.array([0.5, 0.0])
     law = ComputedTorque(plant, tracking_ref=False)
     loop = law @ plant
-    run = dict(tf=1.0, n_steps=101, solver="rk4_fixedsteps", verbose=False)
+    run = dict(tf=1.0, n_samples=101, solver="rk4", verbose=False)
     loop.compute_trajectory(**run, backend="jax")
     law.params["model"]["m"] = 3.0 * np.asarray(law.params["model"]["m"])
     np.testing.assert_allclose(
@@ -373,7 +373,7 @@ def test_a_parameter_edit_runs_on_a_diagram_holding_a_sink():
     diagram.add_subsystem(plant, "plant")
     diagram.add_subsystem(Sink(), "sink")
     diagram.connect("plant", "y", "sink", "u")
-    run = dict(tf=1.0, n_steps=11, solver="rk4_fixedsteps", verbose=False)
+    run = dict(tf=1.0, n_samples=11, solver="rk4", verbose=False)
     diagram.compute_trajectory(**run, backend="jax")
     plant.params["k"] = 2.0
     np.testing.assert_allclose(
@@ -390,7 +390,7 @@ def test_a_new_horizon_before_a_solve_is_a_new_program():
         n_steps=10,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 10},
     )
     assert planner.solve(evaluate=False).trajectory.t[-1] == pytest.approx(1.0)
@@ -422,8 +422,8 @@ def test_a_certificate_verifies_twice_on_one_compile():
     plant = Pendulum()
     plant.params["d"] = 0.5
     roa = region_of_attraction(plant)
-    roa.verify(n=20)
-    assert compiles(lambda: roa.verify(n=20).converged)[0] == 0
+    roa.verify(n_rollouts=20)
+    assert compiles(lambda: roa.verify(n_rollouts=20).converged)[0] == 0
 
 
 def test_an_edit_of_the_programs_numbers_reaches_the_frozen_form():
@@ -447,7 +447,7 @@ def test_an_edit_of_the_programs_numbers_reaches_the_frozen_form():
 def test_a_list_leaf_runs_on_jax_like_an_array():
     class Decay(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=0, output_dim=1)
+            super().__init__(state_dim=1, input_dim=0, output_dim=1)
             self.params = {"k": [1.0]}
             self.x0 = np.array([1.0])
 

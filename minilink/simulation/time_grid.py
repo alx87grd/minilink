@@ -1,14 +1,12 @@
 """The simulation time grid: the output samples on ``[t0, tf]``."""
 
-import logging
-
 import numpy as np
 
-# Automatic output grid (points on [t0, tf]) when neither ``n_steps`` nor ``dt``
+# Automatic output grid (points on [t0, tf]) when neither ``n_samples`` nor ``dt``
 # is given and the solver picks its own steps: a reporting resolution, not an
 # integration step, fine enough (1 ms over 10 s) for smooth plots of fast
 # oscillations. Fixed-step solvers derive ``dt`` from the plant instead.
-DEFAULT_N_STEPS = 10001
+DEFAULT_N_SAMPLES = 10001
 
 
 ###############################################################################
@@ -20,33 +18,34 @@ def build_time_grid(
     t0,
     tf,
     *,
-    n_steps=None,
+    n_samples=None,
     dt=None,
     default_dt=None,
     verbose=False,
 ) -> tuple[np.ndarray, float, int]:
     """
-    Build time samples on ``[t0, tf]`` and return ``(time_vector, dt, n_steps)``.
+    Build time samples on ``[t0, tf]`` and return ``(time_vector, dt, n_samples)``.
 
-    If ``n_steps`` is set, uses a uniform grid of that many points. If only
-    ``dt`` is set, samples ``t0 + k dt``. When ``dt`` divides ``tf - t0`` (to
-    a relative tolerance of 1e-9, which absorbs round-off such as
-    ``1.1 / 0.1``), the grid has ``round((tf - t0) / dt) + 1`` points and
-    ends at ``tf``. Otherwise it steps on until it covers ``tf``: the last
-    sample is the first step past ``tf``, up to one ``dt`` beyond it. If
-    neither, uses ``default_dt`` the same way when the caller supplies one
-    (fixed-step solvers) and otherwise the :data:`DEFAULT_N_STEPS` reporting
-    grid.
+    If ``n_samples`` is set, uses a uniform grid of that many points. If
+    ``dt`` is set, samples ``t0 + k dt``; both together are refused. The grid
+    ends at ``tf``: when ``dt`` divides ``tf - t0`` (to a relative tolerance
+    of 1e-9, which absorbs round-off such as ``1.1 / 0.1``), it has
+    ``round((tf - t0) / dt) + 1`` points; otherwise its last step is shorter
+    than ``dt`` and lands on ``tf`` (``[0, 0.3, 0.6, 0.9, 1.0]`` for ``dt =
+    0.3`` on ``[0, 1]``). If neither, uses ``default_dt`` the same way when
+    the caller supplies one (fixed-step solvers) and otherwise the
+    :data:`DEFAULT_N_SAMPLES` reporting grid. The ``dt`` returned is the
+    grid's step, its first.
     """
     t0, tf = require_time_span(t0, tf)
 
-    if n_steps is None and dt is None and default_dt is None:
+    if n_samples is None and dt is None and default_dt is None:
         # The solver picks its own steps: the reporting grid
-        time_vector = np.linspace(t0, tf, DEFAULT_N_STEPS)
+        time_vector = np.linspace(t0, tf, DEFAULT_N_SAMPLES)
         if verbose:
-            print(f"Automatic {DEFAULT_N_STEPS}-point output grid")
+            print(f"Automatic {DEFAULT_N_SAMPLES}-point output grid")
 
-    elif n_steps is None and dt is None:
+    elif n_samples is None and dt is None:
         # The caller's default step (fixed-step solvers): t₀ + k dt
         dt = require_dt(default_dt, label="automatic dt")
         time_vector = dt_grid(t0, tf, dt)
@@ -54,23 +53,23 @@ def build_time_grid(
             print("Automatic dt from default time-grid policy")
 
     elif dt is None:
-        # n_steps points, uniform on [t₀, t_f]
-        require_n_steps(n_steps)
-        time_vector = np.linspace(t0, tf, n_steps)
+        # n_samples points, uniform on [t₀, t_f]
+        require_n_samples(n_samples)
+        time_vector = np.linspace(t0, tf, n_samples)
 
-    elif n_steps is None:
+    elif n_samples is None:
         # The given step: t₀ + k dt
         dt = require_dt(dt)
         time_vector = dt_grid(t0, tf, dt)
 
     else:
-        # Both given: n_steps wins, once both are valid
-        require_n_steps(n_steps)
+        # Both given: refused, once each is valid on its own
+        require_n_samples(n_samples)
         require_dt(dt)
-        logging.warning(
-            "You must choose between n_steps and dt: using the specified n_steps"
+        raise ValueError(
+            f"a time grid takes n_samples or dt, not both (n_samples={n_samples}, "
+            f"dt={dt}): n_samples points on [t0, tf], or steps of dt from t0"
         )
-        time_vector = np.linspace(t0, tf, n_steps)
 
     require_two_samples(time_vector)
 
@@ -117,26 +116,29 @@ def require_dt(dt, *, label="dt"):
 
 
 def dt_grid(t0, tf, dt):
-    """``t0, t0 + dt, …`` until ``tf`` is covered, ending at ``tf`` when ``dt`` divides the horizon."""
+    """``t0, t0 + dt, …``, ending at ``tf``: a ``dt`` that does not divide the run shortens the last step."""
     n_float = (tf - t0) / dt
     n = round(n_float)
-    time_vector = np.arange(t0, tf + dt, dt)
 
-    # dt divides the horizon: keep t₀ … t₀ + n dt and drop the sample round-off can
+    # dt divides the horizon: t₀ … t₀ + n dt, dropping the sample round-off can
     # add past t_f. Slicing arange keeps every kept sample bit-identical
     # (t0 + dt * arange rounds differently when t0 != 0).
     if n >= 1 and abs(n_float - n) <= _WHOLE_STEPS_RTOL * n:
-        time_vector = time_vector[: n + 1]
+        time_vector = np.arange(t0, tf + dt, dt)[: n + 1]
+
+    # It does not: the steps of dt short of t_f, then a shorter last one onto t_f
+    else:
+        time_vector = np.append(np.arange(t0, tf, dt), tf)
 
     return time_vector
 
 
-def require_n_steps(n_steps):
-    """Refuse an ``n_steps`` that is not an integer of at least 2."""
-    if isinstance(n_steps, bool) or not isinstance(n_steps, (int, np.integer)):
-        raise ValueError("n_steps must be an integer greater than or equal to 2")
-    if n_steps < 2:
-        raise ValueError("n_steps must be greater than or equal to 2")
+def require_n_samples(n_samples):
+    """Refuse an ``n_samples`` that is not an integer of at least 2."""
+    if isinstance(n_samples, bool) or not isinstance(n_samples, (int, np.integer)):
+        raise ValueError("n_samples must be an integer greater than or equal to 2")
+    if n_samples < 2:
+        raise ValueError("n_samples must be greater than or equal to 2")
 
 
 def require_two_samples(time_vector):

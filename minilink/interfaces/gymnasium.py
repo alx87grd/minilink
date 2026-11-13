@@ -21,6 +21,7 @@ from gymnasium import spaces
 
 from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.system import System
+from minilink.planning.problems import require_cost
 
 # Public API
 
@@ -53,8 +54,8 @@ class Sys2Gym(gym.Env):
         Running / terminal cost pair defining the reward.
     dt : float
         Time step of one env step (zero-order hold on the action).
-    tf : float
-        Maximum duration of an episode (truncation).
+    episode_length : float
+        Maximum duration of an episode in seconds (truncation at t0 + episode_length).
     t0 : float
         Initial time (only relevant if the system is time dependent).
     x0 : Distribution, optional
@@ -95,8 +96,9 @@ class Sys2Gym(gym.Env):
         self,
         sys,
         cost,
+        *,
         dt=0.05,
-        tf=10.0,
+        episode_length=10.0,
         t0=0.0,
         render_mode=None,
         x0=None,
@@ -108,7 +110,7 @@ class Sys2Gym(gym.Env):
         self.cost = cost
         self.dt = dt
         self.t0 = t0
-        self.tf = tf  # for truncation of episodes
+        self.episode_length = episode_length  # for truncation of episodes
 
         # The step model of one env step, compiled once for the whole run
         require_step_knobs(solver, substeps)
@@ -136,7 +138,7 @@ class Sys2Gym(gym.Env):
 
         # Memory
         self.x = np.asarray(sys.x0, dtype=float).copy()
-        self.u = sys.get_u_from_input_ports()
+        self.u = sys.u_nominal
         self.t = t0
 
         if self.render_mode == "human":
@@ -148,7 +150,7 @@ class Sys2Gym(gym.Env):
         The Gymnasium view of a :class:`~minilink.planning.problems.PlanningProblem`.
 
         ``reset`` draws the initial state from the problem, the reward is the
-        problem's running cost, a finite horizon ends the episode at ``tf``
+        problem's running cost, a finite horizon ends the episode at ``t0 + horizon``
         with the terminal cost ``h``, leaving the constraint set ``X`` (read on
         the problem's set parameters) is a failure (*terminated*, charged the
         cost of a failure) and leaving the plant's state box, the training
@@ -157,14 +159,11 @@ class Sys2Gym(gym.Env):
         A problem with a point start starts every episode at its ``x0``.
         """
         finite = problem.horizon_kind() == "finite"
-        tf = float(problem.horizon) if finite else float(episode_length or 10.0)
+        length = float(problem.horizon) if finite else float(episode_length or 10.0)
 
         kwargs.setdefault("t0", float(problem.t0))
-        env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
-        env.problem = problem
-        env.finite_horizon = finite
-        env.failure_cost = problem.failure_cost_at(tf, dt=dt)
-        return env
+
+        return ProblemEnv(problem, dt=dt, episode_length=length, **kwargs)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -175,7 +174,7 @@ class Sys2Gym(gym.Env):
         else:
             self.x = np.asarray(self.x0.sample(self.np_random), dtype=float)
 
-        self.u = self.sys.get_u_from_input_ports()
+        self.u = self.sys.u_nominal
         self.t = self.t0
 
         y = np.asarray(
@@ -213,10 +212,10 @@ class Sys2Gym(gym.Env):
         else:
             r = -float(self.cost.g(x, u, t)) * dt  # running cost over the step
 
-        # Truncation of episodes at the horizon tf (within half a step) or out of
+        # Truncation of episodes at t0 + episode_length (within half a step) or out of
         # the state bounds
         truncated = bool(
-            (t_new >= self.t0 + self.tf - 0.5 * dt)
+            (t_new >= self.t0 + self.episode_length - 0.5 * dt)
             or np.any(x_new < self.x_lb)
             or np.any(x_new > self.x_ub)
         )
@@ -298,20 +297,20 @@ class SB3Controller(System):
         if sys is not None:
             x_labels = list(sys.state.labels)
             x_units = list(sys.state.units)
-            x_lb, x_ub = sys.state.lower_bound, sys.state.upper_bound
+            x_lb, x_ub = sys.state.lower, sys.state.upper
             if "u" in sys.inputs:
                 u_labels = list(sys.inputs["u"].labels)
                 u_units = list(sys.inputs["u"].units)
-                u_lb = sys.inputs["u"].lower_bound
-                u_ub = sys.inputs["u"].upper_bound
+                u_lb = sys.inputs["u"].lower
+                u_ub = sys.inputs["u"].upper
 
         self.add_input_port(
             "x",
             dim=n,
             labels=x_labels,
             units=x_units,
-            lower_bound=x_lb,
-            upper_bound=x_ub,
+            lower=x_lb,
+            upper=x_ub,
         )
         self.add_output_port(
             "u",
@@ -320,8 +319,8 @@ class SB3Controller(System):
             dependencies=("x",),
             labels=u_labels,
             units=u_units,
-            lower_bound=u_lb,
-            upper_bound=u_ub,
+            lower=u_lb,
+            upper=u_ub,
         )
 
     def action(self, x) -> np.ndarray:
@@ -340,14 +339,24 @@ class SB3Controller(System):
 class ProblemEnv(Sys2Gym):
     """:class:`Sys2Gym` whose starts and episode ends follow a planning problem."""
 
-    problem = None
-    finite_horizon = False
-    failure_cost = None
+    def __init__(self, problem, *, dt, episode_length, **kwargs):
+        super().__init__(
+            problem.sys,
+            require_cost(problem),
+            dt=dt,
+            episode_length=episode_length,
+            **kwargs,
+        )
+
+        # The problem the episodes follow: its horizon and the cost of a failure
+        self.problem = problem
+        self.finite_horizon = problem.horizon_kind() == "finite"
+        self.failure_cost = problem.failure_cost_at(episode_length, dt=dt)
 
     def reset(self, seed=None, options=None):
         gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
         self.x = np.asarray(self.problem.sample_x0(self.np_random), dtype=float)
-        self.u = self.sys.get_u_from_input_ports()
+        self.u = self.sys.u_nominal
         self.t = self.t0
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
@@ -362,11 +371,13 @@ class ProblemEnv(Sys2Gym):
         # A failure is charged its cost; the end of a finite horizon its h, a
         # failure on the last step both, as the evaluation scores the run
         failed = not problem.X.contains(x, t, None)
-        ended = self.finite_horizon and t >= self.t0 + self.tf - 0.5 * self.dt
+        ended = (
+            self.finite_horizon and t >= self.t0 + self.episode_length - 0.5 * self.dt
+        )
         if failed:
             r -= float(self.failure_cost)
         if ended:
-            r -= float(problem.require_cost().h(x, t))
+            r -= float(require_cost(problem).h(x, t))
         if failed or ended:
             terminated, truncated = True, False
 

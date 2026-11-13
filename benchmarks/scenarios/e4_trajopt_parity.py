@@ -25,7 +25,6 @@ from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -80,7 +79,7 @@ def run_cartpole_rebuild(
     return _metrics_from_result(
         prefix="e4.cartpole_rebuild",
         result=result,
-        notes="CartPole TOP.solve, scipy_slsqp, backend=jax",
+        notes="CartPole TOP.solve, slsqp, backend=jax",
     )
 
 
@@ -97,8 +96,8 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
 
     configure_jax(enable_x64=True)
     sys = Pendulum()
-    sys.inputs["u"].lower_bound[0] = -PENDULUM_TAU_MAX
-    sys.inputs["u"].upper_bound[0] = PENDULUM_TAU_MAX
+    sys.inputs["u"].lower[0] = -PENDULUM_TAU_MAX
+    sys.inputs["u"].upper[0] = PENDULUM_TAU_MAX
 
     x0 = np.array([0.0, 0.0])
     x_goal = np.array([np.pi, 0.0])
@@ -120,17 +119,14 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=n_steps)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": maxiter,
             "ftol": PENDULUM_FTOL,
             "disp": False,
         },
-        verbose=False,
     )
 
     total_times: list[float] = []
@@ -155,7 +151,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         checkpoint_times=PENDULUM_CHECKPOINTS,
         checkpoint_x={t: [float(v) for v in samples[t]] for t in PENDULUM_CHECKPOINTS},
         x_tf=[float(v) for v in traj.x[:, -1].reshape(-1)],
-        cost=float(optimization_result.cost),
+        cost=float(optimization_result.J),
         eq_inf=0.0,
         success=bool(optimization_result.success),
         total_s=float(np.mean(total_times)),
@@ -187,14 +183,14 @@ def run_bicycle_parametric(
 
     configure_jax(enable_x64=True)
     sys = BicycleDynRate(named_ports=True)
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = BICYCLE_W_REAR_MAX
-    sys.state.lower_bound[7] = -BICYCLE_DELTA_MAX
-    sys.state.upper_bound[7] = BICYCLE_DELTA_MAX
-    sys.inputs["w_rear_dot"].lower_bound[0] = -BICYCLE_W_REAR_DOT_MAX
-    sys.inputs["w_rear_dot"].upper_bound[0] = BICYCLE_W_REAR_DOT_MAX
-    sys.inputs["delta_dot"].lower_bound[0] = -BICYCLE_DELTA_DOT_MAX
-    sys.inputs["delta_dot"].upper_bound[0] = BICYCLE_DELTA_DOT_MAX
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = BICYCLE_W_REAR_MAX
+    sys.state.lower[7] = -BICYCLE_DELTA_MAX
+    sys.state.upper[7] = BICYCLE_DELTA_MAX
+    sys.inputs["w_rear_dot"].lower[0] = -BICYCLE_W_REAR_DOT_MAX
+    sys.inputs["w_rear_dot"].upper[0] = BICYCLE_W_REAR_DOT_MAX
+    sys.inputs["delta_dot"].lower[0] = -BICYCLE_DELTA_DOT_MAX
+    sys.inputs["delta_dot"].upper[0] = BICYCLE_DELTA_DOT_MAX
 
     r_r = float(sys.params["r_r"])
     w_rear_ref = BICYCLE_U_TARGET / r_r
@@ -229,11 +225,9 @@ def run_bicycle_parametric(
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=n_steps)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": maxiter,
             "ftol": BICYCLE_FTOL,
@@ -258,7 +252,7 @@ def run_bicycle_parametric(
         plan = pv.solution(z, params=tree, status=status)
         total_times.append(time.perf_counter() - t0)
         traj = plan.trajectory
-        cost_val = float(plan.record.cost)
+        cost_val = float(plan.record.J)
         success = bool(status["success"])  # the solver's flag, as a tick reports it
 
     assert traj is not None

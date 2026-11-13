@@ -14,7 +14,7 @@ from minilink.core.backends import (
     numpy_generator,
     require_jax,
 )
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text, repr_line, repr_pretty
 from minilink.core.params import delegated_params, own_params, param_view
 from minilink.core.sets import BoxSet, Set
 
@@ -53,6 +53,9 @@ class Distribution(ABC):
 
     def __str__(self):
         return inspect_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -149,6 +152,16 @@ class Uniform(Distribution):
     def __init__(self, lower, upper):
         self.box = BoxSet(lower, upper)
         self.support = self.box
+
+    @property
+    def lower(self) -> np.ndarray:
+        """The lower bound ``(dim,)``, its box's."""
+        return self.box.lower
+
+    @property
+    def upper(self) -> np.ndarray:
+        """The upper bound ``(dim,)``, its box's."""
+        return self.box.upper
 
     @property
     def mean(self) -> np.ndarray:

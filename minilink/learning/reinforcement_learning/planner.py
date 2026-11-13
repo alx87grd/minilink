@@ -13,7 +13,6 @@ from minilink.control.neural import NeuralPolicy
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.roles import command_port
 from minilink.core.sets import BoxSet
-from minilink.core.trajectory import Trajectory
 from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
     REINFORCE,
@@ -27,15 +26,21 @@ from minilink.learning.reinforcement_learning.collect import (
     reset_carry,
     rollout,
 )
-from minilink.learning.reinforcement_learning.critics import QFunction, ValueFunction
+from minilink.learning.reinforcement_learning.critics import (
+    CriticField,
+    QFunction,
+    ValueFunction,
+)
 from minilink.learning.reinforcement_learning.policy import (
     ExplorationPolicy,
     GaussianHead,
     SquashedGaussianHead,
 )
-from minilink.planning.environment import RolloutEnvironment, is_continuous
-from minilink.planning.planner import Planner, planner_evidence
-from minilink.planning.results import PlanningSolution
+from minilink.planning.environment import RolloutEnvironment
+from minilink.planning.planner import Planner, planner_at, planner_evidence
+from minilink.planning.plotting import maybe_show
+from minilink.planning.results import PlanningSolution, solve_time_text
+from minilink.planning.step_model import is_continuous
 
 #: The update rule of each name ``method=`` accepts.
 ALGORITHMS = {
@@ -61,7 +66,7 @@ class ReinforcementLearningPlanner(Planner):
     The training objective is the expected discounted return on the control
     grid, ``E[Σ_k γᵏ r_k]``, the reward ``r_k = −g(x_k, u_k, t_k) dt`` the
     running cost at each period's start (``reward="stage"``: ``−c_k``, the stage
-    cost of the problem's step face): a failure (leaving ``X`` or ``U``) is
+    cost of the problem's step model): a failure (leaving ``X`` or ``U``) is
     charged the problem's failure cost, leaving the training zone truncates the
     episode; the record says what it trained on, the score is the problem's. The
     discount ``γ`` is the problem's own per period unless ``gamma=`` overrides
@@ -74,56 +79,61 @@ class ReinforcementLearningPlanner(Planner):
     is an :class:`~minilink.learning.reinforcement_learning.algorithms.Algorithm`,
     so a new method is one file, not a new planner. The law being trained is
     a :class:`~minilink.learning.reinforcement_learning.policy.ExplorationPolicy`:
-    the controller block's mean action with the algorithm family's
-    exploration head around it.
+    the actor block's mean action with the algorithm family's exploration head
+    around it; each solution's controller is a copy of the actor at its
+    weights when solved.
 
     Parameters
     ----------
-    problem : PlanningProblem
+    problem : PlanningProblem or StepPlanningProblem
         Task with a start (a law, a set, or one point to train from), cost and
-        constraint set.
-    dt : float
-        Control period of the learned law (one RK4 step per period).
-    policy : NeuralPolicy, optional
-        The law to train; default built from ``features``, ``hidden``,
+        constraint set; a step problem trains through its step model, on its
+        own clock.
+    dt : float, optional
+        Control period of the learned law on a continuous problem (one RK4
+        step per period; default 0.05 s); a step problem takes none.
+    actor : NeuralPolicy, optional
+        The block to train, the actor of actor-critic (read back as
+        :attr:`actor`); default built from ``features``, ``hidden``,
         ``activation`` and ``normalize`` on the problem's plant.
     method : str or Algorithm
         ``"reinforce"``, ``"actor_critic"``, ``"ppo"`` (on-policy) or
-        ``"sac"`` (off-policy), or an :class:`Algorithm` instance; keyword
-        arguments not listed here go to the algorithm (``learning_rate``,
-        ``n_epochs``, ``tau``, ...).
-    n_envs, n_steps : int
-        Plants simulated in parallel and control periods per collection (an
-        episodic method collects one episode length instead of ``n_steps``).
+        ``"sac"`` (off-policy), or an :class:`Algorithm` instance; its numbers,
+        ``**method_numbers``, are the keywords not listed here
+        (``learning_rate``, ``n_epochs``, ``tau``, ...).
+    n_rollouts, n_steps_per_update : int
+        Rollouts simulated in parallel, and control periods of each per
+        collection, the update's data (an episodic method collects one episode
+        length instead of ``n_steps_per_update``).
     training_zone : Set, optional
         Where episodes run (the plant's state box by default); leaving it truncates
         the episode. A training choice, not a constraint: the constraint is ``problem.X``.
     episode_length : float, optional
-        Episode duration for an infinite-horizon problem (default 10 s).
+        Episode duration for an infinite-horizon problem (default 10 s, or 10
+        ticks of a native step problem).
     gamma : float, optional
         Discount per control period, used when the algorithm does not set its
-        own. Default: the problem's ``discount_factor(dt)`` when the problem
-        declares a rate, else 0.99 with a warning that states the effective horizon.
+        own. Default: the step model's ``γ`` (``e^{−ρ dt}`` on a continuous
+        problem, a step problem's own) when it discounts, else 0.99 with a
+        warning that states the effective horizon.
     log_std_init : float
         Initial exploration log-std on the normalized action (Gaussian head).
     reward : {"running", "stage"}
         The training reward: ``−g dt`` (default) or ``−c_k``.
     seed : int
         Seed of the weights, exploration and starts.
-    verbose : bool
-        Print the environment's semantics and one line per learning iteration
-        (default ``False``: training is silent unless asked).
 
     Attributes
     ----------
-    controller : NeuralPolicy
-        The law, updated in place after every learning iteration.
-    policy : ExplorationPolicy
-        The controller with its exploration head, what the algorithm trains.
+    actor : NeuralPolicy
+        The law being trained, updated in place after every learning
+        iteration (``controller`` is the latest solution's copy of it).
+    exploration_policy : ExplorationPolicy
+        The actor with its exploration head, what the algorithm trains.
     critic : ValueFunction or QFunction or None
         The critic of the algorithm's family.
     history : list of dict
-        One record per iteration (timesteps, mean episode return, losses, fps).
+        One record per iteration (n_timesteps, mean episode return, losses, fps).
     env : RolloutEnvironment
         The compiled environment (its ``describe()`` states the semantics).
     """
@@ -134,15 +144,15 @@ class ReinforcementLearningPlanner(Planner):
         self,
         problem,
         *,
-        dt=0.05,
-        policy=None,
+        dt=None,
+        actor=None,
         features=None,
         hidden=(64, 64),
         activation="tanh",
         normalize=True,
         method="ppo",
-        n_envs=16,
-        n_steps=128,
+        n_rollouts=16,
+        n_steps_per_update=128,
         episode_length=None,
         gamma=None,
         log_std_init=0.0,
@@ -151,22 +161,42 @@ class ReinforcementLearningPlanner(Planner):
         training_zone=None,
         reward="running",
         seed=0,
-        verbose=False,
-        **algorithm_kwargs,
+        **method_numbers,
     ):
         super().__init__(problem)
         jax = require_jax()
 
+        # The keywords as given, the actor and the update rule as they were before any
+        # learning: what rebuilds this planner on another tree (build_kwargs)
+        self.keywords = dict(
+            dt=dt,
+            actor=copy.deepcopy(actor),
+            features=features,
+            hidden=hidden,
+            activation=activation,
+            normalize=normalize,
+            method=copy.deepcopy(method),
+            n_rollouts=n_rollouts,
+            n_steps_per_update=n_steps_per_update,
+            episode_length=episode_length,
+            gamma=gamma,
+            log_std_init=log_std_init,
+            solver=solver,
+            substeps=substeps,
+            training_zone=training_zone,
+            reward=reward,
+            seed=seed,
+            **method_numbers,
+        )
+
         # Training settings
-        self.dt = float(dt)
-        self.n_envs = int(n_envs)
+        self.n_rollouts = int(n_rollouts)
         self.seed = int(seed)
-        self.verbose = bool(verbose)
 
         # Training progress: plant steps, wall-clock time, the latest mean episode
         # return, and one record per learning iteration
-        self.num_timesteps = 0
-        self.train_time = 0.0
+        self.n_timesteps = 0
+        self.train_time_s = 0.0
         self.last_ep_return_mean = np.nan
         self.history = []
 
@@ -181,19 +211,19 @@ class ReinforcementLearningPlanner(Planner):
             reward=reward,
         )
         self.require_expectation_criterion()
-        if self.verbose:
-            print(f"ReinforcementLearningPlanner: {self.env.describe()}")
 
         # The update rule, and its collection length: one whole episode for an
         # episodic method
-        self.algorithm = self.build_algorithm(method, algorithm_kwargs)
-        self.n_steps = (
-            self.env.n_steps_per_episode if self.algorithm.episodic else int(n_steps)
+        self.algorithm = self.build_algorithm(method, method_numbers)
+        self.n_steps_per_update = (
+            self.env.n_steps_per_episode
+            if self.algorithm.episodic
+            else int(n_steps_per_update)
         )
 
         # The law, the exploration head and the critic of the algorithm's family,
         # bound to the algorithm with the one discount
-        self.controller = policy or NeuralPolicy(
+        self.actor = actor or NeuralPolicy(
             problem.sys,
             input_box=require_finite_input_box(problem),
             features=features,
@@ -203,14 +233,16 @@ class ReinforcementLearningPlanner(Planner):
             seed=seed,
         )
         head = self.build_head(hidden, activation, log_std_init, seed)
-        self.policy = ExplorationPolicy(self.controller, head)
+        self.exploration_policy = ExplorationPolicy(self.actor, head)
         self.critic = self.build_critic(hidden, activation, seed)
-        self.algorithm.bind(self.policy, self.critic, self.resolve_discount(gamma))
+        self.algorithm.bind(
+            self.exploration_policy, self.critic, self.resolve_discount(gamma)
+        )
 
         # Trained on the stage cost with a discount of its own: the stage integral at
         # the same rate, ρ = −ln γ / dt, so one discount runs inside and between
         # periods; the score's discount stays the problem's
-        self.scored_gamma = float(self.env.face.gamma)
+        self.scored_gamma = float(self.env.model.gamma)
         stage_on_own_rate = self.env.reward == "stage" and is_continuous(problem)
         if stage_on_own_rate and self.gamma != self.scored_gamma:
             rate = -math.log(self.gamma) / self.dt if self.gamma > 0.0 else math.inf
@@ -224,17 +256,21 @@ class ReinforcementLearningPlanner(Planner):
                 reward=reward,
             )
 
-        # Train state and the parallel plants, from the seed's keys
+        # Train state and the parallel rollouts, from the seed's keys
         self.key = jax.random.PRNGKey(seed)
         self.key, k_init, k_reset = jax.random.split(self.key, 3)
         self.train_state = self.algorithm.init(k_init)
-        self.carry = reset_carry(self.env, k_reset, self.n_envs)
+        self.carry = reset_carry(self.env, k_reset, self.n_rollouts)
 
-        # One jitted call per collection, update and action; an off-policy method
+        # One jitted call per collection and update; an off-policy method
         # updates from a replay of its transitions
         self.rollout_jit = jax.jit(
             partial(
-                rollout, self.env, self.policy, n_steps=self.n_steps, n_envs=self.n_envs
+                rollout,
+                self.env,
+                self.exploration_policy,
+                n_steps=self.n_steps_per_update,
+                n_rollouts=self.n_rollouts,
             )
         )
         self.replay = None
@@ -245,12 +281,11 @@ class ReinforcementLearningPlanner(Planner):
                 self.algorithm.buffer_size, self.env.n, self.env.m
             )
             self.update_jit = jax.jit(self.replay_updates)
-        self.action_jit = jax.jit(
-            lambda theta, x: self.controller.action(x, {"mlp": theta["mlp"]})
-        )
 
-        # The law's rollouts, one jitted scan per number of periods and source draw
-        self.rollout_forms = {}
+    @property
+    def dt(self):
+        """The control period of the learned law: the environment's (a native step problem's tick is 1)."""
+        return self.env.dt
 
     @property
     def gamma(self):
@@ -260,44 +295,67 @@ class ReinforcementLearningPlanner(Planner):
     @property
     def params(self) -> dict:
         """
-        The planner's tree: ``"method"``, the numbers it trains with (the discount ``gamma``, the algorithm's and its optimizer's), and ``"seed"``.
+        The planner's tree: the problem's leaves by role, ``"method"`` the numbers it trains with (the discount ``gamma``, the algorithm's and its optimizer's), and ``"seed"``.
 
         The numbers are read when the update is first traced: set them on the
-        algorithm before learning. The problem's own leaves are the problem's
-        (the score is always the problem's).
+        algorithm before learning, or solve at another tree
+        (``solve(params=)``, which trains a planner rebuilt on the problem
+        holding the tree's leaves). The network's weights are learned, never a
+        number of the tree.
         """
-        return {"method": self.algorithm.method_params, "seed": self.seed}
+        return {
+            **self.problem.parts_view(),
+            "method": self.algorithm.method_params,
+            "seed": self.seed,
+        }
+
+    @property
+    def number_names(self) -> tuple:
+        """The names under :attr:`params` ``["method"]``: the update rule's numbers, its optimizer's under ``"optimizer"``."""
+        return tuple(self.algorithm.method_params)
 
     def solve(
-        self, timesteps=100_000, *, evaluate=False, n_trials=50, verbose=None
+        self,
+        n_timesteps=100_000,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        verbose=False,
     ) -> PlanningSolution:
         """
-        Train for ``timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
+        Train for ``n_timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
 
+        The steps are rounded up to whole collections, and each solve
+        continues the training where the last one stopped (:attr:`actor` at
+        its weights, :attr:`n_timesteps` counting every solve); the solution
+        holds a copy of the law, which later training leaves as it is.
         The solver record carries the training facts. ``evaluate=True`` also
-        rolls the deterministic law out from the problem's start and scores it
-        by Monte Carlo over ``n_trials`` draws of the problem. ``verbose``
-        overrides :attr:`verbose` for this call only.
+        scores the deterministic law, as it is handed out, by Monte Carlo over
+        ``n_trials`` draws of the problem (a continuous problem's integrated on
+        the planner's ``dt``, a step problem's on its model). ``verbose``
+        prints the environment's semantics and one line per learning iteration.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) trains
+        a planner rebuilt there (:func:`~minilink.planning.planner.planner_at`)
+        from its seed, its weights learned from their initial draw; this
+        planner is unchanged.
         """
-        # Train, then store the learned law as the planner's solution
-        self.learn(timesteps, verbose=verbose)
-        solution = self.solution(evaluate, n_trials)
+        # At another tree: the planner there, trained from its seed, its solution kept here
+        if params is not None:
+            solution = planner_at(self, params).solve(
+                n_timesteps, evaluate=evaluate, n_trials=n_trials, verbose=verbose
+            )
+            return self.store_solution(solution)
 
-        return self.store_solution(solution)
-
-    # Training
-
-    def learn(self, timesteps, *, verbose=None):
-        """
-        Train for ``timesteps`` plant steps (rounded up to whole collections); returns ``self``.
-
-        ``verbose`` overrides :attr:`verbose` for this call only.
-        """
         jax = require_jax()
+        started = time.perf_counter()
 
-        log = self.verbose if verbose is None else bool(verbose)
-        steps_per_iteration = self.n_steps * self.n_envs
-        n_iterations = math.ceil(timesteps / steps_per_iteration)
+        steps_per_iteration = self.n_steps_per_update * self.n_rollouts
+        n_iterations = math.ceil(n_timesteps / steps_per_iteration)
+
+        # What the training reads, when asked to report
+        if verbose:
+            print(f"ReinforcementLearningPlanner: {self.env.describe()}")
 
         for _ in range(n_iterations):
             # Fresh keys for this iteration's collection and update
@@ -307,87 +365,87 @@ class ReinforcementLearningPlanner(Planner):
             # Collect experience and update the weights, timed to completion
             batch, stats = self.collect_and_update(k_collect, k_update)
             jax.block_until_ready(self.train_state)
-            self.train_time += time.time() - t0
-            self.num_timesteps += steps_per_iteration
+            self.train_time_s += time.time() - t0
+            self.n_timesteps += steps_per_iteration
 
-            # The new weights, copied into the controller block
-            self.sync_controller()
+            # The new weights, copied into the actor block
+            self.sync_actor()
 
             # The iteration's record, and its progress line
             record = self.record_iteration(batch, stats, t0)
-            if log:
+            if verbose:
                 self.print_iteration(record, stats)
 
-        return self
+        # The training timed, then the learned law stored as the planner's solution
+        solve_time_s = time.perf_counter() - started
+        solution = self.solution(evaluate, n_trials, solve_time_s)
 
-    def sync_controller(self):
-        """Copy the current policy network weights into the controller block."""
-        theta = self.algorithm.params(self.train_state)["policy"]
-        self.controller.params["mlp"] = {
-            k: np.asarray(v) for k, v in theta["mlp"].items()
+        return self.store_solution(solution)
+
+    # Training
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another tree: those it was given, its actor and update rule as they were before learning."""
+        kwargs = {
+            name: copy.deepcopy(value) if name in ("actor", "method") else value
+            for name, value in self.keywords.items()
         }
 
-    # The learned law
+        return kwargs
 
-    def get_controller(self):
-        """The learned law as a controller block (``controller @ plant``)."""
-        return self.controller
-
-    def predict(self, x, deterministic=True):
+    def rebuilt_on(self, problem, kwargs) -> "ReinforcementLearningPlanner":
         """
-        The learned law ``u = pi(x)`` for one state or a batch of states (rows).
+        This planner on ``problem`` from ``kwargs``: the method's numbers set on the new update rule before it learns.
 
-        ``deterministic=False`` draws the action from the exploration policy
-        instead, ``a ~ pi_theta(. | x)`` on a fresh split of the planner's key,
-        and maps it onto the input port. Returns ``(u, None)``, the shape of
-        Stable-Baselines3's ``predict``, so a script written for one trains and
-        evaluates with the other.
+        The discount ``gamma`` is a keyword (it sets the environment's rate); the
+        update rule's other numbers, and its optimizer's under ``"optimizer"``,
+        are written on the rebuilt algorithm, read at its first update.
         """
-        jax = require_jax()
-        jnp = require_jax_numpy()
+        numbers = set(self.number_names) - {"gamma"}
+        keywords = {
+            name: value for name, value in kwargs.items() if name not in numbers
+        }
+        planner = type(self)(problem, **keywords)
 
-        theta = self.algorithm.params(self.train_state)["policy"]
-        x = jnp.asarray(x, dtype=float)
-
-        # u = π(x), row by row for a batch of states
-        if deterministic:
-            if x.ndim == 2:
-                u = jax.vmap(self.action_jit, in_axes=(None, 0))(theta, x)
+        # The method's numbers the tree sets, on the new algorithm and its optimizer
+        algorithm = planner.algorithm
+        for name in numbers & set(kwargs):
+            value = kwargs[name]
+            if name == "optimizer":
+                for key, number in value.items():
+                    setattr(algorithm.optimizer, key, float(number))
             else:
-                u = self.action_jit(theta, x)
+                setattr(algorithm, name, float(value))
 
-        # a ~ π_θ(· | x), one key per state, then u = u_mid + u_half clip(a, −1, 1)
-        else:
-            self.key, key = jax.random.split(self.key)
-            if x.ndim == 2:
-                key = jax.random.split(key, x.shape[0])
-            a = self.policy.sample(theta, x, key)
-            u = self.policy.input(a)
+        return planner
 
-        u = np.asarray(u)
-
-        return u, None
-
-    def nominal_trajectory(self, tf=None) -> Trajectory:
-        """The learned law from the problem's start, with nominal parameters and disturbances."""
-        return self.rollout_law(self.problem.x0, tf)
+    def sync_actor(self):
+        """Copy the current policy network weights into the actor block."""
+        theta = self.algorithm.params(self.train_state)["policy"]
+        self.actor.params["mlp"] = {k: np.asarray(v) for k, v in theta["mlp"].items()}
 
     # Plots
 
-    def plot_learning_curve(self, ax=None):
-        """Mean return of the exploration episodes against training steps."""
+    def plot_learning_curve(self, ax=None, *, show=True):
+        """Mean return of the exploration episodes against training steps.
+
+        A figure made here is shown when ``show`` (``False`` builds it only); a
+        passed ``ax`` leaves display to the caller. Returns the axis.
+        """
         import matplotlib.pyplot as plt
 
-        if ax is None:
+        created = ax is None
+        if created:
             _, ax = plt.subplots(figsize=(8, 3))
 
         # Mean episode return against plant steps, one point per iteration
-        steps = [h["timesteps"] for h in self.history]
+        steps = [h["n_timesteps"] for h in self.history]
         returns = [h["ep_return_mean"] for h in self.history]
         ax.plot(steps, returns)
         ax.set_xlabel("timesteps")
         ax.set_ylabel("mean episode return")
         ax.grid(True, alpha=0.3)
+        maybe_show(plt, created and show, block_when_needed=True)
 
         return ax
 
@@ -404,19 +462,19 @@ class ReinforcementLearningPlanner(Planner):
                 f"criterion={criterion!r} is only reported by evaluate"
             )
 
-    def build_algorithm(self, method, algorithm_kwargs):
+    def build_algorithm(self, method, method_numbers):
         """An algorithm instance as given, or the named one built from the keyword arguments."""
         if isinstance(method, Algorithm):
             return method
 
         if method in ALGORITHMS:
-            return ALGORITHMS[method](**algorithm_kwargs)
+            return ALGORITHMS[method](**method_numbers)
 
         raise ValueError(f"method must be one of {sorted(ALGORITHMS)} or an Algorithm")
 
     def build_head(self, hidden, activation, log_std_init, seed):
         """The exploration head of the algorithm's family."""
-        ctl = self.controller
+        ctl = self.actor
         m = self.env.m
 
         # A Gaussian around the block's mean action
@@ -432,7 +490,7 @@ class ReinforcementLearningPlanner(Planner):
 
     def build_critic(self, hidden, activation, seed):
         """The critic of the algorithm's family: a state value, an action value, or none."""
-        ctl = self.controller
+        ctl = self.actor
         m = self.env.m
         n_features = int(ctl.mlp.inputs["u"].dim)
         kind = self.algorithm.critic_kind
@@ -467,18 +525,20 @@ class ReinforcementLearningPlanner(Planner):
             return float(gamma)
 
         problem = self.env.problem
+        model = self.env.model
         dt = self.dt
 
-        # The problem's discount rate over one control period
-        if problem.discount_rate > 0:
-            return problem.discount_factor(dt)
+        # The problem's discount over one control period: its step model's γ
+        if model.gamma < 1.0:
+            return model.gamma
 
         # The default, announced with its effective horizon dt / (−ln γ)
         horizon = dt / -math.log(DEFAULT_GAMMA)
+        hint = effective_horizon_text(problem, model, horizon)
         warnings.warn(
             f"the problem is undiscounted, so training discounts at gamma={DEFAULT_GAMMA} "
-            f"per control period, an effective horizon of {horizon:.1f} s at "
-            f"dt={dt:g}; declare discount_rate on the problem or pass gamma to choose it",
+            f"per control period, an effective horizon of {hint} or pass gamma to "
+            "choose it",
             stacklevel=3,
         )
 
@@ -490,11 +550,11 @@ class ReinforcementLearningPlanner(Planner):
         jnp = require_jax_numpy()
 
         algorithm = self.algorithm
-        n_steps = self.n_steps
-        n_envs = self.n_envs
+        n_steps_per_update = self.n_steps_per_update
+        n_rollouts = self.n_rollouts
 
         # The algorithm's count of gradient steps, else one per collected transition
-        gradient_steps = algorithm.gradient_steps or n_steps * n_envs
+        gradient_steps = algorithm.gradient_steps or n_steps_per_update * n_rollouts
 
         def gradient_step(state, key):
             # A minibatch drawn uniformly from the filled part of the replay
@@ -519,13 +579,13 @@ class ReinforcementLearningPlanner(Planner):
 
         theta = self.algorithm.params(self.train_state)["policy"]
 
-        # An episodic method learns from complete episodes: every plant restarts, then
-        # runs one
+        # An episodic method learns from complete episodes: every rollout restarts,
+        # then runs one
         if self.algorithm.episodic:
             k_collect, k_reset = jax.random.split(k_collect)
-            self.carry = reset_carry(self.env, k_reset, self.n_envs)
+            self.carry = reset_carry(self.env, k_reset, self.n_rollouts)
 
-        # Collect: n_steps control periods of the n_envs plants
+        # Collect: n_steps_per_update control periods of the n_rollouts rollouts
         batch, self.carry = self.rollout_jit(theta, self.carry, k_collect)
 
         # On-policy: one update on the fresh batch
@@ -558,11 +618,13 @@ class ReinforcementLearningPlanner(Planner):
 
         # The record: steps, mean return, episodes, speed, time, the algorithm's losses
         record = {
-            "timesteps": self.num_timesteps,
+            "n_timesteps": self.n_timesteps,
             "ep_return_mean": self.last_ep_return_mean,
             "n_episodes": int(ep_returns.size),
-            "fps": self.n_steps * self.n_envs / max(time.time() - t0, 1e-9),
-            "elapsed": self.train_time,
+            "fps": self.n_steps_per_update
+            * self.n_rollouts
+            / max(time.time() - t0, 1e-9),
+            "elapsed": self.train_time_s,
             **{k: float(v) for k, v in stats.items()},
         }
         self.history.append(record)
@@ -573,46 +635,45 @@ class ReinforcementLearningPlanner(Planner):
         """One progress line: timesteps, mean episode return, the algorithm's losses, speed."""
         shown = " | ".join(f"{k} {float(v):8.4g}" for k, v in stats.items())
         print(
-            f"steps {record['timesteps']:>8d} | "
+            f"steps {record['n_timesteps']:>8d} | "
             f"ep_return {record['ep_return_mean']:9.1f} | "
             f"{shown} | fps {record['fps']:7.0f} | {record['elapsed']:.0f}s"
         )
 
-    def solution(self, evaluate, n_trials) -> PlanningSolution:
-        """The learned law with its training record; rolled out and scored when asked."""
-        trajectory = None
-        evaluation = None
+    def solution(self, evaluate, n_trials, solve_time_s=None) -> PlanningSolution:
+        """
+        The learned law as a solution: a copy of the law at its weights when solved, its training record, the critic's cost-to-go.
 
-        # The nominal rollout, and the Monte Carlo score over the problem's draws
+        Training again moves only the planner's own law. With ``evaluate``, the
+        copy handed out is scored, as it is, by Monte Carlo over the problem's draws;
+        ``solve_time_s`` is the solve's training wall time (``None``: not timed).
+        """
+        record = self.training_record(solve_time_s)
+        cost_to_go = self.critic_cost_to_go()
+        controller = snapshot_of(self.actor)
+
+        # The Monte Carlo score of the law handed out, over the problem's draws
+        evaluation = None
         if evaluate:
-            trajectory = self.nominal_trajectory()
             evaluation = planner_evidence(
                 self,
-                self.controller,
+                controller,
                 dt=self.dt,
                 n_trials=n_trials,
-                tf=self.env.tf,
+                episode_length=self.env.episode_length,
                 backend="jax",
             )
 
-        return self.learned_solution(trajectory, evaluation)
-
-    def learned_solution(self, trajectory, evaluation) -> PlanningSolution:
-        """The learned law as a solution: a copy of the law at its weights when solved (training again moves only the planner's own), its training record, the rollout and score given, the critic's cost-to-go."""
-        record = self.training_record()
-        cost_to_go = self.critic_cost_to_go()
-        policy = snapshot_of(self.controller)
-
         return PlanningSolution(
             problem=self.problem,
-            policy=policy,
+            controller=controller,
             record=record,
-            trajectory=trajectory,
-            evaluation=evaluation,
             cost_to_go=cost_to_go,
+            evaluation=evaluation,
+            params=copy.deepcopy(self.params),
         )
 
-    def training_record(self) -> "ReinforcementLearningRecord":
+    def training_record(self, solve_time_s=None) -> "ReinforcementLearningRecord":
         """The solver record: the training facts, episode returns turned into costs."""
         jax = require_jax()
 
@@ -627,16 +688,17 @@ class ReinforcementLearningPlanner(Planner):
         history = [
             {
                 **{k: v for k, v in record.items() if k != "ep_return_mean"},
-                "cost": -record["ep_return_mean"],
+                "J": -record["ep_return_mean"],
             }
             for record in self.history
         ]
 
         return ReinforcementLearningRecord(
-            algorithm=type(self.algorithm).__name__,
-            timesteps=self.num_timesteps,
-            train_time_s=self.train_time,
-            cost=-self.last_ep_return_mean,
+            method=type(self.algorithm).__name__,
+            n_timesteps=self.n_timesteps,
+            train_time_s=self.train_time_s,
+            solve_time_s=solve_time_s,
+            mean_episode_cost=-self.last_ep_return_mean,
             weights_finite=weights_finite,
             history=history,
             gamma=float(self.gamma),
@@ -645,66 +707,17 @@ class ReinforcementLearningPlanner(Planner):
         )
 
     def critic_cost_to_go(self):
-        """``J(x) = -V_w(x)`` from the critic, only when it estimates the problem's own discount; else ``None``."""
+        """The critic's field ``J(x) = −V_w(x)`` at its current weights, only when it estimates the problem's own discount; else ``None``."""
         # Only a state-value critic trained on the problem's own discount estimates J
         if self.algorithm.critic_kind != "V":
             return None
 
-        if self.gamma != self.env.problem.discount_factor(self.dt):
+        if self.gamma != self.env.model.gamma:
             return None
 
-        jnp = require_jax_numpy()
-
-        critic = self.critic
         w = self.algorithm.params(self.train_state)["critic"]
 
-        # J(x) = −V_w(x)
-        def cost_to_go(x):
-            J = -float(critic.value(w, jnp.asarray(x, dtype=float)))
-            return J
-
-        return cost_to_go
-
-    def rollout_law(self, x0, tf=None, key=None) -> Trajectory:
-        """The deterministic law on the training grid, input held per period; disturbances drawn only with a ``key``."""
-        jax = require_jax()
-        jnp = require_jax_numpy()
-
-        env = self.env
-        pi = self.action_jit
-        theta = self.algorithm.params(self.train_state)["policy"]
-
-        # N = t_f / dt control periods, over the episode unless tf is given
-        n_steps = int(round((env.tf if tf is None else float(tf)) / env.dt))
-
-        # The episode's sources: their seeds drawn only with a key, the plant nominal
-        sources = None if key is None else env.source_seeds(key)
-
-        # The N periods from x0 at t0, one jitted scan per (N, sources drawn)
-        x0 = jnp.asarray(x0, dtype=float)
-        t0 = env.t0
-        form = (n_steps, sources is None)
-        if form not in self.rollout_forms:
-
-            def rollout(theta, x0, sources):
-                # Closed loop on the grid: u_k = π(x_k), then one control period of the plant
-                def body(carry, _):
-                    x, t = carry
-                    u = pi(theta, x)
-                    x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
-                    return (x_next, t_next), (x, u)
-
-                return jax.lax.scan(body, (x0, t0), None, length=n_steps)
-
-            self.rollout_forms[form] = jax.jit(rollout)
-        (x_end, _), (xs, us) = self.rollout_forms[form](theta, x0, sources)
-
-        # N + 1 samples: the final state appended, the last input held at it
-        xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])
-        us = np.concatenate([np.asarray(us), np.asarray(us)[-1:]])
-        t = t0 + env.dt * np.arange(n_steps + 1)
-
-        return Trajectory(t=t, x=xs.T, u=us.T)
+        return CriticField(self.critic, w)
 
 
 @dataclass(frozen=True)
@@ -712,19 +725,24 @@ class ReinforcementLearningRecord:
     """
     The training facts of a learned law: plant steps, training time, and the last mean episode cost.
 
-    ``cost`` is the mean episode cost ``J`` of the last collection, positive
-    and falling. ``history`` holds one dict per learning iteration
-    (``timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
+    ``n_timesteps`` and ``train_time_s`` count every training of the planner so
+    far, the collections and the updates only; ``solve_time_s`` is this solve's
+    wall time, its whole training (``None``: not timed).
+
+    ``mean_episode_cost`` is the mean episode cost ``J`` of the last collection,
+    positive and falling. ``history`` holds one dict per learning iteration
+    (``n_timesteps``, the mean episode cost ``J``, ``n_episodes``, the algorithm's losses); returns
     stay internal to the algorithms. ``gamma`` is the discount per period the
     training used, ``scored_gamma`` the problem's, the one its score uses; the record says when they differ.
     ``reward`` is what the training rewarded: ``"running"`` (``−g dt``) or
     ``"stage"`` (``−c_k``); the score is always the problem's cost.
     """
 
-    algorithm: str
-    timesteps: int
+    method: str
+    n_timesteps: int
     train_time_s: float
-    cost: float
+    solve_time_s: float | None
+    mean_episode_cost: float
     weights_finite: bool
     history: list
     gamma: float | None = None
@@ -749,9 +767,10 @@ class ReinforcementLearningRecord:
     def __str__(self) -> str:
         trained_on = "-g dt" if self.reward == "running" else "-c_k"
         line = (
-            f"{self.algorithm}: {self.timesteps} plant steps in "
-            f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}; trained on "
+            f"{self.method}: {self.n_timesteps} plant steps in "
+            f"{self.train_time_s:.1f} s, mean episode cost {self.mean_episode_cost:.2f}; trained on "
             f"{trained_on}, scored on the problem's cost"
+            f"{solve_time_text(self.solve_time_s)}"
         )
         if self.discount_differs:
             line += (
@@ -765,6 +784,17 @@ class ReinforcementLearningRecord:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def effective_horizon_text(problem, model, horizon):
+    """The effective horizon in the problem's time, and where its discount is declared."""
+    if model.dt is None:
+        return f"{horizon:.1f} ticks; declare gamma on the step problem"
+    span = f"{horizon:.1f} s at dt={model.dt:g}"
+    if not is_continuous(problem):
+        return f"{span}; declare discount_rate on the problem it discretizes"
+
+    return f"{span}; declare discount_rate on the problem"
 
 
 def require_finite_input_box(problem):

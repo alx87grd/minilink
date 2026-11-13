@@ -14,11 +14,14 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_cost,
+)
 from minilink.planning.trajectory_optimization.transcription import (
     ConstraintFunction,
-    FixedGridOptions,
-    Transcription,
+    FixedGridTranscription,
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
@@ -33,11 +36,7 @@ from minilink.planning.trajectory_optimization.transcription import (
 ###############################################################################
 
 
-class DirectCollocationOptions(FixedGridOptions):
-    """Grid options for direct-collocation transcriptions."""
-
-
-class DirectCollocationTranscription(Transcription):
+class DirectCollocationTranscription(FixedGridTranscription):
     """
     Fixed-time-grid trapezoidal direct-collocation transcription.
 
@@ -49,9 +48,6 @@ class DirectCollocationTranscription(Transcription):
 
     # The transcription's name in a program's metadata
     name = "direct_collocation"
-
-    def __init__(self, options: DirectCollocationOptions):
-        self.options = options
 
     def transcribe(
         self,
@@ -65,7 +61,7 @@ class DirectCollocationTranscription(Transcription):
         if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
             return self.transcribe_jax(problem, backend=backend)
 
-        problem.require_cost()
+        require_cost(problem)
         if dynamics is None:
             dynamics = dynamics_function(problem, backend)
 
@@ -119,7 +115,7 @@ class DirectCollocationTranscription(Transcription):
         # Public trajectories are NumPy: convert off any JAX optimizer arrays here
         x = np.asarray(x, dtype=float)
         u = np.asarray(u, dtype=float)
-        t = np.asarray(self.options.t(problem), dtype=float)
+        t = np.asarray(self.t(problem), dtype=float)
         if dynamics is None:
             dynamics = dynamics_function(problem, backend)
 
@@ -146,9 +142,9 @@ class DirectCollocationTranscription(Transcription):
         """Return the packed decision-vector dimension for ``problem``."""
         n = problem.sys.n
         m = problem.sys.m
-        n_steps = self.options.n_steps
+        n_knots = self.n_knots
 
-        n_z = int((n + m) * n_steps)
+        n_z = int((n + m) * n_knots)
 
         return n_z
 
@@ -168,12 +164,12 @@ class DirectCollocationTranscription(Transcription):
         """Unpack a decision vector into sampled ``(x, u)`` matrices."""
         n = int(problem.sys.n)
         m = int(problem.sys.m)
-        n_steps = self.options.n_steps
+        n_knots = self.n_knots
 
         # The states row by row, then the inputs
-        split = n * n_steps
-        x = z[:split].reshape(n, n_steps)
-        u = z[split:].reshape(m, n_steps)
+        split = n * n_knots
+        x = z[:split].reshape(n, n_knots)
+        u = z[split:].reshape(m, n_knots)
 
         return x, u
 
@@ -187,14 +183,14 @@ class DirectCollocationTranscription(Transcription):
 
         # A trajectory is resampled on the knots
         if isinstance(guess, Trajectory):
-            resampled = guess.resample(t_new=self.options.t(problem))
+            resampled = guess.resample(t_new=self.t(problem))
             return self.pack(resampled.x, resampled.u, problem)
 
         return guess.reshape(-1)
 
     def initial_guess_time_grid(self, problem: PlanningProblem) -> np.ndarray:
         """Return the collocation time grid."""
-        return self.options.t(problem)
+        return self.t(problem)
 
     def decision_bounds(
         self, problem: PlanningProblem, *, boxes_only=False
@@ -206,7 +202,7 @@ class DirectCollocationTranscription(Transcription):
         stay in the bounds).
         """
         n = int(problem.sys.n)
-        n_steps = self.options.n_steps
+        n_knots = self.n_knots
         n_z = self.decision_dimension(problem)
 
         lower = np.full(n_z, -np.inf)
@@ -215,15 +211,15 @@ class DirectCollocationTranscription(Transcription):
         # The state box on every state knot
         X_box = box_bounds(problem.X, BoxSet, boxes_only)
         if X_box is not None:
-            lower[: n * n_steps] = np.repeat(X_box.lower, n_steps)
-            upper[: n * n_steps] = np.repeat(X_box.upper, n_steps)
+            lower[: n * n_knots] = np.repeat(X_box.lower, n_knots)
+            upper[: n * n_knots] = np.repeat(X_box.upper, n_knots)
 
         # The input box on every input knot
         U_box = box_bounds(problem.U, BoxInputSet, boxes_only)
         if U_box is not None:
-            start = n * n_steps
-            lower[start:] = np.repeat(U_box.lower, n_steps)
-            upper[start:] = np.repeat(U_box.upper, n_steps)
+            start = n * n_knots
+            lower[start:] = np.repeat(U_box.lower, n_knots)
+            upper[start:] = np.repeat(U_box.upper, n_knots)
 
         return lower, upper
 
@@ -289,7 +285,7 @@ class DirectCollocationTranscription(Transcription):
             "x0": np.asarray(problem.x0, dtype=float),
             "t0": float(problem.t0),
             "plant": problem.sys.params if plant is None else plant,
-            "cost": problem.require_cost().params,
+            "cost": require_cost(problem).params,
             "discount_rate": float(problem.discount_rate),
         }
         for role in constrained_roles(problem):
@@ -307,9 +303,9 @@ class DirectCollocationTranscription(Transcription):
         """
         jnp = jax.numpy
 
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         grid = self.knot_offsets(problem, jnp)
-        dt = jnp.asarray(self.options.dt(problem))
+        dt = jnp.asarray(self.dt(problem))
         unpack_jax = self.jax_unpacker(problem)
 
         # The dynamics at one knot, vectorized over the knots below
@@ -392,8 +388,8 @@ class DirectCollocationTranscription(Transcription):
         return equalities, inequalities
 
     def knot_offsets(self, problem: PlanningProblem, xp):
-        """The knots' offsets from the horizon's start, ``linspace(0, tf, N)``: ``t_k = t0 + offset_k``."""
-        return xp.asarray(self.options.offsets(problem))
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, N + 1)``: ``t_k = t0 + offset_k``."""
+        return xp.asarray(self.offsets(problem))
 
     def jax_unpacker(self, problem: PlanningProblem):
         """``unpack_jax(z) -> (x, u)``: :meth:`unpack` on the traced ``z``."""
@@ -411,7 +407,7 @@ class DirectCollocationTranscription(Transcription):
     ) -> np.ndarray:
         """Trapezoidal defects of the packed knots, flattened."""
         x, u = self.unpack(z, problem)
-        t = self.options.t(problem)
+        t = self.t(problem)
 
         # f_k = f(x_k, u_k, t_k), one column per knot
         dx = np.column_stack(
@@ -419,7 +415,7 @@ class DirectCollocationTranscription(Transcription):
         )
 
         # d_k = x_{k+1} − x_k − dt/2 (f_k + f_{k+1}) on every interval
-        dt = self.options.dt(problem)
+        dt = self.dt(problem)
         defect = trapezoidal_defect(x, dx, dt)
 
         return defect.reshape(-1)
@@ -458,7 +454,7 @@ class DirectCollocationTranscription(Transcription):
         if boundary is None:
             return
 
-        t_i = float(self.options.t(problem)[index])
+        t_i = float(self.t(problem)[index])
 
         if isinstance(boundary, SingletonSet):
             # x_i − point = 0: the knot sits on the singleton's point
@@ -509,7 +505,7 @@ class DirectCollocationTranscription(Transcription):
             def state_margins(z):
                 x, _ = self.unpack(z, problem)
                 margins = []
-                for k, t_k in enumerate(self.options.t(problem)):
+                for k, t_k in enumerate(self.t(problem)):
                     margin = problem.X.margin(
                         x[:, k],
                         t=float(t_k),
@@ -525,7 +521,7 @@ class DirectCollocationTranscription(Transcription):
             def input_margins(z):
                 x, u = self.unpack(z, problem)
                 margins = []
-                for k, t_k in enumerate(self.options.t(problem)):
+                for k, t_k in enumerate(self.t(problem)):
                     margin = problem.U.margin(
                         u[:, k],
                         x=x[:, k],
@@ -539,10 +535,10 @@ class DirectCollocationTranscription(Transcription):
 
     def objective(self, z: np.ndarray, problem: PlanningProblem):
         """Bolza objective ``J(z)`` of the packed knots."""
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         x, u = self.unpack(z, problem)
-        t = self.options.t(problem)
-        dt = self.options.dt(problem)
+        t = self.t(problem)
+        dt = self.dt(problem)
         cost_params = problem.cost.params
 
         # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t0)}

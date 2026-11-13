@@ -12,11 +12,17 @@ from minilink.core.params import checked
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import host_tree, problem_with
+from minilink.planning.planner import (
+    host_copy,
+    host_tree,
+    open_loop_controller_of,
+    problem_with,
+)
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
+from minilink.planning.trajectory_optimization.planner import planner_parts
 
 ###############################################################################
 # Public API
@@ -28,7 +34,7 @@ class CompiledTrajectoryPlanner:
     The pure face of a trajectory-optimization planner: its solve as functions of ``(params, z)``.
 
     ``z`` is the planner's solution vector: the transcription's decision vector
-    (the knots, ``(rows, N)`` row after row: collocation's states then inputs,
+    (the knots, ``(rows, N + 1)`` row after row: collocation's states then inputs,
     shooting's inputs) with the origin ``t0`` it was solved from appended,
     ``n_z`` entries. ``params`` is the planner's tree: the program's leaves
     (``x0``, ``t0``, the plant's, the cost's, the discount and the
@@ -50,7 +56,7 @@ class CompiledTrajectoryPlanner:
         self.problem = problem
         self.transcription = transcription
         self.backend = backend
-        self.offsets = np.asarray(transcription.options.offsets(problem))
+        self.offsets = np.asarray(transcription.offsets(problem))
         self.n = int(problem.sys.n)
         self.m = int(problem.sys.m)
 
@@ -147,7 +153,7 @@ class CompiledTrajectoryPlanner:
 
         ``params`` is ``None`` (the defaults) or :attr:`params` edited, checked once; the
         solution records its origin ``params["t0"]``. ``status`` is
-        ``{"success", "iterations", "cost"}``. A NumPy program has no
+        ``{"success", "n_iterations", "J"}``. A NumPy program has no
         parameters: the values rebuild it on a copy of the problem.
         """
         tree = self.merged(params)
@@ -171,8 +177,8 @@ class CompiledTrajectoryPlanner:
         z = xp.concatenate([result.z, t0])
         status = {
             "success": result.success,
-            "iterations": result.stats.get("nit"),
-            "cost": result.cost,
+            "n_iterations": result.n_iterations,
+            "J": result.J,
         }
 
         return z, status
@@ -275,15 +281,15 @@ class CompiledTrajectoryPlanner:
         status = {} if status is None else status
         problem = self.problem_at(params)
         z_dec = np.asarray(z[:-1], dtype=float)
-        cost = status.get("cost")
+        J = status.get("J")
 
         result = OptimizationResult(
             z=z_dec,
             success=bool(status.get("success", True)),
-            cost=None if cost is None else float(cost),
+            J=None if J is None else float(J),
             stats={}
-            if status.get("iterations") is None
-            else {"nit": status["iterations"]},
+            if status.get("n_iterations") is None
+            else {"nit": status["n_iterations"]},
         )
         trajectory = self.transcription.reconstruct_result(
             result, problem=problem, backend=self.backend
@@ -305,10 +311,10 @@ class CompiledTrajectoryPlanner:
         )
 
         record = TrajectoryOptimizationRecord(
-            cost=result.cost,
-            solver_success=result.success,
+            J=result.J,
+            optimizer_success=result.success,
             message="",
-            iterations=status.get("iterations"),
+            n_iterations=status.get("n_iterations"),
             solve_time_s=None,
             feasibility_tol=tol,
             max_equality_violation=float(max_eq),
@@ -318,9 +324,15 @@ class CompiledTrajectoryPlanner:
             stats=dict(result.stats),
             optimization_result=result,
         )
-        policy = self.planner.open_loop_policy(trajectory)
+        controller = open_loop_controller_of(trajectory, self.planner.problem.sys)
 
-        return PlanningSolution(problem, policy, record, trajectory, None)
+        return PlanningSolution(
+            problem=problem,
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
+            params=host_copy(self.merged(params)),
+        )
 
     def pack(self, guess, params=None):
         """A guess in ``z`` form: a :class:`~minilink.core.trajectory.Trajectory` or a :class:`~minilink.planning.results.PlanningSolution` resampled on the knots."""
@@ -351,10 +363,10 @@ class CompiledTrajectoryPlanner:
         return self.planner.build_optimizer(program, np.asarray(z_dec, dtype=float))
 
     def rows(self, z):
-        """The knot rows of ``z``'s decision vector, ``(rows, N)``."""
-        n_steps = self.offsets.size
+        """The knot rows of ``z``'s decision vector, ``(rows, N + 1)``."""
+        n_knots = self.offsets.size
 
-        return z[:-1].reshape(-1, n_steps)
+        return z[:-1].reshape(-1, n_knots)
 
     def problem_at(self, params):
         """A copy of the problem holding the compiled tree with ``params`` merged over it (its parts copied): the face's values, never a later edit of the problem's."""
@@ -367,14 +379,6 @@ class CompiledTrajectoryPlanner:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def planner_parts(params):
-    """``(problem, method)``: a planner's tree split into the problem's leaves and the method's numbers (the planner's :func:`~minilink.planning.trajectory_optimization.planner.planner_parts`)."""
-    # Lazy import: the planner module imports this one
-    from minilink.planning.trajectory_optimization import planner
-
-    return planner.planner_parts(params)
 
 
 def has_values(tree) -> bool:

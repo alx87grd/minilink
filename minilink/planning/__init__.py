@@ -52,10 +52,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.dynamic_programming.lookup_policy",
         "LookupPolicy",
     ),
-    "PolicyEvaluator": (
-        "minilink.planning.dynamic_programming.policy_eval",
-        "PolicyEvaluator",
-    ),
     # Function approximation (cost-to-go fits, approximate dynamic programming)
     "QuadraticFeatures": (
         "minilink.planning.dynamic_programming.approximation",
@@ -102,6 +98,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "KinodynamicExtender",
     ),
     "SteeringExtender": ("minilink.planning.search.extenders", "SteeringExtender"),
+    "LiveSearchPlot": ("minilink.planning.search.live_plot", "LiveSearchPlot"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

@@ -15,7 +15,7 @@ plant = SingleMass()  # a mass on a spring, its position measured
 loop = closed_loop(
     P(5.0, ports="reference") % CONTROLLER_PERIOD,
     plant,
-    reference=Step(np.zeros(1), np.array([0.5]), step_time=0.5),
+    reference=Step(np.array([0.5]), np.zeros(1), step_time=0.5),
     filter=LowPassFilter(cutoff_hz=3.0) % FILTER_PERIOD,
 )
 print(loop)

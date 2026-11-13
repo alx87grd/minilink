@@ -9,7 +9,7 @@ from minilink.control.siso import P
 
 class TestBlocks(unittest.TestCase):
     def test_source(self):
-        s = Source(p=2)
+        s = Source(dim=2)
         s.params["value"] = np.array([3.0, 4.0])
         y = s.h(x=[], u=[], t=0)
         np.testing.assert_array_equal(y, np.array([3.0, 4.0]))
@@ -22,6 +22,16 @@ class TestBlocks(unittest.TestCase):
         y_after = step.h(x=[], u=[], t=3.0)
         np.testing.assert_array_equal(y_before, np.array([0.0]))
         np.testing.assert_array_equal(y_after, np.array([1.0]))
+
+    def test_a_bare_step_is_the_unit_step_at_one_second(self):
+        np.testing.assert_array_equal(Step().h(x=[], u=[], t=0.999), [0.0])
+        np.testing.assert_array_equal(Step().h(x=[], u=[], t=1.0), [1.0])
+        # the final level first; a scalar level takes the other's size
+        np.testing.assert_array_equal(Step(2.0, 0.5).h(x=[], u=[], t=0.0), [0.5])
+        np.testing.assert_array_equal(Step(2.0, 0.5).h(x=[], u=[], t=2.0), [2.0])
+        np.testing.assert_array_equal(Step([1.0, 2.0]).h(x=[], u=[], t=0.0), [0, 0])
+        with self.assertRaisesRegex(ValueError, "same shape"):
+            Step([1.0, 2.0], [0.0, 0.0, 0.0])
 
     def test_sine_source(self):
         sine = Sine(amplitude=[2.0, 1.0], omega=3.0, phase=[0.0, np.pi / 2], offset=1.0)
@@ -58,6 +68,28 @@ class TestBlocks(unittest.TestCase):
             plant.h(np.array([3.0]), np.array([4.0])), np.array([3.0])
         )
 
+    def test_an_integrator_of_dim_channels_on_both_backends(self):
+        plant = Integrator(dim=2)
+        plant.params["k"] = 2.0
+        self.assertEqual((plant.n, plant.m, plant.p), (2, 2, 2))
+        x = np.array([3.0, -1.0])
+        u = np.array([4.0, 0.5])
+        np.testing.assert_array_equal(plant.f(x, u), [8.0, 1.0])
+        np.testing.assert_array_equal(plant.h(x, u), x)
+        traj = plant.compute_trajectory(tf=1.0, u=np.array([1.0, -1.0]), verbose=False)
+        np.testing.assert_allclose(traj.x[:, -1], [2.0, -2.0])
+        self.assertEqual(Integrator().n, 1)
+
+        jax = pytest.importorskip("jax")
+        import jax.numpy as jnp
+
+        dx = jax.jit(plant.f)(jnp.asarray(x), jnp.asarray(u))
+        y = jax.jit(plant.h)(jnp.asarray(x), jnp.asarray(u))
+        np.testing.assert_array_equal(np.asarray(dx), [8.0, 1.0])
+        np.testing.assert_array_equal(np.asarray(y), x)
+        ev = plant.compile(backend="jax")
+        np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0)), [8.0, 1.0])
+
     def test_integrator_compiled_rollout(self):
         plant = Integrator()
         evaluator = plant.compile()
@@ -83,7 +115,9 @@ class TestBlocks(unittest.TestCase):
         dx = plant.f(x, u)
         np.testing.assert_allclose(dx, np.array([1.0]))
         np.testing.assert_allclose(plant.h(x, u), np.array([0.0]))
-        np.testing.assert_allclose(plant.compile("numpy").f(x, u, 0.0), np.array([1.0]))
+        np.testing.assert_allclose(
+            plant.compile(backend="numpy").f(x, u, 0.0), np.array([1.0])
+        )
 
     def test_prop_controller_scales_tracking_error(self):
         controller = P(2.5, ports="reference")
@@ -165,9 +199,11 @@ class TestRoutingBlocks(unittest.TestCase):
             [2.0, 8.0],
         )
 
-    def test_scalar_gain_without_dim_raises(self):
-        with self.assertRaises(ValueError):
-            Gain(2.0)
+    def test_a_scalar_gain_is_one_channel_by_default(self):
+        gain = Gain(2.0)
+        self.assertEqual((gain.m, gain.p), (1, 1))
+        np.testing.assert_array_equal(gain.params["K"], [[2.0]])
+        np.testing.assert_allclose(gain.h(None, np.array([3.0])), [6.0])
 
     def test_mux_demux_round_trip(self):
         mux = Mux(dims=(2, 1))
@@ -187,14 +223,40 @@ class TestRoutingBlocks(unittest.TestCase):
 class TestNonlinearBlocks(unittest.TestCase):
     def test_saturation_clips(self):
         sat = Saturation(lower=-1.0, upper=2.0)
-        out = [sat.compute(None, np.array([v]))[0] for v in (-3.0, 0.5, 5.0)]
+        out = [sat.h(None, np.array([v]))[0] for v in (-3.0, 0.5, 5.0)]
         np.testing.assert_allclose(out, [-1.0, 0.5, 2.0])
 
     def test_saturation_refuses_crossed_limits(self):
         with self.assertRaisesRegex(ValueError, "upper end stop must sit above"):
             Saturation(lower=1.0, upper=-1.0)
         flat = Saturation(lower=0.5, upper=0.5)  # equal limits: a constant output
-        np.testing.assert_allclose(flat.compute(None, np.array([3.0])), [0.5])
+        np.testing.assert_allclose(flat.h(None, np.array([3.0])), [0.5])
+
+    def test_saturation_takes_one_end_stop_per_channel(self):
+        sat = Saturation([-1.0, -2.0], [1.0, 2.0])
+        self.assertEqual((sat.dim, sat.m, sat.p), (2, 2, 2))
+        np.testing.assert_array_equal(sat.h(None, np.array([3.0, -3.0])), [1.0, -2.0])
+        mixed = Saturation(0.0, [1.0, 2.0, 3.0])
+        self.assertEqual(mixed.dim, 3)
+        np.testing.assert_array_equal(
+            mixed.h(None, np.array([5.0, -1.0, 2.5])), [1.0, 0.0, 2.5]
+        )
+        with self.assertRaisesRegex(ValueError, "one size"):
+            Saturation([-1.0, -1.0], [1.0, 1.0, 1.0])
+        with self.assertRaisesRegex(ValueError, "dim=3"):
+            Saturation([-1.0, -1.0], [1.0, 1.0], dim=3)
+        with self.assertRaisesRegex(ValueError, "upper end stop must sit above"):
+            Saturation([-1.0, 1.0], [1.0, 0.0])
+        self.assertEqual(Saturation(-1.0, 1.0, dim=4).dim, 4)
+
+    def test_a_vector_saturation_on_jax(self):
+        jax = pytest.importorskip("jax")
+        import jax.numpy as jnp
+
+        sat = Saturation([-1.0, -2.0], [1.0, 2.0])
+        y = jax.jit(sat.h)(None, jnp.array([3.0, -3.0]))
+        self.assertIsInstance(y, jnp.ndarray)
+        np.testing.assert_array_equal(np.asarray(y), [1.0, -2.0])
 
 
 class TestFilterBlocks(unittest.TestCase):
@@ -407,7 +469,7 @@ class TestOneHiddenLayerMLP(unittest.TestCase):
             "b1": np.array([0.25]),
         }
         u = np.array([0.2, -0.4])
-        y = net.compute(np.array([]), u, params=params)
+        y = net.h(np.array([]), u, params=params)
         expected = (
             params["W1"] @ np.tanh(params["W0"] @ u + params["b0"]) + params["b1"]
         )
@@ -428,18 +490,18 @@ class TestOneHiddenLayerMLP(unittest.TestCase):
             "W1": np.zeros((1, 2)),
             "b1": np.array([3.0]),
         }
-        y_default = net.compute(np.array([]), np.array([1.0]))
-        y_override = net.compute(np.array([]), np.array([1.0]), params=override)
+        y_default = net.h(np.array([]), np.array([1.0]))
+        y_override = net.h(np.array([]), np.array([1.0]), params=override)
         np.testing.assert_allclose(y_default, [2.0 * np.tanh(1.0)])
         np.testing.assert_allclose(y_override, [3.0])
 
-    def test_compute_is_jax_traceable(self):
+    def test_h_is_jax_traceable(self):
         jax = pytest.importorskip("jax")
         import jax.numpy as jnp
 
         net = MLP(input_dim=2, output_dim=1, hidden=(3,))
         params = {key: jnp.asarray(value) for key, value in net.params.items()}
-        y = jax.jit(lambda u, params: net.compute([], u, params=params))(
+        y = jax.jit(lambda u, params: net.h([], u, params=params))(
             jnp.array([1.0, -1.0]), params
         )
         self.assertEqual(np.asarray(y).shape, (1,))

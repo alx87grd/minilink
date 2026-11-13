@@ -272,7 +272,10 @@ def _suite_specs(tiny: bool) -> dict[str, SuiteSpec]:
                     pendulum_n_calls=2 if _tiny else 2000,
                     diagram_n_calls=2 if _tiny else 500,
                     sim_n_runs=1 if _tiny else 2,
-                    static_n_steps=5 if _tiny else 200,
+                    static_n_samples=5 if _tiny else 200,
+                    batch_size=50 if _tiny else 1000,
+                    batch_n_steps=50 if _tiny else 1000,
+                    batch_reps=2 if _tiny else 5,
                 )
             ),
         ),

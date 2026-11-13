@@ -15,12 +15,25 @@ class TestCoreComponents(unittest.TestCase):
         with self.assertRaises(ValueError):
             VectorSignal("test", dim=2, nominal_value=[1.0, 2.0, 3.0])
 
+    def test_a_nominal_value_assigned_is_checked_and_copied(self):
+        # Ruling Q8: the property checks an assignment against dim, as the constructor
+        v = VectorSignal("u", dim=2)
+        given = np.array([[1, 2]])
+        v.nominal_value = given
+        given[0, 0] = 7
+        np.testing.assert_array_equal(v.nominal_value, [1.0, 2.0])
+        self.assertEqual(v.nominal_value.dtype, float)
+        with self.assertRaisesRegex(ValueError, "signal 'u' must have 2 entries"):
+            v.nominal_value = np.zeros(3)
+        v.nominal_value = None
+        np.testing.assert_array_equal(v.nominal_value, [0.0, 0.0])
+
     def test_vector_signal_rejects_negative_dimension(self):
         with self.assertRaises(ValueError):
             VectorSignal("test", dim=-1)
 
     def test_system_initialization_has_no_implicit_ports(self):
-        sys = System(n=2)
+        sys = System(state_dim=2)
         self.assertEqual(sys.n, 2)
         self.assertEqual(sys.m, 0)
         self.assertEqual(sys.p, 0)
@@ -29,7 +42,7 @@ class TestCoreComponents(unittest.TestCase):
 
     def test_system_rejects_negative_dimension(self):
         with self.assertRaises(ValueError):
-            System(n=-1)
+            System(state_dim=-1)
 
     def test_static_system(self):
         sys = System()
@@ -38,7 +51,7 @@ class TestCoreComponents(unittest.TestCase):
         self.assertEqual(sys.p, 0)
 
     def test_dynamic_system_standard_ports(self):
-        sys = DynamicSystem(n=2, input_dim=1, output_dim=1, expose_state=True)
+        sys = DynamicSystem(state_dim=2, input_dim=1, output_dim=1, expose_state=True)
         self.assertEqual(sys.n, 2)
         self.assertEqual(sys.m, 1)
         self.assertEqual(sys.p, 1)
@@ -52,8 +65,8 @@ class TestCoreComponents(unittest.TestCase):
         np.testing.assert_array_equal(sys.inputs["y"].nominal_value, np.zeros(2))
         self.assertEqual(sys.inputs["y"].labels, ["y[0]", "y[1]"])
         self.assertEqual(sys.inputs["y"].units, ["", ""])
-        np.testing.assert_array_equal(sys.inputs["y"].lower_bound, [-np.inf, -np.inf])
-        np.testing.assert_array_equal(sys.inputs["y"].upper_bound, [np.inf, np.inf])
+        np.testing.assert_array_equal(sys.inputs["y"].lower, [-np.inf, -np.inf])
+        np.testing.assert_array_equal(sys.inputs["y"].upper, [np.inf, np.inf])
 
     def test_port_dimension_inference_and_metadata_validation(self):
         sys = System()
@@ -82,11 +95,11 @@ class TestCoreComponents(unittest.TestCase):
         sys.add_input_port("r")
         sys.add_input_port("y", dim=2)
         u = np.array([1.0, 2.0, 3.0])
-        signals = sys.get_port_values_from_u(u)
+        signals = sys.ports(u)
         np.testing.assert_array_equal(signals["r"], np.array([1.0]))
         np.testing.assert_array_equal(signals["y"], np.array([2.0, 3.0]))
-        np.testing.assert_array_equal(sys.get_port_values_from_u(u, "r"), [1.0])
-        r, y = sys.get_port_values_from_u(u, "r", "y")
+        np.testing.assert_array_equal(sys.ports(u, "r"), [1.0])
+        r, y = sys.ports(u, "r", "y")
         np.testing.assert_array_equal(r, [1.0])
         np.testing.assert_array_equal(y, [2.0, 3.0])
 
@@ -331,11 +344,11 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_a_mechanical_plant_closes_on_its_state_y(self):
         plant = TwoLinkManipulator()
         self.assertFalse({"q", "dq"} & set(plant.outputs))  # y is [q; dq]
-        diagram = closed_loop(Impedance(dof=2), plant)
+        diagram = closed_loop(Impedance(dim=2), plant)
         self.assertEqual(list(diagram.subsystems), ["controller", "plant"])
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         with self.assertRaisesRegex(ValueError, "declares measurement 'y' dim 2"):
-            closed_loop(Impedance(dof=1), plant)
+            closed_loop(Impedance(dim=1), plant)
 
 
 from minilink.core.closed_loop import closed_loop, resolve_standard_feedback
@@ -422,7 +435,7 @@ class TestDefaultOutput(unittest.TestCase):
     """``output_dim == n`` gives ``y = x`` by default (pyro semantics)."""
 
     def test_dynamic_system_default_h_is_state(self):
-        sys = DynamicSystem(n=2, input_dim=1, output_dim=2)
+        sys = DynamicSystem(state_dim=2, input_dim=1, output_dim=2)
         x = np.array([1.5, -2.0])
         np.testing.assert_array_equal(sys.h(x, np.zeros(1)), x)
         np.testing.assert_array_equal(
@@ -430,11 +443,11 @@ class TestDefaultOutput(unittest.TestCase):
         )
 
     def test_dynamic_system_default_h_zero_when_dims_differ(self):
-        sys = DynamicSystem(n=2, input_dim=1, output_dim=1)
+        sys = DynamicSystem(state_dim=2, input_dim=1, output_dim=1)
         np.testing.assert_array_equal(sys.h(np.ones(2), np.zeros(1)), np.zeros(1))
 
     def test_step_system_default_h_is_state(self):
-        sys = StepSystem(n=2, input_dim=1, output_dim=2)
+        sys = StepSystem(state_dim=2, input_dim=1, output_dim=2)
         x = np.array([3.0, 4.0])
         np.testing.assert_array_equal(sys.h(x, np.zeros(1)), x)
 
@@ -443,7 +456,7 @@ class TestDefaultOutput(unittest.TestCase):
 
         class MassSpringDamper(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, output_dim=2)
+                super().__init__(state_dim=2, input_dim=1, output_dim=2)
 
             def f(self, x, u, t=0, params=None):
                 return np.array([x[1], u[0] - 0.3 * x[1] - 4.0 * x[0]])
@@ -451,7 +464,7 @@ class TestDefaultOutput(unittest.TestCase):
         plant = MassSpringDamper()
         diagram = Gain(np.array([[1.0, 0.5]])) @ plant
         x = np.array([1.0, 0.0])
-        u_ctl = diagram.compute_subsys_output_port(
+        u_ctl = diagram.compute_subsystem_output_port(
             x, np.zeros(diagram.m), 0.0, "controller", "y"
         )
         # r defaults to 0, so u = K (r - y) = -K x = -1.0
@@ -476,7 +489,7 @@ class TestForgottenSuperInit(unittest.TestCase):
         )
 
     def test_unknown_attribute_is_still_a_plain_attribute_error(self):
-        sys = DynamicSystem(n=1)
+        sys = DynamicSystem(state_dim=1)
         with self.assertRaises(AttributeError):
             sys.no_such_attribute
         self.assertFalse(hasattr(sys, "no_such_attribute"))
@@ -494,7 +507,7 @@ class TestForgottenSuperInit(unittest.TestCase):
     def test_property_errors_name_the_real_missing_attribute(self):
         class Typo(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
             @property
             def gain(self):
@@ -507,15 +520,15 @@ class TestForgottenSuperInit(unittest.TestCase):
 
 def test_signal_box_is_derived_from_the_bounds():
 
-    signal = VectorSignal("x", dim=2, lower_bound=[-1.0, -2.0], upper_bound=[1.0, 2.0])
+    signal = VectorSignal("x", dim=2, lower=[-1.0, -2.0], upper=[1.0, 2.0])
     np.testing.assert_allclose(signal.box.lower, [-1.0, -2.0])
-    signal.upper_bound = np.array([3.0, 4.0])
+    signal.upper = np.array([3.0, 4.0])
     np.testing.assert_allclose(signal.box.upper, [3.0, 4.0])  # read anew each time
 
-    sys = DynamicSystem(n=2, input_dim=1)
-    sys.add_input_port("w", dim=2, lower_bound=[-0.5, -0.5], upper_bound=[0.5, 0.5])
-    sys.inputs["u"].lower_bound = np.array([-5.0])
-    sys.inputs["u"].upper_bound = np.array([5.0])
+    sys = DynamicSystem(state_dim=2, input_dim=1)
+    sys.add_input_port("w", dim=2, lower=[-0.5, -0.5], upper=[0.5, 0.5])
+    sys.inputs["u"].lower = np.array([-5.0])
+    sys.inputs["u"].upper = np.array([5.0])
     U = sys.input_box
     np.testing.assert_allclose(U.box.lower, [-5.0, -0.5, -0.5])
     np.testing.assert_allclose(U.box.upper, [5.0, 0.5, 0.5])
@@ -606,11 +619,11 @@ class TestDefaultNames(unittest.TestCase):
 
         class MyPlant(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
         class MyStep(StepSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
         self.assertEqual(MyPlant().name, "MyPlant")
         self.assertEqual(MyStep().name, "MyStep")
@@ -773,3 +786,26 @@ def test_a_trajectory_reads_one_channel_at_a_time_linearly_between_its_samples()
     # Held outside the samples
     np.testing.assert_allclose(traj.at(-1.0), [0.0, 1.0])
     np.testing.assert_allclose(traj.at(5.0, "u"), [20.0])
+
+
+def test_a_static_system_takes_the_port_shortcuts_and_feeds_through():
+    # The CA-1 reproducer: a static map built from the shortcuts, no y_dependencies
+    class CubicGain(System):
+        def __init__(self):
+            super().__init__(input_dim=1, output_dim=1)
+
+        def h(self, x, u, t=0.0, params=None):
+            y = u**3
+            return y
+
+    gain = CubicGain()
+
+    assert gain.n == 0 and gain.m == 1 and gain.p == 1
+    assert gain.outputs["y"].dependencies == ("u",)
+    np.testing.assert_allclose(gain.outputs["y"].compute(None, np.array([2.0])), [8.0])
+
+    # A dynamic or step system declares its own feedthrough: none by default
+    assert (
+        DynamicSystem(state_dim=1, input_dim=1, output_dim=1).outputs["y"].dependencies
+        == ()
+    )

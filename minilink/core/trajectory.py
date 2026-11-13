@@ -38,7 +38,7 @@ class SampledSignals:
         """Return ``True`` when a named signal is available."""
         return name in {"x", "u"} or name in self.signals
 
-    def get_signal(self, name: str) -> np.ndarray:
+    def signal(self, name: str) -> np.ndarray:
         """Return a sampled signal by name."""
         if name == "x":
             return self.x
@@ -75,7 +75,7 @@ class Trajectory(SampledSignals):
     -----
     The trajectory semantic core is ``(t, x, u)``. Extra signals such as
     outputs, derivatives, or reconstructed internal ports can be attached
-    through :meth:`with_signal` or :meth:`with_signals`. The samples keep their
+    through :meth:`with_signals`. The samples keep their
     array module: NumPy arrays are copied as floats, JAX arrays are kept, and a
     trajectory is a JAX pytree, so ``jit``, ``grad`` and ``vmap`` pass through a
     function that returns one.
@@ -116,14 +116,29 @@ class Trajectory(SampledSignals):
         )
 
     def with_cost(self, cost, *, discount_rate=0.0, params=None, t0=0.0) -> Trajectory:
-        """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``), discounted from ``t0``."""
-        cost_rate, running = cost.integrate(
-            self, discount_rate=discount_rate, params=params, t0=t0
-        )
+        """
+        The trajectory with the signals ``"dJ"`` and ``"J"`` of ``cost`` (shape ``(1, N)``), discounted from ``t0``.
 
-        return self.with_signals(
-            {"cost_rate": cost_rate.reshape(1, -1), "cost": running.reshape(1, -1)}
-        )
+        ``"dJ"`` is the discounted running cost ``e^{−ρ (t_k − t0)} g(x_k, u_k, t_k)``,
+        ``"J"`` its integral from ``t0`` (the trapezoid of
+        :meth:`~minilink.core.costs.CostFunction.integrate`) with the discounted
+        terminal cost ``e^{−ρ (t_N − t0)} h(x_N, t_N)`` added at the last sample: its
+        last value is the run's ``J``, an evaluation's ``raw_cost`` on the same run.
+        """
+        xp = array_module(self.x)
+        h = cost.h
+        rho = discount_rate
+        t_N = self.t[-1]
+        x_N = self.x[:, -1]
+
+        # dJ_k = e^{−ρ (t_k − t0)} g_k, and its trapezoid ∫_{t0}^{t_k} dJ dτ
+        dJ, running = cost.integrate(self, discount_rate=rho, params=params, t0=t0)
+
+        # J(t_k) = ∫_{t0}^{t_k} dJ dτ, the terminal e^{−ρ (t_N − t0)} h(x_N, t_N) added at t_N
+        h_N = xp.exp(-rho * (t_N - t0)) * h(x_N, t_N, params)
+        J = xp.concatenate([running[:-1], running[-1:] + h_N])
+
+        return self.with_signals({"dJ": dJ.reshape(1, -1), "J": J.reshape(1, -1)})
 
     def of(self, role: str) -> Trajectory:
         """
@@ -183,7 +198,7 @@ class Trajectory(SampledSignals):
         Linear between the samples and held outside them, shape ``(dim,)``;
         ``name`` is ``"x"``, ``"u"`` or a recorded signal.
         """
-        values = self.get_signal(name)
+        values = self.signal(name)
         xp = array_module(values)
 
         value = interpolate_schedule(xp, self.t, values.T, t)

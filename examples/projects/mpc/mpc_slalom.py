@@ -11,6 +11,7 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
+from minilink.control import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
@@ -18,10 +19,7 @@ from minilink.core.shaping import inverse_barrier
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import mount, point_probe
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -53,12 +51,12 @@ keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 scene = Scene(obstacles=[Sphere(c, keepout_radius) for c in OBSTACLE_CENTERS])
 
 sys_mpc = BicycleDynRate()
-sys_mpc.state.lower_bound[6] = 0.0
-sys_mpc.state.upper_bound[6] = 90.0
-sys_mpc.state.lower_bound[7] = -0.55
-sys_mpc.state.upper_bound[7] = 0.55
-sys_mpc.inputs["u"].lower_bound = np.array([-80.0, -2.0])
-sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
+sys_mpc.state.lower[6] = 0.0
+sys_mpc.state.upper[6] = 90.0
+sys_mpc.state.lower[7] = -0.55
+sys_mpc.state.upper[7] = 0.55
+sys_mpc.inputs["u"].lower = np.array([-80.0, -2.0])
+sys_mpc.inputs["u"].upper = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
@@ -88,7 +86,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    method="scipy_slsqp",
+    method="slsqp",
     options={"maxiter": 100, "ftol": 0.1},
 )
 mpc = ModelPredictiveController(planner, delay=False)

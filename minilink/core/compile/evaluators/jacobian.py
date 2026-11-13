@@ -154,9 +154,8 @@ class JacobianMixin:
         choices += [repr(port_id) for port_id in inputs]
         if self._jac_wires:
             choices.append("a wire 'block:port'")
-        raise ValueError(
-            f"wrt must be {' or '.join(c for c in choices if c)}; got {wrt!r}"
-        )
+        choices = list(dict.fromkeys(c for c in choices if c))
+        raise ValueError(f"wrt must be {' or '.join(choices)}; got {wrt!r}")
 
     def _jac_wire_slice(self, name):
         if not self._jac_wires:

@@ -9,7 +9,7 @@ import numpy as np
 from minilink.core.backends import array_module
 
 SOLVERS = ("rk4", "euler")
-HOLDS = ("zoh", "foh")
+HOLDS = ("zoh", "linear")
 
 # Substeps traced one by one under JAX up to this count; more run in a rolled loop,
 # so a plant at the automatic step (a thousand steps a period) traces as one body

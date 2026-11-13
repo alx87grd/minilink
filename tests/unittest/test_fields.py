@@ -108,6 +108,19 @@ def test_a_non_symmetric_matrix_and_a_band_called_an_ellipsoid_are_refused():
         EllipsoidSet(V, None, -1.0)
 
 
+def test_an_ellipsoid_is_built_from_its_center_matrix_and_level():
+    """from_matrix(c, P, level) is {x : (x − c)ᵀ P (x − c) ≤ level}, the field's own sublevel set."""
+    region = EllipsoidSet.from_matrix(CENTER, P, 2.0)
+    same = QuadraticField(CENTER, P).as_set(upper=2.0)
+
+    assert isinstance(region, EllipsoidSet) and region.level == 2.0
+    for key in ("center", "P", "level"):
+        np.testing.assert_array_equal(region.params[key], same.params[key])
+    np.testing.assert_array_equal(region.sample(5, 4), same.sample(5, 4))
+    with pytest.raises(ValueError, match="level"):
+        EllipsoidSet.from_matrix(CENTER, P, -1.0)
+
+
 def test_the_ellipsoid_reads_its_params_and_moves_with_them():
     region = QuadraticField(CENTER, P).as_set(upper=2.0)
     moved = copy.deepcopy(region)
@@ -197,3 +210,128 @@ def test_a_set_seen_as_a_cost_carries_the_sets_numbers():
         "field": {"lower": -np.ones(2), "upper": np.array([2.0, 1.0])},
     }
     assert float(cost.g(x, np.zeros(1), params=narrow)) == 0.0
+
+
+def test_a_field_with_an_upper_level_alone_is_its_sublevel_set():
+    """``as_set(upper=level)`` is ``V ≤ level``: a field that goes negative keeps the points below zero."""
+    from minilink.core.fields import MarginField
+
+    clearance = MarginField(BoxSet([-1.0], [1.0]))
+    x_outside = np.array([3.0])  # V = −2
+
+    assert clearance.as_set(upper=0.5).contains(x_outside)
+    assert "lower" not in clearance.as_set(upper=0.5).params
+    assert not clearance.as_set().contains(x_outside)
+    assert clearance.as_set(lower=0.0, upper=0.5).params["lower"] == 0.0
+
+
+def test_a_box_drawn_with_no_key_is_its_center():
+    """No key, no draw: a box answers its center, as a uniform law does."""
+    box = BoxSet([-1.0, 0.0], [3.0, 2.0])
+
+    np.testing.assert_allclose(box.sample(None), [1.0, 1.0])
+    np.testing.assert_allclose(box.sample(None, n=3), [[1.0, 1.0]] * 3)
+
+
+def test_a_summed_cost_bound_refuses_a_partial_tree():
+    """A sum's bounds index their terms' numbers as ``g`` does: a tree missing a term is refused."""
+    from minilink.core.costs import QuadraticCost
+
+    total = QuadraticCost(np.eye(1), np.eye(1), np.eye(1), np.zeros(1), np.zeros(1))
+    total = total + 2.0 * QuadraticCost(
+        np.eye(1), np.eye(1), np.eye(1), np.ones(1), np.zeros(1)
+    )
+    X = BoxSet([-1.0], [1.0])
+    partial = dict(list(total.params.items())[:1])
+
+    with pytest.raises(KeyError):
+        total.g_max(X, X, partial)
+
+
+# The bounds and the dimension where they are known; the ball and the singleton draw
+
+
+def test_an_input_box_and_a_uniform_law_read_their_bounds_and_dimension():
+    from minilink import Pendulum
+    from minilink.core.distributions import Uniform
+
+    U = Pendulum().input_box
+    np.testing.assert_array_equal(U.lower, U.box.lower)
+    np.testing.assert_array_equal(U.upper, U.box.upper)
+    assert U.dim == 1
+    law = Uniform([-1.0, 0.0], [1.0, 2.0])
+    np.testing.assert_array_equal(law.lower, [-1.0, 0.0])
+    np.testing.assert_array_equal(law.upper, [1.0, 2.0])
+    assert law.dim == 2
+
+
+def test_every_set_and_field_states_its_dimension_where_it_is_known():
+    from minilink.core.fields import GridField, MarginField
+    from minilink.core.sets import BallSet, CallableSet, SingletonSet
+
+    box = BoxSet(-np.ones(3), np.ones(3))
+    V = QuadraticField(CENTER, P)
+    known = {
+        "box": box,
+        "ball": BallSet(np.zeros(3), 1.0),
+        "singleton": SingletonSet(np.zeros(3)),
+        "intersection": box & BallSet(np.zeros(3), 1.0),
+        "quadratic field": V,
+        "ellipsoid": V.as_set(upper=1.0),
+        "field set": V.as_set(lower=0.5, upper=1.0),
+        "margin field": MarginField(box),
+        "grid field": GridField([np.linspace(0.0, 1.0, 3)] * 3, np.zeros((3, 3, 3))),
+    }
+    for name, obj in known.items():
+        assert obj.dim == 3, name
+    unknown = CallableSet(margin=lambda z, t, p: z)
+    assert not hasattr(unknown, "dim")
+    assert not hasattr(unknown & unknown, "dim")
+
+
+def test_a_ball_draws_inside_itself_and_its_center_with_no_key():
+    from minilink.core.sets import BallSet
+
+    ball = BallSet([1.0, -2.0], 0.5)
+    np.testing.assert_array_equal(ball.sample(None), [1.0, -2.0])
+    np.testing.assert_array_equal(ball.sample(None, n=3), np.tile([1.0, -2.0], (3, 1)))
+    points = ball.sample(np.random.default_rng(0), n=500)
+    assert points.shape == (500, 2)
+    radii = np.linalg.norm(points - ball.center, axis=1)
+    assert np.all(radii <= 0.5)
+    # Uniform in a disc: P(r ≤ ρ) = (ρ / R)², half the draws inside R / √2
+    assert abs(np.mean(radii <= 0.5 / np.sqrt(2.0)) - 0.5) < 0.1
+    np.testing.assert_array_equal(ball.sample(3), ball.sample(3))
+    assert ball.sample(3).shape == (2,)
+
+
+@pytest.mark.jax
+def test_a_ball_draws_on_jax_under_jit():
+    jax = require_jax()
+    jnp = require_jax_numpy()
+    from minilink.core.sets import BallSet
+
+    ball = BallSet([1.0, -2.0], 0.5)
+    draw = jax.jit(lambda key: ball.sample(key, n=200))
+    points = draw(jax.random.PRNGKey(0))
+    assert isinstance(points, jnp.ndarray)
+    assert points.shape == (200, 2)
+    assert np.all(np.linalg.norm(np.asarray(points) - ball.center, axis=1) <= 0.5)
+    assert bool(jnp.all(jax.vmap(ball.contains)(points)))
+
+
+def test_a_singleton_draws_its_point_whatever_the_key():
+    from minilink.core.sets import SingletonSet
+
+    point = SingletonSet([0.3, 0.4])
+    np.testing.assert_array_equal(point.sample(None), [0.3, 0.4])
+    np.testing.assert_array_equal(point.sample(7, n=2), [[0.3, 0.4], [0.3, 0.4]])
+
+
+def test_a_ball_is_a_start_a_problem_draws_from():
+    from minilink import Pendulum, PlanningProblem
+    from minilink.core.sets import BallSet
+
+    problem = PlanningProblem(Pendulum(), x0=BallSet([0.5, 0.0], 0.1), horizon=1.0)
+    starts = problem.start_law.sample(0, n=50)
+    assert np.all(np.linalg.norm(starts - [0.5, 0.0], axis=1) <= 0.1)

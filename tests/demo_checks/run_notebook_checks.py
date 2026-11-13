@@ -12,8 +12,7 @@ Defaults: ``timeout=180``, ``requires=[]``. Overrides in
 ``notebook_overrides.json`` (``smoke: false`` drops a long notebook from the
 default suite; ``--all`` keeps it; ``nightly: false`` drops it from ``--all``
 too, so it runs only when named with ``--notebook``). Not run: ``projects/`` and
-``experimental/``. Performance benchmarks live under ``benchmarks/`` (run via
-``benchmarks/run_study.py`` or ``benchmarks/ode_solver_benchmark.ipynb``).
+``experimental/``.
 
 Usage (from repo root)::
 
@@ -69,10 +68,9 @@ def _notebook_id(rel_path: str) -> str:
 def notebook_ids(rel_paths: list[str]) -> dict[str, str]:
     """Unique id per notebook: its short id, or its path when two share one.
 
-    ``courses/udes_gro860/drone_ppo`` and ``topics/reinforcement_learning/
-    drone_ppo`` both shorten to ``teaching_drone_ppo``; each then takes its
-    path under ``examples/`` joined by ``_``
-    (``teaching_courses_udes_gro860_drone_ppo``).
+    Two notebooks of one name in two folders (``courses/a/x`` and
+    ``topics/b/x``) both shorten to ``teaching_x``; each then takes its path
+    under ``examples/`` joined by ``_`` (``teaching_courses_a_x``).
     """
     short = {rel: _notebook_id(rel) for rel in rel_paths}
     counts = Counter(short.values())

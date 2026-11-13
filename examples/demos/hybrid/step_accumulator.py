@@ -8,7 +8,7 @@ from minilink.core.backends import array_module
 
 class DiscreteAccumulator(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "DiscreteAccumulator"
         self.x0 = np.zeros(1)
 

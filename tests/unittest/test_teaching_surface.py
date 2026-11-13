@@ -48,6 +48,13 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Evaluation",
         "Gaussian",
         "Uniform",
+        "QuadraticField",
+        "GridField",
+        "LTISystem",
+        "LinearizedSystem",
+        "MechanicalSystem",
+        "step_info",
+        "poles",
     ),
     "minilink.estimation": ("StateObserver", "kalman", "luenberger"),
     "minilink.core": (
@@ -64,6 +71,18 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "StepDiagramSystem",
         "Gaussian",
         "Uniform",
+        "MarginField",
+        "GridField",
+        "CallableSet",
+        "IntersectionSet",
+        "SumCost",
+        "ScaledCost",
+        "SampledSystem",
+        "SampledDiagramSystem",
+        "quadratic_hinge",
+        "quadratic_excess",
+        "inverse_barrier",
+        "occupancy",
     ),
     "minilink.blocks": (
         "Integrator",
@@ -123,11 +142,15 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "step_response",
         "plot_step_response",
         "modal_analysis",
+        "poles",
         "controllability",
         "observability",
         "find_equilibrium",
         "linearize",
         "discretize",
+        "step_info",
+        "Margins",
+        "StepInfo",
     ),
     "minilink.simulation": ("Simulator", "StaticSimulator"),
     "minilink.optimization": ("MathematicalProgram", "Optimizer"),
@@ -140,7 +163,6 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "StateSpaceGrid",
         "DynamicProgrammingPlanner",
         "LookupPolicy",
-        "PolicyEvaluator",
         "QuadraticFeatures",
         "RadialBasisFeatures",
         "LinearApproximator",
@@ -161,6 +183,9 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Manipulator",
         "StateSpaceSystem",
         "LTISystem",
+        "DiscreteLTISystem",
+        "LinearizedSystem",
+        "LinearizedStepSystem",
     ),
     "minilink.learning": (
         "ReinforcementLearningPlanner",
@@ -175,7 +200,7 @@ TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.design", "lqr"),
     ("minilink.control.design", "lqr_gain"),
     ("minilink.control.design", "lqr_finite_horizon"),
-    ("minilink.control.design", "trajectory_lqr"),
+    ("minilink.control.design", "lqr_trajectory"),
     ("minilink.control.design", "place"),
     ("minilink.control.design", "place_gain"),
     ("minilink.control.design", "lqg"),
@@ -393,8 +418,8 @@ lqr(lti, np.eye(2), np.eye(1))
 goal = np.array([np.pi, 0.0])
 problem = PlanningProblem(plant, U=plant.input_box,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal))
-grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(3,), dt=0.05)
-DynamicProgrammingPlanner(problem, grid=grid, max_iterations=20, verbose=False).solve()
+grid = StateSpaceGrid(problem, x_grid=(21, 21), u_grid=(3,), dt=0.05)
+DynamicProgrammingPlanner(problem, grid=grid, max_iterations=20).solve()
 print("BASIC-TIER-OK", traj.n_samples)
 """
 
