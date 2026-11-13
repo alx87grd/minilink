@@ -3,7 +3,9 @@
 **Status:** ideas to review, not decided — options and a recommendation, 2026-10-20. The
 package question (A) is settled: `minilink.planning` regrouped by pillar and reinforcement
 learning moved to `minilink.learning`, the `identification/` stub removed, and the package folders restructured on 2026-10-24. Still open,
-and maintainer-owned: the examples tree (B, §3) and where the course material lives (C, §4).  
+and maintainer-owned: the examples tree (B, §3) and where the course material lives (C, §4).
+§7 holds the working plan of 2026-11-13 for the repositories and the layout of the teaching
+one: the direction the maintainer prefers so far, sooner than §4.3's "at v1.0", not yet a ruling.  
 **Lane:** maintainer-owned (student-facing paths and public names; AGENTS.md "Ask first").  
 **Rung:** serves the decision "Where the course material and the projects live"
 (steps K5 / K6 of [TODO.md](TODO.md), v0.9, rows waiting for the maintainer's go);
@@ -177,3 +179,104 @@ research material is a separate call (§6, ask 3).
 When the maintainer rules, the ruling updates this doc and the steps go to
 [TODO.md](TODO.md) in the same change; the commit message carries its why (one fact, one
 home: [README.md](README.md)).
+
+## 7. The repositories and the teaching repo's layout (working plan, 2026-11-13)
+
+The maintainer's preferred direction so far, from the v0.4 consolidation discussion. It moves
+the course material out sooner than §4.3 proposed. Names are candidates until the
+repositories exist.
+
+### 7.1 Four repositories, one question each
+
+| Repository | Visibility | Holds | Rule |
+| --- | --- | --- | --- |
+| `minilink` | public, exists | the library, the tutorials, the curated demos, tests, docs | depends on nothing else of the maintainer's; every file is one to show a stranger |
+| `teaching` (candidate name) | public, to create | the course notebooks and free-standing teaching demonstrations, mostly on minilink but not limited to it | every notebook pins a released tag; a course folder changes between terms only |
+| `minilink-lab` (candidate name) | private, to create when a student needs it | research projects, one folder each; the experimental package | each project pins a tag or a commit; a feature that matures is rewritten into `minilink`, never imported from here |
+| `minilink-private` | private, exists | the maintainer's sandbox: pet ideas, old demos worth a second look | no rules; nothing imports from it |
+
+The sorting question for any file: is it for anyone, for my students, for my lab, or for me?
+Dependencies flow one way: the other three depend on `minilink`, never the reverse. Until
+`minilink-lab` exists, the research projects can sit in `minilink-private` under `projects/`.
+
+Promotion goes `minilink-private` → `minilink-lab` → `minilink`, and code is rewritten on the
+way up, not moved.
+
+### 7.2 The teaching repository: name and top level
+
+The rule that avoids a path such as `control-notebooks/control/`: the repository's name says
+what kind of thing it is, the folders say which subject, and no word appears twice in a path.
+
+**Preferred: `teaching`, subjects at the top level.**
+
+```
+teaching/
+  README.md            the index: one line per notebook, with its Colab badge
+  courses/
+    gro860/
+    gro501/
+    gmc714/
+  dynamics/            modelling, simulation, phase plane
+  control/             PID, root locus, Bode, state feedback, observers
+  optimal-control/     dynamic programming, LQR, trajectory optimization, MPC
+  planning/            RRT, search
+  learning/            Q-learning, policy gradient, PPO
+  robots/              arms: kinematics, impedance, computed torque
+  vehicles/            bicycle models, tires, the racecar
+```
+
+Two rules keep it tidy:
+
+- **A course folder holds only what its PDF links to.** A course notebook that is really a
+  topic notebook lives in the topic folder and the course's README links to it: one copy of
+  each notebook.
+- **A notebook goes where its main idea is, not its plant.** LQR on a cart-pole is
+  `optimal-control/`, not a `cartpole/` folder.
+
+Keep the top level to about eight folders.
+
+**Alternatives considered:**
+
+| Name | Top level | For | Against |
+| --- | --- | --- | --- |
+| `robotics-notebooks` | `courses/`, `modeling/`, `feedback/`, `estimation/`, `optimal-control/`, `planning/`, `learning/`, `systems/` | clear to a stranger | "robotics" undersells GRO501's classical control |
+| `notes-code` | one folder per set of course notes, by chapter, plus `extras/` | a student goes from the PDF's chapter to the code | ties the layout to documents that also change |
+| `by-example` | `courses/`, `dynamics/`, `control/`, `planning/`, `learning/`, `robots/` | paths read like a sentence | vague in a list of repositories |
+
+Other names on the list: `control-notebooks`, `control-by-example`, `teaching-notebooks`,
+`course-notebooks`, `dynamics-and-control`, `phase-space`, `cost-to-go`. Avoid a course code or
+`minilink` in the name: the content outlives both.
+
+### 7.3 The move, without touching a running course
+
+Checked 2026-11-13: every course link and Colab badge points at the `main` branch
+(`…/minilink/blob/main/examples/teaching/…`), and `main` is the tag `0.3.0` plus one README
+commit. So the notebooks can leave on `dev` now; students see nothing until `main` moves.
+
+1. Create the teaching repository and copy the notebooks **from `main`** (they run on `0.3.0`;
+   the `dev` versions differ in 22 files and wait on a branch for the v0.4 tag).
+2. Pin every install cell on the tag (§7.4), and check each notebook in Colab from its new
+   address.
+3. Remove `examples/teaching/` on a `dev` branch, with the checks that name it.
+4. Update the links of the course PDFs and pages; the new repository is live, so this can be
+   done at any time.
+5. Push to `main` after the term.
+
+Leaving the library's CI is the cost: a rename no longer fails on a course notebook. The
+replacement is a check in the teaching repository that runs every notebook against its pin.
+
+### 7.4 The pin
+
+A **tag**, never a branch (it moves) and not a commit hash (unreadable for a student; fine for
+a research project that needs an unreleased state). Tags are bare (`0.3.0`, no `v`), published
+to PyPI by the publish workflow: `0.1.0`, `0.1.1`, `0.2.0`, `0.3.0` are on PyPI. A release tag
+is never moved; a fix is a new tag and one commit bumping every notebook of the course.
+
+**Open, for the maintainer:** the form of the pin in the new repository. The ruling of
+2026-10-25 (§6, ask 2) chose `git clone -b <tag>` over `pip install minilink==<tag>` because
+the notebooks import the examples tree by relative path. In a repository of their own that
+reason holds only for notebooks that still need files of `examples/`; for the others
+`pip install -q minilink==0.3.0` is shorter and faster. Two facts to check per notebook: does
+it import from the examples tree, and does it use `minilink.experimental` (not in the wheel;
+`ode_simulation.ipynb` of GRO501 mentions it)?
+
