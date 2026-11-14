@@ -906,16 +906,21 @@ files only.
 | Tests | 42 539 lines, 101 files | 12 000 to 15 000 lines |
 | Benchmarks | 5 886 lines | 1 000 to 2 000 lines (the regression gate) |
 | Demos | 94 scripts | 12 to 15 scripts |
-| Projects and `minilink/experimental/` | 10 351 lines | none here (the private repository) |
+| Projects and `minilink/experimental/` | 10 351 lines | none here (`workbench`, private) |
 | Tutorial notebooks | 19 | 6 to 8 |
-| Course and topic notebooks | 25 | none here (a courses repository, pinned to a release; moved between terms) |
+| Course and topic notebooks | 25 | none here: moved to `teaching` (2026-11-13) |
 | Governance and plan docs | 9 151 lines, 23 files | 1 500 to 2 000 lines |
 
 - **Three repositories:** `minilink` (the library, the minimal examples, a compact
-  architecture page); a public courses repository for the course notebooks, pinned to a
-  release, with a nightly run against `minilink`'s main that warns and never blocks; the
-  maintainer's private repository for the scratch work, the former demos, the projects and the
-  research models.
+  architecture page); `teaching` (public, `alx87grd/teaching`: the course and topic notebooks
+  sorted by topic, one list per course, its own CI; following `dev` until it is pinned on
+  `0.4.0`); `workbench` (private, `alx87grd/workbench`: the maintainer's log of quick tests,
+  references, prototypes and private course material). Created 2026-11-13, the course
+  notebooks moved (repository-structure.md §7.0).
+- **Next step: sort the examples and the experimental folder** (the maintainer, 2026-11-14).
+  Go through `examples/` (the demos and the projects) and the top-level `experimental/`
+  folder, and decide for each item: a minilink example (one of the minimal set), a prototype
+  in `workbench`, a notebook in `teaching`, or deleted.
 - **The order:** the snapshot tag; the list of examples, each naming the core tools it
   shows (the maintainer's); the new examples built, the rest moved out; the core cut, one
   decision at a time, by what no example and no course notebook uses, with the tests still
