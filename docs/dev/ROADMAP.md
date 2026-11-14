@@ -629,8 +629,8 @@ GRO501 (§4.2, v0.2) and GMC714 (§4.3, v0.3). A course is
    plant composes with `@`.
 2. Default `compute_trajectory` returns a fixed output count (10 001, the fine
    reporting grid) and never selects a solver from the point count.
-3. Every GRO860 notebook and every `examples/tutorial/`, `examples/teaching/`, and `examples/demos/`
-   file imports only through the teaching surface (CI test).
+3. Every `examples/tutorial/` and `examples/demos/` file imports only through the teaching
+   surface (CI test); the course notebooks moved to the teaching repository (2026-11-13).
 4. The Basic tier (NumPy + SciPy + Matplotlib, nothing else) runs
    sim / plot / phase plane / animate / linearize / LQR / VI in a clean
    environment (CI test).
@@ -1051,7 +1051,7 @@ public name; v1.0 (§5.7) freezes.
 After two cohorts have run on v0.2 and the freeze candidate has held a term:
 - **V8** A textbook-validation suite: Dorf / Ogata / Franklin worked examples asserted
   numerically; GRO501 gate 3 is its seed.
-- **V9** Course-neutral labs (10–15 in `examples/teaching/topics/`) and a "For
+- **V9** Course-neutral labs (10–15 in the teaching repository's topic folders) and a "For
   instructors" page. **[maintainer]**
 - **V10** The public face: a teaching quickstart in the README; no internal vocabulary in
   user-facing files; `CONTRIBUTING.md`, issue templates, a code of conduct. **[ask]**

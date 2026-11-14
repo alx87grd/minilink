@@ -1,6 +1,6 @@
 """Differentiate through a CartPole rollout: U-only vs U+params co-design, solved by Optimizer."""
 
-# Teaching twin: examples/teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb
+# Teaching twin: optimal_control/cartpole_rollout_gradients.ipynb in the teaching repository
 
 import jax
 import jax.numpy as jnp

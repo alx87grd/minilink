@@ -36,7 +36,7 @@ the maintainer would and logged in the run's record.
 | The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name, `C(q, v)` or `C(q, dq)`, `actuators=` a count |
 | The root list regenerated from the rebuilt demos | — | v0.4 (end, with K8-1) | your review of the drafted list (§1.13) |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
-| Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
+| The examples tree; where the projects live | K5 | v0.9 | repository-structure.md's options (the course material is ruled: §7.0) |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
@@ -50,7 +50,7 @@ the maintainer would and logged in the run's record.
 | Which pyro demos the courses need | C1 | v0.5 | your pick |
 | Catalog hygiene | S64 | v0.5 | the per-plant clean-ups |
 | Traceable linear analysis | S73 | v0.5 (any time) | `poles`, `frequency_response`, `margins` through the array module, and the sensitivity peaks |
-| The move of the course material | K6 | v0.9 | only if K5 says so |
+| The teaching repository's switch to 0.4.0 | K6 | v0.4 (after the fall term) | pin every notebook on `0.4.0`, move the course notes' links |
 | The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook |
 | A lighter git history | V11 | v0.9 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
@@ -741,17 +741,17 @@ terms; the v1.0 rows after two cohorts.
 
 ### v0.9 — what could still break a name
 
-- [ ] **Where the course material and the projects live** (K5) **[ask — student-facing]**
-  `examples/teaching/` and/or `examples/projects/` in their own repositories, or here, and the
-  examples tree's layout (repository-structure.md §3: tidy today's names, two axes chapter and
-  course, or notebook-first; recommended two axes). The recommendation for the material: pinned
-  cells now, a course repository at v1.0. Options, a recommendation and the asks:
-  [repository-structure.md](repository-structure.md). Done when the ruling is recorded.
-- [ ] **The move** (K6), if K5 says so **[ask — student-facing]**: the history kept
-  (`git filter-repo` per folder), every citing document updated (the GRO860 notes and webpage
-  links, GRO501's `\colab{}`), the new repositories' CI pinned on a minilink release, the
-  notebook smoke check moved with them, this repo's README and `examples/README.md` pointing
-  there. Done when every course link resolves and both CIs pass.
+- [ ] **Where the projects live, and the examples tree** (K5) **[ask — student-facing]**
+  `examples/projects/` in its own repository or here, and the examples tree's layout
+  (repository-structure.md §3). The course material is ruled and moved (§7.0 there: the
+  `alx87grd/teaching` repository, by topic, one list per course). Done when the ruling is
+  recorded.
+- [ ] **The teaching repository's switch** (K6) **[maintainer]**, after the fall term, once
+  `dev` is merged into `main` and `0.4.0` tagged: every notebook's install cell and
+  `requirements.txt` pinned on `0.4.0`, the citing documents updated (the GRO860 notes and
+  webpage links, GRO501's `\colab{}`) to the topic paths. Done when every course link resolves
+  and the teaching repository's CI passes on the pin. (The move itself landed on
+  `dev-consolidation`, 2026-11-13: repository-structure.md §7.0.)
 - [ ] **S27** Diffrax as an optional JAX solver backend, beside the step model's integrators,
   only if a benchmark asks for it, an optional extra (`solver="diffrax"`), never required (a choice)
   (`core/compile/evaluators/stepping.py`). S37 (evaluators keep pure maps and one scannable step; the integrators'
@@ -847,7 +847,7 @@ terms; the v1.0 rows after two cohorts.
   examples from Dorf & Bishop, Ogata, Franklin–Powell asserted numerically (margins, step
   specifications, root locus, LQR and Kalman gains), each citing its example number; GRO501
   gate 3 is the seed. Done when the README links it as the correctness evidence.
-- [ ] **Course-neutral labs** (V9) **[maintainer]**: `examples/teaching/topics/` grows from 5
+- [ ] **Course-neutral labs** (V9) **[maintainer]**: the teaching repository's topic folders grow from 5
   to 10–15 labs (objectives, prerequisites, time, starter and solution), classical control
   and robotics first; a "For instructors" page (pin a version, Colab, adapt a lab, report a
   bug).
@@ -858,9 +858,9 @@ terms; the v1.0 rows after two cohorts.
   the repository on Zenodo once; each release then gets a DOI); the JOSS entry and the RULES 6.9
   carve-out for its state-of-the-field section, decided after v1.0.
 - [ ] **The Stable-Baselines3 teaching notebooks** (S49) **[ask]**, at the end of the term.
-  Four, in `teaching/courses/udes_gro860/`: retire `drone_ppo_sb3.ipynb` and
-  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb` (delete them, their notebook overrides
-  and allowlist entries, and the README rows marked Stable-Baselines3) once the course notes
+  Four, in the teaching repository's `reinforcement_learning/`: retire `drone_ppo_sb3.ipynb` and
+  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb` (delete them, their entries in its
+  `tests/notebooks.json` and `courses/gro860.md`) once the course notes
   point only at the native twins; decide `particle_gymnasium_sb3.ipynb` and
   `gymnasium_interface.ipynb` then.
 - [ ] **Realtime architectural review** **[ask — core]**: `RealtimeSimulator` and the pygame

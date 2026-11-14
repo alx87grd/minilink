@@ -89,7 +89,7 @@ NAMED_CLASS_MODULES = (
 )
 
 # 6.7 — the teaching lane, which must run without the optional Ipopt build.
-TEACHING_EXAMPLE_ROOTS = ("examples/tutorial", "examples/teaching", "examples/demos")
+TEACHING_EXAMPLE_ROOTS = ("examples/tutorial", "examples/demos")
 
 
 # 6.5 — the unit-test modules that are JAX from end to end, the only ones a

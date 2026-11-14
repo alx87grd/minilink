@@ -302,6 +302,6 @@ import sys; sys.path.insert(0, "/content/minilink")
 - [Interactive Pitch Deck](https://alx87grd.github.io/minilink/presentation.html) — self-contained 14-slide executive, academic, and industrial presentation deck.
 - [Showcase Notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb) — one pendulum, its equation written once, handed to every tool: a loop, a clock, LQR, three planners, MPC, reinforcement learning, gradients; about a minute to run.
 - [Tutorials](https://github.com/alx87grd/minilink/tree/main/examples/tutorial) — three layers: `basics/` (model, connect, simulate; start with `01_minilink`), `core/` (the foundation objects and the problem pipeline), `advanced/` (discrete and hybrid loops, optimal control, MPC, RL, differentiable loops).
-- [Teaching Notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching) — swing-up control, dynamic programming, and PPO.
+- [Teaching Notebooks](https://github.com/alx87grd/teaching) — course and topic notebooks in their own repository: control, dynamic programming, LQR, MPC, reinforcement learning.
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).

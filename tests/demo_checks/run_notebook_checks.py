@@ -1,9 +1,6 @@
-"""Execute teaching notebooks via nbclient (demo-check layer).
+"""Execute the tutorial notebooks via nbclient (demo-check layer).
 
-Auto-discovers ``.ipynb`` under mature tutorial/teaching trees:
-
-* ``examples/tutorial/``
-* ``examples/teaching/``
+Auto-discovers ``.ipynb`` under ``examples/tutorial/``.
 
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
 A cell that starts a live keyboard session (``.game(``) is left out: it runs
@@ -37,10 +34,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _CHECKS_DIR = Path(__file__).resolve().parent
 OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
-NOTEBOOK_ROOTS = (
-    REPO_ROOT / "examples" / "tutorial",
-    REPO_ROOT / "examples" / "teaching",
-)
+NOTEBOOK_ROOTS = (REPO_ROOT / "examples" / "tutorial",)
 DEFAULT_TIMEOUT = 180.0
 # A live keyboard session hangs until the user quits; the cell calling it is not run.
 INTERACTIVE_CALL = re.compile(r"^[^#\n]*\.game\(", re.MULTILINE)
@@ -60,17 +54,15 @@ def _notebook_id(rel_path: str) -> str:
         if stem.startswith("showcase_"):
             return stem
         return f"tutorial_{stem}"
-    if "/teaching/" in rel_path:
-        return f"teaching_{stem}"
     return "_".join(Path(rel_path).with_suffix("").parts[-2:])
 
 
 def notebook_ids(rel_paths: list[str]) -> dict[str, str]:
     """Unique id per notebook: its short id, or its path when two share one.
 
-    Two notebooks of one name in two folders (``courses/a/x`` and
-    ``topics/b/x``) both shorten to ``teaching_x``; each then takes its path
-    under ``examples/`` joined by ``_`` (``teaching_courses_a_x``).
+    Two notebooks of one name in two folders (``basics/x`` and ``core/x``)
+    both shorten to ``tutorial_x``; each then takes its path under
+    ``examples/`` joined by ``_`` (``tutorial_basics_x``).
     """
     short = {rel: _notebook_id(rel) for rel in rel_paths}
     counts = Counter(short.values())
@@ -92,7 +84,7 @@ def _load_overrides() -> dict[str, dict]:
 
 
 def _discover_notebooks() -> list[str]:
-    """Repo-relative paths of smoked teaching / tooling notebooks."""
+    """Repo-relative paths of the smoked notebooks."""
     found: list[str] = []
     for root in NOTEBOOK_ROOTS:
         if not root.is_dir():
@@ -229,7 +221,7 @@ def _close_ids(name: str, ids: list[str]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Notebook smoke checks: execute each teaching notebook's code cells "
+            "Notebook smoke checks: execute each tutorial notebook's code cells "
             "(outputs discarded; fail on error)"
         )
     )

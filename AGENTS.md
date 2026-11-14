@@ -94,7 +94,7 @@ Keep DESIGN.md call chains minimal.
 
 **Do directly:** typos and stale docs; docstrings/types in files you are already changing for the task; small cleanups that directly support the requested change.
 
-**Never without explicit ask:** revert, uncomment, rename, or "polish" the user's manual edits in demos, `examples/`, notebooks, or scratch files: tuning constants (`TF`, gains, step times), commented-out plot/animate calls, disabled sections, exploratory locals. Commit and review passes must not overwrite user-tuned script state. Do not rename or move anything under `examples/teaching/courses/` without the citing documents in the same change: GRO860 is notes + webpage; GRO501 for now is only the Notes-Commande `\colab{}` (no course webpage).
+**Never without explicit ask:** revert, uncomment, rename, or "polish" the user's manual edits in demos, `examples/`, notebooks, or scratch files: tuning constants (`TF`, gains, step times), commented-out plot/animate calls, disabled sections, exploratory locals. Commit and review passes must not overwrite user-tuned script state. The course and topic notebooks live in their own repository, `alx87grd/teaching` (`~/code/teaching`): sorted by topic, one list per course in `courses/<course>.md`; a notebook on an active course's list is not renamed or moved during its term.
 
 **Ask first (maintainer-owned):** anything student-facing (`README.md`,
 `examples/`, notebooks, ROADMAP §1, §2 and §4, public names); **core

@@ -1,4 +1,4 @@
-"""Notebook smoke checks — execute teaching notebooks; fail on cell errors.
+"""Notebook smoke checks — execute the tutorial notebooks; fail on cell errors.
 
 **Human (IDE):** open this file and click **Run**.
 """

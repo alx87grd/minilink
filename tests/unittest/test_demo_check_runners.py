@@ -43,7 +43,6 @@ _FORBIDDEN_DEMO_HARNESS = re.compile(
 )
 _DEMO_ROOTS = (
     REPO_ROOT / "examples" / "tutorial",
-    REPO_ROOT / "examples" / "teaching",
     REPO_ROOT / "examples" / "demos",
 )
 
@@ -75,7 +74,7 @@ class TestDemoCheckRunners(unittest.TestCase):
                     hits.append(path.relative_to(REPO_ROOT).as_posix())
         if hits:
             self.fail(
-                "examples/tutorial, examples/teaching, and examples/demos must not "
+                "examples/tutorial and examples/demos must not "
                 "contain smoke/CI harness hooks (adapt in tests/demo_checks "
                 "instead):\n  " + "\n  ".join(hits)
             )
@@ -208,11 +207,6 @@ class TestDemoCheckManifests(unittest.TestCase):
         """A stale ``--demo`` or ``--notebook`` id fails and names the close ids."""
         cases = (
             (flagship_runner, ["--demo", "mpc_minimal"], ["mpc_car_minimal"]),
-            (
-                notebook_runner,
-                ["--notebook", "teaching_drone_pp"],
-                ["teaching_drone_ppo"],
-            ),
             (
                 notebook_runner,
                 ["--notebook", "intro_01_minilink"],

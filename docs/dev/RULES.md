@@ -567,7 +567,7 @@ concrete formatting, ordered by the cost of being wrong:
   missing `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.
 - **6.2 No test harness code in demos:** Never add test environment branches (`if CI: ...`),
   smoke env vars (`MINILINK_NOTEBOOK_SMOKE`), mock flags, or headless switches inside
-  `examples/demos/`, `examples/tutorial/`, or `examples/teaching/`. Test runners adapt
+  `examples/demos/` or `examples/tutorial/`. Test runners adapt
   from the outside (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Falling back when
   an optional package is missing (Ipopt → SciPy) is user UX, not a test hook.
 - **6.3 Tests only when justified.** Write tests for stable public APIs, TRL milestones,

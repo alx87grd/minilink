@@ -4,8 +4,8 @@
 package question (A) is settled: `minilink.planning` regrouped by pillar and reinforcement
 learning moved to `minilink.learning`, the `identification/` stub removed, and the package folders restructured on 2026-10-24. Still open,
 and maintainer-owned: the examples tree (B, §3) and where the course material lives (C, §4).
-§7 holds the working plan of 2026-11-13 for the repositories and the layout of the teaching
-one: the direction the maintainer prefers so far, sooner than §4.3's "at v1.0", not yet a ruling.  
+§7 holds the plan of 2026-11-13 for the repositories and the teaching one, ruled and partly
+done the same day (§7.0): the course material (C) is decided; the examples tree (B) is not.  
 **Lane:** maintainer-owned (student-facing paths and public names; AGENTS.md "Ask first").  
 **Rung:** serves the decision "Where the course material and the projects live"
 (steps K5 / K6 of [TODO.md](TODO.md), v0.9, rows waiting for the maintainer's go);
@@ -185,6 +185,24 @@ home: [README.md](README.md)).
 The maintainer's preferred direction so far, from the v0.4 consolidation discussion. It moves
 the course material out sooner than §4.3 proposed. Names are candidates until the
 repositories exist.
+
+### 7.0 Ruled and done (the maintainer, 2026-11-13)
+
+- **The course and topic notebooks moved** to the public repository `alx87grd/teaching`, on
+  `dev-consolidation`, with `examples/teaching/` deleted here and the checks that named it.
+- **Sorted by topic, not by course** (supersedes §7.2's `courses/<id>/` folders): `python/`,
+  `dynamics/`, `control/`, `optimal_control/`, `dynamic_programming/`,
+  `reinforcement_learning/`, `machine_learning/` (`planning/` with its first notebook). A course is a list,
+  `courses/<course>.md`, linking the notebooks its notes cite in the notes' order; a notebook
+  on an active course's list is not renamed or moved during the term.
+- **The bleeding edge until 0.4.0:** copied from `dev`, not `main` (supersedes §7.3 step 1);
+  the install cells clone minilink's `dev`. Nothing links to the repository yet.
+- **Its own CI:** `tests/run_notebooks.py`, one job per course on every push, every notebook
+  each night.
+- **Left, all at once after the fall term:** `dev` merged into `main` and `0.4.0` tagged; every
+  notebook pinned to `0.4.0`; the course notes' links moved to the new repository.
+- The private side went to `alx87grd/workbench` (log, reference, prototypes, private course
+  material), which replaces `minilink-private` in §7.1.
 
 ### 7.1 Four repositories, one question each
 

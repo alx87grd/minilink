@@ -165,7 +165,7 @@ job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated
 throw, and the ``laptops`` job runs the same smoke on the Basic tier under Windows and macOS.
 
 Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
-only sets headless display knobs. A contract test scans ``examples/tutorial/``, ``examples/teaching/``,
+only sets headless display knobs. A contract test scans ``examples/tutorial/``
 and ``examples/demos/`` for forbidden harness names (see
 ``test_examples_have_no_smoke_env_hooks``).
 
