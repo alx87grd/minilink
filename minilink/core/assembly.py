@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 
 import numpy as np
 
@@ -116,20 +115,8 @@ def inline_diagram(
     return id_map
 
 
-@dataclass(frozen=True)
-class FlattenReport:
-    """How :func:`flatten_diagram` renamed nested blocks.
-
-    ``id_map`` keys every leaf block by its nested path, joined with ``/`` at every
-    level (``"loop/inner/plant"``), to its flat id (``"loop__inner__plant"``, or a
-    numbered id when that name was taken).
-    """
-
-    id_map: dict[str, str]
-
-
-def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenReport]:
-    """Return a single-level copy of ``diagram`` with nested boxes inlined.
+def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, dict[str, str]]:
+    """Return ``(flat, id_map)``: a single-level copy of ``diagram`` with nested boxes inlined, and how its blocks were renamed.
 
     Nested block ids join with ``__`` (``inner__plant``), matching topology
     expand. The stacked state ``x = [x_1; x_2; \\ldots]`` (block order from
@@ -138,7 +125,9 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
     them all at its one level, so the sampled plan reads its slices from the
     nested layout
     (:func:`~minilink.core.compile.plan.nested_layout`). The input diagram is
-    not modified.
+    not modified. ``id_map`` keys every leaf block by its nested path, joined
+    with ``/`` at every level (``"loop/inner/plant"``), to its flat id
+    (``"loop__inner__plant"``, or a numbered id when that name was taken).
     """
     if not is_box(diagram):
         raise TypeError(
@@ -152,9 +141,9 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
         nested_id = first_nested_subsystem_id(flat)
         if nested_id is None:
             break
-        inner_flat, inner_report = flatten_diagram(flat.subsystems[nested_id])
+        inner_flat, inner_map = flatten_diagram(flat.subsystems[nested_id])
         local_map = replace_nested_subsystem(flat, nested_id, inner_flat)
-        for inner_path, inner_id in inner_report.id_map.items():
+        for inner_path, inner_id in inner_map.items():
             id_map[f"{nested_id}/{inner_path}"] = local_map[inner_id]
 
     # The top-level leaves keep their ids
@@ -162,7 +151,7 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
         if not is_box(subsystem):
             id_map[sys_id] = sys_id
 
-    return flat, FlattenReport(id_map=id_map)
+    return flat, id_map
 
 
 def remap_params_nested_to_flat(diagram: DiagramSystem, params) -> dict | None:
@@ -171,10 +160,9 @@ def remap_params_nested_to_flat(diagram: DiagramSystem, params) -> dict | None:
         return None
 
     check_diagram_params(params, diagram.subsystems)
-    flat, report = flatten_diagram(diagram)
+    flat, id_map = flatten_diagram(diagram)
     remapped = {
-        report.id_map[path]: piece
-        for path, piece in nested_params_by_path(diagram, params)
+        id_map[path]: piece for path, piece in nested_params_by_path(diagram, params)
     }
     check_diagram_params(remapped, flat.subsystems)
     return remapped

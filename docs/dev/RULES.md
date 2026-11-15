@@ -113,7 +113,7 @@ concrete formatting, ordered by the cost of being wrong:
   or a program's at `z` (`J*` at the optimum: a record's `.J`, a solve's `status["J"]`, the
   running signal `"J"` and its rate `"dJ"`); `objective` is the criterion minimized over draws;
   `cost_to_go` is the function `J(x, t)` (a `Field`; `J*` or `J_π` by its source, not its
-  name; `ValueTables.J` is the DP table). A quantity that is neither keeps a name of its own
+  name; a value-iteration record's `.J` is the DP table, by node). A quantity that is neither keeps a name of its own
   (`raw_cost`, `path_cost`, `cost_to_come`, `mean_episode_cost`). Recorded exception:
   `Manipulator.J(q)` is the Jacobian, the robotics textbook's letter.
   The whole vocabulary, one word per idea and one idea per word
@@ -148,7 +148,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A planner's record | `solution.record` | `solution.solver` |
   | The block the RL planner trains, given and read back (the actor of actor-critic; the handed-out copy is `solution.controller`) | `actor=`, `planner.actor` | `policy=` |
   | Train, and train more: every planner's one verb (the RL planner's `solve(n_timesteps=)` and the tabular learner's `solve(n_episodes=)` continue their training); the learned law's action | `solve`; `solution.controller`, `planner.actor.action(x)` | `learn`, `predict` (Stable-Baselines3's words, on the bridge's `SB3Controller` only) |
-  | A grid planner's tables, `J` and `pi` by node: the latest solution's; a tabular learner's table as it stands | `ValueTables`, `solution.record.tables`, `planner.tables`; `planner.greedy_tables` | `DynamicProgrammingResult`, `planner.result` |
+  | A grid planner's tables, `J` and `pi` by node | `solution.record.J`, `solution.record.pi` | `DynamicProgrammingResult`, `planner.result`, `ValueTables`, `planner.tables` |
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
   | A solve's wall time, on every planner's record (`None` where the solve has no wall clock) | `solve_time_s` | `train_time_s` for a solve's time (the neural learner's `train_time_s` counts every training of the planner) |
@@ -319,7 +319,7 @@ concrete formatting, ordered by the cost of being wrong:
      block 4 (`J11`, `J12`, …), and the matrix is assembled here, row by row (5.5).
   6. **Return** (output). `return` of a name. Never an equation or an array on the
      `return` line; a result object built from named results may be
-     (`return ValueTables(grid=grid, J=J, …)`).
+     (`return PlanningSolution(controller=policy, record=record, …)`).
 
   A delegation, a constant, a dict literal or a frame composition stays the one line it is:
   the blocks are for equations (`tf` returns its frames as one dict literal). A numeric

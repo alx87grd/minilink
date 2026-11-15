@@ -577,6 +577,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
 - 2026-11-15 (on `dev-consolidation`, for `0.4.0`; CONSTITUTION §4.6): `step_info` returns a
   dict of the step figures by name (`rise_time`, `settling_time`, `overshoot` in percent,
   `peak`, `peak_time`, `steady_state`), and `StepInfo` is gone.
+- 2026-11-15 (on `dev-consolidation`, for `0.4.0`; CONSTITUTION §4.6): value iteration's and
+  the tabular learner's tables are arrays on their record, `solution.record.J` and
+  `solution.record.pi` by node (and value iteration's `record.history`, `record.schedule`);
+  `ValueTables` is gone with `save`/`load`, the shortcut `planner.tables` and the tabular
+  learner's `greedy_tables`; the grid plots take `(grid, J)` and `(grid, pi)`, the animations
+  `(grid, record)`.
 
 ## 3. Maturity (TRL)
 

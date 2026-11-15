@@ -156,18 +156,21 @@ def plot_control_law(
     require_matplotlib(renderer)
     grid_plotting.require_flat_overlay(is_3d, trajectory)
     solution.require_feedback_law()
-    tables = getattr(solution.record, "tables", None)
+    pi = getattr(solution.record, "pi", None)
+    grid = getattr(solution.controller, "grid", None)
     i = 0 if x_axis is None else x_axis
     j = 1 if y_axis is None else y_axis
 
     # On the grid's own nodes: the law's table itself
     if (
-        tables is not None
+        pi is not None
+        and grid is not None
         and not is_3d
         and on_the_nodes(bounds, grid_shape, (101, 101), t)
     ):
         figures = grid_plotting.plot_control_law(
-            tables,
+            grid,
+            pi,
             u_axis=u_axis,
             x_axis=i,
             y_axis=j,

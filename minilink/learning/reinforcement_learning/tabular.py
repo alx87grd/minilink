@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.planning.dynamic_programming.dp import (
-    ValueTables,
     grid_failure_cost,
     grid_of,
 )
@@ -179,40 +178,6 @@ class TabularLearningPlanner(Planner):
         """The grid's step: the period of an episode's interactions, and the integration step of the evidence and the views' run."""
         return self.grid.dt
 
-    @property
-    def tables(self) -> ValueTables | None:
-        """The latest solution's tables, ``J`` and ``pi`` (``None`` before a solve; a shortcut: a tool reads ``solution.record.tables``)."""
-        if self.last_solution is None:
-            return None
-
-        return self.last_solution.record.tables
-
-    @property
-    def greedy_tables(self) -> ValueTables:
-        """
-        The greedy reading of the table ``Q`` as it stands: ``J = min_u Q`` and ``pi = argmin_u Q``.
-
-        The learner's own model, updated by every episode; :attr:`tables` and
-        the shortcuts (:attr:`controller`, :meth:`cost_to_go`, the plots) read
-        the latest solution's instead, ``solution.record.tables``.
-
-        A cell never visited keeps its initial value, zero: the optimistic
-        start that makes untried actions worth trying (``visits`` tells which).
-        Its ``n_iterations`` counts the episodes learned so far (value iteration's
-        counts sweeps), ``delta`` is ``nan``.
-        """
-        grid = self.grid
-        Q = self.Q
-        n_episodes = len(self.history)
-
-        # J(x) = min_u Q(x, u) and π(x) = argmin_u Q(x, u)
-        J = Q.min(axis=1)
-        pi = Q.argmin(axis=1)
-
-        return ValueTables(
-            grid=grid, J=J, pi=pi, n_iterations=n_episodes, delta=float("nan")
-        )
-
     def solve(
         self,
         n_episodes=1000,
@@ -310,9 +275,11 @@ class TabularLearningPlanner(Planner):
 
             self.record_episode(c_sum, len(visited), explore.epsilon(progress))
 
-        # The greedy law of the learned table
-        tables = self.greedy_tables
-        controller = LookupPolicy(tables.grid, tables.pi)
+        # The greedy law of the learned table: J(x) = min_u Q(x, u), π(x) = argmin_u Q(x, u),
+        # a cell never visited keeping its initial zero, the optimistic start
+        J = self.Q.min(axis=1)
+        pi = self.Q.argmin(axis=1)
+        controller = LookupPolicy(self.grid, pi)
         solve_time_s = time.perf_counter() - started
 
         # Optionally, the law, as it is, scored over the problem's draws
@@ -329,10 +296,8 @@ class TabularLearningPlanner(Planner):
 
         # The solution: the law, the record, the score, and the cost-to-go as a field
         # on the grid, the failure cost past it (the price of leaving the grid)
-        record = self.learning_record(tables, solve_time_s)
-        cost_to_go = tables.grid.field(
-            tables.J, method="linear", outside=self.env.failure_cost
-        )
+        record = self.learning_record(J, pi, solve_time_s)
+        cost_to_go = self.grid.field(J, method="linear", outside=self.env.failure_cost)
         solution = PlanningSolution(
             problem=self.problem,
             controller=controller,
@@ -368,7 +333,7 @@ class TabularLearningPlanner(Planner):
 
         return {**kwargs, **self.given}
 
-    def learning_record(self, tables=None, solve_time_s=None) -> TabularLearningRecord:
+    def learning_record(self, J, pi, solve_time_s=None) -> TabularLearningRecord:
         """The solver record: episodes, coverage of the grid, the cost of the last episodes, and the solve's wall time."""
         history = self.history
         visits = self.visits
@@ -392,7 +357,8 @@ class TabularLearningPlanner(Planner):
             table_finite=table_finite,
             history=list(history),
             solve_time_s=solve_time_s,
-            tables=tables,
+            J=J,
+            pi=pi,
         )
 
     # Plots
@@ -484,7 +450,7 @@ class TabularLearningPlanner(Planner):
 @dataclass(frozen=True)
 class TabularLearningRecord:
     """
-    Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``n_iterations`` the episodes, ``n_episodes``).
+    Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the greedy tables ``J`` and ``pi`` by node the solution was read from.
 
     ``mean_episode_cost`` is the mean cost of the last tenth of the episodes (the
     last one at least); ``history`` holds each episode's cost ``J``;
@@ -498,7 +464,8 @@ class TabularLearningRecord:
     table_finite: bool
     history: list
     solve_time_s: float | None = None
-    tables: ValueTables | None = field(default=None, repr=False, compare=False)
+    J: np.ndarray | None = field(default=None, repr=False, compare=False)
+    pi: np.ndarray | None = field(default=None, repr=False, compare=False)
 
     @property
     def success(self) -> bool:

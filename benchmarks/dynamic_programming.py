@@ -37,7 +37,9 @@ class DPBenchmarkRow:
     cold_solve_s: float
     best_solve_s: float
     n_iterations: int
-    tables: object  # ValueTables, for the cross-backend value check
+    record: (
+        object  # the solution record, its J and pi for the cross-backend value check
+    )
 
 
 def pendulum_problem():
@@ -86,11 +88,11 @@ def benchmark_backend(
 
     cold_solve_s = None
     best_solve_s = np.inf
-    tables = None
+    record = None
     for _ in range(runs):
         t0 = time.perf_counter()
         planner.solve_steps(n_steps)
-        tables = planner.tables
+        record = planner.last_solution.record
         elapsed = time.perf_counter() - t0
         if cold_solve_s is None:
             cold_solve_s = elapsed
@@ -102,8 +104,8 @@ def benchmark_backend(
         build_s=build_s,
         cold_solve_s=cold_solve_s,
         best_solve_s=best_solve_s,
-        n_iterations=tables.n_iterations,
-        tables=tables,
+        n_iterations=record.n_iterations,
+        record=record,
     )
 
 
@@ -136,9 +138,9 @@ def print_dp_benchmark(rows, *, reference: str = "loop") -> None:
 def check_agreement(rows, *, atol: float = 1e-3) -> None:
     """Report the largest cost-to-go gap between backends on feasible nodes."""
     base = rows[0]
-    feasible = base.tables.J < 1e5
+    feasible = base.record.J < 1e5
     print(f"\ncross-backend value check (vs {base.backend}, feasible nodes):")
     for r in rows[1:]:
-        gap = float(np.max(np.abs(r.tables.J[feasible] - base.tables.J[feasible])))
+        gap = float(np.max(np.abs(r.record.J[feasible] - base.record.J[feasible])))
         status = "ok" if gap < atol else "DIFF"
         print(f"  {r.backend:8} max|dJ| = {gap:.2e}  [{status}]")

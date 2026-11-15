@@ -200,7 +200,7 @@ def compile_diagram(
             t0 = time.perf_counter()
             n_before = len(diagram.subsystems)
             print("[compile] Flattening nested diagrams...", end="", flush=True)
-        diagram, _flatten_report = flatten_diagram(diagram)
+        diagram, _ = flatten_diagram(diagram)
         if verbose:
             print(
                 f"  ({n_before} → {len(diagram.subsystems)} blocks, "

@@ -33,7 +33,7 @@ def assert_flatten_dynamics_parity(diagram: DiagramSystem, *, u=None, atol=1e-10
     """``flatten_diagram`` copy matches ``x0``, ``n``, ``f``, and ``compile(flatten=True)``."""
     if u is None:
         u = np.zeros(diagram.m)
-    flat, _report = flatten_diagram(diagram)
+    flat, _ = flatten_diagram(diagram)
     np.testing.assert_allclose(flat.x0, diagram.x0, atol=atol)
     assert flat.n == diagram.n
 
@@ -112,7 +112,7 @@ def test_flatten_rewires_a_diagram_output_read_off_a_nested_box():
     outer = _outer_feedback()
     outer.connect_new_output_port("loop", "y", "out")
 
-    flat, _report = flatten_diagram(outer)
+    flat, _ = flatten_diagram(outer)
     assert flat.connections["output"]["out"] == ("loop__plant", "y")
 
     x = np.array([0.7])
@@ -130,8 +130,8 @@ def test_flatten_params_remap_follows_a_renamed_block():
 
     # A top-level block already holds the name the nested plant would take
     outer = _outer_feedback(block_id="loop__plant")
-    flat, report = flatten_diagram(outer)
-    assert report.id_map["loop/plant"] == "loop__plant2"
+    flat, id_map = flatten_diagram(outer)
+    assert id_map["loop/plant"] == "loop__plant2"
 
     params = {**outer.params, "loop": {**outer.params["loop"]}}
     params["loop"]["controller"] = {
@@ -149,7 +149,7 @@ def test_flatten_params_remap_follows_a_renamed_block():
     )
 
 
-def test_flatten_report_keys_every_leaf_by_its_nested_path():
+def test_flatten_id_map_keys_every_leaf_by_its_nested_path():
     from minilink import Gain
 
     mid = DiagramSystem()
@@ -166,8 +166,8 @@ def test_flatten_report_keys_every_leaf_by_its_nested_path():
     outer.connect("mid", "y", "feedback", "u")
     outer.connect("feedback", "y", "mid", "r")
 
-    _flat, report = flatten_diagram(outer)
-    assert report.id_map == {
+    _flat, id_map = flatten_diagram(outer)
+    assert id_map == {
         "feedback": "feedback",
         "mid/gain": "mid__gain",
         "mid/inner/controller": "mid__inner__controller",

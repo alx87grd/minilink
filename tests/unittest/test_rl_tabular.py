@@ -14,7 +14,6 @@ from minilink.learning.reinforcement_learning import (
     TabularLearningPlanner,
 )
 from minilink.planning import Uniform
-from minilink.planning.dynamic_programming.dp import ValueTables
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
@@ -65,14 +64,16 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     solution = learner.solve(n_episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
     assert isinstance(solution.controller, LookupPolicy)
-    assert isinstance(learner.tables, ValueTables)
+    assert (
+        solution.record.J.shape == solution.record.pi.shape == (learner.grid.n_nodes,)
+    )
     assert solution.record.n_episodes == 2000 and len(learner.history) == 2000
     assert solution.cost_to_go(np.zeros(2)) == learner.cost_to_go(np.zeros(2))
     assert learner.cost_to_go(np.zeros(2), t=1.0) == learner.cost_to_go(np.zeros(2))
     assert np.all(learner.visits.sum(axis=1) > 0)
 
-    J_vi = vi.tables.J
-    error = np.abs(learner.tables.J - J_vi)
+    J_vi = vi.last_solution.record.J
+    error = np.abs(learner.last_solution.record.J - J_vi)
     assert np.median(error) < 0.35 * np.median(J_vi)
 
     # The greedy law is a lookup-table block that closes the loop and regulates
@@ -225,5 +226,5 @@ def test_the_learned_cost_to_go_is_a_grid_field_priced_at_the_failure_cost_past_
     J = solution.cost_to_go
     assert isinstance(J, GridField)
     node = learner.grid.states[17]
-    assert J(node) == pytest.approx(solution.record.tables.J[17])
+    assert J(node) == pytest.approx(solution.record.J[17])
     assert J(np.array([3.0, 0.0])) == learner.env.failure_cost == 20.0

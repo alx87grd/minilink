@@ -235,12 +235,12 @@ class PlanningSolution:
         ``renderer`` is ``"matplotlib"``.
         """
         field = require_cost_to_go(self)
-        tables = getattr(self.record, "tables", None)
+        grid = getattr(self.controller, "grid", None)
 
         return cost_to_go_figure(
             self.problem,
             field,
-            grid=None if tables is None else tables.grid,
+            grid=grid,
             family=self.family,
             x_axis=x_axis,
             y_axis=y_axis,

@@ -1642,9 +1642,7 @@ on-policy), `MonteCarloControl` (the cost observed to the episode's end).
 Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve(n_episodes=)`, the one
 verb, continues the learning from the table as it stands (no `learn`) and
 returns a `PlanningSolution` (the greedy `LookupPolicy` as `controller`,
-`J = min Q` as `cost_to_go`, the tables in `record.tables`); `planner.tables` is the latest
-solution's `ValueTables`, as on value iteration, and `planner.greedy_tables` the greedy reading
-of the table as it stands (`J = min Q`, `pi = argmin Q`), and
+`J = min Q` as `cost_to_go`, the greedy tables `J` and `pi` by node on its record), and
 `plot_cost_to_go`, `plot_control_law` (the solution's, through the planner's thin calls),
 `cost_to_go` and `controller` (a `LookupPolicy`)
 are those of value iteration on the latest solution's tables (RULES 2.4), and the same grid solved by
@@ -1815,8 +1813,8 @@ solved.
 `ValueIterationRecord.success` means the sweeps converged to `tol` (a finite
 horizon, and `solve_steps`, always succeed); the record carries `mode`
 (`"infinite"`, `"finite"` or `"receding"`; whether the sweeps reached `tol` is `converged`), the sweep count, the last cost-to-go change
-and the tables themselves (`record.tables`, the `J` and `pi` the planner's `result`
-and plots read; a finite horizon's stages in `record.tables.schedule`).
+and the tables themselves (`record.J` and `record.pi` by node, the ones the plots read;
+`record.history` per recorded sweep; a finite horizon's stages in `record.schedule`).
 
 **Dynamic programming** (`planning/dynamic_programming/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
@@ -1833,7 +1831,7 @@ picks the mode of `solve` (LQR's rule): an infinite one sweeps until the change 
 falls under `tol` (not an error bound on `J`: with `γ < 1` the bound is `γ·tol/(1 − γ)`);
 a finite one (`horizon = T`, `N = steps_of(T, dt)`, or a step problem's `n_steps`) runs
 exactly `N` sweeps and keeps every stage forward in time, `J_0 … J_N` (`J_N = h`) and the
-laws `π_0 … π_{N−1}`, stage `i` at `t_i = t0 + i dt` (`record.tables.schedule = (t, J, pi)`,
+laws `π_0 … π_{N−1}`, stage `i` at `t_i = t0 + i dt` (`record.schedule = (t, J, pi)`,
 refused past 1 GiB of tables, the failure cost summed over the `N` steps). `solve_steps(n_steps)`
 is the receding `n_steps`-step law: `n_steps` sweeps, the last table used at every time. The
 `PlanningSolution`'s `controller` is the `LookupPolicy` of the greedy table (on a finite horizon
@@ -1847,8 +1845,8 @@ callable; `planner.cost_to_go` reads it). The Bellman backup is written in the b
 engine's step, `Q = G + γ J_next(x_next)`, `J = min_u Q` and `π = argmin_u Q` (the backup is the lesson, so no helper hides it), each engine reading the grid its
 own way at the successors (SciPy's interpolator on NumPy, `map_coordinates` with the in-bounds
 mask on JAX, zero off the grid); the
-`method="loop"` engine stays the double loop written for teaching (the raw `ValueTables`, `J` and `pi` as action ids, is
-`solution.record.tables`, and `planner.tables` the latest solution's); out-of-domain
+`method="loop"` engine stays the double loop written for teaching (the raw tables, `J` and `pi`
+as action ids by node, are `solution.record.J` and `solution.record.pi`); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
 such transition's successor. Three interchangeable

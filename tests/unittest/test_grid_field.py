@@ -144,11 +144,11 @@ def test_value_iterations_cost_to_go_is_a_grid_field_charging_the_failure_cost_o
     planner = DynamicProgrammingPlanner(regulation(), max_iterations=30, **GRID)
     solution = planner.solve()
     J = solution.cost_to_go
-    result = solution.record.tables
+    result = solution.record
     x_in = np.array([0.4, -1.3])
 
     assert isinstance(J, GridField)
-    linear = result.grid.interpolate(result.J, np.atleast_2d(x_in), "linear")[0]
+    linear = planner.grid.interpolate(result.J, np.atleast_2d(x_in), "linear")[0]
     assert J(x_in) == pytest.approx(linear, rel=1e-12)
     assert planner.cost_to_go(x_in) == float(J(x_in))
     assert J(np.array([10.0, 0.0])) == planner.out_of_bound_cost

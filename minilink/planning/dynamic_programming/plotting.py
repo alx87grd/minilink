@@ -16,8 +16,8 @@ from minilink.planning.plotting import maybe_show
 
 
 def plot_cost_to_go(
-    grid_or_result,
-    J=None,
+    grid,
+    J,
     *,
     jmax=None,
     x_axis=0,
@@ -33,14 +33,12 @@ def plot_cost_to_go(
     show=True,
 ):
     """
-    Draw cost-to-go heatmap(s) on the state grid.
+    Draw cost-to-go heatmap(s) of a node-indexed table ``J`` on the state grid.
 
-    Grid form: ``plot_cost_to_go(grid, J, ...)`` for a node-indexed table (a
-    policy's ``J^π``). Result form: ``plot_cost_to_go(result, ...)`` from
-    value iteration. ``x_axis`` and ``y_axis`` are the two state axes of the
+    ``J`` is by grid node: value iteration's ``solution.record.J``, or a
+    policy's ``J^π``. ``x_axis`` and ``y_axis`` are the two state axes of the
     slice, integers, or two lists of one length for several slices.
     """
-    grid, J = (grid_or_result, J) if J is not None else table_of(grid_or_result)
     require_single_slice(trajectory, x_axis, y_axis)
 
     # Several slices: one heatmap per pair, without the overlay
@@ -108,8 +106,8 @@ def plot_cost_to_go(
 
 
 def plot_control_law(
-    grid_or_result,
-    pi=None,
+    grid,
+    pi,
     *,
     u_axis=0,
     x_axis=0,
@@ -122,31 +120,13 @@ def plot_control_law(
     show=True,
 ):
     """
-    Draw a control-law heatmap on the state grid.
+    Draw a control-law heatmap of a node-indexed table ``pi`` (action ids) on the state grid.
 
-    Grid form: ``plot_control_law(grid, pi, ...)`` for a raw policy table.
-    Result form: ``plot_control_law(result, ...)`` from value iteration.
-
+    ``pi`` is by grid node: value iteration's ``solution.record.pi``.
     ``x_axis`` and ``y_axis`` are the two state axes of the slice, integers,
     or two lists of one length for several slices; ``u_axis`` (the input
     component) may be an int or a list aligned with them.
     """
-    # Grid form: the raw table on its grid
-    if pi is not None:
-        return plot_control_law_field(
-            grid_or_result,
-            pi,
-            u_axis=u_axis,
-            x_axis=x_axis,
-            y_axis=y_axis,
-            anchor=anchor,
-            cmap=cmap,
-            ax=ax,
-            show=show,
-        )
-
-    # Result form
-    result = grid_or_result
     require_single_slice(trajectory, x_axis, y_axis)
 
     # Several slices: one heatmap per pair, each with its own input axis
@@ -155,7 +135,8 @@ def plot_control_law(
         u_axes = u_axes_of(u_axis, slices)
         return [
             plot_control_law(
-                result,
+                grid,
+                pi,
                 u_axis=u_k,
                 x_axis=x_k,
                 y_axis=y_k,
@@ -169,8 +150,8 @@ def plot_control_law(
 
     # The heatmap, shown now unless the overlay comes after it
     fig, ax = plot_control_law_field(
-        result.grid,
-        result.pi,
+        grid,
+        pi,
         u_axis=u_axis,
         x_axis=x_axis,
         y_axis=y_axis,
@@ -192,7 +173,8 @@ def plot_control_law(
 
 
 def animate_cost_to_go(
-    result,
+    grid,
+    record,
     *,
     x_axis=0,
     y_axis=1,
@@ -203,16 +185,16 @@ def animate_cost_to_go(
     show=True,
 ):
     """
-    Animate cost-to-go sweeps recorded on ``result.history``.
+    Animate the cost-to-go sweeps a solve recorded on ``record.history``, on ``grid``.
 
     The colours span ``[0, jmax]``; without ``jmax``, the range of the last
     sweep's slice.
     """
-    require_history(result)
+    require_history(record)
 
     return animate(
-        result.grid,
-        result.history,
+        grid,
+        record.history,
         kind="value",
         x_axis=x_axis,
         y_axis=y_axis,
@@ -225,7 +207,8 @@ def animate_cost_to_go(
 
 
 def animate_control_law(
-    result,
+    grid,
+    record,
     *,
     axis=0,
     x_axis=0,
@@ -235,12 +218,12 @@ def animate_control_law(
     file_name=None,
     show=True,
 ):
-    """Animate the control-law sweeps recorded on ``result.history``."""
-    require_history(result)
+    """Animate the control-law sweeps a solve recorded on ``record.history``, on ``grid``."""
+    require_history(record)
 
     return animate(
-        result.grid,
-        result.history,
+        grid,
+        record.history,
         kind="policy",
         axis=axis,
         x_axis=x_axis,
@@ -413,11 +396,6 @@ def cost_scale_limit(failure_cost):
 ###############################################################################
 
 
-def table_of(result):
-    """``(grid, J)``: a value-iteration result's grid and cost-to-go table."""
-    return result.grid, result.J
-
-
 def require_single_slice(trajectory, x_axis, y_axis):
     """Refuse a trajectory overlay on a batch of slices."""
     if trajectory is not None and is_batch(x_axis, y_axis):
@@ -496,11 +474,11 @@ def last_sweep_max(grid, history, x_axis, y_axis, anchor, vmax):
     return float(np.max(Z))
 
 
-def require_history(result):
-    """Refuse an animation of a result that recorded no sweeps."""
-    if not result.history:
+def require_history(record):
+    """Refuse an animation of a solve that recorded no sweeps."""
+    if not record.history:
         raise ValueError(
-            "result.history is empty; re-run with record_history=True to animate"
+            "record.history is empty; re-run with record_history=True to animate"
         )
 
 

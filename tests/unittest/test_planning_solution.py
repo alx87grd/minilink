@@ -784,7 +784,7 @@ def test_the_planning_plots_take_one_keyword_set_and_return_a_plot_result():
 
 def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
     problem, vi, lqr = solved_pendulum()
-    grid = vi.record.tables.grid
+    grid = vi.controller.grid
 
     # On the nodes: the table's own extent and the failure cost atop the scale
     table = vi.plot_cost_to_go(show=False)
@@ -792,7 +792,7 @@ def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
     assert table.axes.collections[0].get_clim()[1] == 500.0
     np.testing.assert_allclose(
         table.axes.collections[0].get_array().max(),
-        min(500.0, float(np.max(vi.record.tables.J))),
+        min(500.0, float(np.max(vi.record.J))),
     )
     # Another mesh, or a time: the field sampled
     sampled = vi.plot_cost_to_go(bounds=((-1.0, 1.0), (-1.0, 1.0)), show=False)
@@ -886,7 +886,7 @@ def round_trip_planner(name):
 def solved_numbers(solution):
     """What a solve computes, as bytes: the controller's numbers, the plan and the record but its timings."""
     import pickle
-    from dataclasses import fields, is_dataclass
+    from dataclasses import fields
 
     record = solution.record
     numbers = {
@@ -894,9 +894,6 @@ def solved_numbers(solution):
         for name in (f.name for f in fields(record))
         if not name.endswith("time_s") and name not in ("optimization_result",)
     }
-    if is_dataclass(numbers.get("tables")):
-        tables = numbers.pop("tables")
-        numbers["J"], numbers["pi"] = tables.J, tables.pi
     controller = {
         key: value
         for key, value in (solution.controller.params or {}).items()

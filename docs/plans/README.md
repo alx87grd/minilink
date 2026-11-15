@@ -44,6 +44,7 @@ workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.5; v0.9 |
 | [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes and paths landed; track, scene, `mount`, spatial fields, course catalog left); `planning.spatial` retires | v0.5 (A3) |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control barrier functions: SDF interpolation, DCBF with slacks, HOCBF, the safety-filter block; the barrier a `Field` | unscheduled (TODO §6) |
+| [plotting-contract.md](plotting-contract.md) | The plotting audit: one renderer-independent figure description, one `render` call, one `PlotResult`, composition through `ax=`; options, a staged recommendation, decisions D1–D7 | any release, infrastructure (TODO's two plotting rows), waiting for the maintainer's rulings |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.5 (C1) |
 | [repository-structure.md](repository-structure.md) | The examples tree and where the teaching material lives; options, a recommendation, the asks | v0.9 (K5, K6) |
 | [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for the RL planner (RS-1–RS-4) | unscheduled (TODO §6) |

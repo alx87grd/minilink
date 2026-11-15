@@ -7,7 +7,6 @@ import numpy as np
 from minilink.core.backends import ensure_jax_x64
 from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
 from minilink.planning.dynamic_programming.dp import (
-    ValueTables,
     stage_schedule,
 )
 from minilink.planning.dynamic_programming.progress import (
@@ -20,9 +19,7 @@ from minilink.planning.dynamic_programming.progress import (
 ###############################################################################
 
 
-def value_iteration(
-    planner, max_sweeps, stop_on_tol=True, keep_stages=False
-) -> ValueTables:
+def value_iteration(planner, max_sweeps, stop_on_tol=True, keep_stages=False) -> dict:
     """
     The planner's value iteration, run on device.
 
@@ -55,14 +52,16 @@ def value_iteration(
     J, pi, k, delta = run(J0, G, coords, in_bounds, gamma, tol)
     jax.block_until_ready(J)
 
-    return ValueTables(
-        grid=planner.grid,
-        J=np.array(J),
-        pi=np.array(pi, dtype=int),
-        n_iterations=int(k),
-        delta=float(delta),
-        history=None,
-    )
+    sweeps = {
+        "J": np.array(J),
+        "pi": np.array(pi, dtype=int),
+        "n_iterations": int(k),
+        "delta": float(delta),
+        "history": None,
+        "schedule": None,
+    }
+
+    return sweeps
 
 
 def device_step(planner, verbose=False):
@@ -237,7 +236,7 @@ def require_device_interpolation(interpolation):
         raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
 
 
-def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> ValueTables:
+def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> dict:
     """A finite horizon's ``N`` backward sweeps in one compiled scan, the stages stacked forward in time."""
     jax = ensure_jax_x64()
 
@@ -259,15 +258,16 @@ def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> ValueTables:
     # The stages forward in time: J_0 … J_N (J_N = h) and π_0 … π_{N−1}
     schedule = stage_schedule(tf, dt, [np.array(J0), *J_swept], list(pi_swept))
 
-    return ValueTables(
-        grid=planner.grid,
-        J=np.array(J_swept[-1]),
-        pi=np.array(pi_swept[-1], dtype=int),
-        n_iterations=N,
-        delta=delta,
-        history=None,
-        schedule=schedule,
-    )
+    sweeps = {
+        "J": np.array(J_swept[-1]),
+        "pi": np.array(pi_swept[-1], dtype=int),
+        "n_iterations": N,
+        "delta": delta,
+        "history": None,
+        "schedule": schedule,
+    }
+
+    return sweeps
 
 
 def compiled_scan(planner, N):

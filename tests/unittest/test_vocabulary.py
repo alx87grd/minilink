@@ -45,7 +45,6 @@ RETIRED = {
             "TrajectoryOptimizationRecord",
             "ValueIterationRecord",
             "TreeSearchRecord",
-            "ValueTables",
         ),
     ),
     "optimizer_options": ("options", None),
@@ -278,10 +277,10 @@ RETIRED_NAMES = {
     ),
     # One name per thing in the planners' records (the maintainer's ruling 17 of 2026-11-10)
     "minilink.planning.dynamic_programming.dp.DynamicProgrammingResult": (
-        "ValueTables, read as solution.record.tables"
+        "solution.record.J and solution.record.pi"
     ),
     "minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.result": (
-        "planner.tables, the latest solution's"
+        "solution.record.J and solution.record.pi"
     ),
     "minilink.planning.search.rrt.TreeSearchRecord.cost": "path_cost",
     "minilink.planning.evaluation.Evaluation.cost": (
@@ -294,7 +293,7 @@ RETIRED_NAMES = {
         "mean_episode_cost"
     ),
     "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.result": (
-        "planner.tables, the latest solution's; planner.greedy_tables, the table as it stands"
+        "solution.record.J and solution.record.pi"
     ),
     # The RL planner speaks minilink's words (the maintainer's ruling 18 of 2026-11-10)
     "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.learn": (
@@ -325,6 +324,19 @@ RETIRED_NAMES = {
     # The step figures as a dict by name
     "minilink.analysis.time_response.StepInfo": "a dict of the step figures by name",
     "minilink.analysis.StepInfo": "a dict of the step figures by name",
+    # Value iteration's tables are arrays on its record
+    "minilink.planning.dynamic_programming.dp.ValueTables": (
+        "solution.record.J, solution.record.pi, record.history and record.schedule"
+    ),
+    "minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.tables": (
+        "planner.last_solution.record.J and .pi"
+    ),
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.tables": (
+        "planner.last_solution.record.J and .pi"
+    ),
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.greedy_tables": (
+        "Q.min(axis=1) and Q.argmin(axis=1)"
+    ),
     # The smaller ones (the maintainer's ruling 22 of 2026-11-11)
     "minilink.blocks.sources.Source.plot_signal": (
         "source.compute_trajectory(tf=...), then source.plot_trajectory()"

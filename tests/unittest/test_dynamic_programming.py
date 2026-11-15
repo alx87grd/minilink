@@ -17,7 +17,6 @@ from minilink.planning.dynamic_programming.approximation import (
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingPlanner,
-    ValueTables,
 )
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.planner import require_solution
@@ -70,7 +69,7 @@ def solve(problem, *, precompute=True, record_history=False, **opt_kwargs):
     options = dict(gamma=0.95, tol=0.001, max_iterations=400, **opt_kwargs)
     planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
     planner.solve(record_history=record_history)
-    return (planner, planner.tables)
+    return (planner, planner.last_solution.record)
 
 
 class TestStateSpaceGrid(unittest.TestCase):
@@ -145,13 +144,13 @@ class TestStateSpaceGrid(unittest.TestCase):
 
 class TestValueIteration(unittest.TestCase):
     def test_converges(self):
-        _, result = solve(make_problem())
+        planner, result = solve(make_problem())
         self.assertLess(result.delta, 0.001)
         self.assertGreater(result.n_iterations, 1)
 
     def test_value_zero_at_goal_and_grows_with_distance(self):
-        _, result = solve(make_problem())
-        grid = result.grid
+        planner, result = solve(make_problem())
+        grid = planner.grid
         goal = grid.nearest_node([0.0, 0.0])
         near = grid.nearest_node([0.5, 0.0])
         far = grid.nearest_node([2.0, 0.0])
@@ -159,8 +158,8 @@ class TestValueIteration(unittest.TestCase):
         self.assertLess(result.J[near], result.J[far])
 
     def test_greedy_action_opposes_error(self):
-        _, result = solve(make_problem())
-        grid = result.grid
+        planner, result = solve(make_problem())
+        grid = planner.grid
         for x, sign in [
             ([2.0, 0.0], -1),
             ([-2.0, 0.0], 1),
@@ -175,7 +174,7 @@ class TestValueIteration(unittest.TestCase):
         grid = StateSpaceGrid(problem, x_grid=(21, 21), u_grid=(5,), dt=0.1)
         planner = DynamicProgrammingPlanner(problem, grid=grid)
         planner.solve_steps(5)
-        result = planner.tables
+        result = planner.last_solution.record
         self.assertEqual(result.n_iterations, 5)
 
     def test_out_of_bound_penalty_and_cleanup(self):
@@ -200,7 +199,7 @@ class TestValueIteration(unittest.TestCase):
         self.assertTrue(np.array_equal(a.pi, b.pi))
 
     def test_record_history(self):
-        _, result = solve(make_problem(), record_history=True)
+        planner, result = solve(make_problem(), record_history=True)
         self.assertEqual(len(result.history), result.n_iterations + 1)
 
 
@@ -215,10 +214,10 @@ class TestControllerAndEvaluation(unittest.TestCase):
         planner.solve()
         self.assertIs(planner.controller, require_solution(planner).controller)
         nearest = LookupPolicy(
-            planner.tables.grid, planner.tables.pi, interpolation="nearest"
+            planner.grid, planner.last_solution.record.pi, interpolation="nearest"
         )
         self.assertIsNot(nearest, planner.controller)
-        np.testing.assert_array_equal(nearest.pi, planner.tables.pi)
+        np.testing.assert_array_equal(nearest.pi, planner.last_solution.record.pi)
 
     def test_verbs_before_solve_raise_the_no_solution_error(self):
         planner = DynamicProgrammingPlanner(
@@ -242,7 +241,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         problem = make_problem()
         planner, result = solve(problem)
         planner.clean_infeasible_set()
-        controller = LookupPolicy(result.grid, result.pi)
+        controller = LookupPolicy(planner.grid, result.pi)
         plant = problem.sys
         plant.x0 = np.array([2.0, 0.0])
         diagram = DiagramSystem()
@@ -256,7 +255,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
     def test_policy_evaluation_matches_optimal_value(self):
         problem = make_problem()
         planner, result = solve(problem)
-        controller = LookupPolicy(result.grid, result.pi)
+        controller = LookupPolicy(planner.grid, result.pi)
         J_pi = planner.evaluate_policy(controller.action).params["values"].reshape(-1)
         failure_cost = planner.out_of_bound_cost
         feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
@@ -281,17 +280,6 @@ class TestControllerAndEvaluation(unittest.TestCase):
             self.assertGreaterEqual(
                 failure_cost, g_max * 0.1 * (1.0 - 0.9**N) / (1.0 - 0.9) * (1 - 1e-12)
             )
-
-    def test_result_save_load_round_trip(self):
-        import os
-        import tempfile
-
-        _, result = solve(make_problem())
-        path = os.path.join(tempfile.mkdtemp(), "dp.npz")
-        result.save(path)
-        loaded = ValueTables.load(path, result.grid)
-        self.assertTrue(np.array_equal(result.J, loaded.J))
-        self.assertTrue(np.array_equal(result.pi, loaded.pi))
 
 
 class TestJaxPrecompute(unittest.TestCase):
@@ -409,7 +397,10 @@ class TestBackends(unittest.TestCase):
                 setattr(fresh, name, value)
                 fresh.solve_steps(5)
                 np.testing.assert_allclose(
-                    reused.tables.J, fresh.tables.J, rtol=0, atol=1e-12
+                    reused.last_solution.record.J,
+                    fresh.last_solution.record.J,
+                    rtol=0,
+                    atol=1e-12,
                 )
 
     def test_value_iteration_is_the_algorithm_behind_every_verb(self):
@@ -437,11 +428,13 @@ class TestBackends(unittest.TestCase):
                 clean_infeasible=False,
                 **ENGINES[backend],
             )
-            tables = planner.value_iteration(4, stop_on_tol=False)
+            sweeps = planner.value_iteration(4, stop_on_tol=False)
             solution = planner.solve_steps(4)
-            self.assertEqual(tables.n_iterations, 4, backend)
-            np.testing.assert_array_equal(tables.J, planner.tables.J, err_msg=backend)
-            np.testing.assert_array_equal(tables.pi, planner.tables.pi)
+            self.assertEqual(sweeps["n_iterations"], 4, backend)
+            np.testing.assert_array_equal(
+                sweeps["J"], planner.last_solution.record.J, err_msg=backend
+            )
+            np.testing.assert_array_equal(sweeps["pi"], planner.last_solution.record.pi)
             self.assertTrue(solution.success)
 
     def test_jax_receding_horizon_matches_numpy(self):
@@ -461,7 +454,7 @@ class TestBackends(unittest.TestCase):
             options = dict(backend=backend, gamma=0.95)
             planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
             planner.solve_steps(15)
-            results[backend] = planner.tables
+            results[backend] = planner.last_solution.record
 
         numpy_J, jax_J = results["numpy"].J, results["jax"].J
         self.assertEqual(results["jax"].n_iterations, 15)
@@ -493,7 +486,7 @@ class TestBackends(unittest.TestCase):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 planner.solve(**workflow)
-            return planner.tables, stdout.getvalue()
+            return planner.last_solution.record, stdout.getvalue()
 
         device, _ = jax_solve()
         recorded, _ = jax_solve(record_history=True)
@@ -530,7 +523,7 @@ class TestBackends(unittest.TestCase):
             )
             planner = DynamicProgrammingPlanner(problem, grid=grid, **ENGINES[backend])
             planner.solve_steps(6)
-            return planner.tables
+            return planner.last_solution.record
 
         loop = receding("loop", tf=1.0)
         table = receding("numpy", tf=1.0)
@@ -547,8 +540,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         import matplotlib
 
         matplotlib.use("Agg")
-        _, result = solve(make_problem())
-        fig, ax = plotting.plot_cost_to_go(result, show=False)
+        planner, result = solve(make_problem())
+        fig, ax = plotting.plot_cost_to_go(planner.grid, result.J, show=False)
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -556,8 +549,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         import matplotlib
 
         matplotlib.use("Agg")
-        _, result = solve(make_problem())
-        fig, ax = plotting.plot_control_law(result, show=False)
+        planner, result = solve(make_problem())
+        fig, ax = plotting.plot_control_law(planner.grid, result.pi, show=False)
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -585,7 +578,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         self.assertEqual(ax.collections[0].get_clim()[1], 10.0)
         ax = planner.plot_cost_to_go(jmax=np.inf, show=False).axes
         self.assertEqual(
-            ax.collections[0].get_clim()[1], float(np.max(planner.tables.J))
+            ax.collections[0].get_clim()[1],
+            float(np.max(planner.last_solution.record.J)),
         )
 
     def test_animate_cost_to_go_colours_up_to_jmax(self):
@@ -594,11 +588,13 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
-        _, result = solve(make_problem(), record_history=True)
+        planner, result = solve(make_problem(), record_history=True)
         for jmax, top in ((7.0, 7.0), (None, float(np.max(result.history[-1][1])))):
             with self.subTest(jmax=jmax):
                 plt.close("all")
-                animation = plotting.animate_cost_to_go(result, jmax=jmax, show=False)
+                animation = plotting.animate_cost_to_go(
+                    planner.grid, result, jmax=jmax, show=False
+                )
                 fig = plt.gcf()
                 self.assertEqual(fig.axes[0].collections[0].get_clim(), (0.0, top))
                 fig.canvas.draw()  # the first frame: the animation has rendered
@@ -611,10 +607,10 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
-        _, result = solve(make_problem())
+        planner, result = solve(make_problem())
         plt.close("all")
         plotting.plot_cost_to_go(
-            result, x_axis=[0, 1], y_axis=[1, 0], is_3d=True, show=False
+            planner.grid, result.J, x_axis=[0, 1], y_axis=[1, 0], is_3d=True, show=False
         )
         surfaces = [
             ax
@@ -631,9 +627,9 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         self.assertEqual(plotting.cost_scale_limit(500), 500.0)
 
     def test_lookup_policy_smoke(self):
-        _, result = solve(make_problem())
-        controller = LookupPolicy(result.grid, result.pi)
-        u = controller.action(result.grid.states[0])
+        planner, result = solve(make_problem())
+        controller = LookupPolicy(planner.grid, result.pi)
+        u = controller.action(planner.grid.states[0])
         self.assertEqual(u.shape, (1,))
 
     def test_plot_policy_trajectory_overlay(self):
@@ -645,9 +641,11 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         planner.clean_infeasible_set()
         plant = problem.sys
         plant.x0 = np.array([2.0, 0.0])
-        diagram = LookupPolicy(result.grid, result.pi) @ plant
+        diagram = LookupPolicy(planner.grid, result.pi) @ plant
         trajectory = diagram.compute_trajectory(tf=8.0, verbose=False)
-        _, ax = plotting.plot_control_law(result, trajectory=trajectory, show=False)
+        _, ax = plotting.plot_control_law(
+            planner.grid, result.pi, trajectory=trajectory, show=False
+        )
         self.assertGreaterEqual(len(ax.lines), 1)
 
     def test_lookup_controller_matmul_wires_state_feedback(self):
@@ -745,14 +743,14 @@ class TestPolicyEvaluationField(unittest.TestCase):
         x = np.zeros(2)
         self.assertAlmostEqual(
             float(J_pi(x)),
-            float(result.grid.interpolate(J_pi.params["values"].reshape(-1), [x])[0]),
+            float(planner.grid.interpolate(J_pi.params["values"].reshape(-1), [x])[0]),
         )
         # Past the grid, the failure cost, as on the solution's cost-to-go
         self.assertEqual(float(J_pi(np.array([1e3, 0.0]))), planner.out_of_bound_cost)
         drawn = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
         self.assertIsNotNone(drawn.figure)
         J = J_pi.params["values"].reshape(-1)
-        fig, _ = result.grid.plot_cost_to_go(J, is_3d=True, show=False)
+        fig, _ = planner.grid.plot_cost_to_go(J, is_3d=True, show=False)
         self.assertIsNotNone(fig)
 
 
@@ -763,18 +761,18 @@ class TestCostToGoInterpolation(unittest.TestCase):
         problem = make_problem()
         planner, result = solve(problem, interpolation="nearest")
         x = np.array([[0.13, -0.41]])
-        nearest = float(result.grid.interpolate(result.J, x, "nearest")[0])
-        linear = float(result.grid.interpolate(result.J, x, "linear")[0])
+        nearest = float(planner.grid.interpolate(result.J, x, "nearest")[0])
+        linear = float(planner.grid.interpolate(result.J, x, "linear")[0])
         self.assertNotEqual(nearest, linear)
         self.assertEqual(planner.cost_to_go(x[0]), nearest)
         self.assertEqual(planner.last_solution.cost_to_go(x[0]), nearest)
-        self.assertEqual(result.grid.field(result.J)(x[0]), linear)
+        self.assertEqual(planner.grid.field(result.J)(x[0]), linear)
 
         J_pi = planner.evaluate_policy(planner.controller)
         J = J_pi.params["values"].reshape(-1)
         self.assertEqual(J_pi.method, "nearest")
         self.assertEqual(
-            float(J_pi(x[0])), float(result.grid.interpolate(J, x, "nearest")[0])
+            float(J_pi(x[0])), float(planner.grid.interpolate(J, x, "nearest")[0])
         )
 
     def test_spline_is_refused_naming_cubic(self):
@@ -993,22 +991,28 @@ class TestInfeasibleCostPrice(unittest.TestCase):
                 )
                 scalar.solve_steps(30)
                 constant.solve_steps(30)
-                np.testing.assert_array_equal(constant.tables.J, scalar.tables.J)
-                np.testing.assert_array_equal(constant.tables.pi, scalar.tables.pi)
+                np.testing.assert_array_equal(
+                    constant.last_solution.record.J, scalar.last_solution.record.J
+                )
+                np.testing.assert_array_equal(
+                    constant.last_solution.record.pi, scalar.last_solution.record.pi
+                )
 
     @pytest.mark.slow
     def test_loop_numpy_and_policy_evaluation_agree_on_the_failure_cost(self):
         table = self.planner(exit_failure_cost)
         loop = self.planner(exit_failure_cost, "loop")
         table.solve()
-        loop.solve_steps(table.tables.n_iterations)
-        np.testing.assert_allclose(loop.tables.J, table.tables.J)
+        loop.solve_steps(table.last_solution.record.n_iterations)
+        np.testing.assert_allclose(
+            loop.last_solution.record.J, table.last_solution.record.J
+        )
         # the charged exits, not the 1e6 default, bound the cost-to-go
-        self.assertLess(np.max(table.tables.J), 1.0e3)
+        self.assertLess(np.max(table.last_solution.record.J), 1.0e3)
 
         J_pi = table.evaluate_policy(table.controller.action).params["values"]
         J_pi = J_pi.reshape(-1)
-        self.assertLess(np.max(np.abs(J_pi - table.tables.J)), 0.05)
+        self.assertLess(np.max(np.abs(J_pi - table.last_solution.record.J)), 0.05)
 
     def test_jax_table_charges_the_failure_cost(self):
         import pytest
@@ -1022,8 +1026,10 @@ class TestInfeasibleCostPrice(unittest.TestCase):
 
         numpy_planner.solve()
         jax_planner.solve()
-        np.testing.assert_allclose(jax_planner.tables.J, numpy_planner.tables.J)
-        self.assertLess(np.max(jax_planner.tables.J), 1.0e3)
+        np.testing.assert_allclose(
+            jax_planner.last_solution.record.J, numpy_planner.last_solution.record.J
+        )
+        self.assertLess(np.max(jax_planner.last_solution.record.J), 1.0e3)
 
     def test_jax_rejects_an_untraceable_failure_cost(self):
         import pytest
@@ -1134,7 +1140,7 @@ def test_the_lookup_policys_command_never_leaves_the_grids_input_box():
         problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, max_iterations=20
     )
     planner.solve()
-    policy = LookupPolicy(planner.tables.grid, planner.tables.pi)
+    policy = LookupPolicy(planner.grid, planner.last_solution.record.pi)
 
     rng = np.random.default_rng(0)
     for x in rng.uniform(plant.state.box.lower, plant.state.box.upper, size=(200, 2)):

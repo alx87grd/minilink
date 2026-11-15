@@ -44,7 +44,7 @@ def double_integrator(horizon=1.0, S=np.eye(2)):
 def test_the_horizon_picks_the_mode():
     solution = finite()
     record = solution.record
-    t, J, pi = record.tables.schedule
+    t, J, pi = record.schedule
 
     assert record.mode == "finite" and record.n_iterations == N and record.success
     assert t.shape == (N + 1,) and J.shape[0] == N + 1 and pi.shape[0] == N
@@ -60,36 +60,36 @@ def test_the_horizon_picks_the_mode():
         reach().replace(horizon=None), max_iterations=30, **GRID
     ).solve()
     assert infinite.record.mode == "infinite"
-    assert infinite.record.tables.schedule is None
+    assert infinite.record.schedule is None
     assert "t" not in infinite.controller.params
 
 
 def test_the_last_stage_is_the_terminal_cost_and_the_first_the_full_horizon_tables():
     planner = DynamicProgrammingPlanner(reach(), **GRID)
     solution = planner.solve()
-    t, J, pi = solution.record.tables.schedule
+    t, J, pi = solution.record.schedule
 
     np.testing.assert_array_equal(J[-1], planner.terminal_cost(planner.tf))
-    np.testing.assert_array_equal(J[0], solution.record.tables.J)
-    np.testing.assert_array_equal(pi[0], solution.record.tables.pi)
+    np.testing.assert_array_equal(J[0], solution.record.J)
+    np.testing.assert_array_equal(pi[0], solution.record.pi)
 
 
 def test_each_stage_is_the_receding_law_of_the_steps_left():
     # Stage i of the finite horizon is solve_steps(N − i): its cost-to-go and its law
     planner = DynamicProgrammingPlanner(reach(), **GRID)
-    t, J, pi = planner.solve().record.tables.schedule
+    t, J, pi = planner.solve().record.schedule
 
     for i in (0, 17, N - 1):
         receding = planner.solve_steps(N - i)
         assert receding.record.mode == "receding"
-        np.testing.assert_array_equal(J[i], receding.record.tables.J)
-        np.testing.assert_array_equal(pi[i], receding.record.tables.pi)
+        np.testing.assert_array_equal(J[i], receding.record.J)
+        np.testing.assert_array_equal(pi[i], receding.record.pi)
 
 
 def test_the_law_holds_each_stage_and_stage_zero_outside_the_horizon():
     solution = finite()
-    t, _, pi = solution.record.tables.schedule
-    grid = solution.record.tables.grid
+    t, _, pi = solution.record.schedule
+    grid = solution.controller.grid
     law = solution.controller
     stage = {
         i: LookupPolicy(grid, pi[i]) for i in (0, 1, 3, N - 1)
@@ -121,8 +121,8 @@ def test_a_float_tick_reads_its_own_stage():
 
 def test_the_cost_to_go_reads_each_stage_at_its_time():
     solution = finite()
-    t, J, _ = solution.record.tables.schedule
-    grid = solution.record.tables.grid
+    t, J, _ = solution.record.schedule
+    grid = solution.controller.grid
     x = grid.states[40]
 
     for i in (0, 10, N):
@@ -187,7 +187,7 @@ def test_past_the_horizon_value_iteration_applies_stage_zero_not_a_tie():
     solution = DynamicProgrammingPlanner(
         problem, x_grid=(21, 21), u_grid=(9,), dt=0.05, out_of_bound_cost=1e3
     ).solve()
-    _, _, pi = solution.record.tables.schedule
+    _, _, pi = solution.record.schedule
     x = np.array([1.0, 0.5])
 
     assert np.all(pi[-1] == pi[-1][0])  # The tie: one action everywhere
@@ -207,9 +207,9 @@ def test_lqrs_schedule_runs_on_the_problems_clock():
 @pytest.mark.jax
 def test_the_jax_engine_keeps_the_same_stages():
     pytest.importorskip("jax")
-    on_numpy = finite().record.tables
+    on_numpy = finite().record
     for verbose in (False, True):
-        on_jax = finite(backend="jax", verbose=verbose).record.tables
+        on_jax = finite(backend="jax", verbose=verbose).record
 
         t_np, J_np, pi_np = on_numpy.schedule
         t_jx, J_jx, pi_jx = on_jax.schedule

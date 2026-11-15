@@ -411,6 +411,8 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   matplotlib (draw into an existing axes; refused with plotly) and `show=`, and returns a
   `PlotResult`; every `animate*` takes `renderer=`, `show=`, `file_name=` and returns one too,
   the animation its payload; one finishing helper does the layout, the show and the record.
+  The heatmaps of `planning/spatial` sample their own field (`plot_cost_field(costs, bounds=…)`),
+  so the `FieldGrid` intermediate between `sample_field_costs` and the plot goes.
   Today the 76 plot and animate functions mix the three keywords and return a `PlotResult`,
   `(figure, axes)` (the planning plots) or another call's result. Done when every one follows
   the contract and its tests read `result.figure` and `result.axes`.

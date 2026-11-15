@@ -19,7 +19,7 @@ nested.add_subsystem(inner, "loop")
 nested.connect("loop", "y", "gain", "u")
 nested.connect("gain", "y", "loop", "r")
 
-flat, report = flatten_diagram(nested)
+flat, id_map = flatten_diagram(nested)
 
 
 # nested.plot_diagram(expand=False)

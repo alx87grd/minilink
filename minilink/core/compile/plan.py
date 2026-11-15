@@ -571,9 +571,9 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
     require_tick_laws_on_their_box_clock(diagram, base)
 
     # The wiring of one flat level; the slices of the nested layout
-    flat, report = flatten_diagram(diagram)
+    flat, id_map = flatten_diagram(diagram)
     layout = nested_layout(diagram)
-    paths = {flat_id: tuple(path.split("/")) for path, flat_id in report.id_map.items()}
+    paths = {flat_id: tuple(path.split("/")) for path, flat_id in id_map.items()}
     order = evaluation_order_of(flat)
     output_slices, signal_dim = signal_layout(flat)
     snapshot = params_snapshot(flat)
