@@ -406,7 +406,8 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   documented): one colour keyword, `jmax`, across DP, tabular RL, the policy evaluation and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); the operators' named forms
   exported together (scan: core#9).
-- [ ] **One plotting contract** (any time, agent; infrastructure, CONSTITUTION §6): every
+- [ ] **One plotting contract** (any time, agent; infrastructure, CONSTITUTION §6; the design,
+  its steps and the decisions it waits for: [plotting-contract.md](plotting-contract.md)): every
   `plot_*` takes `renderer=` (a matplotlib-only plot refuses `"plotly"` by name), `ax=` on
   matplotlib (draw into an existing axes; refused with plotly) and `show=`, and returns a
   `PlotResult`; every `animate*` takes `renderer=`, `show=`, `file_name=` and returns one too,
