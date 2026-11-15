@@ -47,6 +47,9 @@ def region_of_attraction(
     smallest ``V`` among those where ``V̇ ≥ 0`` along the nonlinear dynamics,
     until a pass finds none. ``V̇ < 0`` is checked on samples only, so the
     region is an estimate, not a proof: a state no sample hit can break it.
+    The level can only err high, and the samples thin out as the state grows:
+    in four states and more, read it with ``basin=True`` on
+    :func:`plot_region_of_attraction`, or a larger ``n_samples``.
 
     Parameters
     ----------
