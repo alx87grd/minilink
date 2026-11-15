@@ -1438,6 +1438,11 @@ J                   = cost, or with penalize_failure on cost + failure_cost · (
                       and cost_bound + failure_cost for a run not finite
 ```
 
+**A problem without a cost is a feasibility question**: the judge scores every run `cost = 0`
+and `cost_bound = 0`, so it reports `failed`, `reached` and their margins, and a failure is
+charged only a `failure_cost` the problem is given. A planner that minimizes a cost (LQR, value
+iteration, trajectory optimization, MPPI, the learners) still refuses such a problem.
+
 **The stage cost is integrated with the state**: the evaluator's run carries the running
 cost `C(t) = ∫ e^{−ρ(τ − t0)} g(x_plant, u_plant, τ) dτ` beside the loop's state, by the same
 scheme and substeps, read at the plant block's own state and input in the pass that computes

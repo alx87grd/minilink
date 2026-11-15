@@ -43,7 +43,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
-from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
+from minilink.planning.problems import seeds_of, source_id, stack_leaves
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = (
@@ -610,11 +610,17 @@ class ProblemEvaluator:
         )
 
     def cost_rate(self, params):
-        """The plant's discounted cost rate ``e^{−ρ(τ − t0)} g(x, u, τ)`` on the run's tree: the integrand the run carries."""
-        g = require_cost(self.problem).g
+        """The plant's discounted cost rate ``e^{−ρ(τ − t0)} g(x, u, τ)`` on the run's tree: the integrand the run carries; ``0`` without a cost."""
+        cost = self.problem.cost
         cost_params = params["cost"]
         rho = params["discount_rate"]
         t0 = params["t0"]
+
+        # Without a cost the run costs nothing: a feasibility question, judged on X, U and Xf
+        if cost is None:
+            return lambda x, u, tau: 0.0 * tau
+
+        g = cost.g
 
         # ċ = e^{−ρ(τ − t0)} g(x_plant, u_plant, τ)
         def rate(x, u, tau):

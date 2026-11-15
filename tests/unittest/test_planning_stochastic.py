@@ -940,3 +940,30 @@ def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_val
     fixed = problem.replace(penalize_failure=True, failure_cost=7.0)
     assert fixed.discretize(dt).failure_cost_at() == 7.0
     assert RolloutEnvironment(fixed, dt=dt, backend="numpy").failure_cost == 7.0
+
+
+def test_a_problem_without_a_cost_is_judged_on_its_sets_only():
+    # A feasibility question: does the loop reach Xf from each start? Every run
+    # costs 0, and the reached flags are those of the same problem with a cost
+    from minilink import BallSet, lqr
+    from minilink.planning.evaluator import evaluate
+
+    plant = pendulum()
+    x_up = np.array([np.pi, 0.0])
+    ctl = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=x_up)
+    starts = Uniform(x_up - [0.5, 1.0], x_up + [0.5, 1.0])
+    problem = PlanningProblem(plant, x0=starts, Xf=BallSet(x_up, 0.05), horizon=8.0)
+
+    judged = evaluate(problem, ctl, n_trials=50, backend="numpy")
+    with_cost = evaluate(
+        problem.replace(cost=quadratic(plant)), ctl, n_trials=50, backend="numpy"
+    )
+
+    np.testing.assert_array_equal(judged.raw_cost, 0.0)
+    np.testing.assert_array_equal(judged.reached, with_cost.reached)
+    assert problem.cost_bound() == 0.0
+
+    # A failure is charged only the failure cost the problem is given
+    charged = problem.replace(penalize_failure=True, failure_cost=7.0)
+    J = evaluate(charged, ctl, n_trials=50, backend="numpy").J
+    np.testing.assert_array_equal(J, np.where(judged.reached, 0.0, 7.0))

@@ -21,6 +21,12 @@ MAX_PASSES = 20
 #: Points per axis of the phase-plane plot.
 PLOT_POINTS = 201
 
+#: How the level is sized: where V stops decreasing, or where a start stops converging.
+METHODS = ("lyapunov", "simulation")
+
+#: The colors of the regions a plot draws, in order.
+REGION_COLORS = ("tab:red", "tab:purple", "tab:green", "tab:brown")
+
 
 ###############################################################################
 # Public API
@@ -34,6 +40,7 @@ def region_of_attraction(
     t: float = 0.0,
     params=None,
     *,
+    method: str = "lyapunov",
     Q=None,
     n_samples: int = None,
 ) -> EllipsoidSet:
@@ -51,6 +58,15 @@ def region_of_attraction(
     in four states and more, read it with ``basin=True`` on
     :func:`plot_region_of_attraction`, or a larger ``n_samples``.
 
+    ``method="simulation"`` is the brute-force twin: no Lyapunov condition, only
+    simulations. It keeps the ellipsoid's shape, the one the linearization
+    gives through ``P``, so the two answers compare along the same directions;
+    ``V`` is then only the scale of that shape, not an energy. A sample blocks
+    the level when its trajectory, simulated for ten time constants of the
+    slowest mode, does not end near ``x̄``. The region is the largest of the
+    family whose sampled starts all converge, so it reaches at least as far as
+    the Lyapunov one, and a trajectory may leave it on its way back.
+
     Parameters
     ----------
     sys : DynamicSystem
@@ -61,10 +77,14 @@ def region_of_attraction(
         state by default. The region is centered on the refined point.
     u_bar, t, params : optional
         Held input, time and parameter set, as in every analysis tool.
+    method : {"lyapunov", "simulation"}
+        What blocks the level: ``V̇ ≥ 0`` at a sample, or a sampled start that
+        does not converge in simulation.
     Q : array of shape (n, n), optional
         Right-hand side of the Lyapunov equation; the identity by default.
     n_samples : int, optional
-        States drawn per pass, 50 000 by default.
+        States drawn per pass: 50 000 by default, 2 000 for ``"simulation"``,
+        each sample a simulated trajectory.
 
     Returns
     -------
@@ -77,15 +97,18 @@ def region_of_attraction(
     ------
     ValueError
         If the linearization is not Hurwitz: an unstable equilibrium has no
-        region of attraction.
+        region of attraction, or if ``method`` is not one of :data:`METHODS`.
     """
+    require_method(method)
+
     # The equilibrium is found near the guess; the held input defaults to the nominal one
     x_bar = find_equilibrium(sys, x_bar, u_bar, t, params)
     u_bar = np.asarray(sys.u_nominal if u_bar is None else u_bar, dtype=float)
 
     n = int(sys.n)
     Q = np.eye(n) if Q is None else np.asarray(Q, dtype=float)
-    n_samples = 50_000 if n_samples is None else int(n_samples)
+    default_samples = 50_000 if method == "lyapunov" else 2_000
+    n_samples = default_samples if n_samples is None else int(n_samples)
     domain = sys.state.box
     f = dynamics_of(sys, u_bar, t, params)
 
@@ -103,6 +126,11 @@ def region_of_attraction(
     half = np.minimum(x_bar - domain.lower, domain.upper - x_bar)
     c = min(9.0, float(np.min(half**2 / np.diag(np.linalg.inv(P)))))
 
+    # The simulations: ten time constants of the slowest mode, each state from its start
+    if method == "simulation":
+        horizon, dt = time_scales_of(sys, x_bar, u_bar, t, params)
+        rollout = rollout_of(sys, u_bar, t, params, horizon, dt)
+
     for k_pass in range(MAX_PASSES):
         # States drawn uniformly inside the current region {V ≤ c}
         X = (
@@ -112,12 +140,21 @@ def region_of_attraction(
         )
         d = X - x_bar
 
-        # V = dᵀ P d and V̇ = 2 dᵀ P f(x) at every sample, f the nonlinear dynamics
         V = np.einsum("ij,jk,ik->i", d, P, d)
-        V_dot = 2.0 * np.einsum("ij,jk,ik->i", d, P, f(X))
 
-        # A sample blocks the level where V̇ ≥ 0; the equilibrium itself, V̇ = 0 to rounding, does not
-        blocked = (V_dot >= 0.0) & (V > 1e-10 * c)
+        # Lyapunov: a sample blocks the level where V̇ = 2 dᵀ P f(x) ≥ 0, f the nonlinear dynamics
+        if method == "lyapunov":
+            V_dot = 2.0 * np.einsum("ij,jk,ik->i", d, P, f(X))
+            failing = V_dot >= 0.0
+
+        # Simulation: where the trajectory from the sample ends outside {V ≤ 10⁻³ c}
+        else:
+            d_final = rollout(X) - x_bar
+            V_final = np.einsum("ij,jk,ik->i", d_final, P, d_final)
+            failing = V_final > 1e-3 * c
+
+        # The equilibrium itself, V̇ = 0 to rounding, never blocks
+        blocked = failing & (V > 1e-10 * c)
         if not blocked.any():
             break
 
@@ -131,7 +168,7 @@ def region_of_attraction(
 
 def plot_region_of_attraction(
     sys,
-    region: EllipsoidSet,
+    regions,
     x_axis: int = 0,
     y_axis: int = 1,
     *,
@@ -144,14 +181,18 @@ def plot_region_of_attraction(
     show: bool = True,
 ):
     """
-    Draw a region of attraction of ``sys`` in the plane of two states.
+    Draw regions of attraction of ``sys`` in the plane of two states.
 
-    The other states are held at the region's center, so what is drawn is the
-    slice of the region through the equilibrium. The layers: the level set
-    ``V = c``, the curve ``V̇ = 0`` where ``V`` stops decreasing, and the
-    equilibrium; ``basin=True`` shades the states of the plane that converge
-    in simulation, which shows how much a quadratic ``V`` gives up;
-    ``trajectories`` is a sequence of initial states to simulate and overlay.
+    ``regions`` is one :class:`~minilink.core.fields.EllipsoidSet`, or a dict
+    of them by name about the same equilibrium (``{"Lyapunov": region,
+    "simulation": simulated}``), each name its legend entry. The other states
+    are held at the first region's center, so what is drawn is the slice of
+    each region through the equilibrium. The layers: each region's boundary,
+    the curve ``V̇ = 0`` where the first region's ``V`` stops decreasing, and
+    the equilibrium;
+    ``basin=True`` shades the states of the plane that converge in simulation,
+    which shows how much a quadratic ``V`` gives up; ``trajectories`` is a
+    sequence of initial states to simulate and overlay.
 
     Returns
     -------
@@ -163,17 +204,25 @@ def plot_region_of_attraction(
     # Lazy import: the simulator loads on first use, not with the analysis verbs
     from minilink.simulation.simulator import Simulator
 
-    x_bar = region.params["center"]
-    P = region.params["P"]
-    c = region.level
-    V = region.field
+    regions = (
+        {"region": regions} if isinstance(regions, EllipsoidSet) else dict(regions)
+    )
+    names = list(regions)
+    regions = list(regions.values())
+    x_bar = regions[0].params["center"]
+    P = regions[0].params["P"]
     u_bar = np.asarray(sys.u_nominal if u_bar is None else u_bar, dtype=float)
     labels = list(sys.state.labels)
 
-    # The window: two and a half times the slice's half-widths √(c ((P_s)⁻¹)ᵢᵢ)
+    # The window: two and a half times the largest slice's half-widths √(c ((P_s)⁻¹)ᵢᵢ)
     axes = [x_axis, y_axis]
-    P_s = P[np.ix_(axes, axes)]
-    half = 2.5 * np.sqrt(c * np.diag(np.linalg.inv(P_s)))
+    half = 2.5 * np.max(
+        [
+            np.sqrt(r.level * np.diag(np.linalg.inv(r.params["P"][np.ix_(axes, axes)])))
+            for r in regions
+        ],
+        axis=0,
+    )
     grid_x = np.linspace(x_bar[x_axis] - half[0], x_bar[x_axis] + half[0], PLOT_POINTS)
     grid_y = np.linspace(x_bar[y_axis] - half[1], x_bar[y_axis] + half[1], PLOT_POINTS)
     GX, GY = np.meshgrid(grid_x, grid_y)
@@ -181,9 +230,8 @@ def plot_region_of_attraction(
     X[:, x_axis] = GX.ravel()
     X[:, y_axis] = GY.ravel()
 
-    # V and V̇ = 2 (x − x̄)ᵀ P f(x) on the plane
+    # V̇ = 2 (x − x̄)ᵀ P f(x) on the plane, for the first region's P
     f = dynamics_of(sys, u_bar, t, params)
-    V_plane = V(X).reshape(GX.shape)
     V_dot_plane = 2.0 * np.einsum("ij,jk,ik->i", X - x_bar, P, f(X)).reshape(GX.shape)
 
     if ax is None:
@@ -194,16 +242,18 @@ def plot_region_of_attraction(
     if basin:
         X_final = rollout_of(sys, u_bar, t, params, horizon, dt)(X)
         reached = np.linalg.norm(X_final - x_bar, axis=1) < 0.05 * np.max(
-            region.half_width
+            regions[0].half_width
         )
         ax.contourf(
             GX, GY, reached.reshape(GX.shape), levels=[0.5, 1.5], colors=["#cfe3f7"]
         )
         ax.fill([], [], color="#cfe3f7", label="converges in simulation")
 
-    # The level set V = c and the curve V̇ = 0
-    ax.contour(GX, GY, V_plane, levels=[c], colors="tab:red", linewidths=2.0)
-    ax.plot([], [], color="tab:red", linewidth=2.0, label=r"region $V \leq c$")
+    # Each region's boundary, then the curve V̇ = 0
+    for name, region, color in zip(names, regions, REGION_COLORS):
+        V_plane = region.field(X).reshape(GX.shape)
+        ax.contour(GX, GY, V_plane, levels=[region.level], colors=color, linewidths=2.0)
+        ax.plot([], [], color=color, linewidth=2.0, label=name)
     if np.any(V_dot_plane > 1e-9 * np.max(np.abs(V_dot_plane))):
         ax.contour(
             GX,
@@ -253,6 +303,12 @@ def plot_region_of_attraction(
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_method(method):
+    """Refuse a way of sizing the level that is not one of :data:`METHODS`."""
+    if method not in METHODS:
+        raise ValueError(f"method must be one of {METHODS}, got {method!r}")
 
 
 def require_hurwitz(poles):

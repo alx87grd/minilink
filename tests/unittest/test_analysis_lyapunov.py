@@ -188,6 +188,25 @@ class TestRegionOfAttraction(unittest.TestCase):
             region_of_attraction(loop).level, region_of_attraction(loop).level
         )
 
+    def test_the_simulated_region_reaches_past_the_lyapunov_one(self):
+        # Same ellipsoid family, sized by convergence instead of V̇ < 0: at least
+        # as large, and every start drawn inside converges
+        loop = saturated_loop()
+        lyapunov_region = region_of_attraction(loop)
+        simulated = region_of_attraction(loop, method="simulation")
+
+        self.assertIsInstance(simulated, EllipsoidSet)
+        np.testing.assert_allclose(
+            simulated.params["P"], lyapunov_region.params["P"], atol=1e-12
+        )
+        self.assertGreaterEqual(simulated.level, lyapunov_region.level)
+        X0 = simulated.sample(3, 30)
+        self.assertTrue(np.all(converges(loop, simulated, X0, horizon=20.0)))
+
+    def test_an_unknown_method_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "lyapunov"):
+            region_of_attraction(StableLinear(), method="sos")
+
 
 @pytest.mark.optional
 @pytest.mark.jax
@@ -223,6 +242,22 @@ def test_the_plot_draws_the_region_and_the_basin():
     assert "region of attraction" in " ".join(ax.get_title().split())
     assert len(ax.collections) >= 2  # the shaded basin and the level set
     assert ax.get_xlabel() == loop.state.labels[0]
+
+
+@pytest.mark.plotting
+def test_the_plot_draws_both_estimates_side_by_side():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    loop = saturated_loop()
+    regions = {
+        "Lyapunov": region_of_attraction(loop),
+        "simulation": region_of_attraction(loop, method="simulation"),
+    }
+
+    _, ax = plot_region_of_attraction(loop, regions, show=False)
+    legend = [text.get_text() for text in ax.get_legend().get_texts()]
+    assert "Lyapunov" in legend and "simulation" in legend
 
 
 @pytest.mark.plotting

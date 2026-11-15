@@ -558,8 +558,13 @@ class PlanningProblem:
         with ``ρ = 0``, or boxes with no finite bound, falls back to ``1e6`` with
         a warning naming ``failure_cost``. ``params`` are the cost's numbers to
         bound (an evaluation's overridden weights); ``None`` reads its own.
+        Without a cost every run costs 0, so the bound is 0: a failure is then
+        charged only a ``failure_cost`` given to the problem.
         """
-        cost = require_cost(self)
+        cost = self.cost
+        if cost is None:
+            return 0.0
+
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
         T = (
             (self.horizon if self.horizon_kind() == "finite" else np.inf)

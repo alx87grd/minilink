@@ -5,7 +5,7 @@ import numpy as np
 from minilink import DiagramSystem, Pendulum, Saturation, lqr
 from minilink.analysis import plot_region_of_attraction, region_of_attraction
 
-TORQUE = 8.0  # Nm, against m g l = 9.81 Nm: too weak to hold the pendulum far over
+TORQUE = 10.0  # Nm, against m g l = 9.81 Nm: too weak to hold the pendulum far over
 Q = np.diag([1.0, 0.01])  # try diag([1000, 10]): faster poles, a smaller region
 X_UP = np.array([np.pi, 0.0])  # upright
 
@@ -30,7 +30,17 @@ loop.plot_diagram()
 # Find the equilibrium, linearize there, solve A'P + PA = -Q, then shrink the
 # level set of V until V decreases at every sampled state inside it.
 region = region_of_attraction(loop, X_UP)
-print(f"V <= {region.level:.4g}, reaching {region.half_width} per state")
+print(f"Lyapunov:   V <= {region.level:.4g}, reaching {region.half_width} per state")
+
+# Brute force, no Lyapunov condition: the ellipse of the same shape, shrunk until every
+# sampled start converges in simulation
+simulated = region_of_attraction(loop, X_UP, method="simulation")
+print(f"simulation: reaching {simulated.half_width} per state")
 
 plot_region_of_attraction(loop, region)
-plot_region_of_attraction(loop, region, basin=True, trajectories=[X_UP + [1.0, 0.0]])
+plot_region_of_attraction(
+    loop,
+    {"Lyapunov": region, "simulation": simulated},
+    basin=True,
+    trajectories=[X_UP + [1.0, 0.0]],
+)

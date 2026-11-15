@@ -14,7 +14,6 @@ from minilink.core.backends import (
     ensure_jax_x64,
 )
 from minilink.core.trajectory import Trajectory
-from minilink.planning.problems import require_cost
 
 PROBLEM_FAILURE_COST = "problem"  # score_run's failure cost read from the problem
 
@@ -171,7 +170,7 @@ def score_run(
     params = problem_leaves(problem) if params is None else params
     xp = array_module(traj.x)
 
-    cost_fn = require_cost(problem)
+    cost_fn = problem.cost
     rho = params.get("discount_rate", problem.discount_rate)
     t0 = params.get("t0", problem.t0)
     finite_horizon = problem.horizon_kind() == "finite"
@@ -210,19 +209,23 @@ def score_run(
     reached = reachability_margin >= 0.0
 
     # raw_cost = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ horizon} h(x(t_end), t_end): the
-    # integral the run carried, or the trapezoid on a logged run's samples
-    if running_cost is None:
-        safe_run = Trajectory(t=t, x=x.T, u=u.T)
-        _, running = cost_fn.integrate(
-            safe_run, discount_rate=rho, params=cost_params, t0=t0
-        )
+    # integral the run carried, or the trapezoid on a logged run's samples; 0
+    # without a cost, the run judged on X, U and Xf only
+    if cost_fn is None:
+        raw_cost = xp.zeros(())
     else:
-        running = xp.where(finite, running_cost, 0.0)
-    raw_cost = running[-1]
-    if finite_horizon:
-        raw_cost = raw_cost + xp.exp(-rho * horizon) * cost_fn.h(
-            x[-1], t_end, cost_params
-        )
+        if running_cost is None:
+            safe_run = Trajectory(t=t, x=x.T, u=u.T)
+            _, running = cost_fn.integrate(
+                safe_run, discount_rate=rho, params=cost_params, t0=t0
+            )
+        else:
+            running = xp.where(finite, running_cost, 0.0)
+        raw_cost = running[-1]
+        if finite_horizon:
+            raw_cost = raw_cost + xp.exp(-rho * horizon) * cost_fn.h(
+                x[-1], t_end, cost_params
+            )
     raw_cost = xp.where(finite, raw_cost, xp.inf)  # A run not finite costs +inf
 
     # J = raw_cost, or with the failure charged raw_cost + failure_cost · (failed or
