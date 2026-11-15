@@ -515,10 +515,10 @@ class TestFamilyPattern(unittest.TestCase):
 
     def test_structural_tests_accept_an_lti_system(self):
         lti = InvertedPendulum().linearize([0.0, 0.0])
-        self.assertTrue(controllability(lti).is_full_rank)
-        self.assertTrue(observability(lti).is_full_rank)
+        self.assertEqual(controllability(lti)[1], 2)
+        self.assertEqual(observability(lti)[1], 2)
         self.assertEqual(
-            controllability(lti).rank,
+            controllability(lti)[1],
             np.linalg.matrix_rank(controllability_matrix(lti.A(), lti.B())),
         )
 

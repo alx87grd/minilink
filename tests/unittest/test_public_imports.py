@@ -46,7 +46,7 @@ class TestPublicImports(unittest.TestCase):
             step_info,
         )
         from minilink import Pendulum as RootPendulum
-        from minilink.analysis import Margins, StepInfo, step_response
+        from minilink.analysis import step_response
         from minilink.core import (
             QuadraticField,
             inverse_barrier,
@@ -67,9 +67,19 @@ class TestPublicImports(unittest.TestCase):
         model = LTISystem(np.array([[-1.0]]), np.array([[1.0]]), np.array([[1.0]]))
         t, y = step_response(model)
         info = step_info(t, y)
-        self.assertIsInstance(info, StepInfo)
-        self.assertAlmostEqual(info.overshoot, 0.0, places=6)
-        self.assertIsInstance(margins(model), Margins)
+        self.assertEqual(
+            set(info),
+            {
+                "rise_time",
+                "settling_time",
+                "overshoot",
+                "peak",
+                "peak_time",
+                "steady_state",
+            },
+        )
+        self.assertAlmostEqual(info["overshoot"], 0.0, places=6)
+        self.assertEqual(len(margins(model)), 4)
 
         # Each shaping as a field's cost: zero inside, a penalty past the edge
         V = QuadraticField(np.zeros(1), np.eye(1))

@@ -149,8 +149,6 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "linearize",
         "discretize",
         "step_info",
-        "Margins",
-        "StepInfo",
     ),
     "minilink.simulation": ("Simulator", "StaticSimulator"),
     "minilink.optimization": ("MathematicalProgram", "Optimizer"),

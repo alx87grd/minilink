@@ -29,7 +29,7 @@ for name, ctl in family.items():
     ]  # the plant's angle, after the law's own states
     info = step_info(traj.t, theta)
     print(
-        f"{name:<10}{len(poles):>19}{0.5 - info.steady_state:>14.3f}{info.overshoot:>13.1f}"
+        f"{name:<10}{len(poles):>19}{0.5 - info['steady_state']:>14.3f}{info['overshoot']:>13.1f}"
     )
     plt.plot(traj.t, theta, label=name)
 

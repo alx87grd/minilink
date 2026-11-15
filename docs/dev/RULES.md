@@ -84,14 +84,14 @@ concrete formatting, ordered by the cost of being wrong:
   (`last_program` and `last_optimizer` on trajectory optimization, `Simulator.last_debug`). The
   Simulator's `last_traj` and `last_solve_time_s` predate the rule (TODO, D1.4). A new
   exception needs a reason of `sys.traj`'s weight.
-- **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
-  students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
-  request/response dataclasses, option bags, or adapter layers that only wrap those. A new
-  named record is justified when it is a domain noun (a trajectory, a certificate, a plan) —
-  not when it is a programming convenience. Before adding a record, name the object it already
-  is: a `(lower, upper)` pair is a `BoxSet`, a reset rule is a `Distribution`, a sublevel set
-  is a `Set`, a scalar function of the state is a `Field` (`core/fields.py`), a sampled run
-  is a `Trajectory`.
+- **2.5 A core object, else arrays, else ask.** A math or control tool returns, in order: a core
+  object that already is the answer (CONSTITUTION §4.6); arrays, or a tuple of arrays named in
+  its docstring; and only then a new object, which is the maintainer's decision, justified by what the
+  caller could not rebuild from arrays. Do not add request/response classes, option bags, or
+  adapter layers. Before proposing a new object, name the one it already is: a pair of bounds
+  is a box set, a reset rule is a distribution, a sublevel set is a set, a scalar function of
+  the state is a field, a sampled run is a trajectory, and a model is a `System`. Graphics and
+  rendering machinery are exempt (CONSTITUTION §6).
 - **2.6 Names are short, and the class name is the name.** A block's display `name` is its
   class name unless the class sets its own, and a composite is named as the expression that
   built it (`PID @ Pendulum`, `Step >> Integrator`, `A + B`, `feedback(G)`). Those names
@@ -130,7 +130,7 @@ concrete formatting, ordered by the cost of being wrong:
   | Number of time steps, the transitions (a transcription's intervals: `N + 1` knots) | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
   | The RL planner's control periods of each rollout per collection, the data of one update | `n_steps_per_update` | `n_steps` (a horizon's transitions) |
   | Number of time samples on a horizon, endpoints included (`Simulator`, `compute_trajectory`, the frequency and step responses, the LQR gain schedule) | `n_samples` | `n_steps`, `n`, `n_pts` |
-  | Number of sampled rollouts (MPPI, a certificate's `verify`, the RL planner's parallel rollouts) | `n_rollouts` | `n_samples` (time samples only), `n_envs` |
+  | Number of sampled rollouts (MPPI, the RL planner's parallel rollouts) | `n_rollouts` | `n_samples` (time samples only), `n_envs` |
   | Iterations, an exact count (a fixed scan); every count is `n_<thing>` | `n_iterations` | `iterations` as the keyword |
   | Iterations, a cap | `max_iterations` | |
   | A training budget, episodes / plant steps (the RL planners' `solve`, their records) | `n_episodes` / `n_timesteps` | `episodes`, `timesteps` |
@@ -484,7 +484,7 @@ concrete formatting, ordered by the cost of being wrong:
   and NumPy docstrings except in equation paths (rule 5.1). Lazy imports follow 5.27. Prefer a low
   helper count in math tools; inline single-use helpers.
 - **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Frozen dataclasses
-  for records — a `Trajectory`, a certificate, a solver record, a solution; plain classes with
+  for records — a `Trajectory`, a solver record, a solution, an evaluation; plain classes with
   `params` for every parametric object — systems, costs, sets, fields, laws, shapes. Never dataclasses as
   input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
 - **5.22 Comment only when it is not a copy of the code.** Beat 2 of rule 5.3 is
@@ -512,8 +512,8 @@ concrete formatting, ordered by the cost of being wrong:
 - **5.24 Docstrings, comments and messages are timeless.** They state the math and the
   contract as a textbook would. They never name the design process (step ids, audits, dates,
   "decided", "landed", "for now", "currently", "until pipeline B", a ROADMAP or TODO
-  section), the course or its exercises, or what another library refuses; that history
-  lives in the git history. The same holds for test
+  section), the course or its exercises, or another library, as a reason or as a contrast;
+  that history lives in the git history. The same holds for test
   docstrings and comments, and for refusal and warning messages: a refusal says what is
   supported and what to pass instead.
 - **5.25 One verb family per role:** A helper's name says its role.
@@ -724,3 +724,7 @@ concrete formatting, ordered by the cost of being wrong:
   block reused across the family or the library (`filtered_rate`, `held_integral`,
   `clipped`). No class-attribute aliases (`Cl = Plane2D.Cl`). Copies that differ in behavior
   are not merged by a refactor; name the difference and ask.
+- **7.9 Rules name kinds, not classes.** A rule states its principle with kinds of objects; it
+  names the `System` and the core mathematical objects, and any other class only as an example
+  (CONSTITUTION §6, "One home per fact"). When a rule's section is edited, the class and
+  signature names it does not need leave it; there is no separate sweep.

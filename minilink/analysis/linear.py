@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 from scipy import linalg
 from scipy.optimize import brentq, linear_sum_assignment
@@ -190,19 +188,12 @@ def minreal(A, B, C, D, *, tol=RANK_TOL):
 # Margins
 
 
-@dataclass(frozen=True)
-class Margins:
-    """Gain and phase margins of a loop transfer function ``L(jw)``."""
-
-    gain_margin_db: float  # Infinite when the phase never crosses −180°
-    phase_margin_deg: float  # Infinite when the magnitude never crosses 0 dB
-    w_gain_crossover: float  # Where |L| = 1 (rad/s): the phase margin is read here
-    w_phase_crossover: float  # Where ∠L = −180° (rad/s): the gain margin is read here
-
-
 def margins(w, G, response=None):
-    """Margins from a sampled response ``G = L(jw)``; crossings found by interpolation.
+    """Margins ``(gm, pm, w_pc, w_gc)`` from a sampled response ``G = L(jw)``; crossings found by interpolation.
 
+    ``gm`` is the gain margin as a ratio, ``1 / |L(jWcg)|`` at the phase
+    crossover ``w_pc``; ``pm`` the phase margin in degrees at the gain
+    crossover ``w_gc`` (rad/s); ``inf`` where a crossover does not exist.
     With ``response``, a callable ``w -> L(jw)``, each bracketed crossing is
     solved exactly on it (Brent's method), so the margins do not depend on
     the grid, which only has to bracket them.
@@ -223,13 +214,16 @@ def margins(w, G, response=None):
     w_pc, magnitude_pc = phase_crossovers(w, magnitude_db, phase_deg, response)
 
     # GM = −|L(jω_pc)| in dB
-    gm = -magnitude_pc
+    gm_db = -magnitude_pc
 
     # The loop is as robust as its smallest margin of each kind
     pm, w_gc = smallest_margin(pm, w_gc)
-    gm, w_pc = smallest_margin(gm, w_pc)
+    gm_db, w_pc = smallest_margin(gm_db, w_pc)
 
-    return Margins(float(gm), float(pm), float(w_gc), float(w_pc))
+    # gm = 1 / |L(jω_pc)| = 10^(GM_dB / 20), a ratio
+    gm = 10.0 ** (gm_db / 20.0)
+
+    return float(gm), float(pm), float(w_pc), float(w_gc)
 
 
 # Root locus

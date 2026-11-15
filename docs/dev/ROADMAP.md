@@ -566,6 +566,17 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   gone. The level search shrinks the region by draws inside it until none has `V̇ ≥ 0`: the
   same levels in two states, and in four (the cart-pole) a level 3.3 times smaller, the old
   box sampling having missed states where `V` grows.
+- 2026-11-15 (on `dev-consolidation`, for `0.4.0`; CONSTITUTION §4.6, a tool returns arrays
+  before a new object): `controllability` and `observability` return the tuple `(matrix,
+  rank)` (`ctrb, rank = controllability(sys)`, controllable when `rank == sys.n`), and
+  `StructuralProperties` is gone with its `is_full_rank` and printed verdict.
+- 2026-11-15 (on `dev-consolidation`, for `0.4.0`; CONSTITUTION §4.6): `margins` returns the
+  tuple `(gm, pm, w_pc, w_gc)`: the gain margin a ratio (`20 log10(gm)` in dB, the unit the
+  Bode note still prints), read at the phase crossover `w_pc`, and the phase margin in degrees,
+  read at the gain crossover `w_gc`; `Margins` is gone.
+- 2026-11-15 (on `dev-consolidation`, for `0.4.0`; CONSTITUTION §4.6): `step_info` returns a
+  dict of the step figures by name (`rise_time`, `settling_time`, `overshoot` in percent,
+  `peak`, `peak_time`, `steady_state`), and `StepInfo` is gone.
 
 ## 3. Maturity (TRL)
 

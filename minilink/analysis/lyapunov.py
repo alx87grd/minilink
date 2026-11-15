@@ -11,6 +11,7 @@ from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
 from minilink.core.fields import EllipsoidSet, QuadraticField
+from minilink.graphical.common import PlotResult
 
 #: The seed of the first pass's samples, one more per pass: the level reads the same twice.
 SAMPLE_SEED = 0
@@ -196,7 +197,8 @@ def plot_region_of_attraction(
 
     Returns
     -------
-    (Figure, Axes)
+    PlotResult
+        The matplotlib figure and axes, as every plot returns them.
     """
     # Lazy import: matplotlib loads on first use, not with the analysis
     import matplotlib.pyplot as plt
@@ -297,7 +299,11 @@ def plot_region_of_attraction(
     if show:
         plt.show()
 
-    return ax.figure, ax
+    plot = PlotResult(
+        renderer="matplotlib", payload=(ax.figure, ax), figure=ax.figure, axes=ax
+    )
+
+    return plot
 
 
 ###############################################################################
@@ -378,8 +384,6 @@ if __name__ == "__main__":
     from minilink import InvertedPendulum, lqr
 
     plant = InvertedPendulum()
-    plant.inputs["u"].lower = np.array([-2.0])  # too weak to hold it far over
-    plant.inputs["u"].upper = np.array([2.0])
     ctl = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2))
     region = region_of_attraction(ctl @ plant)
-    print(region.level, region.half_width)
+    print(f"V <= {region.level:.4g}, reaching {region.half_width} per state")

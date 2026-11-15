@@ -62,8 +62,8 @@ included (`MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost
 (`quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy`); of the fields, the
 concrete `QuadraticField` and `GridField` are also on the root. The model families a design
 verb names are on the root too (`LTISystem`, `LinearizedSystem`, `MechanicalSystem`), with
-`step_info` and `poles`; the analysis band exports the records its verbs return (`Margins`,
-`StepInfo`).
+`step_info` and `poles`; `margins` returns `(gm, pm, w_pc, w_gc)`, `gm` a ratio, and `step_info` a dict of the step
+figures by name.
 
 ## 3. Package Map
 

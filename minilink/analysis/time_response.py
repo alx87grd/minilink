@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 
 from minilink.analysis import linear
@@ -27,18 +25,6 @@ from minilink.graphical.control import (
 ###############################################################################
 # Public API
 ###############################################################################
-
-
-@dataclass(frozen=True)
-class StepInfo:
-    """Textbook step-response figures (MATLAB ``stepinfo`` conventions)."""
-
-    rise_time: float  # 10 % to 90 % of the final value; nan when there is none
-    settling_time: float  # Last exit from the band of 2 % of the peak deviation
-    overshoot: float  # Percent of the final value; nan when there is none
-    peak: float
-    peak_time: float
-    steady_state: float  # The last sample; nan when the response has not settled
 
 
 def step_response(
@@ -91,14 +77,19 @@ def step_response(
     return time, y
 
 
-def step_info(t, y) -> StepInfo:
+def step_info(t, y) -> dict:
     """Rise time, settling time, overshoot, peak and steady state of a sampled step response.
 
-    Reads any sampled response: the linear one from :func:`step_response`, or
-    a simulated trajectory's time and output arrays. The settling band is 2 %
-    of the response's peak deviation from its final value: 2 % of the final
-    value for a step from rest that neither dips below its start nor overshoots
-    by 100 %, and still defined for a response that returns to zero.
+    A dict of the figures by name: ``rise_time`` (10 % to 90 % of the
+    final value), ``settling_time`` (the last exit from the settling band),
+    ``overshoot`` (percent of the final value), ``peak``, ``peak_time`` and
+    ``steady_state`` (the last sample); ``nan`` where a figure does not
+    exist. Reads any sampled response: the linear one from
+    :func:`step_response`, or a simulated trajectory's time and output arrays.
+    The settling band is 2 % of the response's peak deviation from its final
+    value: 2 % of the final value for a step from rest that neither dips below
+    its start nor overshoots by 100 %, and still defined for a response that
+    returns to zero.
     """
     t = np.asarray(t, dtype=float).reshape(-1)
     y = np.asarray(y, dtype=float).reshape(-1)
@@ -127,35 +118,30 @@ def step_info(t, y) -> StepInfo:
 
     # Rise time and overshoot are relative to a final value: none when the response
     # has not settled, or settles at zero (its final value inside the band)
-    if not settled or abs(y_final) <= band:
-        return StepInfo(
-            rise_time=float(np.nan),
-            settling_time=t_s,
-            overshoot=float(np.nan),
-            peak=y_p,
-            peak_time=t_p,
-            steady_state=y_ss,
-        )
+    t_r = float(np.nan)
+    M_p = float(np.nan)
+    if settled and abs(y_final) > band:
+        # Progress toward y_f, signed so an undershoot (a zero in the right half plane) never counts
+        progress = np.sign(y_final) * y
 
-    # Progress toward y_f, signed so an undershoot (a zero in the right half plane) never counts
-    progress = np.sign(y_final) * y
+        # Rise time t_r = t(90 % of y_f) − t(10 % of y_f)
+        t_10 = first_time_reaching(t, progress, 0.1 * abs(y_final))
+        t_90 = first_time_reaching(t, progress, 0.9 * abs(y_final))
+        t_r = float(t_90 - t_10)
 
-    # Rise time t_r = t(90 % of y_f) − t(10 % of y_f)
-    t_10 = first_time_reaching(t, progress, 0.1 * abs(y_final))
-    t_90 = first_time_reaching(t, progress, 0.9 * abs(y_final))
-    t_r = float(t_90 - t_10)
+        # Overshoot M_p = 100 (max progress − |y_f|) / |y_f| in percent, floored at 0
+        M_p = float(100.0 * max((np.max(progress) - abs(y_final)) / abs(y_final), 0.0))
 
-    # Overshoot M_p = 100 (max progress − |y_f|) / |y_f| in percent, floored at 0
-    M_p = float(100.0 * max((np.max(progress) - abs(y_final)) / abs(y_final), 0.0))
+    info = {
+        "rise_time": t_r,
+        "settling_time": t_s,
+        "overshoot": M_p,
+        "peak": y_p,
+        "peak_time": t_p,
+        "steady_state": y_ss,
+    }
 
-    return StepInfo(
-        rise_time=t_r,
-        settling_time=t_s,
-        overshoot=M_p,
-        peak=y_p,
-        peak_time=t_p,
-        steady_state=y_ss,
-    )
+    return info
 
 
 def plot_step_response(
@@ -233,13 +219,14 @@ def is_linear_model(sys) -> bool:
 def step_figure(time, y, info, sys, of, wrt, period=None):
     """The step-response figure: the response and its peak, the steady state and the figures' note; a difference equation's as its samples."""
     # The steady-state line once settled, and the note of the finite figures
-    lines = () if np.isnan(info.steady_state) else (RefLine("y", info.steady_state),)
+    steady = info["steady_state"]
+    lines = () if np.isnan(steady) else (RefLine("y", steady),)
     note = "\n".join(
         f"{name} = {value:.3g} {unit}"
         for name, value, unit in (
-            ("Rise time", info.rise_time, "s"),
-            ("Settling time", info.settling_time, "s"),
-            ("Overshoot", info.overshoot, "%"),
+            ("Rise time", info["rise_time"], "s"),
+            ("Settling time", info["settling_time"], "s"),
+            ("Overshoot", info["overshoot"], "%"),
         )
         if np.isfinite(value)
     )
@@ -267,8 +254,8 @@ def step_figure(time, y, info, sys, of, wrt, period=None):
             size=5.0,
             hover=hover,
         )
-    t_peak = np.array([info.peak_time])
-    y_peak = np.array([info.peak])
+    t_peak = np.array([info["peak_time"]])
+    y_peak = np.array([info["peak"]])
     peak = Trace(t_peak, y_peak, style.SYSTEM_COLOR, mode="markers", marker="o")
 
     # One panel, with room under the response for the note

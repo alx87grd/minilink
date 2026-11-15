@@ -1,7 +1,5 @@
 """Structural analysis: the controllability and observability of a system's linear model."""
 
-from dataclasses import dataclass
-
 import numpy as np
 
 from minilink.analysis.linearization import design_model
@@ -67,22 +65,21 @@ def controllability(
     method="auto",
     eps=1e-6,
 ):
-    """Return the controllability test of ``sys``'s linear model.
+    """Return ``(𝒞, rank)``: the Kalman controllability matrix of ``sys``'s linear model and its rank.
 
-    The pair ``(A, B)`` is controllable when its Kalman controllability matrix
-    has full row rank ``n``. ``sys`` is a linear model, read as is, or any
-    plant, linearized at ``(x_bar, u_bar)`` about its command port alone (the
-    nominal point by default), as ``lqr`` and ``place`` read it. ``tol`` is
-    the relative singular-value threshold below which a direction counts as
-    missing, the same as :func:`~minilink.analysis.linear.minreal`'s. On
-    arrays, :func:`controllability_matrix` gives ``𝒞``.
+    The pair ``(A, B)`` is controllable when ``rank == n``, the number of
+    states. ``sys`` is a linear model, read as is, or any plant, linearized at
+    ``(x_bar, u_bar)`` about its command port alone (the nominal point by
+    default), as ``lqr`` and ``place`` read it. ``tol`` is the relative
+    singular-value threshold below which a direction counts as missing, the same
+    as :func:`~minilink.analysis.linear.minreal`'s. On arrays,
+    :func:`controllability_matrix` gives ``𝒞``.
     """
     require_system(sys, "controllability", "controllability_matrix(A, B)")
 
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A = model.A()
     B = model.B()
-    n = A.shape[0]
 
     # 𝒞 = [B, AB, …, Aⁿ⁻¹B]
     ctrb = controllability_matrix(A, B)
@@ -91,7 +88,7 @@ def controllability(
     sigma = np.linalg.svd(ctrb, compute_uv=False)
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
-    return StructuralProperties(matrix=ctrb, rank=r, n=n)
+    return ctrb, r
 
 
 def observability(
@@ -105,14 +102,14 @@ def observability(
     method="auto",
     eps=1e-6,
 ):
-    """Return the observability test of ``sys``'s linear model.
+    """Return ``(𝒪, rank)``: the Kalman observability matrix of ``sys``'s linear model and its rank.
 
-    The pair ``(A, C)`` is observable when its Kalman observability matrix has
-    full column rank ``n``. ``sys`` is a linear model, read as is, or any
-    plant, linearized at ``(x_bar, u_bar)`` with ``C`` over its measured
-    output ``y`` (a plant without ``y`` is refused), as ``luenberger`` and
-    ``kalman`` read it; ``tol`` as in :func:`controllability`. On arrays,
-    :func:`observability_matrix` gives ``𝒪``.
+    The pair ``(A, C)`` is observable when ``rank == n``, the number of states.
+    ``sys`` is a linear model, read as is, or any plant, linearized at ``(x_bar,
+    u_bar)`` with ``C`` over its measured output ``y`` (a plant without ``y`` is
+    refused), as ``luenberger`` and ``kalman`` read it; ``tol`` as in
+    :func:`controllability`. On arrays, :func:`observability_matrix` gives
+    ``𝒪``.
     """
     require_system(sys, "observability", "observability_matrix(A, C)")
 
@@ -121,7 +118,6 @@ def observability(
     )
     A = model.A()
     C = model.C()
-    n = A.shape[0]
 
     # 𝒪 = [C; CA; …; CAⁿ⁻¹]
     obsv = observability_matrix(A, C)
@@ -130,26 +126,7 @@ def observability(
     sigma = np.linalg.svd(obsv, compute_uv=False)
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
-    return StructuralProperties(matrix=obsv, rank=r, n=n)
-
-
-@dataclass(frozen=True)
-class StructuralProperties:
-    """Result of a controllability or observability test."""
-
-    matrix: np.ndarray  # The stacked Kalman matrix
-    rank: int
-    n: int  # Number of states
-
-    @property
-    def is_full_rank(self) -> bool:
-        """The test passes: the Kalman matrix has rank ``n``."""
-        return self.rank == self.n
-
-    def __str__(self):
-        verdict = "full rank" if self.is_full_rank else "rank deficient"
-
-        return f"StructuralProperties: rank {self.rank} of n = {self.n}, {verdict}"
+    return obsv, r
 
 
 ###############################################################################
@@ -182,6 +159,7 @@ if __name__ == "__main__":
     B = np.array([[0.0], [1.0]])
     C = np.array([[1.0, 0.0]])
     model = LTISystem(A, B, C)
-    print(controllability(model))
-    print(observability(model))
-    print("𝒞 =\n", controllability_matrix(A, B))
+    ctrb, ctrb_rank = controllability(model)
+    obsv, obsv_rank = observability(model)
+    print("𝒞 =\n", ctrb, f"\nrank {ctrb_rank} of n = 2")
+    print("𝒪 =\n", obsv, f"\nrank {obsv_rank} of n = 2")

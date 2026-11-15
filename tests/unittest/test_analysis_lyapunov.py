@@ -238,7 +238,7 @@ def test_the_plot_draws_the_region_and_the_basin():
     loop = saturated_loop()
     region = region_of_attraction(loop)
 
-    fig, ax = plot_region_of_attraction(loop, region, basin=True, show=False)
+    ax = plot_region_of_attraction(loop, region, basin=True, show=False).axes
     assert "region of attraction" in " ".join(ax.get_title().split())
     assert len(ax.collections) >= 2  # the shaded basin and the level set
     assert ax.get_xlabel() == loop.state.labels[0]
@@ -255,7 +255,7 @@ def test_the_plot_draws_both_estimates_side_by_side():
         "simulation": region_of_attraction(loop, method="simulation"),
     }
 
-    _, ax = plot_region_of_attraction(loop, regions, show=False)
+    ax = plot_region_of_attraction(loop, regions, show=False).axes
     legend = [text.get_text() for text in ax.get_legend().get_texts()]
     assert "Lyapunov" in legend and "simulation" in legend
 
@@ -270,9 +270,9 @@ def test_plot_overlays_leave_the_system_run_and_start_untouched():
     region = region_of_attraction(sys)
     traj = sys.compute_trajectory(tf=0.5, verbose=False)
 
-    _, ax = plot_region_of_attraction(
+    ax = plot_region_of_attraction(
         sys, region, trajectories=[[2.0, 1.0], [-3.0, 0.5]], show=False
-    )
+    ).axes
     assert len(ax.lines) >= 4  # each overlay: its path and its start
     assert sys.traj is traj
     np.testing.assert_array_equal(sys.x0, [1.0, -1.0])

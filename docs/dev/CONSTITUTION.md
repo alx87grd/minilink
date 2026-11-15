@@ -144,10 +144,14 @@ The student syntax never breaks when graduating to advanced research.
    convenient entry points that delegate directly to their standalone tool modules (`Simulator`, `analysis.linearize`).
 4. **Explicit data flow.** No hidden registries, no invisible global switches, and no implicit backend state.
 5. **Name by diagram role, not implementation technology.**
-6. **Arrays and core objects, not DTO layers.** Equation paths and tools take arrays in and
-   arrays out, or already-named domain objects (`System`, `Trajectory`, `PlanningProblem`,
-   sets, costs). Do not introduce adapter layers or input/output dataclasses that merely wrap
-   `x`, `u`, `t`, or a result the caller already holds.
+6. **Return a core object, else arrays.** Equation paths take and return arrays. A math or
+   control tool takes and returns, in order of preference: a core object that already is the
+   answer (a `System`, or one of the mathematical objects of §2); arrays, or a tuple of arrays
+   named in its docstring; and only then a new object. A new core object or result type is the
+   maintainer's decision, justified by what the caller could not rebuild from arrays, never by
+   convenience. Do not introduce adapter layers or input/output classes that merely wrap `x`,
+   `u`, `t`, or a result the caller already holds. Graphics, rendering backends and other
+   machinery follow the infrastructure exemption (§6).
 7. **The 80/20 rule: the most functionality for the least code.** Work hard on finding the
    simplest approach and architecture that delivers a feature. Judge a design by its ratio of
    functionality to complexity: lines of code, public names, options, classes. When 80% of a
@@ -191,3 +195,7 @@ When trade-offs or design tensions arise, higher-ranked principles strictly over
   equations use non-traceable Python libraries, standard NumPy tools continue to work seamlessly.
 - **Infrastructure exemption:** Machine-facing infrastructure (rendering loops, compiler internals,
   I/O, test harnesses) is evaluated on robustness and maintainability, not on looking like textbook math.
+- **One home per fact:** The constitution and the rules state principles in terms of kinds of
+  objects (a system, a core object, a record, a set, a field). They name the `System` and the
+  mathematical objects of §2, the foundations that hold; every other class and signature is
+  named in the design document and the code only, so a rename never edits a principle.

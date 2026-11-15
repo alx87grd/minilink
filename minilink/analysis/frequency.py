@@ -9,7 +9,6 @@ import warnings
 import numpy as np
 
 from minilink.analysis import linear
-from minilink.analysis.linear import Margins
 from minilink.analysis.linearization import (
     channel_label,
     channel_subtitle,
@@ -147,12 +146,13 @@ def margins(
     n_samples: int = _MARGIN_GRID_POINTS,
     method: str = "auto",
     eps: float = 1e-6,
-) -> Margins:
-    """Gain and phase margins of the selected channel taken as a loop gain.
+) -> tuple[float, float, float, float]:
+    """Gain and phase margins ``(gm, pm, w_pc, w_gc)`` of the selected channel taken as a loop gain.
 
-    Same arguments as :func:`frequency_response`; returns
-    :class:`~minilink.analysis.linear.Margins` (``inf`` where a crossover
-    does not exist).
+    ``gm`` is the gain margin as a ratio (``20 log10(gm)`` in dB), read at the
+    phase crossover ``w_pc``; ``pm`` the phase margin in degrees, read at the
+    gain crossover ``w_gc`` (rad/s); each is ``inf`` where its crossover does
+    not exist. Same arguments as :func:`frequency_response`.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
@@ -585,10 +585,9 @@ def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
     # With margins: the crossover lines, the margins note, the 0 dB and −180° references
     crossovers, notes, references = (), (), ()
     if m is not None:
+        _, _, w_pc, w_gc = m
         crossovers = tuple(
-            RefLine("x", w_c)
-            for w_c in (m.w_gain_crossover, m.w_phase_crossover)
-            if np.isfinite(w_c)
+            RefLine("x", w_c) for w_c in (w_gc, w_pc) if np.isfinite(w_c)
         )
         notes = (Note(margins_text(m)),)
         references = (RefLine("y", 0.0),), (RefLine("y", -180.0),)
@@ -620,20 +619,19 @@ def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
     )
 
 
-def margins_text(m: Margins) -> str:
-    """The margins note: ``Gm`` and ``Pm`` at their crossover frequencies, ``inf`` where none exists."""
-    gm = (
-        "inf"
-        if not np.isfinite(m.gain_margin_db)
-        else f"{m.gain_margin_db:.1f} dB (at {m.w_phase_crossover:.3g} rad/s)"
-    )
-    pm = (
-        "inf"
-        if not np.isfinite(m.phase_margin_deg)
-        else f"{m.phase_margin_deg:.1f} deg (at {m.w_gain_crossover:.3g} rad/s)"
-    )
+def margins_text(m) -> str:
+    """The margins note: ``gm`` in dB and ``pm`` at their crossover frequencies, ``inf`` where none exists."""
+    gm, pm, w_pc, w_gc = m
 
-    return f"Gm = {gm}\nPm = {pm}"
+    # GM_dB = 20 log10(gm)
+    gm_text = (
+        "inf"
+        if not np.isfinite(gm)
+        else f"{20.0 * np.log10(gm):.1f} dB (at {w_pc:.3g} rad/s)"
+    )
+    pm_text = "inf" if not np.isfinite(pm) else f"{pm:.1f} deg (at {w_gc:.3g} rad/s)"
+
+    return f"Gm = {gm_text}\nPm = {pm_text}"
 
 
 def pzmap_figure(z, p, sys, of, wrt, radius=None, period=None):
@@ -702,7 +700,7 @@ def root_text(s) -> str:
 def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None, period=None):
     """The root-locus figure: one trace per branch, with the open-loop poles and zeros; a difference equation's with the unit circle."""
     # The view keeps the poles, zeros and the branches near them; the far tails
-    # of the asymptotes leave the frame as they do in MATLAB, or the window
+    # of the asymptotes leave the frame, or the window
     # within radius of the origin when one is given.
     if radius is None:
         radius = 3.0 * linear.open_loop_radius(

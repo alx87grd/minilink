@@ -406,6 +406,14 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   documented): one colour keyword, `jmax`, across DP, tabular RL, the policy evaluation and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); the operators' named forms
   exported together (scan: core#9).
+- [ ] **One plotting contract** (any time, agent; infrastructure, CONSTITUTION §6): every
+  `plot_*` takes `renderer=` (a matplotlib-only plot refuses `"plotly"` by name), `ax=` on
+  matplotlib (draw into an existing axes; refused with plotly) and `show=`, and returns a
+  `PlotResult`; every `animate*` takes `renderer=`, `show=`, `file_name=` and returns one too,
+  the animation its payload; one finishing helper does the layout, the show and the record.
+  Today the 76 plot and animate functions mix the three keywords and return a `PlotResult`,
+  `(figure, axes)` (the planning plots) or another call's result. Done when every one follows
+  the contract and its tests read `result.figure` and `result.axes`.
 
 ### Wave B — GRO501, the carry-over (0.2.0 shipped)
 
@@ -609,8 +617,8 @@ pillar names it.
   the joint levels of `(x, u)`, with `min_over_u()` the `J` field and `greedy()` the
   `LookupPolicy` (ruled 2026-11-06, [plans-as-policies.md](plans-as-policies.md) §7), and
   tabular RL's `cost_to_go` on it; `CallableField` (RL critics); `LinearApproximator`
-  as a field; `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the
-  field (its `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon`
+  as a field (the region of attraction is an `EllipsoidSet` of its `V` since 2026-11-15);
+  `lqr_finite_horizon`
   handing out `QuadraticField(x̄, S, t)` beside its controller (scan: planning#4; the policy
   evaluation's `GridField` landed with the API naming sweep, §1.11). Done when the DP
   baselines `cmp` and `test_planning_solution.py`, `test_rl_tabular.py` and

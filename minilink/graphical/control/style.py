@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
-# Titles, axis labels and colours follow the MATLAB Control System Toolbox, so
-# the figures read like the ones in the course notes.
-SYSTEM_COLOR = "#0072BD"  # MATLAB blue
-CRITICAL_COLOR = "#A2142F"  # MATLAB red, the -1 point
+# Titles, axis labels and colours of the control figures, one look for every plot.
+SYSTEM_COLOR = "#0072BD"  # The response, a deep blue
+CRITICAL_COLOR = "#A2142F"  # The −1 point, a dark red
 AXIS_COLOR = "#7f7f7f"
 
 BODE_TITLE = "Bode Diagram"

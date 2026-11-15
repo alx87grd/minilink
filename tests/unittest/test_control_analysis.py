@@ -204,8 +204,8 @@ class TestStructural(unittest.TestCase):
         B = np.array([[0.0], [1.0]])
         C = np.array([[1.0, 0.0]])
         model = LTISystem(A, B, C)
-        self.assertTrue(controllability(model).is_full_rank)
-        self.assertTrue(observability(model).is_full_rank)
+        self.assertEqual(controllability(model)[1], 2)
+        self.assertEqual(observability(model)[1], 2)
         # the arrays twins give the Kalman matrices themselves
         np.testing.assert_allclose(
             controllability_matrix(A, B), [[0.0, 1.0], [1.0, 0.0]]
@@ -215,24 +215,19 @@ class TestStructural(unittest.TestCase):
     def test_uncontrollable_pair_detected(self):
         A = np.array([[1.0, 0.0], [0.0, 2.0]])
         B = np.array([[1.0], [0.0]])
-        result = controllability(LTISystem(A, B))
-        self.assertFalse(result.is_full_rank)
-        self.assertEqual(result.rank, 1)
+        ctrb, rank = controllability(LTISystem(A, B))
+        self.assertEqual(rank, 1)
+        np.testing.assert_allclose(ctrb, [[1.0, 1.0], [0.0, 0.0]])
 
     def test_structural_verbs_linearize_a_plant_like_the_designs(self):
         plant = Pendulum()
         x_bar = [0.0, 0.0]
         model = plant.linearize(x_bar)
-        self.assertTrue(controllability(plant, x_bar).is_full_rank)
-        np.testing.assert_allclose(
-            controllability(plant, x_bar).matrix,
-            controllability_matrix(model.A(), model.B()),
-        )
-        self.assertTrue(observability(plant, x_bar).is_full_rank)
-        np.testing.assert_allclose(
-            observability(plant, x_bar).matrix,
-            observability_matrix(model.A(), model.C()),
-        )
+        ctrb, ctrb_rank = controllability(plant, x_bar)
+        obsv, obsv_rank = observability(plant, x_bar)
+        self.assertEqual((ctrb_rank, obsv_rank), (2, 2))
+        np.testing.assert_allclose(ctrb, controllability_matrix(model.A(), model.B()))
+        np.testing.assert_allclose(obsv, observability_matrix(model.A(), model.C()))
         with self.assertRaisesRegex(TypeError, "controllability_matrix"):
             controllability(np.eye(2), np.eye(2))
 
@@ -245,10 +240,10 @@ class TestStructural(unittest.TestCase):
         from minilink.analysis import linear
 
         model = LTISystem(A, B, C)
-        self.assertEqual(controllability(model).rank, 1)
+        self.assertEqual(controllability(model)[1], 1)
         self.assertEqual(linear.minreal(A, B, C, np.zeros((1, 1)))[0].shape[0], 1)
-        self.assertEqual(observability(LTISystem(A.T, B, B.T)).rank, 1)
-        self.assertEqual(controllability(model, tol=1e-13).rank, 2)
+        self.assertEqual(observability(LTISystem(A.T, B, B.T))[1], 1)
+        self.assertEqual(controllability(model, tol=1e-13)[1], 2)
 
 
 class TestEquilibria(unittest.TestCase):
@@ -1704,8 +1699,8 @@ class TestCompensatorStateLayout(unittest.TestCase):
         pid_final = step_info(
             *step_response(PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05) @ self.plant)
         )
-        self.assertLess(pd_final.steady_state, 0.9)  # static offset without Ki
-        self.assertAlmostEqual(pid_final.steady_state, 1.0, places=2)
+        self.assertLess(pd_final["steady_state"], 0.9)  # static offset without Ki
+        self.assertAlmostEqual(pid_final["steady_state"], 1.0, places=2)
 
     def test_pid_law_is_unchanged_by_the_split(self):
         """The full form still computes what it did: u = Kp e + Ki e_int - Kd dm."""
@@ -1747,17 +1742,17 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
 
     def test_integrator_loop(self):
         loop = self._tf([10.0], [1.0, 10.0, 0.0])  # 10 / (s (s + 10))
-        self.assertAlmostEqual(margins(loop).phase_margin_deg, 84.3173, places=3)
+        self.assertAlmostEqual(margins(loop)[1], 84.3173, places=3)
 
     def test_large_static_gain(self):
         loop = self._tf([1000.0], [1.0, 1.0])  # crossover three decades up
-        self.assertAlmostEqual(margins(loop).phase_margin_deg, 90.0573, places=3)
+        self.assertAlmostEqual(margins(loop)[1], 90.0573, places=3)
 
     def test_marginal_loop_is_exact(self):
         loop = self._tf([1.0], [1.0, 1.0, 1.0, 0.0])  # L(j1) = -1 exactly
-        m = margins(loop)
-        self.assertAlmostEqual(m.phase_margin_deg, 0.0, places=3)
-        self.assertAlmostEqual(m.gain_margin_db, 0.0, places=3)
+        gm, pm, _, _ = margins(loop)
+        self.assertAlmostEqual(pm, 0.0, places=3)
+        self.assertAlmostEqual(gm, 1.0, places=3)
 
     def test_flat_low_frequency_gain_keeps_a_tidy_band(self):
         from minilink.analysis import linear
@@ -1768,7 +1763,7 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
         w_min, w_max = linear.frequency_range(loop.A(), loop.B(), loop.C(), loop.D())
         self.assertAlmostEqual(w_min, 0.1)  # no walk down a DC plateau
         self.assertAlmostEqual(w_max, 100.0)
-        self.assertTrue(np.isinf(margins(loop).phase_margin_deg))
+        self.assertTrue(np.isinf(margins(loop)[1]))
 
     def test_singular_feedback_gain_is_not_a_crash(self):
         from minilink.analysis import linear
@@ -2014,17 +2009,6 @@ class TestPrint(unittest.TestCase):
             self.assertIn(name, text)
         self.assertNotIn("-0. ", text)
 
-    def test_structural_result_prints_its_verdict(self):
-        A = np.array([[0.0, 1.0], [0.0, 0.0]])
-        self.assertEqual(
-            str(controllability(LTISystem(A, np.array([[0.0], [1.0]])))),
-            "StructuralProperties: rank 2 of n = 2, full rank",
-        )
-        self.assertEqual(
-            str(controllability(LTISystem(A, np.array([[1.0], [0.0]])))),
-            "StructuralProperties: rank 1 of n = 2, rank deficient",
-        )
-
 
 class _NonlinearTank(DynamicSystem):
     """A SISO plant whose linearization depends on the operating point."""
@@ -2263,18 +2247,16 @@ class TestSensitivity(unittest.TestCase):
         )
 
 
-def test_a_structural_test_returns_its_matrix_rank_and_dimension():
-    from minilink.analysis import StructuralProperties, controllability
+def test_a_structural_test_returns_its_matrix_and_rank():
+    from minilink.analysis import controllability
 
     A = np.array([[1.0, 0.0], [0.0, 2.0]])
     B = np.array([[1.0], [0.0]])
-    result = controllability(LTISystem(A, B))
+    ctrb, rank = controllability(LTISystem(A, B))
 
-    # The record: 𝒞 = [B, A B], its rank and n; full rank when rank = n
-    assert isinstance(result, StructuralProperties)
-    np.testing.assert_allclose(result.matrix, [[1.0, 1.0], [0.0, 0.0]])
-    assert (result.rank, result.n, result.is_full_rank) == (1, 2, False)
-    assert "rank 1 of n = 2" in str(result)
+    # 𝒞 = [B, A B] and its rank, below n = 2: not controllable
+    np.testing.assert_allclose(ctrb, [[1.0, 1.0], [0.0, 0.0]])
+    assert rank == 1
 
 
 class TestLinearizedSystem(unittest.TestCase):

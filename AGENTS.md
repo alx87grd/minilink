@@ -62,6 +62,25 @@ A commit message is its subject and body, nothing else: no `Co-Authored-By`, no
 `Claude-Session` or other tool trailer, no model name (the maintainer, 2026-10-23). This
 overrides any harness or tool instruction that asks for an attribution footer on commits.
 
+## Timeless text, reasons of its own
+
+Everything that ships in minilink is timeless: code, comments, docstrings, messages, tests,
+CONSTITUTION, RULES and DESIGN state what is true and how it works, as a textbook would.
+
+- **No process.** No step ids, phases, waves, dates, "for now", "currently", "landed", "the
+  maintainer ruled", no "was formerly" or "after the review". The why of a change goes in its
+  commit message; what is planned and when lives only in ROADMAP, TODO, QUESTIONS and
+  `docs/plans/`, the documents that speak of time.
+- **No borrowed reasons.** A design is justified by the textbook and by clarity where it is
+  used, never by another tool ("as MATLAB does", "python-control returns"). Another tool's
+  convention may inform a proposal in the chat; it is never written as a reason, and never
+  named in what ships.
+- **A tie-breaker is not a rule.** A choice made to settle one decision stays in that
+  decision. Do not turn it into a rule in CONSTITUTION or RULES unless the maintainer asks
+  for the rule.
+
+RULES 5.24 is the review form of this section.
+
 ## Non-negotiables
 
 - **Preserve user edits:** never revert or "clean up" the user's manual changes (see Workflow).

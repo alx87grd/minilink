@@ -43,7 +43,7 @@ class TestLinearCore(unittest.TestCase):
     def setUp(self):
         # G(s) = (s + 2) / ((s + 1)(s + 3))
         self.G = TransferFunction([1.0, 2.0], [1.0, 4.0, 3.0])
-        # L(s) = 1 / (s (s + 1)(s + 2)): Gm = 20 log10(6) at sqrt(2) rad/s
+        # L(s) = 1 / (s (s + 1)(s + 2)): gm = 20 log10(6) at sqrt(2) rad/s
         self.L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
 
     def test_poles_zeros_gain(self):
@@ -64,13 +64,17 @@ class TestLinearCore(unittest.TestCase):
 
     def test_margins_of_a_textbook_loop(self):
         w = np.logspace(-2, 2, 4000)
-        m = linear.margins(w, linear.frequency_response(*_matrices(self.L), w))
-        self.assertAlmostEqual(m.gain_margin_db, 20 * np.log10(6.0), places=3)
-        self.assertAlmostEqual(m.w_phase_crossover, np.sqrt(2.0), places=4)
-        self.assertAlmostEqual(m.phase_margin_deg, 53.41, places=1)
+        gm, pm, w_pc, _ = linear.margins(
+            w, linear.frequency_response(*_matrices(self.L), w)
+        )
+        self.assertAlmostEqual(gm, 6.0, places=3)
+        self.assertAlmostEqual(w_pc, np.sqrt(2.0), places=4)
+        self.assertAlmostEqual(pm, 53.41, places=1)
         # a stable first-order lag never crosses 0 dB or -180 deg
-        m = linear.margins(w, linear.frequency_response(*_matrices(self.G), w))
-        self.assertTrue(np.isinf(m.gain_margin_db) and np.isinf(m.phase_margin_deg))
+        gm, pm, _, _ = linear.margins(
+            w, linear.frequency_response(*_matrices(self.G), w)
+        )
+        self.assertTrue(np.isinf(gm) and np.isinf(pm))
 
     def test_root_locus_branches_are_continuous_and_closed_loop_exact(self):
         A, B, C, D = _matrices(self.L)
@@ -127,12 +131,12 @@ class TestLinearCore(unittest.TestCase):
         t = np.linspace(0.0, 15.0, 3001)
         info = step_info(t, linear.step_response(*_matrices(tf), t))
         expected = 100.0 * np.exp(-np.pi * zeta / np.sqrt(1 - zeta**2))
-        self.assertAlmostEqual(info.overshoot, expected, places=1)
-        self.assertAlmostEqual(info.steady_state, 1.0, places=3)
+        self.assertAlmostEqual(info["overshoot"], expected, places=1)
+        self.assertAlmostEqual(info["steady_state"], 1.0, places=3)
         self.assertAlmostEqual(
-            info.peak_time, np.pi / (wn * np.sqrt(1 - zeta**2)), places=2
+            info["peak_time"], np.pi / (wn * np.sqrt(1 - zeta**2)), places=2
         )
-        self.assertGreater(info.settling_time, info.rise_time)
+        self.assertGreater(info["settling_time"], info["rise_time"])
 
     def test_step_info_rise_time_skips_the_undershoot(self):
         # G(s) = (1 - s) / (s + 1)²: y = 1 - (1 + 2t) e^(-t) dips to -0.21 at t = 0.5 s,
@@ -140,7 +144,7 @@ class TestLinearCore(unittest.TestCase):
         tf = TransferFunction([-1.0, 1.0], [1.0, 2.0, 1.0])
         t = np.linspace(0.0, 12.0, 12001)
         info = step_info(t, linear.step_response(*_matrices(tf), t))
-        self.assertAlmostEqual(info.rise_time, 4.631 - 1.483, places=2)
+        self.assertAlmostEqual(info["rise_time"], 4.631 - 1.483, places=2)
 
     def test_step_info_undershoot_is_not_overshoot(self):
         # G(s) = (1 - 5s) / (s + 1)²: y = 1 - (1 + 6t) e^(-t) dips to -1.608 at t = 5/6 s
@@ -148,10 +152,10 @@ class TestLinearCore(unittest.TestCase):
         tf = TransferFunction([-5.0, 1.0], [1.0, 2.0, 1.0])
         t = np.linspace(0.0, 20.0, 20001)
         info = step_info(t, linear.step_response(*_matrices(tf), t))
-        self.assertEqual(info.overshoot, 0.0)
-        self.assertAlmostEqual(info.peak, 1.0 - 6.0 * np.exp(-5.0 / 6.0), places=4)
+        self.assertEqual(info["overshoot"], 0.0)
+        self.assertAlmostEqual(info["peak"], 1.0 - 6.0 * np.exp(-5.0 / 6.0), places=4)
         info_negative = step_info(t, -linear.step_response(*_matrices(tf), t))
-        self.assertEqual(info_negative.overshoot, 0.0)
+        self.assertEqual(info_negative["overshoot"], 0.0)
 
     def test_step_info_of_a_response_that_never_settles(self):
         # An integrator's step is a ramp: it has a peak (its last sample) but no
@@ -160,28 +164,28 @@ class TestLinearCore(unittest.TestCase):
         integrator = TransferFunction([1.0], [1.0, 0.0])
         for y in (t, linear.step_response(*_matrices(integrator), t)):
             info = step_info(t, y)
-            self.assertTrue(np.isnan(info.rise_time))
-            self.assertTrue(np.isnan(info.settling_time))
-            self.assertTrue(np.isnan(info.overshoot))
-            self.assertTrue(np.isnan(info.steady_state))
-            self.assertAlmostEqual(info.peak_time, 5.0)
+            self.assertTrue(np.isnan(info["rise_time"]))
+            self.assertTrue(np.isnan(info["settling_time"]))
+            self.assertTrue(np.isnan(info["overshoot"]))
+            self.assertTrue(np.isnan(info["steady_state"]))
+            self.assertAlmostEqual(info["peak_time"], 5.0)
 
     def test_step_info_band_is_two_percent_of_the_peak_deviation(self):
         # y = t e^(-t) peaks at 1/e and returns to 0: the band is 2 % of that peak
         # deviation, and y leaves it for the last time at t = 6.834 s
         t = np.linspace(0.0, 20.0, 20001)
         info = step_info(t, t * np.exp(-t))
-        self.assertAlmostEqual(info.settling_time, 6.834, places=2)
-        self.assertAlmostEqual(info.steady_state, 0.0)
+        self.assertAlmostEqual(info["settling_time"], 6.834, places=2)
+        self.assertAlmostEqual(info["steady_state"], 0.0)
 
         # Its last sample is 4·10⁻⁸, inside the band: it settles at zero, so it has
         # no rise time or overshoot relative to that final value
-        self.assertTrue(np.isnan(info.rise_time))
-        self.assertTrue(np.isnan(info.overshoot))
+        self.assertTrue(np.isnan(info["rise_time"]))
+        self.assertTrue(np.isnan(info["overshoot"]))
 
         # From rest the peak deviation is |y_f|: y = 1 − e^(-t) settles at ln 50
         info = step_info(t, 1.0 - np.exp(-t))
-        self.assertAlmostEqual(info.settling_time, np.log(50.0), places=2)
+        self.assertAlmostEqual(info["settling_time"], np.log(50.0), places=2)
 
 
 class TestChannelTools(unittest.TestCase):
@@ -206,7 +210,7 @@ class TestChannelTools(unittest.TestCase):
         self.assertEqual(G_n.shape, (50,))
         time, y = step_response(plant, x_bar, n_samples=200)
         self.assertEqual(time.shape, y.shape)
-        self.assertIsInstance(margins(plant, x_bar), linear.Margins)
+        self.assertEqual(len(margins(plant, x_bar)), 4)
         G_tf = transfer_function(plant, x_bar)
         A = plant.linearize(x_bar).A()
         np.testing.assert_allclose(
@@ -219,11 +223,11 @@ class TestChannelTools(unittest.TestCase):
 
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
         coarse, fine = margins(L, n_samples=60), margins(L, n_samples=4000)
-        # L(s) = 1 / (s (s + 1)(s + 2)): Gm = 20 log10(6) at sqrt(2) rad/s, exactly
-        self.assertAlmostEqual(coarse.gain_margin_db, 20 * np.log10(6.0), places=9)
-        self.assertAlmostEqual(coarse.w_phase_crossover, np.sqrt(2.0), places=9)
-        self.assertAlmostEqual(coarse.phase_margin_deg, fine.phase_margin_deg, places=8)
-        self.assertAlmostEqual(coarse.w_gain_crossover, fine.w_gain_crossover, places=8)
+        # L(s) = 1 / (s (s + 1)(s + 2)): gm = 6 at sqrt(2) rad/s, exactly
+        self.assertAlmostEqual(coarse[0], 6.0, places=8)
+        self.assertAlmostEqual(coarse[2], np.sqrt(2.0), places=9)
+        self.assertAlmostEqual(coarse[1], fine[1], places=8)
+        self.assertAlmostEqual(coarse[3], fine[3], places=8)
         # the Bode note and margins() print one number
         self.assertEqual(margins_text(coarse), margins_text(fine))
 
@@ -242,8 +246,8 @@ class TestChannelTools(unittest.TestCase):
 
     def test_transfer_function_blocks_go_through_unchanged(self):
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
-        m = margins(L)
-        self.assertAlmostEqual(m.gain_margin_db, 20 * np.log10(6.0), places=2)
+        gm, _, _, _ = margins(L)
+        self.assertAlmostEqual(gm, 6.0, places=2)
         gains, roots = root_locus(L)
         self.assertEqual(roots.shape[1], 3)
 
@@ -402,16 +406,16 @@ class TestPlots(unittest.TestCase):
     def test_bode_plot_reports_the_margins_of_margins(self):
         # the 200 plotted points put the gain crossover at 1.28 rad/s; margins() at 1.27
         loop = TransferFunction([4.9], [1.0, 3.0, 2.0, 0.0])
-        m = margins(loop)
+        gm, pm, w_pc, w_gc = margins(loop)
         r = plot_bode(loop, show=False)
         texts = [t.get_text() for t in r.axes[0].texts]
         self.assertIn(
-            f"Gm = {m.gain_margin_db:.1f} dB (at {m.w_phase_crossover:.3g} rad/s)\n"
-            f"Pm = {m.phase_margin_deg:.1f} deg (at {m.w_gain_crossover:.3g} rad/s)",
+            f"Gm = {20 * np.log10(gm):.1f} dB (at {w_pc:.3g} rad/s)\n"
+            f"Pm = {pm:.1f} deg (at {w_gc:.3g} rad/s)",
             texts,
         )
         crossovers = [line.get_xdata()[0] for line in r.axes[0].lines[1:3]]
-        self.assertEqual(crossovers, [m.w_gain_crossover, m.w_phase_crossover])
+        self.assertEqual(crossovers, [w_gc, w_pc])
 
     def test_plotly_backend_draws_the_same_figures(self):
         pytest.importorskip("plotly")

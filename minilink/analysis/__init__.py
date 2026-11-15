@@ -18,9 +18,6 @@ from minilink.core.exports import lazy_facade
 #
 # Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "Margins": ("minilink.analysis.linear", "Margins"),
-    "StepInfo": ("minilink.analysis.time_response", "StepInfo"),
-    "StructuralProperties": ("minilink.analysis.structural", "StructuralProperties"),
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "complementary_sensitivity": (

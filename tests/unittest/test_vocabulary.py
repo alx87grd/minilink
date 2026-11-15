@@ -314,8 +314,17 @@ RETIRED_NAMES = {
     "minilink.dynamics.catalog.astro.three_body.ThreeBodyProblem": "ThreeBody",
     "minilink.catalog.ThreeBodyProblem": "ThreeBody",
     "minilink.ThreeBodyProblem": "ThreeBody",
-    "minilink.analysis.structural.StructuralResult": "StructuralProperties",
-    "minilink.analysis.StructuralResult": "StructuralProperties",
+    "minilink.analysis.structural.StructuralResult": "the tuple (matrix, rank)",
+    "minilink.analysis.StructuralResult": "the tuple (matrix, rank)",
+    # A structural test returns its Kalman matrix and rank
+    "minilink.analysis.structural.StructuralProperties": "the tuple (matrix, rank)",
+    "minilink.analysis.StructuralProperties": "the tuple (matrix, rank)",
+    # The margins as a tuple, the gain margin a ratio
+    "minilink.analysis.linear.Margins": "the tuple (gm, pm, w_pc, w_gc)",
+    "minilink.analysis.Margins": "the tuple (gm, pm, w_pc, w_gc)",
+    # The step figures as a dict by name
+    "minilink.analysis.time_response.StepInfo": "a dict of the step figures by name",
+    "minilink.analysis.StepInfo": "a dict of the step figures by name",
     # The smaller ones (the maintainer's ruling 22 of 2026-11-11)
     "minilink.blocks.sources.Source.plot_signal": (
         "source.compute_trajectory(tf=...), then source.plot_trajectory()"

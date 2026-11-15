@@ -26,7 +26,10 @@ plant.plot_pzmap()
 # The loop gain L = C G with a PID compensator: margins read on the series diagram
 C = PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05)
 L = C >> plant
-print("\nmargins of L = C G:", margins(L))
+gm, pm, w_pc, w_gc = margins(L)
+print(
+    f"\nmargins of L = C G: gain margin {gm:.3g} at {w_pc:.3g} rad/s, phase margin {pm:.1f} deg at {w_gc:.3g} rad/s"
+)
 L.plot_bode()
 plot_nyquist(L)
 
