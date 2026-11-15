@@ -725,27 +725,29 @@ def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late()
 # Script 7
 
 
-def test_script_07_fields_the_certificates_v_is_a_quadratic_field():
+def test_script_07_fields_the_region_of_attraction_is_a_quadratic_sublevel_set():
     from minilink.analysis.lyapunov import region_of_attraction
     from minilink.core.fields import EllipsoidSet, QuadraticField
 
     plant = Pendulum()
     plant.params["d"] = 0.5
-    roa = region_of_attraction(plant)
-    X = roa.x_bar + np.random.default_rng(0).normal(scale=0.3, size=(20, 2))
-    d = X - roa.x_bar
+    region = region_of_attraction(plant)
+    x_bar = region.params["center"]
+    P = region.params["P"]
+    X = x_bar + np.random.default_rng(0).normal(scale=0.3, size=(20, 2))
+    d = X - x_bar
 
-    # V = (x − x̄)ᵀ P (x − x̄), its sublevel set the certified region
-    assert isinstance(roa.V, QuadraticField)
-    np.testing.assert_array_equal(roa.V(X), np.einsum("ij,jk,ik->i", d, roa.P, d))
-    assert isinstance(roa.region, EllipsoidSet)
+    # V = (x − x̄)ᵀ P (x − x̄), the region its sublevel set {V ≤ c}
+    assert isinstance(region, EllipsoidSet)
+    assert isinstance(region.field, QuadraticField)
+    np.testing.assert_array_equal(region.field(X), np.einsum("ij,jk,ik->i", d, P, d))
     np.testing.assert_array_equal(
-        roa.contains(X), [bool(roa.region.contains(x)) for x in X]
+        [bool(region.contains(x)) for x in X], region.field(X) <= region.level
     )
 
     # The same field is a terminal cost: h(x) = V(x)
-    h = roa.V.as_terminal_cost()
-    assert h.h(X[0]) == roa.V(X[0])
+    h = region.field.as_terminal_cost()
+    assert h.h(X[0]) == region.field(X[0])
 
 
 @pytest.mark.optional

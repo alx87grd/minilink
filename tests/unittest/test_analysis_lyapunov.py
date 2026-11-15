@@ -1,4 +1,4 @@
-"""Lyapunov certificates: the level, its verification, and the plot."""
+"""Region of attraction: the Lyapunov matrix, the level, and the plot."""
 
 import unittest
 
@@ -7,14 +7,15 @@ import pytest
 
 from minilink import CartPole, InvertedPendulum, VanDerPol
 from minilink.analysis.lyapunov import (
-    LyapunovCertificate,
+    dynamics_of,
     plot_region_of_attraction,
     region_of_attraction,
 )
 from minilink.control.design import lqr
 from minilink.core.backends import array_module
-from minilink.core.fields import QuadraticField
+from minilink.core.fields import EllipsoidSet, QuadraticField
 from minilink.core.system import DynamicSystem
+from minilink.simulation.simulator import Simulator
 
 
 class StableLinear(DynamicSystem):
@@ -66,206 +67,162 @@ def saturated_pendulum(torque=2.0):
     return plant
 
 
-class TestQuadraticCertificate(unittest.TestCase):
-    def test_linear_loop_is_limited_only_by_its_domain(self):
+def saturated_loop():
+    plant = saturated_pendulum()
+    return lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
+
+
+def converges(sys, region, X0, horizon):
+    """Whether each state of ``X0`` ends near the region's center after ``horizon`` seconds."""
+    x_bar = region.params["center"]
+    finals = [
+        Simulator(sys, x0=x0, tf=horizon, verbose=False).solve().x[:, -1] for x0 in X0
+    ]
+    distance = np.linalg.norm(np.array(finals) - x_bar, axis=1)
+    return distance < 0.05 * np.max(region.half_width)
+
+
+def V_dot_on(sys, region, X):
+    """``V̇ = 2 (x − x̄)ᵀ P f(x)`` on a stack of states."""
+    x_bar = region.params["center"]
+    P = region.params["P"]
+    f = dynamics_of(sys, sys.u_nominal, 0.0, None)
+    return 2.0 * np.einsum("ij,jk,ik->i", X - x_bar, P, f(X))
+
+
+class TestRegionOfAttraction(unittest.TestCase):
+    def test_the_region_is_the_sublevel_set_of_the_lyapunov_function(self):
         sys = StableLinear()
-        roa = region_of_attraction(sys)
+        region = region_of_attraction(sys)
 
-        self.assertIsInstance(roa, LyapunovCertificate)
-        np.testing.assert_allclose(roa.x_bar, [0.0, 0.0], atol=1e-9)
-        # A' P + P A = -Q with A = diag(a, b) gives P = diag(-1/2a, -1/2b)
-        np.testing.assert_allclose(roa.P, np.diag([0.5, 0.25]), atol=1e-9)
-        self.assertTrue(np.all(roa.poles.real < 0))
+        self.assertIsInstance(region, EllipsoidSet)
+        np.testing.assert_allclose(region.params["center"], [0.0, 0.0], atol=1e-9)
+        # AᵀP + PA = −Q with A = diag(a, b) gives P = diag(−1/2a, −1/2b)
+        np.testing.assert_allclose(region.params["P"], np.diag([0.5, 0.25]), atol=1e-9)
+        self.assertIsInstance(region.field, QuadraticField)
         # Nothing in the plane stops V; the state box does, at |x| = 10
-        self.assertLessEqual(roa.extent.max(), 10.0 + 1e-6)
-        self.assertTrue(roa.contains(np.zeros(2)))
-        self.assertTrue(roa.verify(n_rollouts=50).holds)
+        self.assertLessEqual(region.half_width.max(), 10.0 + 1e-6)
+        self.assertTrue(region.contains(np.zeros(2)))
 
-    def test_saturated_pendulum_certificate_sits_inside_the_true_basin(self):
-        plant = saturated_pendulum()
-        loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
-        roa = region_of_attraction(loop)
+    def test_the_saturated_pendulum_region_lies_inside_the_true_basin(self):
+        loop = saturated_loop()
+        region = region_of_attraction(loop)
 
-        self.assertGreater(roa.level, 0.0)
-        self.assertTrue(roa.contains(roa.x_bar))
-        # Simulation agrees with the theory, which is the whole point
-        report = roa.verify(n_rollouts=100)
-        self.assertTrue(report.holds, msg=str(report))
-        self.assertIsNone(report.counterexample)
-        # The limiting sample is on the boundary of the claim, not inside it
-        self.assertAlmostEqual(roa.V(roa.limiting_state), roa.level, places=9)
+        self.assertGreater(region.level, 0.0)
+        # Simulation agrees with the theory: every state drawn inside converges
+        X0 = region.sample(1, 40)
+        self.assertTrue(np.all(converges(loop, region, X0, horizon=20.0)))
+
+    def test_no_dense_sample_inside_the_region_has_a_growing_v(self):
+        # The level is an estimate from samples: a far denser draw inside the
+        # region finds V̇ ≥ 0 only at its very edge, if at all
+        loop = saturated_loop()
+        region = region_of_attraction(loop)
+        X = region.sample(7, 100_000)
+        V = region.field(X)
+
+        growing = V_dot_on(loop, region, X) >= 0.0
+        self.assertTrue(not growing.any() or V[growing].min() > 0.99 * region.level)
 
     def test_reverse_van_der_pol_stays_inside_its_limit_cycle(self):
-        # The textbook case: the region of attraction is bounded by the
-        # unstable limit cycle, which for mu = 1 passes about |x| = 2.
+        # The region is bounded by the unstable limit cycle, about |x| = 2 for mu = 1
         sys = ReverseVanDerPol()
         sys.state.lower = np.array([-4.0, -4.0])
         sys.state.upper = np.array([4.0, 4.0])
-        roa = region_of_attraction(sys)
+        region = region_of_attraction(sys)
 
-        self.assertLess(roa.extent.max(), 2.5)
-        self.assertTrue(roa.verify(n_rollouts=100).holds)
-        # A state well outside the cycle diverges, so it must not be certified
-        self.assertFalse(roa.contains(np.array([3.0, 3.0])))
+        self.assertLess(region.half_width.max(), 2.5)
+        # A state well outside the cycle diverges, so it must not be in the region
+        self.assertFalse(region.contains(np.array([3.0, 3.0])))
 
-    def test_unstable_equilibrium_has_nothing_to_certify(self):
+    def test_an_unstable_equilibrium_has_no_region(self):
         plant = saturated_pendulum()
         with self.assertRaises(ValueError) as raised:
             region_of_attraction(plant, np.zeros(2))  # open loop, upright
         self.assertIn("not stable", str(raised.exception))
 
-    def test_equilibrium_is_found_not_assumed(self):
-        # A law with a steady offset settles beside the state it was aimed at.
+    def test_the_equilibrium_is_found_not_assumed(self):
+        # A law with a steady offset settles beside the state it was aimed at
         plant = saturated_pendulum()
         ctl = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2))
         ctl.params["u_bar"] = np.array([0.5])  # a bias the design did not intend
-        roa = region_of_attraction(ctl @ plant, np.zeros(2))
+        loop = ctl @ plant
+        region = region_of_attraction(loop, np.zeros(2))
 
-        self.assertGreater(abs(float(roa.x_bar[0])), 1e-3)
-        np.testing.assert_allclose(roa.V_dot(roa.x_bar), 0.0, atol=1e-6)
+        x_bar = region.params["center"]
+        self.assertGreater(abs(float(x_bar[0])), 1e-3)
+        np.testing.assert_allclose(loop.f(x_bar, loop.u_nominal), 0.0, atol=1e-6)
 
-    def test_every_certified_state_of_a_grid_converges(self):
-        # The property the plot draws: the certified set is inside the basin.
-        plant = saturated_pendulum()
-        loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
-        roa = region_of_attraction(loop)
-
-        half = 2.5 * roa.extent
-        axes = [np.linspace(-h, h, 61) + roa.x_bar[i] for i, h in enumerate(half)]
-        grid = np.stack([m.ravel() for m in np.meshgrid(*axes)], axis=1)
-        certified = roa.contains(grid)
-        self.assertGreater(certified.sum(), 100)
-
-        final = roa.rollout(10.0 / abs(roa.rate))(grid[certified])
-        distance = np.linalg.norm(final - roa.x_bar, axis=1)
-        self.assertLess(distance.max(), 0.05 * roa.extent.max())
-
-    def test_a_plant_that_cannot_trace_is_certified_on_numpy(self):
+    def test_a_plant_that_cannot_trace_is_analyzed_on_numpy(self):
         from minilink.core.compile.compiler import compile_auto
 
         sys = UntraceableSpring()
         backend, _ = compile_auto(sys)
         self.assertEqual(backend, "numpy")  # the premise of this test
 
-        roa = region_of_attraction(sys)  # finite-difference Jacobian, looped sweep
-        self.assertTrue(np.all(roa.poles.real < 0))
-        self.assertGreater(roa.level, 0.0)
-        self.assertTrue(roa.verify(n_rollouts=20).holds)
+        region = region_of_attraction(sys, n_samples=2000)  # looped evaluation
+        self.assertGreater(region.level, 0.0)
 
-    def test_four_state_loop_certifies_and_its_slice_is_not_its_shadow(self):
-        # n > 2: the sweep goes quasi-random, and a phase-plane plot draws the
-        # slice through the equilibrium, which coupling makes smaller than the
-        # shadow the certified set casts on the two axes.
-        arm = CartPole()
-        arm.inputs["u"].lower = np.array([-20.0])
-        arm.inputs["u"].upper = np.array([20.0])
-        arm.state.lower = np.array([-3.0, -4 * np.pi, -10.0, -10.0])
-        arm.state.upper = -arm.state.lower
+    def test_a_four_state_region_holds_on_a_dense_draw(self):
+        # In four states the samples thin out: the shrinking search still lands
+        # at the edge where V stops decreasing
+        cart = CartPole()
+        cart.inputs["u"].lower = np.array([-20.0])
+        cart.inputs["u"].upper = np.array([20.0])
+        cart.state.lower = np.array([-3.0, -4 * np.pi, -10.0, -10.0])
+        cart.state.upper = -cart.state.lower
         x_up = np.array([0.0, np.pi, 0.0, 0.0])
-        loop = lqr(arm, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.eye(1), x_bar=x_up) @ arm
-        roa = region_of_attraction(loop, x_up)
+        Q = np.diag([1.0, 10.0, 1.0, 1.0])
+        loop = lqr(cart, Q=Q, R=np.eye(1), x_bar=x_up) @ cart
+        region = region_of_attraction(loop, x_up)
 
-        self.assertEqual(roa.extent.size, 4)
-        self.assertTrue(roa.verify(n_rollouts=50).holds)
+        self.assertEqual(region.half_width.size, 4)
+        X = region.sample(7, 200_000)
+        V = region.field(X)
+        growing = V_dot_on(loop, region, X) >= 0.0
+        self.assertTrue(not growing.any() or V[growing].min() > 0.95 * region.level)
 
-        shadow = roa.extent[[0, 1]]
-        sliced = roa.slice_extent(0, 1)
-        np.testing.assert_array_less(sliced, shadow + 1e-12)
-        self.assertLess(
-            sliced[1], 0.7 * shadow[1]
-        )  # the pole angle is strongly coupled
-
-    def test_the_search_reports_whether_it_had_enough_samples(self):
-        # Two states on a grid: the halves agree, so the level is sharp.
-        plant = saturated_pendulum()
-        loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
-        roa = region_of_attraction(loop)
-        self.assertLess(roa.sample_spread, 0.1)
-        self.assertFalse(roa.sample_limited)
-        self.assertNotIn("sample-limited", str(roa))
-
-        # The flag is what a caller reads, and it shows up in the summary line
-        thin = region_of_attraction(loop)
-        thin.sample_spread = 0.4
-        self.assertTrue(thin.sample_limited)
-        self.assertIn("sample-limited", str(thin))
-
-    def test_method_and_search_options(self):
-        sys = StableLinear()
-        with self.assertRaisesRegex(NotImplementedError, "a quadratic V only"):
-            region_of_attraction(sys, method="sos")
-        with self.assertRaises(ValueError):
-            region_of_attraction(sys, method="neural")
-        with self.assertRaises(ValueError):
-            region_of_attraction(sys, search="sobol")
-
-        grid = region_of_attraction(sys, search="grid", n_samples=2601)
-        drawn = region_of_attraction(sys, search="random", n_samples=4000)
-        self.assertAlmostEqual(grid.level, drawn.level, delta=0.4 * grid.level)
-
-    def test_the_region_draws_inside_the_level_and_repeats_on_a_seed(self):
-        P = np.array([[4.0, 1.0], [1.0, 2.0]])
-        region = QuadraticField(np.zeros(2), P).as_set(upper=3.0)
-        d = region.sample(0, 500)
-        self.assertTrue(np.all(np.einsum("ij,jk,ik->i", d, P, d) <= 3.0 + 1e-9))
-        np.testing.assert_allclose(region.sample(0, 5), region.sample(0, 5))
-
-    def test_the_certificate_speaks_the_field(self):
-        sys = VanDerPol()
-        sys.params["mu"] = -1.0
-        roa = region_of_attraction(sys)
-        x = roa.x_bar + np.array([0.1, -0.2])
-        self.assertIsInstance(roa.V, QuadraticField)
-        self.assertEqual(roa.V(x), roa.V.value(x))
-        np.testing.assert_allclose(roa.V.gradient(x), 2.0 * roa.P @ (x - roa.x_bar))
-        np.testing.assert_array_equal(roa.extent, roa.region.half_width)
-        self.assertEqual(roa.region.level, roa.level)
-        self.assertTrue(roa.region.contains(roa.x_bar))
-        self.assertEqual(roa.V(list(x)), roa.V(x))
-        self.assertEqual(roa.contains(list(x)), roa.contains(x))
-        self.assertEqual(roa.V(list(x)), roa.V(x))
-        self.assertEqual(roa.contains(list(x)), roa.contains(x))
+    def test_the_level_repeats(self):
+        loop = saturated_loop()
+        self.assertEqual(
+            region_of_attraction(loop).level, region_of_attraction(loop).level
+        )
 
 
 @pytest.mark.optional
 @pytest.mark.jax
 def test_numpy_and_jax_backends_agree():
     pytest.importorskip("jax")
-    plant = saturated_pendulum()
-    loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
-
     from minilink.analysis import lyapunov
 
+    loop = saturated_loop()
     jax_level = region_of_attraction(loop).level
-    original = lyapunov.compiled
-    lyapunov.compiled = lambda sys: (
-        "numpy",
-        sys.compile(backend="numpy", verbose=False),
+
+    # The same search with f evaluated state by state on NumPy
+    original = lyapunov.dynamics_of
+    numpy_evaluator = loop.compile(backend="numpy", verbose=False)
+    lyapunov.dynamics_of = lambda sys, u_bar, t, params: (
+        lambda X: np.stack([numpy_evaluator.f(x, u_bar, t, params) for x in X])
     )
     try:
-        numpy_level = region_of_attraction(loop).level
+        numpy_level = region_of_attraction(loop, n_samples=50_000).level
     finally:
-        lyapunov.compiled = original
+        lyapunov.dynamics_of = original
     np.testing.assert_allclose(jax_level, numpy_level, rtol=1e-6)
 
 
 @pytest.mark.plotting
-def test_plot_draws_the_slice_and_the_basin():
+def test_the_plot_draws_the_region_and_the_basin():
     import matplotlib
 
     matplotlib.use("Agg")
-    plant = saturated_pendulum()
-    loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
-    roa = region_of_attraction(loop)
+    loop = saturated_loop()
+    region = region_of_attraction(loop)
 
-    fig, ax = roa.plot(basin=True, n_samples=41, show=False)
-    self_titled = " ".join(ax.get_title().split())
-    assert "region of attraction" in self_titled
-    assert len(ax.collections) >= 1  # the shaded basin
+    fig, ax = plot_region_of_attraction(loop, region, basin=True, show=False)
+    assert "region of attraction" in " ".join(ax.get_title().split())
+    assert len(ax.collections) >= 2  # the shaded basin and the level set
     assert ax.get_xlabel() == loop.state.labels[0]
-
-    fig_band, _ = plot_region_of_attraction(roa, n_samples=21, show=False)
-    assert fig_band is not None
 
 
 @pytest.mark.plotting
@@ -275,22 +232,12 @@ def test_plot_overlays_leave_the_system_run_and_start_untouched():
     matplotlib.use("Agg")
     sys = StableLinear()
     sys.x0 = np.array([1.0, -1.0])
-    roa = region_of_attraction(sys)
+    region = region_of_attraction(sys)
     traj = sys.compute_trajectory(tf=0.5, verbose=False)
 
-    _, ax = roa.plot(trajectories=[[2.0, 1.0], [-3.0, 0.5]], n_samples=11, show=False)
+    _, ax = plot_region_of_attraction(
+        sys, region, trajectories=[[2.0, 1.0], [-3.0, 0.5]], show=False
+    )
     assert len(ax.lines) >= 4  # each overlay: its path and its start
     assert sys.traj is traj
     np.testing.assert_array_equal(sys.x0, [1.0, -1.0])
-
-
-def test_a_verification_reports_every_trial_and_no_counterexample_when_it_holds():
-    from minilink.analysis import VerificationReport
-
-    report = region_of_attraction(StableLinear()).verify(n_rollouts=20)
-
-    # One verdict and one final distance per trial; a counterexample only on failure
-    assert isinstance(report, VerificationReport)
-    assert report.converged.shape == (20,) and report.final_distance.shape == (20,)
-    assert report.holds and bool(np.all(report.converged))
-    assert report.counterexample is None

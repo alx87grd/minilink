@@ -58,7 +58,6 @@ RETIRED = {
             "lqr_finite_horizon",
             "lqr_gain_schedule",
             "ProblemEvaluator",
-            "LyapunovCertificate",
         ),
     ),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
@@ -83,13 +82,11 @@ RETIRED = {
     "t2u": ("at(t, 'u')", ("Trajectory",)),
     "sample": ("at", ("Trajectory", "ReferencePath", "PolylinePath")),
     "n": (
-        "state_dim on a system; n_rollouts (verify) or n_samples (the plots) on a certificate",
+        "state_dim on a system",
         (
             "System",
             "DynamicSystem",
             "StepSystem",
-            "LyapunovCertificate",
-            "plot_region_of_attraction",
         ),
     ),
     "episodes": ("n_episodes", None),
@@ -191,7 +188,6 @@ RETIRED = {
         ("P", "PI", "PD", "PID", "Impedance", "IntegralImpedance"),
     ),
     "filename": ("file_name", None),
-    "limits": ("bounds", ("LyapunovCertificate", "plot_region_of_attraction")),
     "show_signal": ("compute_trajectory, then plot_trajectory", None),
     "plot_signal": ("compute_trajectory, then plot_trajectory", None),
     "max_nodes": ("max_iterations (a cap on the iterations)", None),
@@ -396,7 +392,6 @@ RETIRED_KEYWORDS = {
     "minilink.planning.evaluation.score_run": {"tf": "horizon"},
     "minilink.planning.planner.planner_evidence": {"tf": "episode_length"},
     "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
-    "minilink.analysis.lyapunov.LyapunovCertificate.verify": {"tf": "horizon"},
     "minilink.core.facades.plotting.SystemPlotting.plot_diagram": {
         "show_inline": 'show="inline"',
         "show_pdf": 'show="pdf"',

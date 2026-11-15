@@ -883,8 +883,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   (`bounding_box`, `half_width = √(level · diag(P⁻¹))`); `EllipsoidSet.from_matrix(center, P,
   level)` builds it from its numbers. A `CallableSet(margin)` is its user margin
   `margin(z, t, params)`, membership derived (`margin ≥ 0`).
-  `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
-  and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
+  `V(x)` calls `value`. `region_of_attraction` returns that ellipsoid, `{V ≤ c}` with
+  `V = QuadraticField(x̄, P)`; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
   a short-horizon MPC, and `LQRPlanner`'s `cost_to_go` is `QuadraticField(x̄, P)` (or
   `(x̄, S, t)` on a finite horizon `T`, `t` on the problem's clock `t0 … t0 + T`; its law
   applies the stationary gain `K∞` at `x̄` past the horizon, `K(t0 + T)` held when the

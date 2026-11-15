@@ -148,6 +148,13 @@ The student syntax never breaks when graduating to advanced research.
    arrays out, or already-named domain objects (`System`, `Trajectory`, `PlanningProblem`,
    sets, costs). Do not introduce adapter layers or input/output dataclasses that merely wrap
    `x`, `u`, `t`, or a result the caller already holds.
+7. **The 80/20 rule: the most functionality for the least code.** Work hard on finding the
+   simplest approach and architecture that delivers a feature. Judge a design by its ratio of
+   functionality to complexity: lines of code, public names, options, classes. When 80% of a
+   feature fits in 20% of the code, build that 80% and leave the rest until a real use asks
+   for it. A prototype returns the textbook object it computes, not a framework built for its
+   future. Simplicity serves readability, never the reverse: more lines are right when they
+   make the code read like the textbook.
 
 ## 5. Conflict Precedence
 
@@ -157,7 +164,8 @@ When trade-offs or design tensions arise, higher-ranked principles strictly over
 2. **Compositional closure** (The continuous set must close; a flow diagram behaves identically to a leaf).
 3. **Continuous contract is primary** (Do not complicate `f`, `DiagramSystem`, flow `compile()`, or `Simulator` for discrete convenience).
 4. **Domain readability** (Textbook mathematics over programmatic abstraction; arrays and core objects over DTO layers).
-5. **Single-path implementation** (Code deduplication is desirable, but never at the expense of readability or purity).
+5. **Functionality per line** (The 80/20 rule: the simplest approach that delivers most of the feature; never at the expense of readability).
+6. **Single-path implementation** (Code deduplication is desirable, but never at the expense of readability or purity).
 
 ## 6. Architectural Notes
 

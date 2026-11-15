@@ -416,16 +416,6 @@ def test_a_bound_tree_is_what_the_program_reads():
     assert n == 0 and float(evaluator.J(z)) == 4.0
 
 
-def test_a_certificate_verifies_twice_on_one_compile():
-    from minilink.analysis.lyapunov import region_of_attraction
-
-    plant = Pendulum()
-    plant.params["d"] = 0.5
-    roa = region_of_attraction(plant)
-    roa.verify(n_rollouts=20)
-    assert compiles(lambda: roa.verify(n_rollouts=20).converged)[0] == 0
-
-
 def test_an_edit_of_the_programs_numbers_reaches_the_frozen_form():
     from minilink.optimization import MathematicalProgram
     from minilink.optimization.evaluators.compiler import compile_program_evaluator

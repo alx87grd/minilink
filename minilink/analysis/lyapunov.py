@@ -1,9 +1,8 @@
-"""Region of attraction of a closed loop: a quadratic Lyapunov certificate ``V = (x − x̄)ᵀ P (x − x̄) ≤ c``."""
+"""Region of attraction of a closed loop: the sublevel set ``{x : (x − x̄)ᵀ P (x − x̄) ≤ c}`` of a quadratic Lyapunov function."""
 
 from __future__ import annotations
 
 import textwrap
-from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.linalg import solve_continuous_lyapunov
@@ -12,13 +11,15 @@ from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
 from minilink.core.fields import EllipsoidSet, QuadraticField
-from minilink.core.sets import BoxSet, Set
 
-#: Families of Lyapunov function this tool can build.
-METHODS = ("quadratic", "sos")
+#: The seed of the first pass's samples, one more per pass: the level reads the same twice.
+SAMPLE_SEED = 0
 
-#: The seed of the states a certificate tests: it must read the same twice.
-CERTIFICATE_SEED = 0
+#: Passes of the level search, each on the region the previous one left.
+MAX_PASSES = 20
+
+#: Points per axis of the phase-plane plot.
+PLOT_POINTS = 201
 
 
 ###############################################################################
@@ -33,443 +34,212 @@ def region_of_attraction(
     t: float = 0.0,
     params=None,
     *,
-    method: str = "quadratic",
     Q=None,
-    window=None,
     n_samples: int = None,
-    search: str = "auto",
-) -> LyapunovCertificate:
+) -> EllipsoidSet:
     """
-    Certify a region of attraction of ``sys`` around an equilibrium.
+    Estimate a region of attraction of ``sys`` around an equilibrium.
 
-    ``P`` solves the Lyapunov equation at the equilibrium the tool finds; the
-    level ``c`` is the largest sampled sublevel set on which ``V̇ < 0`` inside
-    the state box, so it is a sharp estimate, not a proof, and ``verify()`` is
-    its simulation counter-check.
+    ``V(x) = (x − x̄)ᵀ P (x − x̄)`` with ``P`` the solution of the Lyapunov
+    equation of the linearization, and the region is ``{x : V(x) ≤ c}``. The
+    level starts at ``V ≤ 9`` inside the state box and shrinks: each pass
+    draws states uniformly inside the current region and lowers ``c`` to the
+    smallest ``V`` among those where ``V̇ ≥ 0`` along the nonlinear dynamics,
+    until a pass finds none. ``V̇ < 0`` is checked on samples only, so the
+    region is an estimate, not a proof: a state no sample hit can break it.
 
     Parameters
     ----------
     sys : DynamicSystem
         Autonomous system, normally a closed loop such as ``ctl @ plant``.
     x_bar : array of shape (n,), optional
-        Guess of the equilibrium; refined by
-        :func:`~minilink.analysis.equilibria.find_equilibrium`. Defaults to
-        the nominal state. The refined point is what the certificate reports: a law
-        tuned by learning often settles beside the state it was aimed at.
+        Guess of the equilibrium, refined by
+        :func:`~minilink.analysis.equilibria.find_equilibrium`; the nominal
+        state by default. The region is centered on the refined point.
     u_bar, t, params : optional
-        Held input, time, and parameter set, as in every analysis tool.
-    method : {"quadratic", "sos"}
-        Family the Lyapunov function comes from. ``"quadratic"`` solves the
-        Lyapunov equation of the linearization, the textbook construction and
-        the only one implemented; ``"sos"`` is reserved for a sum-of-squares
-        certificate, which would also make the level a proof rather than an
-        estimate.
+        Held input, time and parameter set, as in every analysis tool.
     Q : array of shape (n, n), optional
-        Right-hand side of the Lyapunov equation; the identity by default. A
-        larger ``Q`` in one direction weighs that direction more in ``V``.
-    window : BoxSet or (lower, upper), optional
-        Box the sublevel search covers. The default searches twice, first on
-        the natural scale of ``V`` and then on a box sized to that answer, so
-        the samples land where the level is decided.
+        Right-hand side of the Lyapunov equation; the identity by default.
     n_samples : int, optional
-        Sampling budget per pass (default ``201**2`` in one or two states,
-        50 000 above).
-    search : {"auto", "grid", "random"}
-        How the sublevel set is sampled. ``"grid"`` sweeps a regular grid,
-        the default in one or two states and what the plots draw;
-        ``"random"`` uses a low-discrepancy sequence, which scales better.
+        States drawn per pass, 50 000 by default.
 
     Returns
     -------
-    LyapunovCertificate
+    EllipsoidSet
+        The region: its center is the equilibrium, its ``params["P"]`` the
+        Lyapunov matrix, its :attr:`~minilink.core.fields.EllipsoidSet.level` the level ``c`` and
+        its :attr:`~minilink.core.fields.EllipsoidSet.field` the function ``V``.
 
     Raises
     ------
     ValueError
         If the linearization is not Hurwitz: an unstable equilibrium has no
-        region of attraction to certify.
-    NotImplementedError
-        For ``method="sos"``.
+        region of attraction.
     """
-    require_method(method)
-
-    # The equilibrium is found near the guess, not assumed; the held input defaults
-    # to the nominal one
+    # The equilibrium is found near the guess; the held input defaults to the nominal one
     x_bar = find_equilibrium(sys, x_bar, u_bar, t, params)
     u_bar = np.asarray(sys.u_nominal if u_bar is None else u_bar, dtype=float)
+
+    n = int(sys.n)
+    Q = np.eye(n) if Q is None else np.asarray(Q, dtype=float)
+    n_samples = 50_000 if n_samples is None else int(n_samples)
+    domain = sys.state.box
+    f = dynamics_of(sys, u_bar, t, params)
 
     # A = ∂f/∂x at the equilibrium, which must be Hurwitz
     A = np.asarray(jacobian(sys, "f", "x", x_bar, u_bar, t, params), dtype=float)
     poles = np.linalg.eigvals(A)
     require_hurwitz(poles)
 
-    # AᵀP + PA = −Q, with Q = I unless given; P = (P + Pᵀ) / 2 drops the solver's
-    # rounding off the symmetric solution
-    n = int(sys.n)
-    Q = np.eye(n) if Q is None else np.asarray(Q, dtype=float)
+    # AᵀP + PA = −Q; (P + Pᵀ) / 2 drops the solver's rounding off the symmetric solution
     P = solve_continuous_lyapunov(A.T, -Q)
     P = 0.5 * (P + P.T)
 
-    # V̇ needs f on many states at once: compile once for the whole certificate
-    backend, evaluator = compiled(sys)
-    f_many = dynamics_on(backend, evaluator, u_bar, t, params)
+    # The start: c = 9, capped so the region stays in the state box, √(c (P⁻¹)ᵢᵢ) ≤ the
+    # distance from x̄ to each face
+    half = np.minimum(x_bar - domain.lower, domain.upper - x_bar)
+    c = min(9.0, float(np.min(half**2 / np.diag(np.linalg.inv(P)))))
 
-    # The sweep: a 201² grid in one or two states, 50 000 quasi-random samples
-    # above, inside the model's state box
-    domain = sys.state.box
-    search = ("grid" if n <= 2 else "random") if search == "auto" else search
-    n_samples = (201**2 if n <= 2 else 50_000) if n_samples is None else int(n_samples)
-
-    # c = the largest sampled level whose sublevel set holds only V̇ < 0. One pass
-    # on the natural scale of V, then a second on a box sized to its answer: the
-    # level is decided by the samples nearest its own boundary.
-    box = natural_window(x_bar, P, domain) if window is None else as_box(window)
-    level, limiting, spread = search_level(
-        box, x_bar, P, f_many, domain, n_samples, search
-    )
-    if window is None:
-        box = level_window(x_bar, P, level, domain)
-        refined, refined_limiting, refined_spread = search_level(
-            box, x_bar, P, f_many, domain, n_samples, search
+    for k_pass in range(MAX_PASSES):
+        # States drawn uniformly inside the current region {V ≤ c}
+        X = (
+            QuadraticField(x_bar, P)
+            .as_set(upper=c)
+            .sample(SAMPLE_SEED + k_pass, n_samples)
         )
+        d = X - x_bar
 
-        # A finer sweep only ever tightens the claim
-        if refined < level:
-            level, limiting, spread = refined, refined_limiting, refined_spread
+        # V = dᵀ P d and V̇ = 2 dᵀ P f(x) at every sample, f the nonlinear dynamics
+        V = np.einsum("ij,jk,ik->i", d, P, d)
+        V_dot = 2.0 * np.einsum("ij,jk,ik->i", d, P, f(X))
 
-    return LyapunovCertificate(
-        sys=sys,
-        x_bar=x_bar,
-        P=P,
-        level=float(level),
-        Q=Q,
-        poles=poles,
-        window=box,
-        limiting_state=limiting,
-        sample_spread=spread,
-        method=method,
-        u_bar=u_bar,
-        t=t,
-        params=params,
-        backend=backend,
-        evaluator=evaluator,
-    )
+        # A sample blocks the level where V̇ ≥ 0; the equilibrium itself, V̇ = 0 to rounding, does not
+        blocked = (V_dot >= 0.0) & (V > 1e-10 * c)
+        if not blocked.any():
+            break
 
+        # c = the smallest V among the blocked samples
+        c = float(V[blocked].min())
 
-@dataclass
-class LyapunovCertificate:
-    """
-    Lyapunov function and the level that certifies a region of attraction.
+    region = QuadraticField(x_bar, P).as_set(upper=c)
 
-    Returned by :func:`region_of_attraction`. The certified region is
-    ``{x : V(x) <= level}``: every state in it converges to :attr:`x_bar`.
-
-    Attributes
-    ----------
-    sys : DynamicSystem
-        The closed loop the certificate belongs to.
-    x_bar : array of shape (n,)
-        Equilibrium the region is centered on. It is *found*, not assumed, so
-        it may differ from the operating point that was asked for.
-    P : array of shape (n, n)
-        Lyapunov matrix of the quadratic family,
-        ``V(x) = (x - x_bar)ᵀ P (x - x_bar)``.
-    level : float
-        Certified value ``c`` of ``V``.
-    Q : array of shape (n, n)
-        Right-hand side of ``AᵀP + PA = -Q``.
-    poles : array of shape (n,)
-        Eigenvalues of the linearization, kept as evidence.
-    window : BoxSet
-        Box the sublevel search covered.
-    limiting_state : array of shape (n,)
-        Sampled state that pinned the level: the nearest place, in ``V``,
-        where the loop stops making progress. Reading the control input
-        there usually explains the certificate.
-    sample_spread : float
-        Relative disagreement between the levels two halves of the samples
-        give. Near zero means the sweep had enough samples to decide; see
-        :attr:`sample_limited`.
-    method : str
-        Family the Lyapunov function came from (see :data:`METHODS`).
-    """
-
-    sys: object
-    x_bar: np.ndarray
-    P: np.ndarray
-    level: float
-    Q: np.ndarray
-    poles: np.ndarray
-    window: BoxSet
-    limiting_state: np.ndarray
-    sample_spread: float = 0.0
-    method: str = "quadratic"
-    u_bar: np.ndarray = field(default=None, repr=False)
-    t: float = field(default=0.0, repr=False)
-    params: object = field(default=None, repr=False)
-    backend: str = field(default=None, repr=False)
-    evaluator: object = field(default=None, repr=False)
-
-    # The certificate itself
-
-    @property
-    def V(self) -> QuadraticField:
-        """The Lyapunov function ``V(x) = (x − x̄)ᵀ P (x − x̄)``, one state ``(n,)`` or a stack ``(N, n)``."""
-        return QuadraticField(self.x_bar, self.P)
-
-    @property
-    def region(self) -> EllipsoidSet:
-        """The certified region ``{x : V(x) ≤ c}``, which draws and bounds itself."""
-        return self.V.as_set(upper=self.level)
-
-    def V_dot(self, x):
-        """Derivative of ``V`` along the nonlinear dynamics, same shapes as :meth:`V`."""
-        x_bar = self.x_bar
-        P = self.P
-
-        states = np.atleast_2d(np.asarray(x, dtype=float))
-        d = states - x_bar
-        f = self.dynamics()(states)
-
-        # V̇ = 2 dᵀ P f(x) along the closed-loop dynamics
-        v_dot = 2.0 * np.einsum("ij,jk,ik->i", d, P, f)
-
-        return v_dot if np.ndim(x) > 1 else float(v_dot[0])
-
-    def contains(self, x):
-        """``True`` where the state lies in the certified region."""
-        level = self.level
-
-        v = self.V(x)
-
-        # V(x) ≤ c
-        inside = v <= level
-
-        return inside if np.ndim(x) > 1 else bool(inside)
-
-    @property
-    def extent(self) -> np.ndarray:
-        """Half-width of the certified region along each state: its shadow on each axis."""
-        return self.region.half_width
-
-    def slice_extent(self, x_axis: int = 0, y_axis: int = 1) -> np.ndarray:
-        """
-        Half-widths of the region's *slice* through the equilibrium in two states.
-
-        With the other states pinned at ``x_bar`` the certified set cuts a
-        smaller ellipse than :attr:`extent`, which is its shadow on each axis.
-        The slice is what a phase-plane plot draws.
-        """
-        P = self.P
-        level = self.level
-
-        block = P[np.ix_([x_axis, y_axis], [x_axis, y_axis])]
-
-        # The same shadow, of the 2-D slice through the equilibrium: √(c (P_s⁻¹)ᵢᵢ)
-        extent = np.sqrt(level * np.diag(np.linalg.inv(block)))
-
-        return extent
-
-    @property
-    def sample_limited(self) -> bool:
-        """
-        ``True`` when the level moved between two halves of the samples.
-
-        The sublevel search is only as good as its coverage, and coverage
-        thins out fast with the number of states. When this is ``True`` the
-        level is an optimistic guess rather than a sharp estimate: raise
-        ``n_samples``, narrow ``window``, or read it as indicative only.
-        """
-        return self.sample_spread > 0.1
-
-    @property
-    def rate(self) -> float:
-        """Slowest linearized decay rate: the natural time scale of the loop."""
-        poles = self.poles
-
-        rate = float(np.max(poles.real))
-
-        return rate
-
-    # Display
-
-    def __str__(self) -> str:
-        extent = np.array2string(self.extent, precision=3, suppress_small=True)
-        caveat = (
-            f" — sample-limited, halves disagree by {100 * self.sample_spread:.0f}%"
-            if self.sample_limited
-            else ""
-        )
-        return (
-            f"certified V <= {self.level:.4g} about "
-            f"{np.array2string(self.x_bar, precision=3, suppress_small=True)}: "
-            f"reaches {extent} per state, slowest pole {self.rate:.3g}{caveat}"
-        )
-
-    # The two questions asked of it
-
-    def verify(self, n_rollouts: int = 200, horizon: float = None, tol: float = None):
-        """
-        Integrate ``n_rollouts`` states drawn inside the certified region: all must converge.
-
-        States are drawn uniformly in the ellipsoid ``{V <= level}``, each
-        integrated for ``horizon`` seconds, by default ten time constants of the slowest linearized mode and
-        ``tol`` to a hundredth of the certified extent. A failure means the
-        sublevel search was too coarse, or the model is not what it seems,
-        and the report carries the offending state.
-        """
-        x_bar = self.x_bar
-        region = self.region
-
-        # Ten time constants of the slowest mode, a hundredth of the certified extent
-        horizon = horizon_of(self) if horizon is None else float(horizon)
-        tol = 0.01 * float(np.max(self.extent)) if tol is None else float(tol)
-
-        # Initial states drawn uniformly in {V ≤ c}, each integrated over the horizon
-        x0 = region.sample(CERTIFICATE_SEED, n_rollouts)
-        x_final = self.rollout(horizon)(x0)
-
-        # Every trial must end within tol of the equilibrium
-        final_distance = np.linalg.norm(x_final - x_bar, axis=1)
-        converged = final_distance < tol
-        counterexample = None if np.all(converged) else x0[int(np.argmin(converged))]
-
-        return VerificationReport(converged, final_distance, counterexample)
-
-    def plot(
-        self,
-        x_axis: int = 0,
-        y_axis: int = 1,
-        *,
-        basin: bool = False,
-        detail: bool = True,
-        verified: int = 0,
-        trajectories=(),
-        n_samples: int = 201,
-        bounds=None,
-        ax=None,
-        show: bool = True,
-    ):
-        """Phase-plane slice of the certified region. See :func:`plot_region_of_attraction`."""
-        return plot_region_of_attraction(
-            self,
-            x_axis,
-            y_axis,
-            basin=basin,
-            detail=detail,
-            verified=verified,
-            trajectories=trajectories,
-            n_samples=n_samples,
-            bounds=bounds,
-            ax=ax,
-            show=show,
-        )
-
-    # Compiled dynamics, shared by the questions above
-
-    def dynamics(self):
-        """``f_many(X) -> dX``: the closed-loop dynamics on a stack of states."""
-        return dynamics_on(
-            self.backend, self.evaluator, self.u_bar, self.t, self.params
-        )
-
-    def rollout(self, horizon: float):
-        """``rollout(X0) -> X_final``: integrate a stack of states over ``horizon`` seconds."""
-        poles = self.poles
-
-        # A tenth of the fastest linearized time constant, and at least 50 steps
-        dt = min(0.1 / float(np.max(np.abs(poles))), horizon / 50.0)
-
-        return rollout_on(self.backend, self.evaluator, self.u_bar, self.t, dt, horizon)
-
-
-@dataclass
-class VerificationReport:
-    """Simulation's verdict on a certificate: every trial inside it must converge."""
-
-    converged: np.ndarray
-    final_distance: np.ndarray
-    counterexample: np.ndarray | None = None
-
-    @property
-    def holds(self) -> bool:
-        """``True`` when every sampled state converged to the equilibrium."""
-        return bool(np.all(self.converged))
-
-    def __str__(self) -> str:
-        n = int(self.converged.size)
-        worst = float(np.max(self.final_distance)) if n else float("nan")
-        verdict = "holds" if self.holds else "FAILS"
-        return (
-            f"{int(np.sum(self.converged))}/{n} trials converged, "
-            f"worst final distance {worst:.2e} — certificate {verdict}"
-        )
+    return region
 
 
 def plot_region_of_attraction(
-    certificate: LyapunovCertificate,
+    sys,
+    region: EllipsoidSet,
     x_axis: int = 0,
     y_axis: int = 1,
     *,
+    u_bar=None,
+    t: float = 0.0,
+    params=None,
     basin: bool = False,
-    detail: bool = True,
-    verified: int = 0,
     trajectories=(),
-    n_samples: int = 201,
-    bounds=None,
     ax=None,
     show: bool = True,
 ):
     """
-    Draw a slice of a certified region: the level set, and what pins it.
+    Draw a region of attraction of ``sys`` in the plane of two states.
 
-    The two swept states are ``x_axis`` and ``y_axis``; the others are pinned
-    at the equilibrium, so what is drawn is the *slice* of the certified set
-    through ``x_bar`` (smaller than its shadow on the two axes whenever the
-    states are coupled).
+    The other states are held at the region's center, so what is drawn is the
+    slice of the region through the equilibrium. The layers: the level set
+    ``V = c``, the curve ``V̇ = 0`` where ``V`` stops decreasing, and the
+    equilibrium; ``basin=True`` shades the states of the plane that converge
+    in simulation, which shows how much a quadratic ``V`` gives up;
+    ``trajectories`` is a sequence of initial states to simulate and overlay.
 
-    Layers, each in the legend: ``basin=True`` shades the states of the slice
-    that really converge, by simulation, which shows how much a quadratic
-    ``V`` gives up. ``detail=True`` adds the curve where ``V`` stops
-    decreasing, and the sample that set the level when it lies on this slice
-    — on a slice the two need not touch, since the binding state usually sits
-    off the plane. ``verified=200`` draws the states
-    :meth:`LyapunovCertificate.verify` would test, marked by whether they
-    converged. They lie *inside* the certified set, because the claim is what
-    is on trial and a state there that fails is a counterexample; whether
-    states outside converge is what ``basin`` answers. Two-state loops only,
-    where the draw lies on the plane.
-    ``trajectories`` is a sequence of initial states to overlay.
-
-    ``bounds`` is an explicit ``((x_min, x_max), (y_min, y_max))`` window;
-    the default frames the slices being drawn.
+    Returns
+    -------
+    (Figure, Axes)
     """
     # Lazy import: matplotlib loads on first use, not with the analysis
     import matplotlib.pyplot as plt
 
-    # The default window: two and a half times the slice, not its shadow
-    if bounds is None:
-        center = certificate.x_bar[[x_axis, y_axis]]
-        half = 2.5 * certificate.slice_extent(x_axis, y_axis)
-        bounds = (
-            (center[0] - half[0], center[0] + half[0]),
-            (center[1] - half[1], center[1] + half[1]),
-        )
+    # Lazy import: the simulator loads on first use, not with the analysis verbs
+    from minilink.simulation.simulator import Simulator
+
+    x_bar = region.params["center"]
+    P = region.params["P"]
+    c = region.level
+    V = region.field
+    u_bar = np.asarray(sys.u_nominal if u_bar is None else u_bar, dtype=float)
+    labels = list(sys.state.labels)
+
+    # The window: two and a half times the slice's half-widths √(c ((P_s)⁻¹)ᵢᵢ)
+    axes = [x_axis, y_axis]
+    P_s = P[np.ix_(axes, axes)]
+    half = 2.5 * np.sqrt(c * np.diag(np.linalg.inv(P_s)))
+    grid_x = np.linspace(x_bar[x_axis] - half[0], x_bar[x_axis] + half[0], PLOT_POINTS)
+    grid_y = np.linspace(x_bar[y_axis] - half[1], x_bar[y_axis] + half[1], PLOT_POINTS)
+    GX, GY = np.meshgrid(grid_x, grid_y)
+    X = np.tile(x_bar, (GX.size, 1))
+    X[:, x_axis] = GX.ravel()
+    X[:, y_axis] = GY.ravel()
+
+    # V and V̇ = 2 (x − x̄)ᵀ P f(x) on the plane
+    f = dynamics_of(sys, u_bar, t, params)
+    V_plane = V(X).reshape(GX.shape)
+    V_dot_plane = 2.0 * np.einsum("ij,jk,ik->i", X - x_bar, P, f(X)).reshape(GX.shape)
+
     if ax is None:
         _, ax = plt.subplots(figsize=(7.0, 5.5))
+    horizon, dt = time_scales_of(sys, x_bar, u_bar, t, params)
 
-    draw_region(
-        certificate,
-        ax,
-        x_axis,
-        y_axis,
-        bounds,
-        basin=basin,
-        detail=detail,
-        verified=verified,
-        trajectories=trajectories,
-        n_samples=n_samples,
-    )
+    # The states of the plane that converge in simulation
+    if basin:
+        X_final = rollout_of(sys, u_bar, t, params, horizon, dt)(X)
+        reached = np.linalg.norm(X_final - x_bar, axis=1) < 0.05 * np.max(
+            region.half_width
+        )
+        ax.contourf(
+            GX, GY, reached.reshape(GX.shape), levels=[0.5, 1.5], colors=["#cfe3f7"]
+        )
+        ax.fill([], [], color="#cfe3f7", label="converges in simulation")
+
+    # The level set V = c and the curve V̇ = 0
+    ax.contour(GX, GY, V_plane, levels=[c], colors="tab:red", linewidths=2.0)
+    ax.plot([], [], color="tab:red", linewidth=2.0, label=r"region $V \leq c$")
+    if np.any(V_dot_plane > 1e-9 * np.max(np.abs(V_dot_plane))):
+        ax.contour(
+            GX,
+            GY,
+            V_dot_plane,
+            levels=[0.0],
+            colors="tab:orange",
+            linewidths=1.0,
+            linestyles="--",
+        )
+        ax.plot(
+            [],
+            [],
+            color="tab:orange",
+            linewidth=1.0,
+            linestyle="--",
+            label=r"$\dot V = 0$",
+        )
+
+    # Trajectories, each simulated from its initial state
+    for x0 in trajectories:
+        traj = Simulator(sys, x0=x0, tf=horizon, verbose=False).solve()
+        ax.plot(traj.x[x_axis], traj.x[y_axis], color="0.35", linewidth=1.0)
+        ax.plot(x0[x_axis], x0[y_axis], "o", color="0.35", markersize=4)
+    if len(trajectories):
+        ax.plot([], [], color="0.35", linewidth=1.0, label="trajectory")
+
+    # The equilibrium, the axes and the legend
+    ax.plot(x_bar[x_axis], x_bar[y_axis], "k*", markersize=12, label="equilibrium")
+    title = textwrap.fill(f"{sys.name}: region of attraction", width=52)
+    if int(sys.n) > 2:
+        title += "\n(slice at the equilibrium)"
+    ax.set_title(title, fontsize=10)
+    ax.set_xlabel(labels[x_axis])
+    ax.set_ylabel(labels[y_axis])
+    ax.set_xlim(grid_x[0], grid_x[-1])
+    ax.set_ylim(grid_y[0], grid_y[-1])
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
     ax.figure.tight_layout()
     if show:
         plt.show()
@@ -482,420 +252,67 @@ def plot_region_of_attraction(
 ###############################################################################
 
 
-def require_method(method):
-    """Refuse a certificate family that is not implemented: quadratic ``V`` only."""
-    if method not in METHODS:
-        raise ValueError(f"method must be one of {METHODS}, got {method!r}")
-    if method == "sos":
-        raise NotImplementedError(
-            "sum-of-squares certificates are not implemented: region of "
-            "attraction certificates take a quadratic V only"
-        )
-
-
 def require_hurwitz(poles):
     """Refuse an equilibrium whose linearization has a pole in the closed right half-plane."""
     if poles.real.max() >= 0.0:
         worst = poles[int(np.argmax(poles.real))]
         raise ValueError(
             f"the loop is not stable at this equilibrium (pole at {worst:.4g}); "
-            "there is no region of attraction to certify"
+            "there is no region of attraction"
         )
 
 
-def compiled(sys):
-    """Compile once for the whole certificate: ``(backend, evaluator)``."""
+def dynamics_of(sys, u_bar, t, params):
+    """``f(X) -> dX``: the dynamics of ``sys`` on a stack of states, the input held at ``u_bar``."""
     # Lazy import: the compiler loads on first use, not with the analysis verbs
     from minilink.core.compile.compiler import compile_auto
 
-    return compile_auto(sys)
+    backend, evaluator = compile_auto(sys)
 
-
-def dynamics_on(backend, evaluator, u_bar, t, params):
-    """Return ``f_many(X) -> dX`` evaluating ``f`` on a stack of states."""
     # JAX: f vectorized over the stack and jitted
     if backend == BACKEND_JAX:
         jax = require_jax()
         jnp = require_jax_numpy()
-
-        # One jitted batch per evaluator, the point its arguments
-        key = "certificate dynamics"
-        forms = evaluator.compiled_forms
-        if key not in forms:
-            forms[key] = jax.jit(jax.vmap(evaluator.f, in_axes=(0, None, None, None)))
-        batch = forms[key]
-        return lambda states: np.asarray(batch(jnp.asarray(states), u_bar, t, params))
+        batch = jax.jit(jax.vmap(evaluator.f, in_axes=(0, None, None, None)))
+        return lambda X: np.asarray(batch(jnp.asarray(X), u_bar, t, params))
 
     # NumPy: f state by state
-    return lambda states: np.stack([evaluator.f(x, u_bar, t, params) for x in states])
+    return lambda X: np.stack([evaluator.f(x, u_bar, t, params) for x in X])
 
 
-def natural_window(x_bar, P, domain: BoxSet) -> BoxSet:
-    """First-pass box: the extent of ``{V <= 9}``, trimmed to the model's domain."""
-    # The shadow of {V ≤ 9} on axis i: 3 √((P⁻¹)ᵢᵢ)
-    half_width = 3.0 * np.sqrt(np.diag(np.linalg.inv(P)))
+def time_scales_of(sys, x_bar, u_bar, t, params):
+    """``(horizon, dt)`` of the simulations: ten time constants of the slowest linearized mode, a tenth of the fastest."""
+    A = np.asarray(jacobian(sys, "f", "x", x_bar, u_bar, t, params), dtype=float)
+    poles = np.linalg.eigvals(A)
 
-    window = clip_box(x_bar, half_width, domain)
+    # t_f = 10 / |Re λ_slow|, and Δt = 0.1 / |λ_fast| with at least 50 steps
+    horizon = 10.0 / abs(float(np.max(poles.real)))
+    dt = min(0.1 / float(np.max(np.abs(poles))), horizon / 50.0)
 
-    return window
-
-
-def as_box(window) -> BoxSet:
-    """Coerce a user window: a set with a bounding box, or a ``(lower, upper)`` pair."""
-    if isinstance(window, Set):
-        box = window.bounding_box()
-        if box is None:
-            raise ValueError(
-                "window must be a set with a bounding box or a (lower, upper) pair"
-            )
-        return box
-
-    lower, upper = window
-    return BoxSet(np.asarray(lower, dtype=float), np.asarray(upper, dtype=float))
+    return horizon, dt
 
 
-#: The two disjoint halves the level search scores itself on.
-EVEN = slice(0, None, 2)
-ODD = slice(1, None, 2)
+def rollout_of(sys, u_bar, t, params, horizon: float, dt: float):
+    """``rollout(X0) -> X_final``: each state integrated over ``horizon`` seconds, the input held."""
+    # Lazy import: the compiler loads on first use, not with the analysis verbs
+    from minilink.core.compile.compiler import compile_auto
 
+    backend, evaluator = compile_auto(sys)
 
-def search_level(window, x_bar, P, f_many, domain, n_samples, search):
-    """
-    Largest sampled level ``c`` whose sublevel set only holds decreasing states.
-
-    Returns ``(level, limiting_state, spread)``. A sample blocks the level when
-    ``V̇ >= 0`` there, when it lies outside the model's domain, or when it sits
-    on the window's face — the last so the certified set never reaches past
-    what was actually checked.
-
-    ``spread`` is the relative disagreement between the levels two disjoint
-    halves of the same samples would give. It costs nothing extra and it is
-    how the search says whether it has enough samples: a sharp answer has a
-    spread near zero, while in many states the samples thin out and the
-    halves disagree (see :attr:`LyapunovCertificate.sample_limited`).
-    """
-    states, on_face = sample_box(window, n_samples, search)
-    d = states - x_bar
-
-    # V = dᵀ P d and V̇ = 2 dᵀ P f(x) at every sample
-    v = np.einsum("ij,jk,ik->i", d, P, d)
-    v_dot = 2.0 * np.einsum("ij,jk,ik->i", d, P, f_many(states))
-
-    # A sample blocks the level where V̇ ≥ 0, outside the domain or on the window's
-    # face; the equilibrium itself has V̇ = 0, so V ≤ 10⁻¹⁰ max V never blocks
-    outside = np.any(states < domain.lower, axis=1) | np.any(
-        states > domain.upper, axis=1
-    )
-    away = v > 1e-10 * v.max()
-    blocked = ((v_dot >= 0.0) | outside | on_face) & away
-
-    # The levels the two halves give, and their relative disagreement
-    halves = [blocked_level(blocked[half], v[half]) for half in (EVEN, ODD)]
-    spread = abs(halves[0] - halves[1]) / max(halves[0], halves[1], 1e-300)
-
-    # c = min V over the blocked samples; with nothing blocked, the largest V in
-    # the window
-    if blocked.any():
-        limiting = int(np.argmin(np.where(blocked, v, np.inf)))
-        level = float(v[limiting])
-    else:
-        level = float(v.max())
-        limiting = int(np.argmax(v))
-    limiting_state = states[limiting]
-
-    return level, limiting_state, spread
-
-
-def sample_box(window: BoxSet, n_samples: int, search: str):
-    """Return ``(states, on_face)``: points filling the box, flagged on its faces."""
-    lower = window.lower
-    upper = window.upper
-    n = int(lower.size)
-
-    # A regular grid: its outer layer lies on the faces
-    if search == "grid":
-        per_axis = max(3, int(round(n_samples ** (1.0 / n))))
-        axes = [np.linspace(lower[i], upper[i], per_axis) for i in range(n)]
-        mesh = np.meshgrid(*axes, indexing="ij")
-        states = np.stack([m.ravel() for m in mesh], axis=1)
-        on_face = np.any(states <= lower, axis=1) | np.any(states >= upper, axis=1)
-        return states, on_face
-    if search != "random":
-        raise ValueError(f"search must be 'auto', 'grid' or 'random', got {search!r}")
-
-    # Lazy import: SciPy's quasi-Monte Carlo module loads on first use
-    from scipy.stats import qmc
-
-    # A Halton sequence fills the interior, its first point (the lower corner) dropped
-    unit = qmc.Halton(d=n, scramble=False).random(int(n_samples) + 1)[1:]
-    interior = lower + unit * (upper - lower)
-
-    # A tenth as many points on the faces: snap one coordinate to a bound
-    faces = interior[: max(2 * n, int(n_samples) // 10)].copy()
-    which = np.arange(faces.shape[0]) % n
-    side = (np.arange(faces.shape[0]) // n) % 2
-    faces[np.arange(faces.shape[0]), which] = np.where(
-        side == 0, lower[which], upper[which]
-    )
-
-    states = np.vstack([interior, faces])
-    on_face = np.zeros(states.shape[0], dtype=bool)
-    on_face[interior.shape[0] :] = True
-
-    return states, on_face
-
-
-def blocked_level(blocked, v) -> float:
-    """Level implied by one subset of samples: the smallest blocked ``V``."""
-    # With nothing blocked, the largest V of the subset
-    level = float(v[blocked].min()) if blocked.any() else float(v.max())
-
-    return level
-
-
-def level_window(x_bar, P, level, domain: BoxSet) -> BoxSet:
-    """Second-pass box: half again the extent of the level set just found."""
-    # Half again the shadow of {V ≤ c} on axis i: 1.5 √(c (P⁻¹)ᵢᵢ)
-    half_width = 1.5 * np.sqrt(level * np.diag(np.linalg.inv(P)))
-
-    window = clip_box(x_bar, half_width, domain)
-
-    return window
-
-
-def clip_box(x_bar, half_width, domain: BoxSet) -> BoxSet:
-    """Box of the given half-width about ``x_bar``, trimmed to ``domain``."""
-    lower = np.maximum(x_bar - half_width, domain.lower)
-    upper = np.minimum(x_bar + half_width, domain.upper)
-
-    return BoxSet(lower, upper)
-
-
-def horizon_of(cert):
-    """Ten time constants of the slowest linearized mode: the default simulation span."""
-    rate = cert.rate
-
-    # t_f = 10 / |λ_slow|
-    horizon = 10.0 / abs(rate)
-
-    return horizon
-
-
-def rollout_on(backend, evaluator, u_bar, t, dt: float, horizon: float):
-    """Return ``rollout(X0) -> X_final`` integrating each state over ``horizon`` seconds."""
     n_steps = max(1, int(round(horizon / dt)))
-
-    u_seq = np.tile(np.asarray(u_bar, dtype=float), (n_steps, 1))
+    u_seq = np.tile(u_bar, (n_steps, 1))
 
     # JAX: the step model's rollout, vectorized over the stack and jitted
     if backend == BACKEND_JAX:
         jax = require_jax()
         jnp = require_jax_numpy()
-
-        def finals(states, u_seq, t, dt):
-            return jax.vmap(lambda x0: evaluator.rollout(x0, u_seq, t, dt)[-1])(states)
-
-        # One jitted batch per evaluator, the input sequence and the time its
-        # arguments (the step is a static shape of the rollout)
-        key = "certificate rollout"
-        forms = evaluator.compiled_forms
-        if key not in forms:
-            forms[key] = jax.jit(finals, static_argnums=(3,))
-        batch = forms[key]
-        return lambda states: np.asarray(batch(jnp.asarray(states), u_seq, t, dt))
-
-    # NumPy: x_{k+1} = RK4(x_k, ū, t_k), n_steps times, state by state
-    def rollout_numpy(states):
-        final = np.empty_like(states)
-        for i, x in enumerate(states):
-            final[i] = evaluator.rollout(x, u_seq, t, dt)[-1]
-        return final
-
-    return rollout_numpy
-
-
-def draw_region(
-    cert,
-    ax,
-    x_axis,
-    y_axis,
-    bounds,
-    *,
-    basin,
-    detail,
-    verified,
-    trajectories,
-    n_samples,
-):
-    """Draw one certificate on one axis, and label every layer it drew."""
-    # Lazy import: matplotlib loads on first use, not with the analysis
-    from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch
-
-    # Lazy import: the simulator loads on first use, not with the analysis verbs
-    from minilink.simulation.simulator import Simulator
-
-    # The slice: the two swept states over the window, the others at the equilibrium
-    grid_x = np.linspace(bounds[0][0], bounds[0][1], n_samples)
-    grid_y = np.linspace(bounds[1][0], bounds[1][1], n_samples)
-    GX, GY = np.meshgrid(grid_x, grid_y)
-    states = np.tile(cert.x_bar, (GX.size, 1))
-    states[:, x_axis] = GX.ravel()
-    states[:, y_axis] = GY.ravel()
-    horizon = horizon_of(cert)
-    settled = 0.05 * np.max(cert.extent)
-    keys = []
-
-    # Empirical: the states of the slice that converge in simulation
-    if basin:
-        final = cert.rollout(horizon)(states)
-        reached = np.linalg.norm(final - cert.x_bar, axis=1) < settled
-        ax.contourf(
-            GX, GY, reached.reshape(GX.shape), levels=[0.5, 1.5], colors=["#cfe3f7"]
+        finals = jax.jit(
+            jax.vmap(lambda x0: evaluator.rollout(x0, u_seq, t, dt)[-1]),
         )
-        keys.append(
-            Patch(facecolor="#cfe3f7", label="empirical: converged in simulation")
-        )
+        return lambda X0: np.asarray(finals(jnp.asarray(X0)))
 
-    # Theory: the level set V = c
-    ax.contour(
-        GX,
-        GY,
-        cert.V(states).reshape(GX.shape),
-        levels=[cert.level],
-        colors="tab:red",
-        linewidths=2.0,
-    )
-    keys.append(
-        Line2D(
-            [],
-            [],
-            color="tab:red",
-            linewidth=2.0,
-            label=r"theory: Lyapunov guarantee $V \leq c$",
-        )
-    )
-
-    if detail:
-        # Draw where V stops decreasing only if it actually does on this slice.
-        # V̇ vanishes at the equilibrium as well, to within rounding, and that
-        # speck is not a curve — so compare against the scale of V̇ itself.
-        v_dot = cert.V_dot(states)
-        if (v_dot > 1e-9 * np.max(np.abs(v_dot))).any():
-            ax.contour(
-                GX,
-                GY,
-                v_dot.reshape(GX.shape),
-                levels=[0.0],
-                colors="tab:orange",
-                linewidths=1.0,
-                linestyles="--",
-            )
-            keys.append(
-                Line2D(
-                    [],
-                    [],
-                    color="tab:orange",
-                    linewidth=1.0,
-                    linestyle="--",
-                    label=r"$\dot V = 0$",
-                )
-            )
-
-        # The sample that set the level, when it lies on this slice
-        off_slice = np.delete(cert.limiting_state - cert.x_bar, [x_axis, y_axis])
-        if off_slice.size == 0 or np.allclose(off_slice, 0.0, atol=1e-9):
-            ax.plot(
-                cert.limiting_state[x_axis],
-                cert.limiting_state[y_axis],
-                "s",
-                color="tab:orange",
-                markersize=6,
-            )
-            keys.append(
-                Line2D(
-                    [],
-                    [],
-                    color="tab:orange",
-                    marker="s",
-                    linestyle="",
-                    label="level pinned here",
-                )
-            )
-
-    # The states verify() would test, marked by whether they converged; the draw
-    # lies on the plane only in a two-state loop
-    if verified and int(cert.sys.n) == 2:
-        x0 = cert.region.sample(CERTIFICATE_SEED, int(verified))
-        final = cert.rollout(horizon)(x0)
-        distance = np.linalg.norm(final - cert.x_bar, axis=1)
-        converged = distance < 0.01 * np.max(cert.extent)
-        ax.plot(
-            x0[converged, x_axis],
-            x0[converged, y_axis],
-            ".",
-            color="tab:green",
-            markersize=3,
-        )
-        keys.append(
-            Line2D(
-                [],
-                [],
-                color="tab:green",
-                marker=".",
-                linestyle="",
-                label=f"verify(): {int(converged.sum())}/{int(verified)} inside converged",
-            )
-        )
-        if not converged.all():
-            ax.plot(
-                x0[~converged, x_axis],
-                x0[~converged, y_axis],
-                "x",
-                color="k",
-                markersize=5,
-            )
-            keys.append(
-                Line2D(
-                    [],
-                    [],
-                    color="k",
-                    marker="x",
-                    linestyle="",
-                    label="counterexample: did not converge",
-                )
-            )
-
-    # The overlaid trajectories, each simulated from its initial state; the
-    # system's own x0 and traj are left as they are
-    for x_point in trajectories:
-        traj = Simulator(cert.sys, x0=x_point, tf=horizon, verbose=False).solve()
-        ax.plot(traj.x[x_axis], traj.x[y_axis], color="0.35", linewidth=1.0)
-        ax.plot(x_point[x_axis], x_point[y_axis], "o", color="0.35", markersize=4)
-    if len(trajectories):
-        keys.append(Line2D([], [], color="0.35", linewidth=1.0, label="trajectory"))
-
-    # The equilibrium
-    ax.plot(cert.x_bar[x_axis], cert.x_bar[y_axis], "k*", markersize=12)
-    keys.append(
-        Line2D([], [], color="k", marker="*", linestyle="", label="equilibrium")
-    )
-
-    # Axes, title and legend
-    labels = list(cert.sys.state.labels)
-    ax.set_xlabel(labels[x_axis])
-    ax.set_ylabel(labels[y_axis])
-    notes = [] if int(cert.sys.n) == 2 else ["slice at the equilibrium"]
-    if cert.sample_limited:
-        notes.append("sample-limited")
-    title = textwrap.fill(f"{cert.sys.name}: region of attraction", width=52)
-    if notes:
-        title += "\n(" + ", ".join(notes) + ")"
-    ax.set_title(title, fontsize=10)
-    ax.set_xlim(grid_x[0], grid_x[-1])
-    ax.set_ylim(grid_y[0], grid_y[-1])
-    ax.grid(True, alpha=0.3)
-    ax.legend(handles=keys, loc="upper right", fontsize=8, framealpha=0.9)
+    # NumPy: state by state
+    return lambda X0: np.stack([evaluator.rollout(x0, u_seq, t, dt)[-1] for x0 in X0])
 
 
 if __name__ == "__main__":
@@ -905,6 +322,5 @@ if __name__ == "__main__":
     plant.inputs["u"].lower = np.array([-2.0])  # too weak to hold it far over
     plant.inputs["u"].upper = np.array([2.0])
     ctl = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2))
-    certificate = region_of_attraction(ctl @ plant)
-    print(certificate)
-    print(certificate.verify())
+    region = region_of_attraction(ctl @ plant)
+    print(region.level, region.half_width)

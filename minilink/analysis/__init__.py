@@ -1,11 +1,11 @@
-"""Analysis: the verbs that read a ``System`` at an operating point, from its Jacobians to its Lyapunov certificates."""
+"""Analysis: the verbs that read a ``System`` at an operating point, from its Jacobians to its region of attraction."""
 
 from __future__ import annotations
 
 from minilink.core.exports import lazy_facade
 
 # The band facade: derivatives, linearization, structure, equilibria, modes, frequency
-# and time responses, sensitivity functions, Lyapunov certificates.
+# and time responses, sensitivity functions, the region of attraction.
 #
 # Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``; the
 # sensitivity functions take the loop's pieces instead,
@@ -18,11 +18,9 @@ from minilink.core.exports import lazy_facade
 #
 # Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "LyapunovCertificate": ("minilink.analysis.lyapunov", "LyapunovCertificate"),
     "Margins": ("minilink.analysis.linear", "Margins"),
     "StepInfo": ("minilink.analysis.time_response", "StepInfo"),
     "StructuralProperties": ("minilink.analysis.structural", "StructuralProperties"),
-    "VerificationReport": ("minilink.analysis.lyapunov", "VerificationReport"),
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "complementary_sensitivity": (

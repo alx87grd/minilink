@@ -556,6 +556,16 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the
     problem's tree, and the call was refused for its missing `method` and `seed`). The
     problem's parts keep their paths (`solution.params["plant"]["m"]`).
+- 2026-11-15 (on `dev-consolidation`, for `0.4.0`; the maintainer's ruling: a prototype
+  returns the object it computes, not a certificate): `region_of_attraction(sys, x_bar, …, *,
+  Q, n_samples)` returns the region itself, the `EllipsoidSet` `{V ≤ c}` (its center the
+  equilibrium, `params["P"]`, `level`, `field` the `QuadraticField` `V`), and
+  `plot_region_of_attraction(sys, region, …, *, basin, trajectories)` draws it on its loop.
+  `LyapunovCertificate`, `VerificationReport`, `verify()` and the options `method=`,
+  `window=`, `search=` and the plot's `detail=`, `verified=`, `bounds=`, `n_samples=` are
+  gone. The level search shrinks the region by draws inside it until none has `V̇ ≥ 0`: the
+  same levels in two states, and in four (the cart-pole) a level 3.3 times smaller, the old
+  box sampling having missed states where `V` grows.
 
 ## 3. Maturity (TRL)
 
@@ -590,7 +600,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt; the method table (`gd`, `adam`, `l-bfgs`, `method="auto"`) with a first-order backend, `z0` optional (S74); the generic parametric program on the backend table, the stochastic program its case; a native fixed-step solver with `n_iterations=K` as a proof of concept. | Harden SciPy/Ipopt before TRL 6; the friction-aware MPC example from a port (S76's rest, TODO §1.7); native solvers beyond the proof of concept in v0.5 ([native-optimizers.md](../plans/native-optimizers.md)). |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
-| Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (`V` a `QuadraticField`, its `region` an `EllipsoidSet`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V_dot` and the level search on `V.gradient` (A1's rest); SOS and discrete time later. |
+| Analysis / region of attraction | provisional (research) | 4 | `region_of_attraction` → the `EllipsoidSet` `{V ≤ c}` of a quadratic `V` (`P` from the Lyapunov equation, `c` shrunk by samples inside it until none has `V̇ ≥ 0`: an estimate, not a proof); `plot_region_of_attraction` with the simulated basin; demo. | Cohort validation; a certificate (a bound between samples, or SOS) only with the research that needs it; discrete time later. |
 | Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), the stochastic `PlanningProblem` (a law as its start, laws in `params`, by its parts), `evaluate` and its `Evaluation`; the discount from the problem, `gamma=` a training override; `NeuralPolicy` as `planner.actor`, the critic as the solution's `CriticField`; training on a native step problem too; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](../plans/rl-reward-scaling.md)). |
 | Planning / evaluation (the path to the cost) | provisional until a course runs it | 4 | `problem.compile(controller, dt)` → the problem evaluator; `evaluate` (one run or `n_trials` draws of the continuous loop, integrated to `tf`, each trial realizing the loop's random blocks) and `compare(problem, …)` its facades, `evaluate_trajectory` for a held run; `jax.grad` reaches every gain, plant parameter, cost weight and start; `pe.program(wrt=)` to the `Optimizer`, `pe.live_plot(wrt)` its progress figure; the closing PID example (S77) by hand, by the JAX pipeline and by the native optimizers; the draws by path on both backends (`realize`), disturbances as source blocks, the problem stochastic by its parts, the sampled loop, the judge on the step problem's own `run`, a step problem realizing from its own tree with `t0` its tick offset. The maintainer's review held. | Identification's data cost (C4, v0.5). |
 | Planning / search (RRT) | teaching (G3) | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the problem's input box alone (bang-bang extender; an unbounded `U` refused with the line to write); returns a `PlanningSolution`; the live figure a `LiveSearchPlot` hook of `solve(callback=)`. | RRT-Connect later. |
