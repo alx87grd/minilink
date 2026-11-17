@@ -564,9 +564,9 @@ pick):
   maintainer's reference machine, then keep the default off, turn it on, or drop the flag and
   always flatten if parity holds (reviewer A's lean) **[ask — core]**.
 - [ ] **One plot vocabulary** (S67) (scan: graphics#0, graphics#4, graphics#5, graphics#6,
-  graphics#8, graphics#9, analysis#9, analysis#10): `title`, `ax`, `backend` and `show`
+  graphics#8, graphics#9, analysis#9, analysis#10): `title`, `ax`, `renderer` and `show`
   honoured by every plot verb, one `PlotResult.axes` shape; `plot_trajectory` selects a
-  leaf's named output ports; one axis-label formatter, one unit convention, one backend
+  leaf's named output ports; one axis-label formatter, one unit convention, one renderer
   resolver; the renderers silent (RULES 4.6); a warning on the ±10 phase-plane window; one
   keyword set for the five control plots; the region plot overlays trajectories without
   touching `sys.x0`.

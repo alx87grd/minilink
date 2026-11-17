@@ -26,12 +26,20 @@ maintainer's.
    cost-to-go, a region of attraction on a phase plane), on both renderers.
 
 Goal 1 has a test that can be written today and fails today: no `import matplotlib` or
-`import plotly` outside the renderer modules. It fails in 12 library files (37 import sites),
-all of them in the "drawn directly" tier below.
+`import plotly` outside the renderer modules (the control and time-signal backends, and
+`graphical/animation/renderers/`). Counted as import statements under `minilink/`, it fails
+in 16 files (45 sites). 37 of them, in 12 files, are the drawn-directly tier below. The
+other eight sites are in four files the test has to allow-list or migrate:
+`graphical/phase_plane/phase_plane.py` (matplotlib and plotly, in the same module as the
+spec), `graphical/port_map.py` (its matplotlib renderer), `graphical/common/environment.py`
+(it reads the matplotlib backend name) and `graphical/diagrams/dot.py` (a matplotlib window
+of the graphviz PNG).
 
 ## 2. What exists (measured on `dev-consolidation`, 2026-11-15)
 
-76 `plot_*` and `animate*` functions; about 12 000 lines across the drawing code. Three tiers:
+75 `plot_*` and `animate` / `animate_*` functions (`animated_geometry_source` matches an
+`animate*` search and does not draw; `plot_space_of` and `plot_result_of` name a choice and
+a wrapper, not a figure); about 12 000 lines across the drawing code. Three tiers:
 
 | Tier | Plots | Description object | Renderers |
 | --- | --- | --- | --- |
@@ -56,9 +64,34 @@ What is not:
 - **Tier B is a third of the plots and all of planning.** They return `(fig, ax)`, a `PlotResult`
   wrapping `(fig, ax)`, or a list of either. Plotly cannot draw any of them without rewriting the
   function.
-- **The keywords are mixed.** `renderer=` in about 35 files; `ax=` in 17; the control plots and
-  the time signals have no `ax=`, most of tier B has no `renderer=`. `show=` is everywhere but finished in 13 places, each with its own
-  `plt.show(...)` call and blocking rule.
+- **The keywords are mixed.** In `minilink/`, `renderer=` occurs in 33 files and `ax=` in 18.
+  `show=` is on the plot verbs; the show itself is 14 `plt.show` calls in 11 files, each with
+  its own blocking rule. Control figures (`plot_bode`, `plot_pzmap`, `plot_root_locus`,
+  `plot_nyquist`, `plot_step_response`) and the time-signal plots (`plot_time_signals`, and
+  `plot_trajectory`, `plot_rollout` and `plot_cost` built on it) take `renderer=` and `show=`
+  and have no `ax=`. The phase plane's public function is that same pair; its matplotlib
+  renderer takes `ax=` through `**kwargs`. The port map takes `ax=` and `show=`, has no
+  `renderer=`, and returns a `PlotResult`. Nineteen drawn-directly functions take `ax=` and
+  `show=` and have no `renderer=`: in `planning/dynamic_programming/plotting.py`,
+  `plot_cost_to_go`, `plot_control_law`, `plot_value`, and the internal `plot_field` and
+  `plot_control_law_field`; in `planning/spatial/plotting.py`, `plot_scene`, `plot_track`,
+  `plot_cost_field` and `plot_cost_field_3d`; `plot_tree`, `animate_search` and
+  `animate_convergence` in `planning/search/plotting.py`; `plot_sampled_futures` in
+  `planning/trajectory_optimization/mpc/viz.py`; the two `plot_learning_curve` methods; the
+  three `plot_gain_schedule` definitions in `control/state.py`; and
+  `plot_region_of_attraction`. Eleven return `(fig, ax)` (the two dynamic-programming
+  heatmaps also return a list of them for several slices), the learning curves and the gain
+  schedule return the axes, the two search animations return the animation, and
+  `plot_region_of_attraction` returns a `PlotResult`. Beside those nineteen, `plot_value_3d`
+  and the three dynamic-programming `animate*` take `show=` and neither `ax=` nor
+  `renderer=` (`plot_value_3d` returns `(fig, ax)`; each animation returns the animation), and
+  `plot_cost_field_exports` takes `show=` and forwards `**plot_kwargs`. The template is
+  already in the library: `PlanningSolution.plot_control_law` and `plot_cost_to_go`, and the
+  planner mirrors of them (value iteration's `plot_cost_to_go` included), take `renderer=`,
+  `show=` and `ax=`, return a `PlotResult`, and refuse another renderer by name through
+  `require_matplotlib`. `Comparison` returns a `PlotResult` and takes `show=` only. `animate`
+  on a system takes `renderer=`, `show=` and `file_name=` and returns the renderer's object,
+  not a `PlotResult`.
 - **`PlotResult` carries a duplicate and misses the description.** `payload` repeats
   `(figure, axes)` on matplotlib and `figure` on plotly; `axes` is `None` on plotly; the
   description the figure was drawn from is dropped.
@@ -157,9 +190,10 @@ render(spec, *, renderer="matplotlib", show=True, ax=None) -> PlotResult
 ```
 
 A renderer is one module with a draw function per layer kind (`draw_mesh(ax, layer)`), the
-panel and figure setup, and one `finish(show)` holding the blocking rule now copied in 13
-places. The renderers sit in a name-to-module table read lazily, so a third renderer is one
-module and one table entry. A layer a renderer cannot draw raises by name
+panel and figure setup, and one `finish(show)` holding the blocking rule now copied in 14
+`plt.show` calls across 11 files. The renderers sit in a name-to-module table read lazily,
+so a third renderer is one module and one table entry. A layer a renderer cannot draw
+raises by name
 (`"plotly does not draw Arrows(style='stream'); use renderer='matplotlib'"`): being
 matplotlib-only is a fact of the renderer, not of the plot function.
 
@@ -221,13 +255,15 @@ plane's stream arrows) cannot host an overlay; the renderer refuses it by name.
   signature is aligned: `animate*(…, renderer=, show=, file_name=) -> PlotResult`.
 - **DP and search animations** stay matplotlib functions. Playing a list of descriptions is
   not planned: no use asks for it.
-- **Block diagrams** stay on graphviz; `plot_diagram` keeps its own return.
+- **Block diagrams** stay on graphviz. `plot_diagram` already takes `show=` and `file_name=`;
+  refusing a stray `renderer=` by name is the alignment left, and returning the Graphviz
+  object, not a `PlotResult`, is deliberate so a notebook cell can display it.
 
 ## 4. Options
 
 | Option | What it is | Cost | What the goal gets |
 | --- | --- | --- | --- |
-| **A. Signatures only** (the current TODO row) | every function takes `renderer=`, `ax=`, `show=` and returns `PlotResult`; tier B stays matplotlib code and refuses `"plotly"` by name | small: about 40 functions, mostly signatures and returns | one API; goal 1 not met (the 37 import sites stay); composition on matplotlib only |
+| **A. Signatures only** (the current TODO row) | every function takes `renderer=`, `ax=`, `show=` and returns `PlotResult`; tier B stays matplotlib code and refuses `"plotly"` by name. Smallest slice: move `require_matplotlib` and `plot_result_of` into `graphical/common/`, apply them to the drawn-directly functions of §2 that lack them, replace the `plt.show` calls with one shared show step, and add one contract test over the public `plot_*` functions | small: about 40 functions, mostly signatures and returns | one API; goal 1 not met (the 37 drawn-directly import sites stay, and the four files of §1 stay outside the renderer modules); composition on matplotlib only |
 | **B. One description, in one pass** (§3) | the four schemas merge; tier B moves onto it; one renderer call | the merge (about 1 000 lines touched) plus about 170 drawing calls replaced over 10 files | everything in §1, after one long branch |
 | **C. One description, family by family** | a spike first (§5); then each tier B family moves onto the description and takes the contract in the same commit; the merge of the described plots last and optional | B's cost, spread; every step ships alone and can stop | everything in §1 at the end; each family complete when it lands |
 
@@ -244,7 +280,11 @@ contours and 3-D surfaces enter it. So measure before committing:
    whether `Mesh` wants one name or three. The maintainer rules D1 on those numbers.
 1. **The record and the finish.** `PlotResult` as in §3.3; every `plot_*` returns one (the
    scripts that unpack `fig, ax = …` change, about 16 to 34 call sites); one `finish(show)`.
-   Small, and it does not wait for the rest.
+   Small, and it does not wait for the rest. The smallest slice, and the one to do first:
+   move `require_matplotlib` and `plot_result_of` from `planning/plotting.py` into
+   `graphical/common/`, apply them to the drawn-directly functions of §2 that take `ax=` and
+   `show=` and have no `renderer=`, replace the `plt.show` calls with one shared show step,
+   and add one contract test over the public `plot_*` functions.
 2. **The mesh family.** `ControlFigure` becomes `FigureSpec` with `Mesh`; one `render` call
    with `ax=` as in §3.4. Onto it: the cost-to-go and control-law plots (DP, the planning
    solution, `Comparison`) and the port map, which is the same figure.
@@ -253,10 +293,11 @@ contours and 3-D surfaces enter it. So measure before committing:
    futures; the spatial plots (`FieldGrid` goes, as the TODO row already says). Each family
    takes `renderer=`, `show=`, `ax=`, loses its matplotlib import, and trims the style options
    nobody passes. The work can stop after any family; what has moved is complete. After this
-   step the import test of §1 passes.
+   step the import test of §1 passes once the four files of §1 are allow-listed or migrated.
 4. **Optional, last: the time signals and the phase plane onto `FigureSpec`.** They already
-   meet goal 1 on their own descriptions, so merging them buys one schema instead of three and
-   costs the riskiest change (the live handles, the stream arrows). Until then they take
+   meet goal 1 on their own descriptions, apart from the phase-plane module's imports (§1),
+   so merging them buys one schema instead of three and costs the riskiest change (the live
+   handles, the stream arrows). Until then they take
    `ax=` through their own renderers. Decided after step 3, on what the schema looks like.
 5. **Plotly where it is cheap.** A heatmap, level sets, a polygon and a surface are one Plotly
    trace each; stream arrows wait for a real use.
@@ -301,7 +342,7 @@ the two TODO rows are gone.
 
 ## 8. Housekeeping found by the audit
 
-- TODO's "One plot vocabulary" row (S67) still lists `backend` among the plot keywords; RULES 2.7
-  names it `renderer`. The row merges into this plan once ruled.
+- TODO's "One plot vocabulary" row (S67) names the drawing-library keyword `renderer`, as RULES
+  2.7 does. The row merges into this plan once ruled.
 - `PlotResult._ipython_display_` already keeps a bare plot call in a notebook cell clean; the
   new record keeps it.

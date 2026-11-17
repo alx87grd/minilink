@@ -550,7 +550,9 @@ at `"terrain"`.
   optimizer's algorithm on `Optimizer` and on every planner that optimizes, value
   iteration's `method="loop"`, RRT's `nearest_method=`); the optimizer's solver adapter,
   which a method binds, is `Optimizer.adapter`; `renderer=` is the drawing library on every
-  drawing verb (`plot_renderer=` on `game` and the realtime simulator).
+  drawing verb (`plot_renderer=` on `game` and the realtime simulator). The drawn-directly
+  plots do not take it yet; the split is the plotting contract
+  ([plotting-contract.md](../plans/plotting-contract.md)).
 - **One word for a run's origin:** `t0`, on every runner (`compute_trajectory`,
   `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
   run, the gym bridge). A trajectory's first sample is its `t0` property.
@@ -1364,8 +1366,11 @@ the failure cost, when it has one), both on one written-out keyword set
 trajectory=, title=, ax=, renderer=, show=`) that the planners repeat as a thin call to
 their latest solution (value iteration adds only `field=`, another table of its grid), a
 grid planner's table drawn on the grid's own nodes unless the call asks for another mesh;
-every planning plot, the comparison's included, returns a `PlotResult` (`.figure`,
-`.axes`), and `plot_trajectory`, `animate` and `plot_cost`: the
+the solution's `plot_control_law` and `plot_cost_to_go`, and the comparison's plots,
+return a `PlotResult` (`.figure`, `.axes`); `plot_scene`, `plot_track`,
+`plot_cost_field`, `plot_cost_field_3d`, `plot_tree`, `plot_sampled_futures` and the
+dynamic-programming module plots return `(fig, ax)`; and `plot_trajectory`, `animate`
+and `plot_cost`: the
 plan when there is one, else the controller run once from the problem's start through
 the problem's evaluator (`problem.compile(controller, dt)`, the loop the score runs: a
 continuous law integrated on the views' optional `dt`, `None` the evaluator's automatic

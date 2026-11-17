@@ -198,7 +198,7 @@ def plot_region_of_attraction(
     Returns
     -------
     PlotResult
-        The matplotlib figure and axes, as every plot returns them.
+        A ``PlotResult`` of the matplotlib figure and its axes.
     """
     # Lazy import: matplotlib loads on first use, not with the analysis
     import matplotlib.pyplot as plt
