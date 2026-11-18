@@ -524,8 +524,16 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         ctl = lqr_finite_horizon(
             LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), horizon=1.0
         )
-        ax = ctl.plot_gain_schedule(show=False)
+        ax = ctl.plot_gain_schedule(show=False).axes
         self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
+
+    def test_gain_schedule_plot_draws_on_plotly(self):
+        pytest.importorskip("plotly")
+        ctl = lqr_finite_horizon(
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), horizon=1.0
+        )
+        result = ctl.plot_gain_schedule(renderer="plotly", show=False)
+        self.assertEqual([trace.type for trace in result.figure.data], ["scatter"] * 2)
 
     def test_finite_horizon_after_stationary_keeps_regulating(self):
         ctl = lqr_finite_horizon(
@@ -842,22 +850,23 @@ class TestAnimateModal(unittest.TestCase):
     @pytest.mark.optional
     def test_animate_one_mode_headless(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode=0, show=False)
-        self.assertEqual(len(poles), 2)
+        result = animate_modal(Pendulum(), [0.0, 0.0], mode=0, show=False)
+        self.assertEqual(result.renderer, "matplotlib")
+        self.assertIsNotNone(result.animation)
 
     @pytest.mark.optional
     def test_animate_all_modes(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode="all", show=False)
-        self.assertEqual(len(poles), 2)
+        results = animate_modal(Pendulum(), [0.0, 0.0], mode="all", show=False)
+        self.assertEqual(len(results), 2)
 
 
 class TestModalFacade(unittest.TestCase):
     @pytest.mark.optional
     def test_facade_animate(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = Pendulum().animate_modal(x_bar=[0.0, 0.0], mode=0, show=False)
-        self.assertEqual(len(poles), 2)
+        result = Pendulum().animate_modal(x_bar=[0.0, 0.0], mode=0, show=False)
+        self.assertEqual(result.renderer, "matplotlib")
 
 
 @pytest.mark.optional
@@ -892,7 +901,7 @@ class TestModalAPI(unittest.TestCase):
 
 from minilink.analysis.frequency import bode, margins, pzmap, transfer_function
 from minilink.analysis.time_response import step_response
-from minilink.graphical.common import PlotResult
+from minilink.graphical.common.plot_result import PlotResult
 
 
 class FrequencyPlant(DynamicSystem):
@@ -1143,7 +1152,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from minilink.core.trajectory import Trajectory
-from minilink.graphical.phase_plane import build_phase_plane_spec, plot_phase_plane
+from minilink.graphical.phase_plane import phase_plane_figure, plot_phase_plane
 
 
 class PhasePlaneTestSystem(DynamicSystem):
@@ -1183,34 +1192,35 @@ class TestPhasePlane(unittest.TestCase):
     def tearDown(self):
         plt.close("all")
 
-    def test_build_phase_plane_spec_evaluates_vector_field(self):
+    def test_phase_plane_figure_evaluates_vector_field(self):
         sys = PhasePlaneTestSystem()
-        spec = build_phase_plane_spec(
+        panel = phase_plane_figure(
             sys,
             x_axis=0,
             y_axis=1,
             t=0.25,
             bounds=((-1.0, 1.0), (-2.0, 2.0)),
             grid_shape=(3, 2),
-        )
-        self.assertEqual(spec.X.shape, (2, 3))
-        self.assertEqual(spec.Y.shape, (2, 3))
-        self.assertEqual(spec.x_label, "position")
-        self.assertEqual(spec.y_label, "velocity")
-        self.assertEqual(spec.x_unit, "m")
-        self.assertEqual(spec.y_unit, "m/s")
-        np.testing.assert_allclose(spec.X[0, 2], 1.0)
-        np.testing.assert_allclose(spec.Y[0, 2], -2.0)
-        np.testing.assert_allclose(spec.V[0, 2], -1.5)
-        np.testing.assert_allclose(spec.W[0, 2], -1.75)
+        ).panels[0]
+        field = panel.layers[0]
+        self.assertEqual(field.x.shape, (2, 3))
+        self.assertEqual(field.y.shape, (2, 3))
+        self.assertEqual(panel.x_label, "position [m]")
+        self.assertEqual(panel.y_label, "velocity [m/s]")
+        np.testing.assert_allclose(field.x[0, 2], 1.0)
+        np.testing.assert_allclose(field.y[0, 2], -2.0)
+        np.testing.assert_allclose(field.u[0, 2], -1.5)
+        np.testing.assert_allclose(field.v[0, 2], -1.75)
 
     def test_one_state_system_can_use_same_axis_twice(self):
         sys = OneStateSystem()
-        spec = build_phase_plane_spec(sys, x_axis=0, y_axis=0, grid_shape=(2, 2))
-        self.assertEqual(spec.x_axis, 0)
-        self.assertEqual(spec.y_axis, 0)
-        np.testing.assert_allclose(spec.V, spec.W)
-        np.testing.assert_allclose(spec.V, 2.0 * spec.X)
+        field = (
+            phase_plane_figure(sys, x_axis=0, y_axis=0, grid_shape=(2, 2))
+            .panels[0]
+            .layers[0]
+        )
+        np.testing.assert_allclose(field.u, field.v)
+        np.testing.assert_allclose(field.u, 2.0 * field.x)
 
     def test_infinite_bounds_fall_back_to_trajectory_with_padding(self):
         sys = UnboundedPlanarSystem()
@@ -1219,11 +1229,12 @@ class TestPhasePlane(unittest.TestCase):
             x=np.array([[2.0, 4.0], [-1.0, 3.0]]),
             u=np.zeros((0, 2)),
         )
-        spec = build_phase_plane_spec(sys, traj)
-        np.testing.assert_allclose(spec.x_bounds, (1.9, 4.1))
-        np.testing.assert_allclose(spec.y_bounds, (-1.2, 3.2))
-        np.testing.assert_allclose(spec.trajectory.x, np.array([2.0, 4.0]))
-        np.testing.assert_allclose(spec.trajectory.y, np.array([-1.0, 3.0]))
+        panel = phase_plane_figure(sys, traj).panels[0]
+        np.testing.assert_allclose(panel.x_lim, (1.9, 4.1))
+        np.testing.assert_allclose(panel.y_lim, (-1.2, 3.2))
+        path = panel.layers[1]
+        np.testing.assert_allclose(path.x, np.array([2.0, 4.0]))
+        np.testing.assert_allclose(path.y, np.array([-1.0, 3.0]))
 
     def test_plot_phase_plane_matplotlib_with_overlay(self):
         sys = PhasePlaneTestSystem()
@@ -1255,7 +1266,7 @@ class TestPhasePlane(unittest.TestCase):
 
     def test_unsupported_backend_reports_clear_error(self):
         sys = PhasePlaneTestSystem()
-        with self.assertRaisesRegex(ValueError, "Unknown renderer"):
+        with self.assertRaisesRegex(ValueError, "renderer must be one of"):
             plot_phase_plane(sys, renderer="bokeh", show=False)
 
     def test_axes_and_grid_refuse_booleans_and_floats(self):
@@ -1263,20 +1274,55 @@ class TestPhasePlane(unittest.TestCase):
         for axis in (np.bool_(True), 1.0, np.float64(1.0), 0.5):
             with self.subTest(axis=axis):
                 with self.assertRaisesRegex(ValueError, "integer state index"):
-                    build_phase_plane_spec(sys, x_axis=axis, grid_shape=(2, 2))
+                    phase_plane_figure(sys, x_axis=axis, grid_shape=(2, 2))
         for grid_shape in ((np.bool_(True), 3), (2.5, 3), (3.0, 3)):
             with self.subTest(grid_shape=grid_shape):
                 with self.assertRaisesRegex(ValueError, "must be integers"):
-                    build_phase_plane_spec(sys, grid_shape=grid_shape)
-        spec = build_phase_plane_spec(
+                    phase_plane_figure(sys, grid_shape=grid_shape)
+        panel = phase_plane_figure(
             sys, x_axis=np.int64(1), y_axis=0, grid_shape=(np.int64(2), 3)
+        ).panels[0]
+        self.assertEqual(
+            (panel.x_label, panel.layers[0].x.shape), ("velocity [m/s]", (3, 2))
         )
-        self.assertEqual((spec.x_axis, spec.X.shape), (1, (3, 2)))
 
-    def test_plotly_refuses_the_keywords_it_does_not_take(self):
+    def test_plotly_draws_the_field_and_the_trajectory(self):
         sys = PhasePlaneTestSystem()
-        with self.assertRaisesRegex(TypeError, "dpi, figsize"):
-            plot_phase_plane(sys, renderer="plotly", figsize=(4, 3), dpi=80, show=False)
+        traj = Trajectory(
+            t=np.array([0.0, 1.0, 2.0]),
+            x=np.array([[0.0, 0.5, 1.0], [1.0, 0.0, -1.0]]),
+            u=np.zeros((1, 3)),
+        )
+        for streamplot in (False, True):
+            result = plot_phase_plane(
+                sys,
+                traj,
+                bounds=((-1.0, 1.0), (-1.5, 1.5)),
+                grid_shape=(5, 5),
+                streamplot=streamplot,
+                renderer="plotly",
+                show=False,
+            )
+            names = [trace.name for trace in result.figure.data]
+            self.assertEqual(names[-3:], ["trajectory", "start", "end"])
+            self.assertTrue(
+                all(type(t).__name__ == "Scatter" for t in result.figure.data)
+            )
+
+    def test_a_second_trajectory_draws_into_the_first_plot(self):
+        sys = PhasePlaneTestSystem()
+        first = plot_phase_plane(
+            sys, bounds=((-1.0, 1.0), (-1.5, 1.5)), grid_shape=(3, 3), show=False
+        )
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 0.5], [1.0, 0.0]]),
+            u=np.zeros((1, 2)),
+        )
+        plot_phase_plane(
+            sys, traj, bounds=((-1.0, 1.0), (-1.5, 1.5)), grid_shape=(3, 3), ax=first
+        )
+        self.assertEqual(len(first.axes.lines), 3)
 
 
 from minilink.analysis.discretization import SampledSystem, discretize

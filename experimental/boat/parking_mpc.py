@@ -50,5 +50,4 @@ loop.animate(
     result.resample(n_samples=N_FRAMES),
     overlays=mpc_animation_overlays(result, mpc, loop=loop),
     renderer="meshcat",
-    native=False,
 )

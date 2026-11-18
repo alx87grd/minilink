@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem, subsystem_run
 from minilink.core.system import System
-from minilink.graphical.common import PlotResult
+from minilink.graphical.common.environment import allow_tall_stacked_figures
+from minilink.graphical.common.labels import label_with_unit
+from minilink.graphical.common.matplotlib_style import trajectory_stack_figsize
+from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.figure import (
+    FigureSpec,
+    Panel,
+    Trace,
+    draw,
+    require_renderer,
+)
 from minilink.graphical.signals.signal_colors import (
     color_for_signal,
     is_internal_signal,
@@ -26,41 +34,15 @@ _COST_SIGNAL_LABELS = {"dJ": "dJ/dt", "J": "J"}
 ###############################################################################
 
 
-@dataclass(frozen=True)
-class SignalTrace:
-    """One scalar time trace selected from a vector signal."""
-
-    signal: str
-    component: int
-    label: str
-    unit: str
-    values: np.ndarray
-    color: str
-    alpha: float = 1.0
-    linewidth: float = 1.5
-
-
-@dataclass(frozen=True)
-class SignalPlotSpec:
-    """Backend-neutral signal plot request."""
-
-    title: str
-    t: np.ndarray
-    traces: tuple[SignalTrace, ...]
-    abscissa_label: str = TIME_ABSCISSA_LABEL
-
-
 class LivePlotHandle:
     """Base class for live signal plot handles."""
 
-    supports_live = True
-
-    def update(self, traj_or_spec, *, title: str | None = None) -> None:
-        """Update an existing plot from a new trajectory or plot spec."""
+    def update(self, traj_or_figure, *, title: str | None = None) -> None:
+        """Update an existing plot from a new trajectory or its description."""
         raise NotImplementedError
 
     def close(self) -> None:
-        """Release backend resources held by the live plot."""
+        """Release what the live plot holds: its window, or its server."""
         raise NotImplementedError
 
 
@@ -97,15 +79,15 @@ def resolve_plot_signals(sys) -> tuple[str, ...]:
     return tuple(signals)
 
 
-def build_signal_plot_spec(
+def signal_figure(
     sys,
     traj,
     *,
     signals: tuple[str, ...] = ("x", "u"),
     title: str | None = None,
     abscissa_label: str = TIME_ABSCISSA_LABEL,
-) -> SignalPlotSpec:
-    """Build a one-component-per-row plot specification."""
+) -> FigureSpec:
+    """The description of a trajectory's signals: one panel per component, on one time axis."""
     requested = normalize_plot_signals(sys, signals)
 
     # A block nested in a sub-diagram ("loop/plant:x"), sampled level by level
@@ -138,7 +120,8 @@ def build_signal_plot_spec(
         if sampled is not None:
             traj = traj.with_signals({name: sampled})
 
-    traces = []
+    t = np.asarray(traj.t, dtype=float)
+    panels = []
     internal_index = 0
     for signal_name in requested:
         require_known_signal(sys, traj, signal_name, nested)
@@ -178,26 +161,32 @@ def build_signal_plot_spec(
                 n_components=n_components,
                 internal_index=idx,
             )
-            traces.append(
-                SignalTrace(
-                    signal=signal_name,
-                    component=i,
-                    label=labels[i],
-                    unit=units[i],
-                    values=values[i, :],
-                    color=style.color,
-                    alpha=style.alpha,
-                    linewidth=style.linewidth,
-                )
+            trace = Trace(
+                t,
+                values[i, :],
+                color=style.color,
+                alpha=style.alpha,
+                width=style.linewidth,
+                label=labels[i],
             )
+            y_label = label_with_unit(labels[i], units[i], separator="\n")
+            panels.append(Panel(layers=(trace,), y_label=y_label, legend=False))
 
-    require_traces(traces)
+    require_traces(panels)
 
-    return SignalPlotSpec(
-        title=title or f"Time signals for {sys.name}",
-        t=np.asarray(traj.t, dtype=float),
-        traces=tuple(traces),
-        abscissa_label=abscissa_label,
+    # The time axis under the last panel; the height grows with the panels
+    panels[-1] = Panel(
+        layers=panels[-1].layers,
+        y_label=panels[-1].y_label,
+        x_label=abscissa_label,
+        legend=False,
+    )
+    figsize = trajectory_stack_figsize(
+        len(panels), allow_tall=allow_tall_stacked_figures()
+    )
+
+    return FigureSpec(
+        panels=tuple(panels), title=title or "", share_x=True, figsize=figsize
     )
 
 
@@ -207,34 +196,17 @@ def plot_time_signals(
     *,
     signals: tuple[str, ...] = ("x", "u"),
     abscissa_label: str = TIME_ABSCISSA_LABEL,
+    title: str | None = None,
     renderer="matplotlib",
-    show: bool = True,
-    **kwargs,
+    show=None,
+    ax=None,
 ) -> PlotResult:
-    """Plot sampled time signals with the selected renderer."""
-    spec = build_signal_plot_spec(
-        sys,
-        traj,
-        signals=signals,
-        abscissa_label=abscissa_label,
+    """Plot a trajectory's signals, one row per component: a :class:`PlotResult`."""
+    figure = signal_figure(
+        sys, traj, signals=signals, title=title, abscissa_label=abscissa_label
     )
 
-    key = require_signal_renderer(renderer)
-
-    if key == "matplotlib":
-        # A real cycle: matplotlib_backend imports from this module
-        from minilink.graphical.signals.matplotlib_backend import (
-            render_matplotlib_signal_plot,
-        )
-
-        return render_matplotlib_signal_plot(spec, show=show, **kwargs)
-
-    # A real cycle: plotly_backend imports from this module
-    from minilink.graphical.signals.plotly_backend import (
-        render_plotly_signal_plot,
-    )
-
-    return render_plotly_signal_plot(spec, show=show, **kwargs)
+    return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
 def open_time_signal_plot(
@@ -244,15 +216,15 @@ def open_time_signal_plot(
     signals: tuple[str, ...] = ("x", "u"),
     abscissa_label: str = TIME_ABSCISSA_LABEL,
     renderer="matplotlib",
-    show: bool = True,
-    **kwargs,
+    show=True,
+    pause: float = 0.0,
 ) -> LivePlotHandle:
-    """Open a live time-signal plot with an update handle."""
+    """Open a live time-signal plot: a handle whose ``update`` redraws it from a new trajectory."""
     signal_names = normalize_plot_signals(sys, signals)
 
-    # The spec of any later trajectory, on the same signals
-    def spec_builder(next_traj, *, title=None):
-        return build_signal_plot_spec(
+    # The description of any later trajectory, on the same signals
+    def figure_of(next_traj, *, title=None):
+        return signal_figure(
             sys,
             next_traj,
             signals=signal_names,
@@ -260,34 +232,21 @@ def open_time_signal_plot(
             abscissa_label=abscissa_label,
         )
 
-    spec = spec_builder(traj)
-
-    key = require_signal_renderer(renderer)
-
-    if key == "matplotlib":
+    require_renderer(renderer)
+    if renderer == "matplotlib":
         # A real cycle: matplotlib_backend imports from this module
         from minilink.graphical.signals.matplotlib_backend import (
             open_matplotlib_signal_plot,
         )
 
         return open_matplotlib_signal_plot(
-            spec,
-            spec_builder=spec_builder,
-            show=show,
-            **kwargs,
+            figure_of(traj), figure_of=figure_of, show=show, pause=pause
         )
 
     # A real cycle: plotly_backend imports from this module
-    from minilink.graphical.signals.plotly_backend import (
-        open_plotly_signal_plot,
-    )
+    from minilink.graphical.signals.plotly_backend import open_plotly_signal_plot
 
-    return open_plotly_signal_plot(
-        spec,
-        spec_builder=spec_builder,
-        show=show,
-        **kwargs,
-    )
+    return open_plotly_signal_plot(figure_of(traj), figure_of=figure_of, show=show)
 
 
 ###############################################################################
@@ -537,40 +496,23 @@ def system_channel_samples(sys, traj, name: str) -> np.ndarray | None:
     return out
 
 
-def require_traces(traces):
+def require_traces(panels):
     """Refuse a plot without a single signal component."""
-    if not traces:
+    if not panels:
         raise ValueError("No signal components were selected for plotting.")
 
 
-def require_signal_renderer(renderer):
-    """Refuse a renderer other than ``"matplotlib"`` or ``"plotly"``; return its key."""
-    if not isinstance(renderer, str):
-        raise TypeError("Signal plotting renderer must be a string.")
+def figure_of_update(traj_or_figure, figure_of, *, title=None):
+    """The description an update draws: the one given, or a trajectory's."""
+    if isinstance(traj_or_figure, FigureSpec):
+        return traj_or_figure
 
-    key = renderer.strip().lower()
-    if key not in ("matplotlib", "plotly"):
-        raise ValueError(
-            f"Unknown signal renderer {renderer!r}. Expected 'matplotlib' or 'plotly'."
-        )
-
-    return key
+    return figure_of(traj_or_figure, title=title)
 
 
-def coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):
-    """Return a plot spec directly or rebuild one from a trajectory."""
-    if isinstance(traj_or_spec, SignalPlotSpec):
-        return traj_or_spec
-
-    if spec_builder is None:
-        raise TypeError("Updating from a trajectory requires a spec builder.")
-
-    return spec_builder(traj_or_spec, title=title)
-
-
-def require_same_trace_count(spec, lines):
-    """Refuse an update whose spec has another number of traces than the plot."""
-    if len(spec.traces) != len(lines):
+def require_same_trace_count(figure, n_lines):
+    """Refuse an update whose description has another number of panels than the plot."""
+    if len(figure.panels) != n_lines:
         raise ValueError(
             "Live plot update changed the number of traces; open a new plot."
         )

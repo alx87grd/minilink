@@ -282,12 +282,15 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
     build, _ = PLANNERS["tabular"]
     planner = build()
     solve_of(planner)
-    # An interactive backend: the planning views leave Agg silent
+    # A session with a window: show=False shows nothing, the default shows once
     with (
-        mock.patch("matplotlib.pyplot.show") as shown,
-        mock.patch("matplotlib.pyplot.get_backend", return_value="TkAgg"),
+        mock.patch("minilink.graphical.common.show.show_in_window") as shown,
+        mock.patch(
+            "minilink.graphical.common.show.resolve_show",
+            side_effect=lambda show, renderer: "window" if show else None,
+        ),
     ):
-        ax = planner.plot_learning_curve(show=False)
+        ax = planner.plot_learning_curve(show=False).axes
         source = Step()
         source.compute_trajectory(tf=2.0)
         source.plot_trajectory(show=False)
@@ -295,6 +298,16 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
         planner.plot_learning_curve()
         assert shown.call_count == 1
     assert ax.get_xlabel() == "episode"
+
+
+def test_the_learning_curve_draws_on_plotly():
+    pytest.importorskip("plotly")
+    build, _ = PLANNERS["tabular"]
+    planner = build()
+    solve_of(planner)
+    result = planner.plot_learning_curve(renderer="plotly", show=False)
+    assert result.renderer == "plotly"
+    assert [trace.type for trace in result.figure.data] == ["scatter", "scatter"]
 
 
 @pytest.mark.jax

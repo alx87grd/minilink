@@ -11,7 +11,7 @@ from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
 from minilink.core.fields import EllipsoidSet, QuadraticField
-from minilink.graphical.common import PlotResult
+from minilink.graphical.figure import Contour, FigureSpec, Panel, Trace, draw
 
 #: The seed of the first pass's samples, one more per pass: the level reads the same twice.
 SAMPLE_SEED = 0
@@ -26,7 +26,7 @@ PLOT_POINTS = 201
 METHODS = ("lyapunov", "simulation")
 
 #: The colors of the regions a plot draws, in order.
-REGION_COLORS = ("tab:red", "tab:purple", "tab:green", "tab:brown")
+REGION_COLORS = ("#d62728", "#9467bd", "#2ca02c", "#8c564b")
 
 
 ###############################################################################
@@ -178,8 +178,9 @@ def plot_region_of_attraction(
     params=None,
     basin: bool = False,
     trajectories=(),
+    renderer="matplotlib",
+    show=None,
     ax=None,
-    show: bool = True,
 ):
     """
     Draw regions of attraction of ``sys`` in the plane of two states.
@@ -198,11 +199,8 @@ def plot_region_of_attraction(
     Returns
     -------
     PlotResult
-        A ``PlotResult`` of the matplotlib figure and its axes.
+        The drawn figure, its axes and its description.
     """
-    # Lazy import: matplotlib loads on first use, not with the analysis
-    import matplotlib.pyplot as plt
-
     # Lazy import: the simulator loads on first use, not with the analysis verbs
     from minilink.simulation.simulator import Simulator
 
@@ -236,9 +234,8 @@ def plot_region_of_attraction(
     f = dynamics_of(sys, u_bar, t, params)
     V_dot_plane = 2.0 * np.einsum("ij,jk,ik->i", X - x_bar, P, f(X)).reshape(GX.shape)
 
-    if ax is None:
-        _, ax = plt.subplots(figsize=(7.0, 5.5))
     horizon, dt = time_scales_of(sys, x_bar, u_bar, t, params)
+    layers = []
 
     # The states of the plane that converge in simulation
     if basin:
@@ -246,64 +243,82 @@ def plot_region_of_attraction(
         reached = np.linalg.norm(X_final - x_bar, axis=1) < 0.05 * np.max(
             regions[0].half_width
         )
-        ax.contourf(
-            GX, GY, reached.reshape(GX.shape), levels=[0.5, 1.5], colors=["#cfe3f7"]
+        layers.append(
+            Contour(
+                grid_x,
+                grid_y,
+                reached.reshape(GX.shape),
+                levels=(0.5, 1.5),
+                filled=True,
+                color="#cfe3f7",
+                label="converges in simulation",
+            )
         )
-        ax.fill([], [], color="#cfe3f7", label="converges in simulation")
 
     # Each region's boundary, then the curve V̇ = 0
     for name, region, color in zip(names, regions, REGION_COLORS):
         V_plane = region.field(X).reshape(GX.shape)
-        ax.contour(GX, GY, V_plane, levels=[region.level], colors=color, linewidths=2.0)
-        ax.plot([], [], color=color, linewidth=2.0, label=name)
-    if np.any(V_dot_plane > 1e-9 * np.max(np.abs(V_dot_plane))):
-        ax.contour(
-            GX,
-            GY,
-            V_dot_plane,
-            levels=[0.0],
-            colors="tab:orange",
-            linewidths=1.0,
-            linestyles="--",
+        layers.append(
+            Contour(
+                grid_x,
+                grid_y,
+                V_plane,
+                levels=(region.level,),
+                color=color,
+                width=2.0,
+                label=name,
+            )
         )
-        ax.plot(
-            [],
-            [],
-            color="tab:orange",
-            linewidth=1.0,
-            linestyle="--",
-            label=r"$\dot V = 0$",
+    if np.any(V_dot_plane > 1e-9 * np.max(np.abs(V_dot_plane))):
+        layers.append(
+            Contour(
+                grid_x,
+                grid_y,
+                V_dot_plane,
+                levels=(0.0,),
+                color="#ff7f0e",
+                dash="dash",
+                label=r"$\dot V = 0$",
+            )
         )
 
     # Trajectories, each simulated from its initial state
     for x0 in trajectories:
         traj = Simulator(sys, x0=x0, tf=horizon, verbose=False).solve()
-        ax.plot(traj.x[x_axis], traj.x[y_axis], color="0.35", linewidth=1.0)
-        ax.plot(x0[x_axis], x0[y_axis], "o", color="0.35", markersize=4)
+        layers.append(Trace(traj.x[x_axis], traj.x[y_axis], color="#595959", width=1.0))
+        layers.append(
+            Trace([x0[x_axis]], [x0[y_axis]], color="#595959", mode="markers", size=4.0)
+        )
     if len(trajectories):
-        ax.plot([], [], color="0.35", linewidth=1.0, label="trajectory")
+        layers.append(Trace([], [], color="#595959", width=1.0, label="trajectory"))
 
     # The equilibrium, the axes and the legend
-    ax.plot(x_bar[x_axis], x_bar[y_axis], "k*", markersize=12, label="equilibrium")
+    layers.append(
+        Trace(
+            [x_bar[x_axis]],
+            [x_bar[y_axis]],
+            color="black",
+            mode="markers",
+            marker="*",
+            size=12.0,
+            label="equilibrium",
+        )
+    )
     title = textwrap.fill(f"{sys.name}: region of attraction", width=52)
     if int(sys.n) > 2:
         title += "\n(slice at the equilibrium)"
-    ax.set_title(title, fontsize=10)
-    ax.set_xlabel(labels[x_axis])
-    ax.set_ylabel(labels[y_axis])
-    ax.set_xlim(grid_x[0], grid_x[-1])
-    ax.set_ylim(grid_y[0], grid_y[-1])
-    ax.grid(True, alpha=0.3)
-    ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
-    ax.figure.tight_layout()
-    if show:
-        plt.show()
-
-    plot = PlotResult(
-        renderer="matplotlib", payload=(ax.figure, ax), figure=ax.figure, axes=ax
+    panel = Panel(
+        layers=tuple(layers),
+        title=title,
+        x_label=labels[x_axis],
+        y_label=labels[y_axis],
+        x_lim=(grid_x[0], grid_x[-1]),
+        y_lim=(grid_y[0], grid_y[-1]),
+        legend=True,
     )
+    spec = FigureSpec(panels=(panel,), figsize=(7.0, 5.5))
 
-    return plot
+    return draw(spec, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################

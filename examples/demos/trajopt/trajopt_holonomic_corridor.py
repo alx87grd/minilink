@@ -153,9 +153,10 @@ plot_bounds = (
     (WAYPOINTS[:, 0].min() - PLOT_PAD, WAYPOINTS[:, 0].max() + PLOT_PAD),
     (WAYPOINTS[:, 1].min() - PLOT_PAD, WAYPOINTS[:, 1].max() + PLOT_PAD),
 )
-fig, ax = track.plot(
+drawn = track.plot(
     show=False, bounds=plot_bounds, title="U-turn reference track + trajopt"
 )
+fig, ax = drawn.figure, drawn.axes
 scene.plot(show=False, ax=ax, bounds=plot_bounds, show_density=False, title=None)
 ax.plot(
     traj.x[0, :],

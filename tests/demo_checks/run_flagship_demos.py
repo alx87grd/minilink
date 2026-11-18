@@ -46,6 +46,7 @@ def _run_script(path: Path, *, timeout: float) -> tuple[str, str]:
         **os.environ,
         "PYTHONPATH": str(REPO_ROOT),
         "MPLBACKEND": "Agg",
+        "MINILINK_HEADLESS": "1",
         "SDL_VIDEODRIVER": "dummy",
     }
     try:

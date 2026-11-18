@@ -25,15 +25,8 @@ def save_gif(
 ) -> None:
     out = STATIC / name
     sys_or_diagram.animate(
-        traj,
-        renderer="matplotlib",
-        html=False,
-        show=False,
-        save=True,
-        file_name=str(out.with_suffix("")),
-        speed=speed,
-        camera=camera,
-    )
+        traj, renderer="matplotlib", show=False, speed=speed, camera=camera
+    ).save(out)
     shrink_gif(out)
 
 
@@ -55,14 +48,8 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
     """Write the interactive 3-D page, then the GIF screenshot of that page."""
     SHOWCASE.mkdir(parents=True, exist_ok=True)
     html = SHOWCASE / page
-    sys_or_diagram.animate(
-        traj,
-        renderer="meshcat",
-        html=False,
-        show=False,
-        save=True,
-        file_name=str(html),
-        **animate_kwargs,
+    sys_or_diagram.animate(traj, renderer="meshcat", show=False, **animate_kwargs).save(
+        html
     )
     print(f"{html}: {html.stat().st_size / 1e6:.2f} MB")
     html_to_gif(html, STATIC / gif)

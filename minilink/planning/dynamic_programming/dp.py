@@ -22,7 +22,7 @@ from minilink.planning.planner import (
     planner_evidence,
     require_solution,
 )
-from minilink.planning.plotting import cost_to_go_figure
+from minilink.planning.plotting import draw_cost_to_go
 from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution, solve_time_text
@@ -747,9 +747,9 @@ class DynamicProgrammingPlanner(Planner):
         is_3d=False,
         trajectory=None,
         title=None,
-        ax=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """
         The latest solution's cost-to-go table on the grid (:meth:`PlanningSolution.plot_cost_to_go`, the same keywords): a ``PlotResult``.
@@ -769,15 +769,15 @@ class DynamicProgrammingPlanner(Planner):
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
-            ax=ax,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
         if field is None:
             return require_solution(self).plot_cost_to_go(**drawn)
 
         # Another table of this grid, drawn as the solution's own
-        return cost_to_go_figure(
+        return draw_cost_to_go(
             self.problem, field, grid=self.grid, family="value iteration", **drawn
         )
 

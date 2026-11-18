@@ -1,22 +1,20 @@
 """Runtime environment: script, IPython, Jupyter or Colab, and the figure policies each one sets."""
 
+import os
 import sys
 
 __all__ = [
-    "EnvName",
     "detect_env",
-    "prefers_inline_animation",
-    "is_inline_capable",
+    "resolve_show",
+    "is_headless",
     "is_blocking_needed",
     "allow_tall_stacked_figures",
     "override_env",
 ]
 
-EnvName = str
-
-# One cached detection, so every environment-sensitive site (the animation HTML
-# default, figure blocking, the meshcat prompt, the stacked plot height) reads the
-# same answer through the policy predicates below.
+# One cached detection, so every environment-sensitive site (the show resolver,
+# figure blocking, the meshcat prompt, the stacked plot height) reads the same
+# answer through the policy predicates below.
 _CACHE = None
 
 
@@ -41,8 +39,9 @@ def detect_env():
         _CACHE = "colab"
         return _CACHE
 
-    # The running IPython shell, if any: IPython is optional
+    # The running IPython shell, if any
     try:
+        # Lazy import: IPython is optional, loaded only to find a running shell
         from IPython import get_ipython
 
         ip = get_ipython()
@@ -60,31 +59,35 @@ def detect_env():
     return _CACHE
 
 
-def prefers_inline_animation() -> bool:
+def resolve_show(show, renderer):
     """
-    Default value for ``html=None`` in animation APIs.
+    Where a figure drawn with ``renderer`` goes: ``"inline"``, ``"window"`` or ``None``.
 
-    Returns True in Colab (always) and in Jupyter when the active matplotlib
-    backend cannot physically pop up a window. Returns False for script,
-    IPython REPL, and Jupyter with an interactive backend (qt, widget/ipympl,
-    macosx, tk, nbagg).
+    ``show=True`` picks the place: inline in a notebook (matplotlib only with an
+    inline backend), a window elsewhere. ``"inline"`` and ``"window"`` name it,
+    and are refused by name where it cannot be. ``False`` is ``None``. A
+    headless run (:func:`is_headless`) shows nothing.
     """
+    require_show(show)
+    if show is False or is_headless():
+        return None
+
     env = detect_env()
-    if env == "colab":
-        return True
-    if env == "jupyter" and mpl_backend_is_non_interactive():
-        return True
-    return False
+    place = default_place(env, renderer) if show is True else show
+
+    # Where nothing can be shown: silence for show=True, a refusal when named, and
+    # for pygame, which only draws in a window of its own
+    if not can_show(place, env, renderer):
+        if show is True and renderer != "pygame":
+            return None
+        raise ValueError(cannot_show_message(place, env, renderer))
+
+    return place
 
 
-def is_inline_capable() -> bool:
-    """
-    True when the env can render ``IPython.display`` objects (if explicitly asked).
-
-    Used to decide whether honoring an explicit ``html=True`` will actually
-    display something to the user.
-    """
-    return detect_env() in ("jupyter", "colab")
+def is_headless() -> bool:
+    """True when ``MINILINK_HEADLESS`` is set: no figure is shown, whatever ``show`` asks."""
+    return os.environ.get(HEADLESS_VARIABLE, "") not in ("", "0")
 
 
 def is_blocking_needed() -> bool:
@@ -124,15 +127,104 @@ def override_env(name) -> None:
 ###############################################################################
 
 
+# The variable that silences every figure, for automated runs
+HEADLESS_VARIABLE = "MINILINK_HEADLESS"
+
+# The values show= takes
+SHOWS = (True, False, "inline", "window")
+
+
+def require_show(show):
+    """Refuse a ``show`` that is not ``True``, ``False``, ``"inline"`` or ``"window"``."""
+    if not any(
+        show is value or (isinstance(show, str) and show == value) for value in SHOWS
+    ):
+        raise ValueError(
+            f'show must be True, False, "inline" or "window", got {show!r}'
+        )
+
+
+def default_place(env, renderer):
+    """The place ``show=True`` picks: inline in a notebook, a window elsewhere."""
+    if renderer == "pygame":
+        return "window"
+    if env == "colab":
+        return "inline"
+    if env == "jupyter":
+        if renderer == "matplotlib" and not mpl_backend_is_inline():
+            return "window"
+        return "inline"
+
+    return "window"
+
+
+def can_show(place, env, renderer) -> bool:
+    """Whether ``place`` can show a figure drawn with ``renderer`` here."""
+    if place == "inline":
+        if env not in ("jupyter", "colab") or renderer == "pygame":
+            return False
+        return renderer != "matplotlib" or mpl_backend_is_inline()
+
+    # A window: none in Colab; a display (pygame's off-screen driver counts), and
+    # for matplotlib an interactive backend
+    if env == "colab":
+        return False
+    if renderer == "pygame" and os.environ.get("SDL_VIDEODRIVER") == "dummy":
+        return True
+    if not has_display():
+        return False
+    if renderer == "matplotlib":
+        return not mpl_backend_is_non_interactive()
+
+    return True
+
+
+def cannot_show_message(place, env, renderer) -> str:
+    """Why ``place`` cannot show a ``renderer`` figure here, and what to pass instead."""
+    if place == "inline":
+        return (
+            f"show='inline' needs a notebook with an inline display; this is a {env} "
+            f"session for renderer={renderer!r}; pass show=True or show='window'"
+        )
+
+    return (
+        f"show='window' needs a display and an interactive backend; this {env} "
+        f"session has none for renderer={renderer!r}; pass show=True or show='inline'"
+    )
+
+
+def has_display() -> bool:
+    """Whether a window can open: always on macOS and Windows, with ``DISPLAY`` or ``WAYLAND_DISPLAY`` on Linux."""
+    if not sys.platform.startswith("linux"):
+        return True
+
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
+def mpl_backend_is_inline() -> bool:
+    """True when matplotlib draws into the notebook's output (the ``inline`` backend)."""
+    # Lazy import: matplotlib loads where its figure is shown, not with the resolver
+    import matplotlib
+
+    return "inline" in matplotlib.get_backend().lower()
+
+
 def mpl_backend_is_non_interactive() -> bool:
     """
     True when the currently active matplotlib backend cannot pop up a window.
 
-    Covers the default Jupyter/Colab ``inline`` backend and the bare ``agg``
-    backend. Interactive backends (``qt*``, ``macosx``, ``tkagg``, ``ipympl`` /
-    ``widget``, ``nbagg``) return False.
+    Covers the notebook's ``inline`` backend and the file backends (``agg``,
+    ``pdf``, ``svg``, …). Interactive backends (``qt*``, ``macosx``, ``tkagg``,
+    ``ipympl`` / ``widget``, ``nbagg``) return False.
     """
+    # Lazy import: matplotlib loads when a figure is shown, not with the core
     import matplotlib
+    from matplotlib.backends import BackendFilter, backend_registry
 
     backend = matplotlib.get_backend().lower()
-    return ("inline" in backend) or (backend == "agg")
+    file_backends = {
+        name.lower()
+        for name in backend_registry.list_builtin(BackendFilter.NON_INTERACTIVE)
+    }
+
+    return "inline" in backend or backend in file_backends

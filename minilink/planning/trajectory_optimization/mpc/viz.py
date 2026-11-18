@@ -12,8 +12,14 @@ from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
 )
+from minilink.graphical.colormaps import colormap_rgb
+from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
 from minilink.planning.evaluation import require_recorded_input
 from minilink.planning.trajectory_optimization.compiled import require_state_knots
+
+# The sampled futures' blue
+FUTURE_COLOR = "#1f77b4"
+
 
 ###############################################################################
 # Public API
@@ -203,58 +209,73 @@ def plot_sampled_futures(
     x_axis=0,
     y_axis=1,
     n_shown: int = 32,
+    renderer="matplotlib",
+    show=None,
     ax=None,
-    show: bool = True,
 ):
     """
     The fans of a sampling MPC at the solves of ``ticks``: the heaviest futures shaded by weight, the plan in black, the closed loop.
 
     ``x_axis`` and ``y_axis`` name what is drawn against what: two state
     indices (``0`` and ``1``, the car's plane), or ``x_axis="t"`` for the state
-    ``y_axis`` against time (the pendulum's angle). ``ticks`` index the solves of the run. Returns
-    ``(fig, ax)``.
+    ``y_axis`` against time (the pendulum's angle). ``ticks`` index the solves of the run.
     """
-    # Lazy import: matplotlib loads with the first figure
-    import matplotlib.pyplot as plt
-
     futures = mpc_sampled_futures(rollout, mpc, loop=loop, n_shown=n_shown)
     plant = plant_trail_of(rollout, loop)
-    pv = mpc.pv
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = ax.figure
+    spec = sampled_futures_figure(
+        futures,
+        plant,
+        mpc.pv,
+        ticks=ticks,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        n_shown=n_shown,
+    )
+
+    return draw(spec, renderer=renderer, show=show, ax=ax)
+
+
+def sampled_futures_figure(futures, plant, pv, *, ticks, x_axis, y_axis, n_shown):
+    """The fans of ``ticks``, their plans and the closed loop ``plant``, as a description."""
 
     def coordinates(t, x_path):
         """The drawn pair of a path: time or a state on each axis."""
         return [t if axis == "t" else x_path[:, axis] for axis in (x_axis, y_axis)]
 
-    # Each fan: its futures shaded by weight, the plan they moved to
+    # Each fan: its futures shaded by weight w ∈ [0, 1], the plan they moved to
+    layers = []
     for tick in ticks:
         fan = futures[tick]
         t_fan = fan["t"] + pv.dt * np.arange(fan["plan"].shape[0])
         weights = fan["weights"] / fan["weights"].max()
         for x_path, weight in zip(fan["futures"], weights):
-            ax.plot(
-                *coordinates(t_fan, x_path),
-                color="tab:blue",
-                alpha=0.08 + 0.5 * weight,
-                lw=0.7,
+            layers.append(
+                Trace(
+                    *coordinates(t_fan, x_path),
+                    color=FUTURE_COLOR,
+                    alpha=0.08 + 0.5 * weight,
+                    width=0.7,
+                )
             )
-        ax.plot(*coordinates(t_fan, fan["plan"]), color="black", lw=1.5)
+        layers.append(Trace(*coordinates(t_fan, fan["plan"]), color="black"))
 
     # The closed loop
-    ax.plot(
-        *coordinates(plant.t, plant.x.T), color="tab:grey", lw=2, label="closed loop"
+    layers.append(
+        Trace(
+            *coordinates(plant.t, plant.x.T),
+            color="#7f7f7f",
+            width=2.0,
+            label="closed loop",
+        )
     )
-    ax.set_xlabel("t [s]" if x_axis == "t" else f"x[{x_axis}]")
-    ax.set_ylabel("t [s]" if y_axis == "t" else f"x[{y_axis}]")
-    ax.set_title(f"MPPI: {n_shown} of {pv.K} sampled futures, shaded by weight")
-    ax.legend(loc="best", fontsize=8)
-    if show:
-        plt.show()
+    panel = Panel(
+        layers=tuple(layers),
+        title=f"MPPI: {n_shown} of {pv.K} sampled futures, shaded by weight",
+        x_label="t [s]" if x_axis == "t" else f"x[{x_axis}]",
+        y_label="t [s]" if y_axis == "t" else f"x[{y_axis}]",
+    )
 
-    return fig, ax
+    return FigureSpec(panels=(panel,))
 
 
 class SampledFutures(Overlay):
@@ -267,12 +288,9 @@ class SampledFutures(Overlay):
     """
 
     def __init__(self, futures, *, axes=(0, 1), cmap="Blues"):
-        # Lazy import: matplotlib's colormaps load with the first overlay
-        from matplotlib import colormaps
-
         self.futures = futures
         self.axes = list(axes)
-        self.cmap = colormaps[cmap]
+        self.cmap = cmap
 
     def get_dynamic_geometry(self, t=0.0, params=None):
         # Lazy import: the world frame's name loads with the animation
@@ -283,7 +301,10 @@ class SampledFutures(Overlay):
         lines = [
             CustomLine(
                 x_path[:, self.axes],
-                color=(*self.cmap(0.35 + 0.65 * weight)[:3], 0.1 + 0.6 * weight),
+                color=(
+                    *colormap_rgb(self.cmap, 0.35 + 0.65 * weight),
+                    0.1 + 0.6 * weight,
+                ),
                 linewidth=0.6 + 1.2 * weight,
             )
             for x_path, weight in zip(fan["futures"], weights)

@@ -160,24 +160,20 @@ def run_rrt_vs_rrt_star():
     fig, axes = plt.subplots(1, 2, figsize=(12.0, 5.5), sharex=True, sharey=True)
     planners = (("RRT", rrt), ("RRT*", rrt_star))
     for ax, (title, planner) in zip(axes, planners):
+        extra = ""
+        if title == "RRT*" and sol_rrt_star.record.reached_goal:
+            extra = f", converged={sol_rrt_star.record.converged}"
         scene.plot(
             bounds=PLOT_BOUNDS,
             show_clearance_contour=True,
             show=False,
             ax=ax,
-        )
-        extra = ""
-        if title == "RRT*" and sol_rrt_star.record.reached_goal:
-            extra = f", converged={sol_rrt_star.record.converged}"
-        planner.plot_tree(
-            ax=ax,
-            show=False,
-            path_style="waypoints",
             title=(
                 f"{title} seed={SEED} "
                 f"({path_hops(planner)} hops, cost={path_cost(planner):.2f}{extra})"
             ),
         )
+        planner.plot_tree(ax=ax, path_style="waypoints")
 
     fig.suptitle("RRT (first goal) vs RRT* (post-goal convergence)")
     plt.tight_layout()
@@ -220,12 +216,9 @@ def run_extender_comparison():
             show_clearance_contour=True,
             show=False,
             ax=ax,
-        )
-        planner.plot_tree(
-            ax=ax,
-            show=False,
             title=f"{label} seed={SEED} ({len(planner.tree.nodes)} nodes)",
         )
+        planner.plot_tree(ax=ax)
 
     fig.suptitle("RRT extenders on the same holonomic obstacle scene")
     plt.tight_layout()

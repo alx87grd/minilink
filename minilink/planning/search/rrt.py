@@ -241,19 +241,41 @@ class RRTPlanner(Planner):
             solve_time_s=solve_time_s,
         )
 
-    def plot_tree(self, **kwargs):
-        """Plot the final tree and solution path (lazy matplotlib import).
+    def plot_tree(
+        self,
+        *,
+        x_axis: int = 0,
+        y_axis: int = 1,
+        title: str | None = None,
+        path_style: str = "dense",
+        figsize=(6.0, 5.0),
+        renderer="matplotlib",
+        show=None,
+        ax=None,
+    ):
+        """Plot the final tree and solution path in the ``(x_axis, y_axis)`` state projection.
 
-        ``x_axis`` / ``y_axis`` choose the state projection; pass ``ax`` to
-        overlay on a ``scene.plot`` heatmap.
+        ``path_style="waypoints"`` draws the path through the tree's nodes;
+        pass ``ax`` (a ``scene.plot`` record or matplotlib axes) to overlay the
+        tree on a scene. See :func:`~minilink.planning.search.plotting.plot_tree`.
         """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import plot_tree
 
-        return plot_tree(self, **kwargs)
+        return plot_tree(
+            self,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            title=title,
+            path_style=path_style,
+            figsize=figsize,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
 
     def animate_search(self, **kwargs):
-        """Animate the tree growth in a state projection (lazy matplotlib import)."""
+        """Animate the tree growth in a state projection, in matplotlib."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_search
 

@@ -1,4 +1,4 @@
-"""The planning views of one solution: its cost-to-go, its control law and its trajectory, and Matplotlib's show they share."""
+"""The planning views of one solution: its cost-to-go, its control law and its trajectory."""
 
 from __future__ import annotations
 
@@ -6,34 +6,16 @@ import numpy as np
 
 from minilink.core.fields import GridField
 from minilink.core.sets import is_finite_box
-
-# Matplotlib is imported inside each view, so the planning layer stays importable
-# without a display backend until a plot is requested.
-
+from minilink.graphical.common.labels import state_axis_label
+from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, draw, overlay
+from minilink.planning.dynamic_programming import plotting as grid_plotting
 
 ###############################################################################
 # Public API
 ###############################################################################
 
 
-def maybe_show(plt, show, *, block_when_needed=False):
-    """
-    Show the figures, unless asked not to or on the non-interactive Agg backend.
-
-    ``block_when_needed`` blocks on the show when the process needs it to stay
-    alive (a bare script), as the search views do.
-    """
-    if show and plt.get_backend().lower() != "agg":
-        if block_when_needed:
-            # Lazy import: the graphics load on first use, not with the core
-            from minilink.graphical.common.environment import is_blocking_needed
-
-            plt.show(block=is_blocking_needed())
-        else:
-            plt.show()
-
-
-def cost_to_go_figure(
+def draw_cost_to_go(
     problem,
     field,
     *,
@@ -49,9 +31,9 @@ def cost_to_go_figure(
     is_3d,
     trajectory,
     title,
-    ax,
     renderer,
     show,
+    ax,
 ):
     """
     The cost-to-go field ``J`` drawn over two state axes, the others pinned at ``anchor``: a :class:`PlotResult`.
@@ -62,21 +44,16 @@ def cost_to_go_figure(
     on a mesh over ``bounds``, the problem's state box by default, ``anchor``
     the goal, else the start. ``jmax`` tops the colour scale, by default the
     field's value past its grid (the failure cost) when it has one; an
-    infinite ``jmax`` hands the scale to Matplotlib. ``is_3d`` adds the
-    surface; ``trajectory`` overlays a run on the heatmap.
+    infinite ``jmax`` hands the scale to the renderer. ``is_3d`` draws the
+    surface instead of the heatmap; ``trajectory`` overlays a run on the
+    heatmap.
     """
-    import matplotlib.pyplot as plt
-
-    # Lazy import: the grid's drawing loads on first use, not with the planning layer
-    from minilink.planning.dynamic_programming import plotting as grid_plotting
-
-    require_matplotlib(renderer)
     grid_plotting.require_flat_overlay(is_3d, trajectory)
-    jmax = colour_top(field, jmax)
+    jmax = color_top(field, jmax)
 
     # On the grid's own nodes: the table itself
     if is_grid_table(field, grid) and on_the_nodes(bounds, grid_shape, (51, 51), t):
-        figures = grid_plotting.plot_cost_to_go(
+        return grid_plotting.plot_cost_to_go(
             grid,
             node_table(field),
             jmax=jmax,
@@ -85,13 +62,13 @@ def cost_to_go_figure(
             anchor=anchor,
             is_3d=is_3d,
             trajectory=trajectory,
-            ax=ax,
             title="Cost-to-go" if title is None else title,
+            renderer=renderer,
             show=show,
+            ax=ax,
         )
-        return plot_result_of(figures)
 
-    # Else the field sampled on a mesh: the heatmap, then the surface and the overlay
+    # Else the field sampled on a mesh
     x_level, y_level, J = sample_field(
         problem,
         field,
@@ -103,21 +80,24 @@ def cost_to_go_figure(
         t=t,
     )
     title = f"cost-to-go ({family})" if title is None else title
-    fig, ax = cost_to_go_heatmap(
-        problem, x_level, y_level, J, x_axis, y_axis, jmax, title, ax
-    )
+
+    # The surface
     if is_3d:
-        fig, ax = cost_to_go_surface(
+        surface = cost_to_go_surface(
             problem, x_level, y_level, J, x_axis, y_axis, jmax, title
         )
-    if trajectory is not None:
-        grid_plotting.overlay_trajectory(
-            ax, trajectory, x_axis, y_axis, ("closed loop", "start", "end")
-        )
+        return draw(surface, renderer=renderer, show=show, ax=ax)
 
-    maybe_show(plt, show)
+    # The heatmap with the run over it
+    overlay = grid_plotting.trajectory_layers(
+        trajectory, x_axis, y_axis, ("closed loop", "start", "end")
+    )
+    panel = cost_to_go_panel(
+        problem, x_level, y_level, J, x_axis, y_axis, jmax, title, overlay
+    )
+    heatmap = FigureSpec(panels=(panel,))
 
-    return plot_result_of((fig, ax))
+    return draw(heatmap, renderer=renderer, show=show, ax=ax)
 
 
 def plot_control_law(
@@ -133,9 +113,9 @@ def plot_control_law(
     is_3d=False,
     trajectory=None,
     title=None,
-    ax=None,
     renderer="matplotlib",
-    show=True,
+    show=None,
+    ax=None,
 ):
     """
     A solution's feedback law over two state axes: :meth:`PlanningSolution.plot_control_law`.
@@ -148,12 +128,6 @@ def plot_control_law(
     nominal values (``anchor`` refused). ``trajectory`` overlays a run on the
     heatmap.
     """
-    import matplotlib.pyplot as plt
-
-    # Lazy import: the grid's drawing loads on first use, not with the planning layer
-    from minilink.planning.dynamic_programming import plotting as grid_plotting
-
-    require_matplotlib(renderer)
     grid_plotting.require_flat_overlay(is_3d, trajectory)
     solution.require_feedback_law()
     pi = getattr(solution.record, "pi", None)
@@ -168,7 +142,7 @@ def plot_control_law(
         and not is_3d
         and on_the_nodes(bounds, grid_shape, (101, 101), t)
     ):
-        figures = grid_plotting.plot_control_law(
+        return grid_plotting.plot_control_law(
             grid,
             pi,
             u_axis=u_axis,
@@ -176,19 +150,15 @@ def plot_control_law(
             y_axis=j,
             anchor=anchor,
             trajectory=trajectory,
+            title=title,
+            renderer=renderer,
+            show=show,
             ax=ax,
-            show=show and title is None,
         )
-        result = plot_result_of(figures)
-        if title is not None:
-            for drawn in result if isinstance(result, list) else [result]:
-                drawn.axes.set_title(title)
-            maybe_show(plt, show)
-        return result
 
-    # Else the controller's own law over the problem's box, then the overlay
+    # Else the controller's own law over the problem's box, with the run over it
     require_no_anchor(anchor)
-    result = controller_law_figure(
+    law = controller_law_figure(
         solution,
         x_axis=x_axis,
         y_axis=y_axis,
@@ -198,16 +168,13 @@ def plot_control_law(
         t=t,
         is_3d=is_3d,
         title=title,
-        ax=ax,
-        show=show and trajectory is None,
     )
-    if trajectory is not None:
-        grid_plotting.overlay_trajectory(
-            result.axes, trajectory, i, j, ("closed loop", "start", "end")
-        )
-        maybe_show(plt, show)
+    run = grid_plotting.trajectory_layers(
+        trajectory, i, j, ("closed loop", "start", "end")
+    )
+    spec = overlay(law, [run])
 
-    return result
+    return draw(spec, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################
@@ -216,12 +183,15 @@ def plot_control_law(
 
 
 def controller_law_figure(solution, *, bounds=None, **kwargs):
-    """The solution's controller drawn by its own ``plot_control_law``, ``bounds`` and the colour limits filled from the problem."""
+    """The description of the solution's controller's own ``plot_control_law``, ``bounds`` and the colour limits filled from the problem."""
     given = dict(kwargs)
     if bounds is not None:
         given["bounds"] = bounds
+    law = solution.controller.plot_control_law(
+        **control_law_kwargs(solution, given), renderer=None
+    )
 
-    return solution.controller.plot_control_law(**control_law_kwargs(solution, given))
+    return law.spec
 
 
 def sample_field(problem, field, *, x_axis, y_axis, anchor, bounds, grid_shape, t):
@@ -254,29 +224,23 @@ def sample_field(problem, field, *, x_axis, y_axis, anchor, bounds, grid_shape, 
     return x_level, y_level, J
 
 
-def plot_solution_trajectory(solution, traj, *, signals, renderer, show):
+def plot_solution_trajectory(solution, traj, *, signals, renderer, show, ax=None):
     """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.signals.time_signals import plot_time_signals
 
-    # The trajectory on the solution's system, shown once it is titled
-    result = plot_time_signals(
+    # The title says which: the plan the planner computed, or the controller's run
+    kind = "plan" if solution.trajectory is not None else "run"
+
+    return plot_time_signals(
         solution.problem.sys,
         traj,
         signals=signals,
+        title=f"{kind} ({solution.family})",
         renderer=renderer,
-        show=False,
+        show=show,
+        ax=ax,
     )
-
-    # The title says which: the plan the planner computed, or the controller's run
-    kind = "plan" if solution.trajectory is not None else "run"
-    if renderer == "matplotlib":
-        import matplotlib.pyplot as plt
-
-        result.figure.suptitle(f"{kind} ({solution.family})")
-        maybe_show(plt, show)
-
-    return result
 
 
 def control_law_kwargs(solution, kwargs) -> dict:
@@ -322,23 +286,12 @@ def require_no_anchor(anchor):
         )
 
 
-def require_matplotlib(renderer):
-    """Refuse a drawing library the planning plots do not draw with: Matplotlib only."""
-    if renderer != "matplotlib":
-        raise ValueError(
-            f"the planning plots draw with renderer='matplotlib' only, got {renderer!r}"
-        )
-
-
-def colour_top(field, jmax):
+def color_top(field, jmax):
     """The top of the cost-to-go colour scale: ``jmax``, else the field's value past its grid; an infinite one is no top (``None``)."""
-    # Lazy import: the grid's drawing loads on first use, not with the planning layer
-    from minilink.planning.dynamic_programming.plotting import cost_scale_limit
-
     if jmax is None:
         jmax = (field.params or {}).get("outside")
 
-    return cost_scale_limit(jmax)
+    return grid_plotting.cost_scale_limit(jmax)
 
 
 def is_grid_table(field, grid) -> bool:
@@ -363,74 +316,35 @@ def node_table(field) -> np.ndarray:
     return values.reshape(-1)
 
 
-def plot_result_of(figures):
-    """``(fig, ax)`` as a :class:`PlotResult`, or a list of them for several slices."""
-    # Lazy import: the graphics load on first use, not with the planning layer
-    from minilink.graphical.common.plot_result import PlotResult
+def cost_to_go_panel(
+    problem, x_level, y_level, J, x_axis, y_axis, jmax, title, layers=()
+):
+    """The heatmap of a sampled field on the colour scale ``0 ≤ J ≤ jmax``, ``layers`` over it, as a panel."""
+    heatmap = Heatmap(x=x_level, y=y_level, z=J.T, cmap="YlOrRd", vmin=0.0, vmax=jmax)
 
-    if isinstance(figures, list):
-        return [plot_result_of(item) for item in figures]
-    fig, axes = figures
-
-    return PlotResult(renderer="matplotlib", payload=(fig, axes), figure=fig, axes=axes)
-
-
-def cost_to_go_heatmap(problem, x_level, y_level, J, x_axis, y_axis, jmax, title, ax):
-    """The heatmap of a sampled field on the colour scale ``0 ≤ J ≤ jmax``, its colour bar, the state labels: ``(fig, ax)``."""
-    import matplotlib.pyplot as plt
-
-    # A new figure, or the one that holds the given axes
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = ax.figure
-
-    # The heatmap on the colour scale 0 ≤ J ≤ jmax, and its colour bar
-    mesh = ax.pcolormesh(x_level, y_level, J.T, shading="gouraud", cmap="YlOrRd")
-    mesh.set_clim(vmin=0.0, vmax=jmax)
-    fig.colorbar(mesh, ax=ax)
-
-    # The state labels and the title
-    labels = state_labels(problem.sys)
-    ax.set_xlabel(labels[x_axis])
-    ax.set_ylabel(labels[y_axis])
-    ax.set_title(title)
-    ax.grid(True, alpha=0.3)
-
-    return fig, ax
+    return Panel(
+        layers=(heatmap, *layers),
+        title=title,
+        x_label=state_axis_label(problem.sys, x_axis),
+        y_label=state_axis_label(problem.sys, y_axis),
+        legend=True,
+    )
 
 
 def cost_to_go_surface(problem, x_level, y_level, J, x_axis, y_axis, jmax, title):
-    """The surface of a sampled field, clipped to ``0 ≤ J ≤ jmax``, on a figure of its own: ``(fig, ax)``."""
-    import matplotlib.pyplot as plt
-
-    # J clipped to the colour scale, over the mesh of the two levels
+    """The surface of a sampled field, clipped to ``0 ≤ J ≤ jmax``, as a description."""
     J_plot = np.clip(J, 0.0, np.inf if jmax is None else jmax)
-    mesh_x, mesh_y = np.meshgrid(x_level, y_level)
+    surface = Surface(x=x_level, y=y_level, z=J_plot.T, cmap="YlOrRd")
+    panel = Panel(
+        layers=(surface,),
+        title=title,
+        x_label=state_axis_label(problem.sys, x_axis),
+        y_label=state_axis_label(problem.sys, y_axis),
+        z_label="J",
+        is_3d=True,
+    )
 
-    fig = plt.figure()
-    ax = fig.add_subplot(projection="3d")
-    surf = ax.plot_surface(mesh_x, mesh_y, J_plot.T, cmap="YlOrRd", linewidth=0)
-    labels = state_labels(problem.sys)
-    ax.set_xlabel(labels[x_axis])
-    ax.set_ylabel(labels[y_axis])
-    ax.set_zlabel("J")
-    ax.set_title(title)
-    fig.colorbar(surf, ax=ax, shrink=0.6)
-
-    return fig, ax
-
-
-def state_labels(sys) -> list:
-    """The state's axis labels with their units, ``x[i]`` where the state names none."""
-    labels = getattr(sys.state, "labels", None)
-    units = getattr(sys.state, "units", None)
-    n = int(sys.n)
-    return [
-        (labels[i] if labels else f"x[{i}]")
-        + (f" [{units[i]}]" if units and units[i] else "")
-        for i in range(n)
-    ]
+    return FigureSpec(panels=(panel,))
 
 
 def state_box(problem):

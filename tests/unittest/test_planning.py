@@ -1214,10 +1214,33 @@ def test_plot_tree_and_animate_search_smoke():
         max_iterations=2000,
     )
     planner.solve()
-    fig, ax = planner.plot_tree(x_axis=0, y_axis=1, show=False)
+    drawn = planner.plot_tree(x_axis=0, y_axis=1, show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert fig is not None and ax is not None
     anim = planner.animate_search(x_axis=0, y_axis=1, step=20, show=False)
     assert anim is not None
+
+
+def test_plot_tree_draws_on_plotly():
+    pytest.importorskip("plotly")
+    problem, _ = make_holonomic_obstacle_problem()
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS),
+        seed=0,
+        max_iterations=2000,
+    )
+    planner.solve()
+    result = planner.plot_tree(renderer="plotly", show=False)
+    assert result.renderer == "plotly"
+    assert {trace.type for trace in result.figure.data} == {"scatter"}
+    names = {trace.name for trace in result.figure.data}
+    assert {"path", "start", "goal"} <= names
+
+    # The tree's edges are one line, broken by NaN between edges
+    edges = [n.edge.states for n in planner.tree.nodes if n.parent is not None]
+    tree = result.spec.panels[0].layers[0]
+    assert np.isnan(tree.x).sum() == len(edges) - 1
 
 
 def make_steering_extender():
@@ -1495,7 +1518,6 @@ from minilink.planning.spatial.collision import (
     disc,
     point_probe,
 )
-from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.scene import Scene
 from minilink.core.shaping import (
     inverse_barrier,
@@ -1814,24 +1836,21 @@ def test_scene_plot_smoke():
         obstacles=(Sphere([4.0, 0.0], 0.5),),
         workspace_fields=(GaussianField([2.0, 1.5], 2.0, 1.0),),
     )
-    fig, ax = scene.plot(show=False)
+    drawn = scene.plot(show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert fig is not None
     assert ax is not None
-    fig, ax = scene.plot(show=False, body=_holonomic_disc(0.25), x=np.array([2.0, 0.0]))
+    drawn = scene.plot(show=False, body=_holonomic_disc(0.25), x=np.array([2.0, 0.0]))
+    fig, ax = drawn.figure, drawn.axes
     assert len(ax.patches) >= 2
-    _, ax = scene.plot(show=False, body=_holonomic_point(), x=np.array([2.0, 0.0]))
+    ax = scene.plot(show=False, body=_holonomic_point(), x=np.array([2.0, 0.0])).axes
     assert len(ax.lines) >= 1
 
 
 def test_drawn_shapes_span_their_bounds():
-    """Each shape's patches span shape_bounds: an inflated box grows, rounded."""
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
+    """Each shape's outlines span shape_bounds: an inflated box grows, rounded."""
     from minilink.core.geometry import Box, Inflated, Union
-    from minilink.planning.spatial.plotting import draw_shape, shape_bounds
+    from minilink.planning.spatial.plotting import shape_bounds, shape_outlines
 
     box = Box([0.0, 0.0], [2.0, 1.0])
     shapes = [
@@ -1842,66 +1861,60 @@ def test_drawn_shapes_span_their_bounds():
         Union((Inflated(box, 0.4), Sphere([4.0, 0.0], 0.5))),
     ]
     for shape in shapes:
-        fig, ax = plt.subplots()
-        draw_shape(ax, shape, "gray", 0.5)
-        boxes = [
-            patch.get_patch_transform().transform_path(patch.get_path()).get_extents()
-            for patch in ax.patches
-        ]
-        drawn = [
-            min(b.x0 for b in boxes),
-            max(b.x1 for b in boxes),
-            min(b.y0 for b in boxes),
-            max(b.y1 for b in boxes),
-        ]
+        outlines = shape_outlines(shape)
+        x = np.concatenate([x for x, _ in outlines])
+        y = np.concatenate([y for _, y in outlines])
         (x_lo, x_hi), (y_lo, y_hi) = shape_bounds(shape)
-        np.testing.assert_allclose(drawn, [x_lo, x_hi, y_lo, y_hi], atol=1e-9)
-        plt.close(fig)
+        np.testing.assert_allclose(
+            [x.min(), x.max(), y.min(), y.max()], [x_lo, x_hi, y_lo, y_hi], atol=1e-9
+        )
 
 
-def test_sample_field_costs_matches_point_probe_cost():
+def test_the_cost_field_samples_the_point_probe_cost():
+    from minilink.planning.spatial.plotting import sampled_costs
+
     scene = Scene(obstacles=(Sphere([2.0, 0.0], 0.5),))
     body = _holonomic_point()
     cost = scene.clearance_field(body).as_cost(
         weight=4.0, shaping=inverse_barrier(epsilon=0.1)
     )
     bounds = ((-1.0, 4.0), (-2.0, 2.0))
-    grid = sample_field_costs([cost], bounds=bounds, grid=(5, 4))
-    p = np.array([grid.xs[2], grid.ys[1]])
-    assert grid.Z[1, 2] == pytest.approx(cost.g(p, np.zeros(1)))
+    xs, ys, Z = sampled_costs(
+        [cost], bounds=bounds, grid=(5, 4), state_dim=2, u=None, t=0.0, params=None
+    )
+    p = np.array([xs[2], ys[1]])
+    assert Z[1, 2] == pytest.approx(cost.g(p, np.zeros(1)))
 
 
-def test_sample_field_costs_obstacle_is_radially_symmetric():
+def test_the_cost_field_of_an_obstacle_is_radially_symmetric():
+    from minilink.planning.spatial.plotting import plot_cost_field
+
     scene = Scene(obstacles=(Sphere([2.0, 0.0], 0.5),))
     cost = scene.clearance_field(_holonomic_point()).as_cost(weight=1.0)
     bounds = ((0.0, 4.0), (-2.0, 2.0))
-    grid = sample_field_costs([cost], bounds=bounds, grid=(41, 21))
-    center_j = int(np.argmin(np.abs(grid.ys)))
-    row = grid.Z[center_j, :]
-    xs = grid.xs
+    heatmap = (
+        plot_cost_field([cost], bounds=bounds, grid=(41, 21), renderer=None)
+        .spec.panels[0]
+        .layers[0]
+    )
+    xs, ys, Z = heatmap.x, heatmap.y, heatmap.z
+    row = Z[int(np.argmin(np.abs(ys))), :]
     left = row[xs < 2.0]
     right = row[xs > 2.0]
     assert np.allclose(left, right[::-1], rtol=0.0, atol=1e-12)
+    assert heatmap.cmap == "turbo" and heatmap.vmin == 0.0
 
 
-def test_cost_field_cmap_low_to_high_contrast():
-    from minilink.planning.spatial.plotting import cost_field_cmap
-
-    cmap = cost_field_cmap()
-    low = cmap(0.0)
-    high = cmap(1.0)
-    assert low[2] > low[0]
-    assert high[0] > high[2]
-
-
-def test_plot_cost_field_exports_smoke(tmp_path):
+def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
     import os
 
     os.environ.setdefault("MPLBACKEND", "Agg")
     import matplotlib
 
     matplotlib.use("Agg", force=True)
-    from minilink.planning.spatial.plotting import plot_cost_field_exports
+    import matplotlib.pyplot as plt
+
+    from minilink.planning.spatial.plotting import plot_cost_field, plot_cost_field_3d
 
     scene = Scene(obstacles=(Sphere([1.0, 0.0], 0.4),))
     body = _holonomic_point()
@@ -1909,34 +1922,58 @@ def test_plot_cost_field_exports_smoke(tmp_path):
     path = scene.clearance_field(body).as_cost(weight=1.0)
     corridor = scene.clearance_field(body).as_cost(weight=2.0)
     obstacle = scene.clearance_field(body).as_cost(weight=3.0)
-    grids = {
-        "path": sample_field_costs([path], bounds=bounds, grid=(16, 14)),
-        "corridor": sample_field_costs([corridor], bounds=bounds, grid=(16, 14)),
-        "obstacle": sample_field_costs([obstacle], bounds=bounds, grid=(16, 14)),
-        "combined": sample_field_costs(
-            [path, corridor, obstacle], bounds=bounds, grid=(16, 14)
-        ),
-    }
-    out = plot_cost_field_exports(
-        grids,
-        scene=scene,
-        overlay_bounds=bounds,
-        log_scale=True,
-        show=False,
-        save_dir=tmp_path,
+    costs = [path, corridor, obstacle]
+    flat = plot_cost_field(
+        costs, bounds=bounds, grid=(16, 14), log_scale=True, title="2D", show=False
     )
-    assert set(out) == {"path", "corridor", "obstacle", "combined"}
-    assert out["obstacle"]["2d"][1].get_title() == "Obstacle cost (2D)"
-    assert out["combined"]["3d"][1].get_title() == "Combined cost (3D)"
-    for entry in out.values():
-        fig2d, ax2d = entry["2d"]
-        fig3d, ax3d = entry["3d"]
-        assert fig2d is not None and ax2d is not None
-        assert fig3d is not None and ax3d is not None
-        assert len(fig2d.axes) == 2
-        assert len(fig3d.axes) == 2
-    assert (tmp_path / "combined_2d.png").exists()
-    assert (tmp_path / "combined_3d.png").exists()
+    both = scene.plot(ax=flat, bounds=bounds, show_density=False, title="")
+    surface = plot_cost_field_3d(
+        costs, bounds=bounds, grid=(16, 14), log_scale=True, title="3D", show=False
+    )
+    assert flat.axes.get_title() == "2D" and surface.axes.get_title() == "3D"
+    assert len(flat.figure.axes) == 2 and len(surface.figure.axes) == 2
+    assert both.figure is flat.figure and len(both.spec.panels[0].layers) > 1
+    assert flat.save(tmp_path / "flat.png").exists()
+    assert surface.save(tmp_path / "surface.png").exists()
+    plt.close("all")
+
+
+def test_the_spatial_plots_draw_on_plotly():
+    pytest.importorskip("plotly")
+    from minilink.planning.spatial.plotting import (
+        plot_cost_field,
+        plot_cost_field_3d,
+        plot_track,
+    )
+
+    scene = Scene(
+        obstacles=(Sphere([4.0, 0.0], 0.5),),
+        workspace_fields=(GaussianField([2.0, 1.5], 2.0, 1.0),),
+    )
+    drawn = scene.plot(renderer="plotly", show=False, show_clearance_contour=True)
+    types = [trace.type for trace in drawn.figure.data]
+    assert types[0] == "heatmap" and "contour" in types
+    assert any(getattr(trace, "fill", None) == "toself" for trace in drawn.figure.data)
+
+    track = ReferenceTrack(from_waypoints([[0, 0], [5, 1], [10, 0]]), half_width=0.8)
+    drawn = plot_track(track, renderer="plotly", show=False, show_waypoints=False)
+    assert [trace.name for trace in drawn.figure.data] == ["corridor", None, "path"]
+
+    cost = scene.clearance_field(_holonomic_point()).as_cost(weight=1.0)
+    bounds = ((0.0, 6.0), (-2.0, 2.0))
+    drawn = plot_cost_field(
+        [cost],
+        bounds=bounds,
+        grid=(12, 8),
+        log_scale=True,
+        renderer="plotly",
+        show=False,
+    )
+    assert [trace.type for trace in drawn.figure.data] == ["heatmap"]
+    drawn = plot_cost_field_3d(
+        [cost], bounds=bounds, grid=(12, 8), renderer="plotly", show=False
+    )
+    assert [trace.type for trace in drawn.figure.data] == ["surface"]
 
 
 import os
@@ -2087,7 +2124,8 @@ def test_plot_track_smoke():
 
     matplotlib.use("Agg", force=True)
     track = ReferenceTrack(from_waypoints([[0, 0], [5, 1], [10, 0]]), half_width=0.8)
-    fig, ax = track.plot(show=False)
+    drawn = track.plot(show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert fig is not None
     assert len(ax.lines) >= 1
 
@@ -2409,7 +2447,8 @@ def test_a_track_draws_and_overlays_its_corridor_at_half_width_from_the_centerli
     # The plot: the same three polylines on one axes
     import matplotlib.pyplot as plt
 
-    fig, ax = plot_track(track, show=False)
+    drawn = plot_track(track, show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert len(ax.get_lines()) >= 3
     plt.close(fig)
 

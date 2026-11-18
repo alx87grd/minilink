@@ -178,10 +178,15 @@ class TimeVaryingFeedback(System):
 
         return u_cmd
 
-    def plot_gain_schedule(self, ax=None, show=True):
+    def plot_gain_schedule(self, *, renderer="matplotlib", show=None, ax=None):
         """Draw every entry of the gain schedule ``K(t)`` against time."""
         return plot_gain_schedule(
-            self.params["t"], self.params["K"], title=self.name, ax=ax, show=show
+            self.params["t"],
+            self.params["K"],
+            title=self.name,
+            renderer=renderer,
+            show=show,
+            ax=ax,
         )
 
 
@@ -236,39 +241,49 @@ class TrajectoryFeedback(System):
 
         return u_cmd
 
-    def plot_gain_schedule(self, ax=None, show=True):
+    def plot_gain_schedule(self, *, renderer="matplotlib", show=None, ax=None):
         """Draw every entry of the gain schedule ``K(t)`` against time."""
         return plot_gain_schedule(
-            self.params["t"], self.params["K"], title=self.name, ax=ax, show=show
+            self.params["t"],
+            self.params["K"],
+            title=self.name,
+            renderer=renderer,
+            show=show,
+            ax=ax,
         )
 
 
 # Plots
 
 
-def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):
+def plot_gain_schedule(
+    t, K, *, title="Gain schedule", renderer="matplotlib", show=None, ax=None
+):
     """Draw every entry of a gain schedule ``K(t)``, shape ``(N, m, n)``, against time."""
-    import matplotlib.pyplot as plt
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.figure import draw
+
+    spec = gain_schedule_figure(t, K, title=title)
+
+    return draw(spec, renderer=renderer, show=show, ax=ax)
+
+
+def gain_schedule_figure(t, K, *, title):
+    """The gain schedule ``K(t)``, one line per entry ``K_ij``, as a description."""
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.figure import FigureSpec, Panel, Trace
 
     _, m, n = K.shape
-    if ax is None:
-        _, ax = plt.subplots(figsize=(8, 3))
 
     # One line per gain entry K_ij(t)
-    for i in range(m):
-        for j in range(n):
-            ax.plot(t, K[:, i, j], label=f"$K_{{{i + 1},{j + 1}}}$")
+    traces = tuple(
+        Trace(t, K[:, i, j], label=f"$K_{{{i + 1},{j + 1}}}$")
+        for i in range(m)
+        for j in range(n)
+    )
+    panel = Panel(layers=traces, title=title, x_label="t [s]", y_label="K(t)")
 
-    ax.set_xlabel("t [s]")
-    ax.set_ylabel("K(t)")
-    ax.set_title(title)
-    ax.legend(ncol=max(1, m * n // 2), fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
-
-    return ax
+    return FigureSpec(panels=(panel,), figsize=(8.0, 3.0))
 
 
 ###############################################################################

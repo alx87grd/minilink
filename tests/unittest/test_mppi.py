@@ -219,10 +219,29 @@ def test_the_overlays_and_the_figure_draw_mppi():
     overlays = mpc_animation_overlays(run, mpc, loop=loop, samples=8)
     fan = next(o for o in overlays if isinstance(o, SampledFutures))
     assert len(next(iter(fan.get_dynamic_geometry(0.2).values()))) == 8 + 1
-    fig, ax = plot_sampled_futures(
+    ax = plot_sampled_futures(
         run, mpc, loop=loop, ticks=[0, 5], x_axis="t", y_axis=0, show=False
-    )
+    ).axes
     assert len(ax.lines) == 2 * (32 + 1) + 1
+
+
+def test_the_sampled_futures_draw_on_plotly():
+    pytest.importorskip("plotly")
+    from minilink.planning.trajectory_optimization.mpc import plot_sampled_futures
+
+    mpc, loop, run = zero_delay_run()
+    result = plot_sampled_futures(
+        run,
+        mpc,
+        loop=loop,
+        ticks=[0],
+        x_axis="t",
+        y_axis=0,
+        n_shown=4,
+        renderer="plotly",
+        show=False,
+    )
+    assert [trace.type for trace in result.figure.data] == ["scatter"] * (4 + 1 + 1)
 
 
 def test_verbose_prints_mppis_account():

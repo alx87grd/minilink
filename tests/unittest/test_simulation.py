@@ -1005,7 +1005,7 @@ class TestRealtimeSimulator(unittest.TestCase):
 
     def test_named_system_channels_in_live_and_offline_plots(self):
         import matplotlib.pyplot as plt
-        from minilink.graphical.signals.time_signals import build_signal_plot_spec
+        from minilink.graphical.signals.time_signals import signal_figure
 
         sys = TwoPortLinearSystem()
         sys.state.labels = ["pos"]
@@ -1029,16 +1029,16 @@ class TestRealtimeSimulator(unittest.TestCase):
         self.assertEqual(len(live_out.lines), 3)  # y (1), left (1), pos (1)
 
         # Offline spec builder resolves the same output port, input port, and state label.
-        spec = build_signal_plot_spec(sys, traj, signals=("y", "left", "pos"))
-        self.assertEqual(len(spec.traces), 3)
-        self.assertEqual(spec.traces[1].label, "left[0]")
-        self.assertEqual(spec.traces[2].label, "pos")
+        spec = signal_figure(sys, traj, signals=("y", "left", "pos"))
+        self.assertEqual(len(spec.panels), 3)
+        self.assertEqual(spec.panels[1].layers[0].label, "left[0]")
+        self.assertEqual(spec.panels[2].layers[0].label, "pos")
         plt.close("all")
 
         # The renderer is plot_renderer; a name passed as plot is refused and says so
         with self.assertRaisesRegex(ValueError, "plot_renderer"):
             RealtimeSimulator(sys, renderer=None, plot="plotly")
-        with self.assertRaisesRegex(ValueError, "Unknown signal renderer"):
+        with self.assertRaisesRegex(ValueError, "renderer must be one of"):
             RealtimeSimulator(
                 sys, renderer=None, plot=("y",), plot_renderer="invalid_renderer"
             )

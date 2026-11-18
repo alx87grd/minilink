@@ -62,6 +62,7 @@ def _run_script(path: Path, *, timeout: float) -> DemoRunRow:
         **os.environ,
         "PYTHONPATH": os.pathsep.join((str(HEADLESS_DIR), str(REPO_ROOT))),
         "MPLBACKEND": "Agg",
+        "MINILINK_HEADLESS": "1",
     }
     try:
         proc = subprocess.run(

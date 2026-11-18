@@ -7,20 +7,11 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from minilink.graphical.common.environment import detect_env
-from minilink.graphical.common.plotly_style import (
-    PLOTLY_FIG_WIDTH,
-    PLOTLY_SIGNAL_MARGIN,
-    PLOTLY_SIGNAL_MIN_HEIGHT,
-    PLOTLY_SIGNAL_ROW_HEIGHT,
-    PLOTLY_TEMPLATE,
-)
-from minilink.graphical.signals.signal_colors import plotly_color
+from minilink.graphical.common.environment import detect_env, is_headless
+from minilink.graphical.figure import draw
 from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
-    PlotResult,
-    SignalPlotSpec,
-    coerce_signal_plot_spec,
+    figure_of_update,
     require_same_trace_count,
 )
 
@@ -29,38 +20,20 @@ from minilink.graphical.signals.time_signals import (
 ###############################################################################
 
 
-def render_plotly_signal_plot(
-    spec: SignalPlotSpec,
-    *,
-    show: bool = True,
-    **kwargs,
-) -> PlotResult:
-    """Render a one-shot time-signal plot with Plotly."""
-    fig = create_figure(spec, **kwargs)
-    if show:
-        fig.show()
-
-    return PlotResult(renderer="plotly", payload=fig, figure=fig)
-
-
-def open_plotly_signal_plot(
-    spec: SignalPlotSpec,
-    *,
-    spec_builder=None,
-    show: bool = True,
-    **kwargs,
-) -> LivePlotHandle:
-    """Open a live Plotly time-signal plot."""
-    fig = create_figure(spec, **kwargs)
+def open_plotly_signal_plot(figure, *, figure_of=None, show=True):
+    """Draw ``figure`` with Plotly and keep it live: a widget in a notebook, a polled page elsewhere."""
+    fig = draw(figure, renderer="plotly", show=False).figure
 
     # Not shown: the figure alone, updated in place
-    if not show:
-        return PlotlyLivePlotHandle(fig, spec_builder=spec_builder)
+    if not show or is_headless():
+        return PlotlyLivePlotHandle(fig, figure_of=figure_of)
 
     # In a notebook: a FigureWidget under the cell, updated in place
     env = detect_env()
     if env in ("jupyter", "colab"):
-        go, _ = require_plotly()
+        # Lazy import: Plotly is optional, loaded with the first live figure
+        import plotly.graph_objects as go
+
         try:
             fw = go.FigureWidget(fig)
         except (TypeError, ValueError, ImportError):
@@ -68,9 +41,7 @@ def open_plotly_signal_plot(
             polling = PlotlyPollingServer()
             polling.start(fig)
             return PlotlyLivePlotHandle(
-                fig,
-                spec_builder=spec_builder,
-                polling_server=polling,
+                fig, figure_of=figure_of, polling_server=polling
             )
 
         try:
@@ -80,17 +51,13 @@ def open_plotly_signal_plot(
         except ImportError:
             fw.show()
 
-        return PlotlyLivePlotHandle(fw, spec_builder=spec_builder)
+        return PlotlyLivePlotHandle(fw, figure_of=figure_of)
 
     # Elsewhere: a browser page on localhost polls the latest figure
     polling = PlotlyPollingServer()
     polling.start(fig)
 
-    return PlotlyLivePlotHandle(
-        fig,
-        spec_builder=spec_builder,
-        polling_server=polling,
-    )
+    return PlotlyLivePlotHandle(fig, figure_of=figure_of, polling_server=polling)
 
 
 class PlotlyLivePlotHandle(LivePlotHandle):
@@ -100,24 +67,20 @@ class PlotlyLivePlotHandle(LivePlotHandle):
         self,
         fig,
         *,
-        spec_builder=None,
+        figure_of=None,
         polling_server: PlotlyPollingServer | None = None,
     ):
         self.fig = fig
-        self.spec_builder = spec_builder
+        self.figure_of = figure_of
         self._polling_server = polling_server
 
-    def update(self, traj_or_spec, *, title: str | None = None) -> None:
-        """Redraw each trace from a new trajectory or plot spec, with the same traces."""
-        spec = coerce_signal_plot_spec(
-            traj_or_spec,
-            self.spec_builder,
-            title=title,
-        )
+    def update(self, traj_or_figure, *, title: str | None = None) -> None:
+        """Redraw each trace from a new trajectory or description, with the same panels."""
+        spec = figure_of_update(traj_or_figure, self.figure_of, title=title)
 
         # In place: the same traces take the new samples, in one batched redraw
         # when the figure has one (a FigureWidget)
-        require_same_trace_count(spec, self.fig.data)
+        require_same_trace_count(spec, len(self.fig.data))
         batch = getattr(self.fig, "batch_update", None)
         if callable(batch):
             with self.fig.batch_update():
@@ -139,90 +102,6 @@ class PlotlyLivePlotHandle(LivePlotHandle):
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def create_figure(spec: SignalPlotSpec, **kwargs):
-    """One subplot row per trace on a shared time axis; the other ``kwargs`` update the layout."""
-    go, make_subplots = require_plotly()
-
-    # The size: the caller's, or one row height per trace above a minimum height
-    kwargs = dict(kwargs)
-    width = kwargs.pop("width", PLOTLY_FIG_WIDTH)
-    height = kwargs.pop(
-        "height",
-        max(PLOTLY_SIGNAL_MIN_HEIGHT, PLOTLY_SIGNAL_ROW_HEIGHT * len(spec.traces)),
-    )
-
-    # Forwarded from live/open paths for Matplotlib; not valid Plotly layout keys.
-    kwargs.pop("pause", None)
-    kwargs.pop("block", None)
-
-    # One row per trace, its y axis titled with the trace's label and unit
-    fig = make_subplots(
-        rows=len(spec.traces),
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.03,
-    )
-    for row, trace in enumerate(spec.traces, start=1):
-        fig.add_trace(
-            go.Scatter(
-                x=spec.t,
-                y=trace.values,
-                mode="lines",
-                name=trace.label,
-                line={
-                    "color": plotly_color(trace.color),
-                    "width": trace.linewidth,
-                },
-                opacity=trace.alpha,
-            ),
-            row=row,
-            col=1,
-        )
-        ylabel = ylabel_with_unit(trace.label, trace.unit)
-        fig.update_yaxes(title_text=ylabel, row=row, col=1)
-
-    # The time axis under the bottom row, then the layout, the caller's keys last
-    fig.update_xaxes(title_text=spec.abscissa_label, row=len(spec.traces), col=1)
-    fig.update_layout(
-        title=spec.title,
-        width=width,
-        height=height,
-        showlegend=False,
-        margin=dict(PLOTLY_SIGNAL_MARGIN),
-        template=PLOTLY_TEMPLATE,
-        hovermode="x unified",
-    )
-    if kwargs:
-        fig.update_layout(**kwargs)
-
-    return fig
-
-
-def require_plotly():
-    """Refuse to draw without Plotly; return ``(go, make_subplots)``."""
-    try:
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-    except ImportError as exc:
-        raise ImportError(
-            "Plotly signal plots require Plotly. Install with: pip install plotly",
-        ) from exc
-
-    return go, make_subplots
-
-
-def ylabel_with_unit(label: str, unit: str) -> str:
-    """The y-axis title ``label [unit]``; a unit already in brackets keeps them, as in the matplotlib backend."""
-    if not unit:
-        return label
-
-    unit = str(unit).strip()
-    if unit.startswith("[") and unit.endswith("]"):
-        return f"{label} {unit}"
-
-    return f"{label} [{unit}]"
 
 
 class PlotlyPollingServer:
@@ -350,10 +229,11 @@ class PlotlyPollHandler(BaseHTTPRequestHandler):
 
 
 def redraw_traces(fig, spec, title):
-    """Move each trace of ``fig`` to the spec's samples and label; retitle it when ``title`` is given."""
-    for trace_obj, trace in zip(fig.data, spec.traces, strict=True):
-        trace_obj.x = spec.t
-        trace_obj.y = trace.values
+    """Move each trace of ``fig`` to its panel's samples and label; retitle it when ``title`` is given."""
+    for trace_obj, panel in zip(fig.data, spec.panels, strict=True):
+        trace = panel.layers[0]
+        trace_obj.x = trace.x
+        trace_obj.y = trace.y
         trace_obj.name = trace.label
     if title is not None:
         fig.update_layout(title=title)

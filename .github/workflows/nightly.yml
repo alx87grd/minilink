@@ -58,6 +58,7 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}
         MPLBACKEND: Agg
+        MINILINK_HEADLESS: "1"
         SDL_VIDEODRIVER: dummy
       run: |
         python tests/demo_checks/run_all_demos.py --timeout 900 --continue-on-error
@@ -67,6 +68,7 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}
         MPLBACKEND: Agg
+        MINILINK_HEADLESS: "1"
         SDL_VIDEODRIVER: dummy
       run: |
         python tests/demo_checks/run_notebook_checks.py --all --timeout 1800
@@ -100,6 +102,7 @@ jobs:
     - name: Test with pytest
       env:
         MPLBACKEND: Agg
+        MINILINK_HEADLESS: "1"
       run: pytest -n auto
 
   # Students' laptops: the Basic tier (NumPy, SciPy, Matplotlib; no Graphviz,
@@ -119,6 +122,7 @@ jobs:
     env:
       PYTHONUTF8: "1"
       MPLBACKEND: Agg
+      MINILINK_HEADLESS: "1"
 
     steps:
     - uses: actions/checkout@v4

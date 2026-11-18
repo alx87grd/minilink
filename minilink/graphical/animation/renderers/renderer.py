@@ -58,38 +58,36 @@ class AnimationRenderer(ABC):
     def close_scene(self) -> None:
         """Release/close backend resources for the current session."""
 
-    def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
-        """Optional notebook inline output (default: unsupported).
-
-        ``frames`` entries each carry ``"transforms"`` and ``"camera"``
-        (see :meth:`minilink.graphical.animation.Animator._prepare_transforms`).
-        """
-        raise NotImplementedError("Inline animation is not supported by this renderer.")
-
-    def export_animation(
-        self, primitives, frames, schedule, file_name: str, *, is_3d: bool = False
-    ) -> None:
-        """Optional animation export (default: unsupported)."""
-        raise NotImplementedError("Animation export is not supported by this renderer.")
-
-    def play_native(
-        self,
-        primitives,
-        frames,
-        schedule,
-        *,
-        is_3d: bool,
-        scene_title: str | None = None,
+    def build_clip(
+        self, primitives, frames, schedule, *, is_3d=False, scene_title=None
     ):
-        """
-        Optional native playback using the backend's own animation engine.
+        """The renderer's clip, ``(figure, animation)``: none for a renderer that draws live."""
+        return None, None
 
-        Subclasses that support a native animation API (matplotlib
-        ``FuncAnimation``, meshcat ``Animation`` + ``set_animation``, ...)
-        override this hook. Default raises ``NotImplementedError`` so callers
-        can fall back to the generic per-frame loop.
-        """
-        raise NotImplementedError("Native playback is not supported by this renderer.")
+    def show_clip(self, clip, place):
+        """Play the frames live in a window, each at its time on the schedule, until it closes."""
+        frames, schedule = clip.frames, clip.schedule
+        self.open_scene(
+            is_3d=clip.is_3d,
+            show=True,
+            camera=frames[0]["camera"],
+            title=clip.scene_title or f"Animation: {self.sys.name}",
+        )
+        for frame in frames:
+            self.draw_frame(
+                frame["primitives"], frame["transforms"], frame["t"], frame["camera"]
+            )
+            self.present(block=False, interval_s=schedule.interval_ms / 1000.0)
+            if self.poll_events().get("quit", False):
+                break
+        self.close_scene()
+
+    def save_clip(self, clip, path):
+        """Refuse saving an animation this renderer only plays live."""
+        raise ValueError(
+            "this renderer plays animations live and saves none; draw it with "
+            "renderer='matplotlib' (.gif) or renderer='meshcat' (.html) to save it"
+        )
 
 
 # Axis names of a camera column aligned with the world axes

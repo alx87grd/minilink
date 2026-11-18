@@ -18,4 +18,4 @@ for current in (np.zeros(2), CURRENT):
     cl.animate(traj)
 
 boat.skin = boat_skin_3d  # the last run again, as the hull on the water in the browser
-cl.animate(traj, renderer="meshcat", native=False)
+cl.animate(traj, renderer="meshcat")

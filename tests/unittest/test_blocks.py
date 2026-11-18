@@ -302,7 +302,6 @@ from minilink.graphical.signals.signal_colors import (
     is_core_input,
     is_core_state,
     is_internal_signal,
-    plotly_color,
 )
 
 
@@ -349,9 +348,9 @@ class TestSignalColors(unittest.TestCase):
         self.assertTrue(is_internal_signal("controller:u"))
         self.assertFalse(is_internal_signal("x"))
 
-    def test_plotly_color_maps_tab_names(self):
-        self.assertEqual(plotly_color("tab:green"), "#2ca02c")
-        self.assertEqual(plotly_color("tab:orange"), "#ff7f0e")
+    def test_the_palette_is_hex_every_renderer_reads(self):
+        for color in (STATE_COLOR, INPUT_COLOR, *INTERNAL_SIGNAL_COLORS):
+            self.assertRegex(color, r"^#[0-9a-f]{6}$")
 
 
 from minilink.blocks.sources import WhiteNoise

@@ -86,5 +86,4 @@ diagram.animate(
         result, mpc, loop=diagram, scene=scene, track=track
     ),
     renderer="meshcat",
-    native=False,
 )

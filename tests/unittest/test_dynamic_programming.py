@@ -541,7 +541,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         planner, result = solve(make_problem())
-        fig, ax = plotting.plot_cost_to_go(planner.grid, result.J, show=False)
+        drawn = plotting.plot_cost_to_go(planner.grid, result.J, show=False)
+        fig, ax = drawn.figure, drawn.axes
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -550,7 +551,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         planner, result = solve(make_problem())
-        fig, ax = plotting.plot_control_law(planner.grid, result.pi, show=False)
+        drawn = plotting.plot_control_law(planner.grid, result.pi, show=False)
+        fig, ax = drawn.figure, drawn.axes
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -601,6 +603,22 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
                 del animation
                 plt.close(fig)
 
+    def test_the_sweep_animations_draw_into_axes_and_refuse_another_renderer(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        planner, result = solve(make_problem(), record_history=True)
+        for animate in (plotting.animate_cost_to_go, plotting.animate_control_law):
+            with self.subTest(animate=animate.__name__):
+                fig, ax = plt.subplots()
+                drawn = animate(planner.grid, result, ax=ax)
+                self.assertIs(drawn.figure, fig)
+                with self.assertRaisesRegex(ValueError, "matplotlib alone"):
+                    animate(planner.grid, result, renderer="plotly")
+                plt.close(fig)
+
     def test_batch_cost2go_draws_the_surfaces(self):
         import matplotlib
 
@@ -643,9 +661,9 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         plant.x0 = np.array([2.0, 0.0])
         diagram = LookupPolicy(planner.grid, result.pi) @ plant
         trajectory = diagram.compute_trajectory(tf=8.0, verbose=False)
-        _, ax = plotting.plot_control_law(
+        ax = plotting.plot_control_law(
             planner.grid, result.pi, trajectory=trajectory, show=False
-        )
+        ).axes
         self.assertGreaterEqual(len(ax.lines), 1)
 
     def test_lookup_controller_matmul_wires_state_feedback(self):
@@ -750,7 +768,7 @@ class TestPolicyEvaluationField(unittest.TestCase):
         drawn = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
         self.assertIsNotNone(drawn.figure)
         J = J_pi.params["values"].reshape(-1)
-        fig, _ = planner.grid.plot_cost_to_go(J, is_3d=True, show=False)
+        fig = planner.grid.plot_cost_to_go(J, is_3d=True, show=False).figure
         self.assertIsNotNone(fig)
 
 

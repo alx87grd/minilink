@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 import time
 from pathlib import Path
 
@@ -21,8 +20,9 @@ from minilink.graphical.animation.primitives import (
     Sphere,
     TorqueArrow,
 )
+from minilink.graphical.animation.renderers.plotly_renderer import require_html_path
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
-from minilink.graphical.common.environment import is_blocking_needed
+from minilink.graphical.common.environment import detect_env, is_blocking_needed
 from minilink.graphical.meshes import merge_meshes
 
 
@@ -871,7 +871,7 @@ class MeshcatRenderer(AnimationRenderer):
         # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
         self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         if show:
-            if "google.colab" in sys.modules:
+            if detect_env() == "colab":
                 from google.colab import output
 
                 port = int(self.vis.url().split(":")[-1].split("/")[0])
@@ -906,7 +906,7 @@ class MeshcatRenderer(AnimationRenderer):
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
-            if "google.colab" in sys.modules:
+            if detect_env() == "colab":
                 from IPython.display import display
 
                 print("Meshcat static frame built. Displaying offline standalone HTML.")
@@ -1060,53 +1060,32 @@ class MeshcatRenderer(AnimationRenderer):
         self.vis.set_animation(animation_obj, play=True, repetitions=1)
         return animation_obj
 
-    def export_animation(
-        self, primitives, frames, schedule, file_name: str, *, is_3d: bool = False
-    ) -> None:
-        """Write a standalone HTML page of the native Meshcat animation."""
-        self.show = False
-        self._set_native_animation(frames, schedule)
-        path = html_export_path(file_name)
-        path.write_text(self.vis.static_html(), encoding="utf-8")
-        print(f"Saving animation to {path} ...")
-
-    def play_native(
-        self,
-        primitives,
-        frames,
-        schedule,
-        *,
-        is_3d: bool,
-        scene_title: str | None = None,
+    def build_clip(
+        self, primitives, frames, schedule, *, is_3d=False, scene_title=None
     ):
-        """
-        Drive playback through ``meshcat.animation.Animation`` +
-        ``Visualizer.set_animation`` instead of a Python frame loop. The browser
-        plays keyframes natively; no ``time.sleep`` in Python.
-        """
-        self.show = True
-        animation_obj = self._set_native_animation(frames, schedule)
-        self.vis.open()
-        self.vis.wait()
-        return animation_obj
-
-    def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
-        """
-        Return an ``IPython.display.HTML`` iframe snapshot of the meshcat scene
-        with the animation embedded. Uses ``Visualizer.render_static`` under the
-        hood, which wraps ``static_html()`` in a self-contained ``srcdoc=``.
-        Ideal for Colab: no zmq client, no port forwarding.
-        """
+        """The trajectory as a keyframed Meshcat animation in a viewer of its own: ``(vis, animation)``."""
         self.show = False
-        self._set_native_animation(frames, schedule)
+        animation_obj = self._set_native_animation(frames, schedule)
 
-        try:
-            return self.vis.render_static(height=480)
-        except Exception:
-            # Fallback: return the raw static HTML blob wrapped for notebooks.
-            try:
-                from IPython.display import HTML as IPythonHTML
+        return self.vis, animation_obj
 
-                return IPythonHTML(self.vis.static_html())
-            except ImportError:
-                return self.vis.static_html()
+    def show_clip(self, clip, place):
+        """Play the clip inline (a self-contained page) or in the browser viewer."""
+        vis = clip.built()[0]
+        if place == "inline":
+            from IPython.display import display
+
+            display(vis.render_static(height=480))
+            return
+
+        # The browser viewer: opened, and waited for until a browser connects
+        vis.open()
+        vis.wait()
+
+    def save_clip(self, clip, path):
+        """A self-contained ``.html`` page of the keyframed animation."""
+        require_html_path(path)
+        path = path if path.suffix else path.with_suffix(".html")
+        path.write_text(clip.built()[0].static_html(), encoding="utf-8")
+
+        return path

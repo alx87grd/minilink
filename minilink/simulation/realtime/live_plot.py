@@ -56,7 +56,7 @@ class LiveSignalPlotOutput(RealtimeOutput):
         close_on_stop: bool = False,
     ):
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.signals.time_signals import require_signal_renderer
+        from minilink.graphical.figure import require_renderer
 
         if window is not None and float(window) <= 0.0:
             raise ValueError(f"window must be positive or None, got {window!r}")
@@ -66,7 +66,8 @@ class LiveSignalPlotOutput(RealtimeOutput):
         self.signals = signals
         self.window = None if window is None else float(window)
         self.every = int(every)
-        self.renderer = require_signal_renderer(renderer)
+        require_renderer(renderer)
+        self.renderer = renderer
         self.show = bool(show)
         self.close_on_stop = bool(close_on_stop)
 

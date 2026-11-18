@@ -1,46 +1,12 @@
 """Field grids: a scalar field sampled on a 2-D axis-aligned grid, as plain NumPy arrays."""
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable
 
 import numpy as np
 
 ###############################################################################
 # Public API
 ###############################################################################
-
-
-@dataclass(frozen=True)
-class FieldGrid:
-    """
-    A scalar field sampled on a 2-D axis-aligned grid.
-
-    Plain NumPy arrays, no Matplotlib: the heatmaps of
-    :mod:`minilink.planning.spatial.plotting` draw them.
-
-    Parameters
-    ----------
-    xs : np.ndarray
-        Grid coordinates along the first axis, shape ``(nx,)``.
-    ys : np.ndarray
-        Grid coordinates along the second axis, shape ``(ny,)``.
-    Z : np.ndarray
-        Sampled values, shape ``(ny, nx)`` (row ``j`` holds ``ys[j]``).
-    """
-
-    xs: np.ndarray
-    ys: np.ndarray
-    Z: np.ndarray
-
-    @property
-    def extent(self) -> tuple:
-        """``(x_min, x_max, y_min, y_max)`` for image-style plotting."""
-        return (
-            float(self.xs[0]),
-            float(self.xs[-1]),
-            float(self.ys[0]),
-            float(self.ys[-1]),
-        )
 
 
 def sample_grid(
@@ -50,12 +16,13 @@ def sample_grid(
     grid: tuple = (120, 120),
     t: float = 0.0,
     params=None,
-) -> FieldGrid:
+):
     """
-    Sample a scalar query over a 2-D axis-aligned grid.
+    Sample a scalar query over a 2-D axis-aligned grid: ``(xs, ys, Z)``.
 
     Scenes and state fields rasterize their clearance and cost-density queries
-    with it, for heatmaps.
+    with it, for heatmaps. ``Z[j, i]`` is the value at ``(xs[i], ys[j])``,
+    shape ``(ny, nx)``.
 
     Parameters
     ----------
@@ -79,44 +46,7 @@ def sample_grid(
         for i, x in enumerate(xs):
             Z[j, i] = float(fn(np.array([x, y]), t, params))
 
-    return FieldGrid(xs, ys, Z)
-
-
-def sample_field_costs(
-    costs: Sequence,
-    *,
-    bounds,
-    grid: tuple = (200, 200),
-    state_dim: int = 2,
-    u=None,
-    t: float = 0.0,
-    params=None,
-) -> FieldGrid:
-    """
-    Rasterize shaped ``FieldCost`` terms on a workspace XY grid.
-
-    Each cell is the cost of a **workspace point** ``p = (x, y)`` using a
-    **point probe** — build costs with ``mount(point_probe(), on=sys)`` so the
-    field does not depend on robot heading or body extent. ``state_dim`` must
-    match the planner plant state size (``sys.n``). The MPC tuning plots of
-    :mod:`minilink.planning.spatial.plotting` draw the result.
-    """
-    require_costs(costs)
-
-    # The held input, and the state whose first two entries carry the point
-    u_use = np.zeros(1) if u is None else u
-    x = np.zeros(int(state_dim))
-
-    def fn(p, t_query=0.0, params_query=None):
-        x[0] = p[0]
-        x[1] = p[1]
-
-        # g(p) = Σ_c g_c(x(p), u, t), summed in the terms' order
-        g = sum(float(c.g(x, u_use, t=t_query, params=params_query)) for c in costs)
-
-        return g
-
-    return sample_grid(fn, bounds, grid=grid, t=t, params=params)
+    return xs, ys, Z
 
 
 def pad_bounds(bounds, padding: float):
@@ -127,14 +57,3 @@ def pad_bounds(bounds, padding: float):
     padded = ((x_lo - pad, x_hi + pad), (y_lo - pad, y_hi + pad))
 
     return padded
-
-
-###############################################################################
-# Internal machinery
-###############################################################################
-
-
-def require_costs(costs):
-    """Refuse a raster with no cost term."""
-    if not costs:
-        raise ValueError("sample_field_costs requires at least one cost")

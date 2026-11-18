@@ -4,34 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-STATE_COLOR = "tab:blue"
-INPUT_COLOR = "tab:red"
+from minilink.graphical.figure import TAB10
 
-INTERNAL_SIGNAL_COLORS = (
-    "tab:green",
-    "tab:orange",
-    "tab:purple",
-    "tab:olive",
-    "tab:brown",
-    "tab:pink",
-    "tab:cyan",
-    "tab:gray",
-)
+# The state in blue, the input in red, from the one palette
+STATE_COLOR = TAB10[0]
+INPUT_COLOR = TAB10[3]
 
-# Matplotlib tab: names → hex for Plotly parity
-SIGNAL_COLOR_HEX: dict[str, str] = {
-    "blue": "#0000ff",
-    "tab:blue": "#1f77b4",
-    "tab:red": "#d62728",
-    "tab:green": "#2ca02c",
-    "tab:orange": "#ff7f0e",
-    "tab:purple": "#9467bd",
-    "tab:olive": "#bcbd22",
-    "tab:brown": "#8c564b",
-    "tab:pink": "#e377c2",
-    "tab:cyan": "#17becf",
-    "tab:gray": "#7f7f7f",
-}
+# Every other signal: green, orange, purple, olive, brown, pink, cyan, grey
+INTERNAL_SIGNAL_COLORS = tuple(TAB10[k] for k in (2, 1, 4, 8, 5, 6, 9, 7))
 
 CORE_INPUT_NAMES = frozenset({"u", "u_cmd"})
 CORE_STATE_NAMES = frozenset({"x"})
@@ -81,11 +61,6 @@ def color_for_signal(
     alpha = component_alpha(component, n_components)
 
     return SignalStyle(color=base, alpha=alpha, linewidth=linewidth)
-
-
-def plotly_color(color: str) -> str:
-    """Map a matplotlib color name to hex for Plotly."""
-    return SIGNAL_COLOR_HEX.get(color, color)
 
 
 def is_core_input(name: str) -> bool:

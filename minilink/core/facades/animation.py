@@ -19,11 +19,12 @@ class SystemAnimation:
         *,
         is_3d=False,
         renderer="matplotlib",
+        show=True,
         camera=None,
         overlays=None,
     ):
         """
-        Convenience shortcut rendering a single frame of the system.
+        Draw one frame of the system at ``(x, u, t)``: an :class:`AnimationResult` of one frame.
 
         ``camera`` accepts an optional override: a constant 4x4 or a
         ``camera(frames, x, u, t)`` callable.
@@ -31,14 +32,13 @@ class SystemAnimation:
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation import Animator
 
-        animator = Animator(self)
-
-        return animator.show(
+        return Animator(self).render_frame(
             x,
             u,
             t,
             is_3d=is_3d,
             renderer=renderer,
+            show=show,
             camera=camera,
             overlays=overlays,
         )
@@ -49,42 +49,26 @@ class SystemAnimation:
         *,
         speed=1.0,
         is_3d=False,
-        html: bool | None = None,
         renderer="matplotlib",
-        native: bool = True,
+        show=True,
         scene_title: str | None = None,
-        show: bool = True,
-        save: bool = False,
-        file_name: str = "Animation",
         camera=None,
         overlays=None,
     ):
         """
-        Convenience shortcut to animate a trajectory of this system.
+        Animate a trajectory of this system: an :class:`AnimationResult`.
 
         ``speed`` is the playback rate, in simulated seconds per wall-clock
-        second: ``2.0`` plays twice as fast as real time.
-
-        ``html=None`` auto-resolves via
-        :func:`minilink.graphical.common.environment.prefers_inline_animation`:
-        ``True`` in Colab and in local Jupyter with a non-interactive
-        matplotlib backend (``inline`` / ``agg``); ``False`` for bare
-        script, IPython REPL, and Jupyter with an interactive backend
-        (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
-        ``native=True`` (default) drives each backend's own animation
-        engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
-        Pass ``native=False`` to fall back to the per-frame Python-loop
-        playback (useful for debugging; see ``DESIGN.md`` §4.7). ``camera``
+        second: ``2.0`` plays twice as fast as real time. ``show=True`` plays it
+        where the session puts it: inline in a notebook, in a window or a
+        browser viewer elsewhere; ``"inline"`` or ``"window"`` names the place,
+        ``False`` builds it only. The record saves it: ``.save("swing.gif")``
+        on matplotlib, ``.save("lap.html")`` on Meshcat and Plotly. ``camera``
         accepts an optional override (a constant 4x4 or a
-        ``camera(frames, x, u, t)`` callable). ``save=True`` writes the backend's file: a Pillow GIF
-        for ``renderer="matplotlib"`` (``{file_name}.gif`` when the name has
-        no ``.gif`` suffix), or a self-contained HTML page of the native
-        Meshcat animation for ``renderer="meshcat"`` (``{file_name}.html``
-        when the name has no suffix).
+        ``camera(frames, x, u, t)`` callable).
         """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation import Animator
-        from minilink.graphical.common.environment import prefers_inline_animation
 
         # The trajectory passed, else the last one computed, else a fresh one
         if traj is None:
@@ -93,29 +77,16 @@ class SystemAnimation:
             else:
                 traj = self.compute_trajectory(verbose=False)
 
-        resolved_html = prefers_inline_animation() if html is None else html
-
-        animator = Animator(self)
-        show_plot = show and not resolved_html
-        ani_obj = animator.animate_simulation(
+        return Animator(self).animate_simulation(
             traj,
             speed=speed,
             is_3d=is_3d,
-            html=resolved_html,
-            show=show_plot,
-            save=save,
-            file_name=file_name,
             renderer=renderer,
-            native=native,
+            show=show,
             scene_title=scene_title,
             camera=camera,
             overlays=overlays,
         )
-
-        # For html output, return the IPython.display.HTML object and let the
-        # notebook auto-display it via the standard last-expression rule.
-        # Calling display.display() *and* returning the object renders twice.
-        return ani_obj
 
 
 class DynamicAnimation:
@@ -140,8 +111,6 @@ class DynamicAnimation:
         renderer="matplotlib",
         is_3d=False,
         show=True,
-        html=None,
-        native=True,
     ):
         """Linearize, excite the selected mode(s), and animate them on this system.
 
@@ -166,8 +135,6 @@ class DynamicAnimation:
             renderer=renderer,
             is_3d=is_3d,
             show=show,
-            html=html,
-            native=native,
         )
 
     def game(

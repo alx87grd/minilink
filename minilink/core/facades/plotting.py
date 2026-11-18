@@ -19,7 +19,8 @@ class SystemPlotting:
         *,
         signals=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """
         Convenience shortcut to plot sampled time signals.
@@ -64,9 +65,12 @@ class SystemPlotting:
             signals=signals,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
-    def plot_cost(self, cost, *, of=None, traj=None, renderer="matplotlib", show=True):
+    def plot_cost(
+        self, cost, *, of=None, traj=None, renderer="matplotlib", show=None, ax=None
+    ):
         """
         Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
 
@@ -85,7 +89,7 @@ class SystemPlotting:
         scored = scored_trajectory(self, of, traj).with_cost(cost)
 
         return scored_system.plot_trajectory(
-            scored, signals=("dJ", "J"), renderer=renderer, show=show
+            scored, signals=("dJ", "J"), renderer=renderer, show=show, ax=ax
         )
 
     def plot_input_output_map(
@@ -105,8 +109,9 @@ class SystemPlotting:
         cmap="bwr",
         vmin=None,
         vmax=None,
+        renderer="matplotlib",
+        show=None,
         ax=None,
-        show=True,
     ):
         """
         Convenience shortcut plotting one output component over swept inputs.
@@ -135,8 +140,9 @@ class SystemPlotting:
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
-            ax=ax,
+            renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_control_law(
@@ -156,8 +162,9 @@ class SystemPlotting:
         cmap="bwr",
         vmin=None,
         vmax=None,
+        renderer="matplotlib",
+        show=None,
         ax=None,
-        show=True,
     ):
         """
         Convenience shortcut plotting the textbook slice of this block's control law.
@@ -190,8 +197,9 @@ class SystemPlotting:
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
-            ax=ax,
+            renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def get_diagram(self, *, expand=True):
@@ -227,30 +235,25 @@ class SystemPlotting:
 
         return bundle
 
-    def plot_diagram(self, file_name=None, show=True, *, expand=True):
+    def plot_diagram(self, *, show=True, expand=True):
         """
-        Convenience shortcut to render the system diagram.
+        Convenience shortcut to draw the system's diagram: a :class:`PlotResult`.
 
         A diagram that contains another diagram shows the inner blocks inside
         a labelled box, at every depth, with the wires going straight to the
         inner ports. Pass ``expand=False`` to draw each nested diagram as one
         block with its boundary ports.
 
-        ``show`` is where the figure goes: ``True`` picks the place, inline
-        SVG in Jupyter / Colab (the returned Graphviz object is the cell
-        output; this method does not also call ``display()``, which would
-        draw the figure twice) and a Matplotlib window with the Graphviz PNG
-        in bare scripts and IPython REPLs (same blocking policy as trajectory
-        plots); ``"inline"``, ``"window"`` or ``"pdf"`` (the OS PDF viewer)
-        name it; ``False`` builds the Digraph only. Pass ``file_name`` to
-        write Graphviz output to disk.
-        Without the Graphviz binary the figure is skipped with a warning and
-        ``None`` is returned, so a notebook cell does not fail.
+        ``show=True`` shows it where the session puts it: an SVG under the
+        notebook cell, the vector PDF in the system's viewer elsewhere;
+        ``"inline"`` or ``"window"`` names the place, ``False`` builds it only.
+        ``.save("loop.svg")`` writes it in the format of the extension.
+        Without the Graphviz binary the figure is skipped with a warning.
         """
         # A real cycle through minilink.core.system
         from minilink.graphical.diagrams import plot_diagram
 
-        return plot_diagram(self, file_name=file_name, show=show, expand=expand)
+        return plot_diagram(self, show=show, expand=expand)
 
 
 class LinearPlotting:
@@ -273,7 +276,8 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
         title=None,
     ):
         """Bode diagram of one SISO channel, gain and phase margins marked.
@@ -298,6 +302,7 @@ class LinearPlotting:
             eps=eps,
             renderer=renderer,
             show=show,
+            ax=ax,
             title=title,
         )
 
@@ -316,7 +321,8 @@ class LinearPlotting:
         minimal=None,
         radius=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Root locus of one SISO channel closed with ``u = -K y``.
 
@@ -340,6 +346,7 @@ class LinearPlotting:
             radius=radius,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_pzmap(
@@ -356,7 +363,8 @@ class LinearPlotting:
         minimal=None,
         radius=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Plot poles and zeros of one SISO channel.
 
@@ -379,6 +387,7 @@ class LinearPlotting:
             radius=radius,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_nyquist(
@@ -395,7 +404,8 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Nyquist diagram of one SISO channel, with the critical point ``-1``.
 
@@ -418,6 +428,7 @@ class LinearPlotting:
             eps=eps,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_step_response(
@@ -434,7 +445,8 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Step response of one SISO channel of the linear model, with rise time, settling time and overshoot.
 
@@ -457,6 +469,7 @@ class LinearPlotting:
             eps=eps,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
 
@@ -471,9 +484,18 @@ class DynamicPlotting(LinearPlotting):
         *,
         x_axis=0,
         y_axis=None,
+        u=None,
+        x_ref=None,
+        t=0.0,
+        bounds=None,
+        grid_shape=(21, 21),
+        params=None,
+        title=None,
+        streamplot=False,
+        figsize=None,
         renderer="matplotlib",
-        show=True,
-        **kwargs,
+        show=None,
+        ax=None,
     ):
         """
         Convenience shortcut to plot a phase-plane vector field.
@@ -494,9 +516,18 @@ class DynamicPlotting(LinearPlotting):
             traj,
             x_axis=x_axis,
             y_axis=y_axis,
+            u=u,
+            x_ref=x_ref,
+            t=t,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            params=params,
+            title=title,
+            streamplot=streamplot,
+            figsize=figsize,
             renderer=renderer,
             show=show,
-            **kwargs,
+            ax=ax,
         )
 
 
@@ -511,7 +542,8 @@ class StepPlotting(LinearPlotting):
         *,
         signals=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """
         Convenience shortcut to plot sampled step signals.
@@ -546,6 +578,7 @@ class StepPlotting(LinearPlotting):
             ),
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
 

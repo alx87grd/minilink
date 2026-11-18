@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
 from minilink.planning.dynamic_programming.dp import (
     grid_failure_cost,
     grid_of,
@@ -21,7 +22,6 @@ from minilink.planning.planner import (
     planner_at,
     planner_evidence,
 )
-from minilink.planning.plotting import maybe_show
 from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.step_model import is_continuous
@@ -363,32 +363,22 @@ class TabularLearningPlanner(Planner):
 
     # Plots
 
-    def plot_learning_curve(self, ax=None, window=20, *, show=True):
-        """Episode cost against episodes, smoothed by a moving average of ``window`` episodes.
-
-        A figure made here is shown when ``show`` (``False`` builds it only); a
-        passed ``ax`` leaves display to the caller. Returns the axis.
-        """
-        import matplotlib.pyplot as plt
-
-        created = ax is None
-        if created:
-            _, ax = plt.subplots(figsize=(8, 3))
-
+    def plot_learning_curve(
+        self, window=20, *, renderer="matplotlib", show=None, ax=None
+    ):
+        """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""
         # The episodes' costs J, and the averaging kernel over the window
         J = np.array([record["J"] for record in self.history])
         kernel = np.ones(min(window, J.size)) / min(window, J.size)
+        J_mean = np.convolve(J, kernel, "valid")
 
         # The raw costs, then their moving average
-        ax.plot(np.arange(1, J.size + 1), J, alpha=0.3)
-        ax.plot(np.arange(kernel.size, J.size + 1), np.convolve(J, kernel, "valid"))
+        raw = Trace(np.arange(1, J.size + 1), J, alpha=0.3)
+        mean = Trace(np.arange(kernel.size, J.size + 1), J_mean)
+        panel = Panel(layers=(raw, mean), x_label="episode", y_label="episode cost")
+        spec = FigureSpec(panels=(panel,), figsize=(8.0, 3.0))
 
-        ax.set_xlabel("episode")
-        ax.set_ylabel("episode cost")
-        ax.grid(True, alpha=0.3)
-        maybe_show(plt, created and show, block_when_needed=True)
-
-        return ax
+        return draw(spec, renderer=renderer, show=show, ax=ax)
 
     ###########################################################################
     # Internal machinery

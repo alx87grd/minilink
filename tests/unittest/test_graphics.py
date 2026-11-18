@@ -27,6 +27,7 @@ from minilink.graphical.animation.renderers.matplotlib_renderer import (
     _camera_3d_view_init,
 )
 from minilink.graphical.animation.renderers.renderer import axis_label_from_column
+from minilink.graphical.common.animation_result import Clip
 from minilink.graphical.common.environment import override_env
 
 
@@ -163,7 +164,7 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
     def test_default_2d_view_uses_target_plus_minus_scale(self):
         s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         a = Animator(s)
-        a.show(np.zeros(2), np.zeros(1), 0.0, is_3d=False, renderer="matplotlib")
+        a.render_frame(np.zeros(2), np.zeros(1), 0.0, renderer="matplotlib", show=False)
         from minilink.graphical.animation.renderers.matplotlib_renderer import (
             MatplotlibRenderer,
         )
@@ -994,9 +995,8 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "lap.html"
-            MeshcatRenderer(_Anim()).export_animation(
-                [prim], frames, schedule, str(dest), is_3d=True
-            )
+            backend = MeshcatRenderer(_Anim())
+            backend.save_clip(Clip(backend, frames, schedule, is_3d=True), dest)
             html = dest.read_text(encoding="utf-8")
             self.assertTrue(dest.is_file())
             self.assertIn("<html", html.lower())
@@ -1018,9 +1018,9 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "trail.html"
-            MeshcatRenderer(_Anim()).export_animation(
-                [a], _line_frames(a, a, b), _schedule(3), str(dest), is_3d=True
-            )
+            backend = MeshcatRenderer(_Anim())
+            clip = Clip(backend, _line_frames(a, a, b), _schedule(3), is_3d=True)
+            backend.save_clip(clip, dest)
             html = dest.read_text(encoding="utf-8")
         commands = [
             umsgpack.unpackb(base64.b64decode(blob))
@@ -1076,7 +1076,7 @@ class TestPygameOptionalSmoke(unittest.TestCase):
 
 import pytest
 from minilink.graphical.signals import (
-    build_signal_plot_spec,
+    signal_figure,
     open_time_signal_plot,
     plot_time_signals,
     resolve_plot_signals,
@@ -1201,14 +1201,13 @@ class TestAdvancedPlotting(unittest.TestCase):
         outer.add_subsystem(Impedance() @ pendulum, "loop")
         traj = outer.compute_trajectory(tf=0.5, verbose=False)
 
-        spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "y"),))
-        self.assertEqual({trace.signal for trace in spec.traces}, {"loop/plant:y"})
-        values = np.vstack([trace.values for trace in spec.traces])
+        spec = signal_figure(outer, traj, signals=((pendulum, "y"),))
+        values = np.vstack([panel.layers[0].y for panel in spec.panels])
         np.testing.assert_allclose(
             values, traj.x
         )  # the static controller adds no state
         with self.assertRaisesRegex(ValueError, "not part of this diagram"):
-            build_signal_plot_spec(outer, traj, signals=((Pendulum(), "y"),))
+            signal_figure(outer, traj, signals=((Pendulum(), "y"),))
 
     def test_the_state_port_reads_the_state_labels(self):
         from minilink.control.impedance import Impedance
@@ -1218,9 +1217,10 @@ class TestAdvancedPlotting(unittest.TestCase):
         outer = DiagramSystem()
         outer.add_subsystem(Impedance() @ pendulum, "loop")
         traj = outer.compute_trajectory(tf=0.2, verbose=False)
-        spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "x"),))
+        spec = signal_figure(outer, traj, signals=((pendulum, "x"),))
         self.assertEqual(
-            [trace.label for trace in spec.traces], list(pendulum.state.labels)
+            [panel.layers[0].label for panel in spec.panels],
+            list(pendulum.state.labels),
         )
 
     def test_subsystem_signal_resolves_diagram_id(self):
@@ -1294,8 +1294,8 @@ class TestAdvancedPlotting(unittest.TestCase):
             u=np.array([[1.0, 1.0]]),
             signals={"extra": np.ones((2, 2))},
         )
-        spec = build_signal_plot_spec(self.sys, traj, signals=("x", "u", "extra"))
-        labels = [trace.label for trace in spec.traces]
+        spec = signal_figure(self.sys, traj, signals=("x", "u", "extra"))
+        labels = [panel.layers[0].label for panel in spec.panels]
         self.assertIn("x[0]", labels)
         self.assertIn("u[0]", labels)
         self.assertIn("extra[0]", labels)
@@ -1303,17 +1303,19 @@ class TestAdvancedPlotting(unittest.TestCase):
 
     def test_signal_spec_assigns_distinct_tier_colors(self):
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
-        spec = build_signal_plot_spec(
+        spec = signal_figure(
             self.diagram, traj_plus, signals=("x", "step:y", "controller:u")
         )
-        colors = {trace.signal: trace.color for trace in spec.traces}
-        self.assertNotEqual(colors["x"], colors["step:y"])
-        self.assertNotEqual(colors["step:y"], colors["controller:u"])
-        self.assertNotEqual(colors["x"], colors["controller:u"])
+        # The state first, then the source's output, then the controller's command
+        colors = [panel.layers[0].color for panel in spec.panels]
+        state, source, command = colors[0], colors[-2], colors[-1]
+        self.assertNotEqual(state, source)
+        self.assertNotEqual(source, command)
+        self.assertNotEqual(state, command)
 
     def test_unknown_signal_reports_available_names(self):
         with self.assertRaisesRegex(ValueError, "controller:u"):
-            build_signal_plot_spec(self.diagram, self.traj, signals=("missing",))
+            signal_figure(self.diagram, self.traj, signals=("missing",))
 
     def test_live_time_signal_plot_reuses_artists(self):
         traj0 = Trajectory(
@@ -1475,8 +1477,8 @@ class TestPlotlyRenderer(unittest.TestCase):
             x=np.array([[0.0, 0.1, 0.2]]),
             u=np.array([[1.0, 1.0, 1.0]]),
         )
-        fig = Animator(sys).animate_simulation(
-            traj, renderer="plotly", html=True, show=False
+        fig = (
+            Animator(sys).animate_simulation(traj, renderer="plotly", show=False).figure
         )
         self.assertEqual(len(fig.data), 2)
         self.assertEqual(len(fig.frames), 3)
@@ -1494,8 +1496,8 @@ class TestPlotlyRenderer(unittest.TestCase):
             x=np.array([[0.0, 25.0, -5.0]]),
             u=np.zeros((0, 3)),
         )
-        fig = Animator(sys).animate_simulation(
-            traj, renderer="plotly", html=True, show=False
+        fig = (
+            Animator(sys).animate_simulation(traj, renderer="plotly", show=False).figure
         )
         self.assertEqual(tuple(fig.layout.xaxis.range), (-10.0, 10.0))
         self.assertEqual(tuple(fig.layout.yaxis.range), (-10.0, 10.0))
@@ -1521,7 +1523,7 @@ class TestPlotlyRenderer(unittest.TestCase):
                 "camera": camera_matrix(target=(10.0, 3.0, 0.0), scale=2.0),
             },
         ]
-        fig = backend.render_inline_animation(
+        fig, _ = backend.build_clip(
             [point], frames, SimpleNamespace(interval_ms=50), is_3d=False
         )
         self.assertEqual(tuple(fig.layout.xaxis.range), (-2.0, 2.0))
@@ -1535,26 +1537,39 @@ class TestPlotlyRenderer(unittest.TestCase):
             np.asarray(fig.frames[1].data[0].y, dtype=float), [3.0]
         )
 
-    def test_plotly_native_false_html_false_raises(self):
-        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
-        traj = Trajectory(
-            t=np.array([0.0, 0.1]), x=np.array([[0.0, 0.1]]), u=np.array([[1.0, 1.0]])
-        )
-        with self.assertRaisesRegex(ValueError, "renderer='plotly'.*native=False"):
-            Animator(sys).animate_simulation(
-                traj, renderer="plotly", html=False, native=False, show=True
-            )
+    def test_a_plotly_animation_saves_as_a_page_and_refuses_an_image(self):
+        import tempfile
+        from pathlib import Path
 
-    def test_plotly_native_false_html_true_allowed(self):
         sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         sys.skin = debug_state_skin
         traj = Trajectory(
             t=np.array([0.0, 0.1]), x=np.array([[0.0, 0.1]]), u=np.array([[1.0, 1.0]])
         )
-        fig = Animator(sys).animate_simulation(
-            traj, renderer="plotly", html=True, native=False, show=False
+        result = Animator(sys).animate_simulation(traj, renderer="plotly", show=False)
+        self.assertEqual(len(result.figure.frames), 2)
+        with tempfile.TemporaryDirectory() as tmp:
+            written = result.save(Path(tmp) / "swing")
+            self.assertEqual(written.name, "swing.html")
+            self.assertIn("<html", written.read_text(encoding="utf-8").lower())
+            with self.assertRaisesRegex(ValueError, ".html page"):
+                result.save(Path(tmp) / "swing.png")
+
+    def test_a_plotly_clip_plays_inline_through_a_renderer_that_runs_the_autoplay(self):
+        import plotly.io as pio
+
+        from minilink.graphical.animation.renderers.plotly_renderer import (
+            inline_renderer_of,
         )
-        self.assertEqual(len(fig.frames), 2)
+
+        default = pio.renderers.default
+        try:
+            pio.renderers.default = "plotly_mimetype+notebook"
+            self.assertEqual(inline_renderer_of(pio.renderers), "notebook_connected")
+            pio.renderers.default = "colab"
+            self.assertIsNone(inline_renderer_of(pio.renderers))
+        finally:
+            pio.renderers.default = default
 
 
 @pytest.mark.plotting
@@ -1574,7 +1589,7 @@ class TestPlotlySignalPlot(unittest.TestCase):
             sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
         self.assertEqual(len(result.figure.data), 2)
-        self.assertEqual(result.figure.layout.width, PLOTLY_FIG_WIDTH)
+        self.assertEqual(result.figure.layout.width, 100 * result.spec.figsize[0])
         handle = open_time_signal_plot(
             sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
@@ -1595,8 +1610,8 @@ class TestPlotlySignalPlot(unittest.TestCase):
             sys, traj, signals=("x", "u"), renderer="plotly", show=False
         )
         layout = result.figure.layout
-        self.assertEqual(layout.yaxis.title.text, "x[0] [m]")
-        self.assertEqual(layout.yaxis2.title.text, "u[0] [N]")
+        self.assertEqual(layout.yaxis.title.text, "x[0]<br>[m]")
+        self.assertEqual(layout.yaxis2.title.text, "u[0]<br>[N]")
 
     def test_stacked_figsize_caps_height_for_popup_layout(self):
         from minilink.graphical.common.matplotlib_style import (
@@ -1751,6 +1766,22 @@ class TestPlotInputOutputMap(unittest.TestCase):
         )
         self.assertIsNotNone(res.figure)
         plt.close(res.figure)
+
+    def test_plotly_draws_the_line_the_heatmap_and_the_surface(self):
+        sat = Saturation(-1.0, 1.0)
+        line = sat.plot_input_output_map(renderer="plotly", show=False)
+        self.assertEqual([type(t).__name__ for t in line.figure.data], ["Scatter"])
+        law = StateFeedback(np.array([[3.0, 1.0]]))
+        for is_3d, kind in ((False, "Heatmap"), (True, "Surface")):
+            res = law.plot_input_output_map(
+                x_axis=0,
+                y_axis=1,
+                grid_shape=(5, 5),
+                is_3d=is_3d,
+                renderer="plotly",
+                show=False,
+            )
+            self.assertEqual([type(t).__name__ for t in res.figure.data], [kind])
 
 
 class TestPlotControlLaw(unittest.TestCase):
@@ -1997,7 +2028,7 @@ class TestAnimationFrameSchedule(unittest.TestCase):
         schedule = trajectory_frame_schedule(traj, 1.0)
         self.assertEqual(schedule.n_frames, 1)
         self.assertGreater(schedule.interval_ms, 0.0)
-        Pendulum().animate(traj, show=False, html=False)
+        Pendulum().animate(traj, show=False)
 
     def test_zero_duration_trajectory_shows_every_sample(self):
         from minilink.graphical.animation.renderers.timing import sim_index_for_frame
@@ -2010,11 +2041,11 @@ class TestAnimationFrameSchedule(unittest.TestCase):
         schedule = trajectory_frame_schedule(traj, 1.0)
         self.assertEqual(schedule.n_frames, 3)
         self.assertEqual(sim_index_for_frame(schedule.n_frames - 1, schedule), 2)
-        Pendulum().animate(traj, show=False, html=False)
+        Pendulum().animate(traj, show=False)
 
 
 class TestGifExport(unittest.TestCase):
-    """``animate(save=True)`` with matplotlib writes ``{file_name}.gif`` exactly once."""
+    """A matplotlib animation saves as ``{name}.gif`` exactly once, a GIF without a suffix."""
 
     def test_save_keeps_or_appends_the_gif_suffix(self):
         import os
@@ -2028,14 +2059,20 @@ class TestGifExport(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with contextlib.redirect_stdout(io.StringIO()):
                 for name in ("clip.gif", "plain"):
-                    sys.animate(
-                        traj,
-                        save=True,
-                        show=False,
-                        html=False,
-                        file_name=os.path.join(tmp, name),
-                    )
+                    sys.animate(traj, show=False).save(os.path.join(tmp, name))
             self.assertEqual(sorted(os.listdir(tmp)), ["clip.gif", "plain.gif"])
+
+    def test_save_refuses_a_format_that_is_not_a_clip(self):
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
+        traj = Trajectory(
+            t=np.array([0.0, 0.1]), x=np.array([[0.0, 1.0]]), u=np.zeros((0, 2))
+        )
+        before = plt.get_fignums()
+        for name in ("clip.html", "clip.png"):
+            with self.assertRaisesRegex(ValueError, r"\.gif or an \.mp4"):
+                sys.animate(traj, show=False).save(name)
+        self.assertEqual(plt.get_fignums(), before)  # refused before any figure
 
 
 # --- the catalog's drawing pieces: skins keyed to frames, primitives as declared ---

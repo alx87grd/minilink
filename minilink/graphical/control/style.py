@@ -1,4 +1,4 @@
-"""Control-analysis figure style: the titles, labels, colors and axes both backends share."""
+"""Control-analysis figure style: the titles, labels, colours and axes every control figure shares."""
 
 from __future__ import annotations
 
@@ -24,6 +24,10 @@ IMAG_LABEL = "Imaginary Axis (seconds⁻¹)"
 TIME_LABEL = "Time (seconds)"
 AMPLITUDE_LABEL = "Amplitude"
 DEVIATION_LABEL = "Deviation Δy"  # A linearization's response, from its operating point
+
+# The figure sizes: one panel, and the Bode stack of two at 0.8 of its height each
+PANEL_FIGSIZE = (4.0, 3.0)
+STACK_FIGSIZE = (4.0, 4.8)
 
 
 ###############################################################################

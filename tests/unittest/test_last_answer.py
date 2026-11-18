@@ -11,7 +11,7 @@ PACKAGE = Path(__file__).resolve().parents[2] / "minilink"
 SHORTCUTS = {
     "last_solution": {
         "planning/planner.py": {"require_solution"},
-        "planning/search/plotting.py": {"plot_tree", "animate_search.update"},
+        "planning/search/plotting.py": {"plot_tree", "animate_search"},
     },
     "traj": {
         "core/discrete/sampled_diagram.py": {"SampledDiagramSystem.animate"},

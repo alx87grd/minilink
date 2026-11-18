@@ -467,6 +467,13 @@ def test_compare_reads_the_solutions_side_by_side():
     axes = race.plot_trajectory(show=False).axes
     assert len(axes) == 3 and len(axes[0].get_lines()) == 2
 
+    # The same panels with Plotly, titled above them
+    laws = race.plot_control_law(title="laws", renderer="plotly", show=False)
+    assert [type(trace).__name__ for trace in laws.figure.data] == ["Heatmap"] * 2
+    assert laws.figure.layout.title.text == "laws"
+    runs = race.plot_trajectory(renderer="plotly", show=False)
+    assert [trace.name for trace in runs.figure.data[:2]] == ["VI", "LQR"]
+
     # one evaluation scores every policy on the same draws; a solution stands for its policy
     scored = compare(problem, VI=vi, LQR=lqr, dt=0.1, backend="numpy")
     assert list(scored) == ["VI", "LQR"] and scored["LQR"] is lqr
@@ -708,7 +715,10 @@ def test_the_planner_mirrors_its_latest_solution(make, monkeypatch):
     planner.plot_cost(show=False)
     planner.plot_cost(dt=0.01)
     assert planner.dt is not None
-    assert given == [{"dt": planner.dt, "show": False}, {"dt": 0.01}]
+    assert given == [
+        {"dt": planner.dt, "renderer": "matplotlib", "show": False, "ax": None},
+        {"dt": 0.01, "renderer": "matplotlib", "show": None, "ax": None},
+    ]
 
 
 def test_the_planners_cost_to_go_reads_the_time_on_a_finite_horizon():
@@ -782,6 +792,19 @@ def test_the_planning_plots_take_one_keyword_set_and_return_a_plot_result():
             assert isinstance(drawn, PlotResult) and drawn.figure is not None
 
 
+def test_the_3d_cost_to_go_draws_the_surface_alone():
+    """is_3d draws one figure, the surface: on the grid's nodes and on a sampled field."""
+    import matplotlib.pyplot as plt
+
+    problem, vi, lqr = solved_pendulum()
+    for solution in (vi, lqr):
+        plt.close("all")
+        drawn = solution.plot_cost_to_go(is_3d=True, show=False)
+        assert [panel.is_3d for panel in drawn.spec.panels] == [True]
+        assert plt.get_fignums() == [drawn.figure.number]
+    plt.close("all")
+
+
 def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
     problem, vi, lqr = solved_pendulum()
     grid = vi.controller.grid
@@ -805,6 +828,20 @@ def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
     assert law.axes.get_title() == "π"
 
 
+def test_the_planning_plots_draw_with_plotly_and_take_a_run_over_them():
+    problem, vi, lqr = solved_pendulum()
+    loop = lqr.controller @ problem.sys
+    traj = loop.compute_trajectory(tf=1.0, verbose=False).of("plant")
+    for solution in (vi, lqr):
+        J = solution.plot_cost_to_go(renderer="plotly", show=False)
+        assert [type(trace).__name__ for trace in J.figure.data] == ["Heatmap"]
+        law = solution.plot_control_law(trajectory=traj, renderer="plotly", show=False)
+        kinds = [type(trace).__name__ for trace in law.figure.data]
+        assert kinds == ["Heatmap", "Scatter", "Scatter", "Scatter"]
+    surface = lqr.plot_cost_to_go(is_3d=True, renderer="plotly", show=False)
+    assert [type(trace).__name__ for trace in surface.figure.data] == ["Surface"]
+
+
 def test_the_planning_plots_overlay_a_run_and_refuse_what_they_cannot_draw():
     problem, vi, lqr = solved_pendulum()
     loop = lqr.controller @ problem.sys
@@ -814,8 +851,6 @@ def test_the_planning_plots_overlay_a_run_and_refuse_what_they_cannot_draw():
         assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
         drawn = solution.plot_control_law(trajectory=traj, show=False)
         assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
-        with pytest.raises(ValueError, match="renderer='matplotlib'"):
-            solution.plot_cost_to_go(renderer="plotly", show=False)
         with pytest.raises(ValueError, match="cannot be used together"):
             solution.plot_cost_to_go(is_3d=True, trajectory=traj, show=False)
     with pytest.raises(ValueError, match="anchor"):

@@ -15,16 +15,9 @@ from minilink.analysis.linearization import (
     discrete_period,
     siso_matrices,
 )
-from minilink.graphical.common import PlotResult
-from minilink.graphical.control import (
-    ControlFigure,
-    Note,
-    Panel,
-    RefLine,
-    Trace,
-    render_control_figure,
-    style,
-)
+from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.control import style
+from minilink.graphical.figure import FigureSpec, Note, Panel, RefLine, Trace, draw
 
 # Frequencies of the grid on which margins() reads the crossovers
 _MARGIN_GRID_POINTS = 2000
@@ -345,7 +338,8 @@ def plot_bode(
     method: str = "auto",
     eps: float = 1e-6,
     renderer="matplotlib",
-    show: bool = True,
+    show=None,
+    ax=None,
     title: str | None = None,
 ) -> PlotResult:
     """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
@@ -378,7 +372,7 @@ def plot_bode(
         w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
     )
 
-    return render_control_figure(figure, renderer=renderer, show=show)
+    return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
 def plot_pzmap(
@@ -395,7 +389,8 @@ def plot_pzmap(
     minimal: bool | None = None,
     radius: float | None = None,
     renderer="matplotlib",
-    show: bool = True,
+    show=None,
+    ax=None,
 ) -> PlotResult:
     """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros.
 
@@ -418,7 +413,7 @@ def plot_pzmap(
 
     figure = pzmap_figure(z, p, sys, of, wrt, radius, discrete_period(sys))
 
-    return render_control_figure(figure, renderer=renderer, show=show)
+    return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
 def plot_root_locus(
@@ -436,7 +431,8 @@ def plot_root_locus(
     minimal: bool | None = None,
     radius: float | None = None,
     renderer="matplotlib",
-    show: bool = True,
+    show=None,
+    ax=None,
 ) -> PlotResult:
     """Root locus of the selected channel closed with ``u = -K y``.
 
@@ -459,7 +455,7 @@ def plot_root_locus(
         A, B, C, D, gains, roots, sys, of, wrt, radius, discrete_period(sys)
     )
 
-    return render_control_figure(figure, renderer=renderer, show=show)
+    return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
 def plot_nyquist(
@@ -476,7 +472,8 @@ def plot_nyquist(
     method: str = "auto",
     eps: float = 1e-6,
     renderer="matplotlib",
-    show: bool = True,
+    show=None,
+    ax=None,
 ) -> PlotResult:
     """Nyquist diagram of the selected channel with the critical point ``-1``."""
     w, G = nyquist(
@@ -495,7 +492,7 @@ def plot_nyquist(
 
     figure = nyquist_figure(w, G, sys, of, wrt)
 
-    return render_control_figure(figure, renderer=renderer, show=show)
+    return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################
@@ -594,22 +591,29 @@ def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
     else:
         references = (), ()
 
-    return ControlFigure(
+    return FigureSpec(
         title=style.BODE_TITLE if title is None else title,
-        subtitle=channel_subtitle(sys, of, wrt),
         share_x=True,
+        figsize=style.STACK_FIGSIZE,
         panels=(
             Panel(
-                traces=(Trace(w, magnitude_db, style.SYSTEM_COLOR, hover=hover),),
-                lines=crossovers + references[0],
-                notes=notes,
+                layers=(
+                    Trace(w, magnitude_db, color=style.SYSTEM_COLOR, hover=hover),
+                    *crossovers,
+                    *references[0],
+                    *notes,
+                ),
+                title=channel_subtitle(sys, of, wrt),
                 x_label="",
                 y_label=style.MAGNITUDE_LABEL,
                 x_log=True,
             ),
             Panel(
-                traces=(Trace(w, phase_deg, style.SYSTEM_COLOR, hover=hover),),
-                lines=crossovers + references[1],
+                layers=(
+                    Trace(w, phase_deg, color=style.SYSTEM_COLOR, hover=hover),
+                    *crossovers,
+                    *references[1],
+                ),
                 x_label=style.FREQUENCY_LABEL,
                 y_label=style.PHASE_LABEL,
                 x_log=True,
@@ -646,19 +650,19 @@ def pzmap_figure(z, p, sys, of, wrt, radius=None, period=None):
     if period is not None:
         circle = unit_circle()
         traces = (
-            Trace(circle.real, circle.imag, style.AXIS_COLOR, dash="dash"),
+            Trace(circle.real, circle.imag, color=style.AXIS_COLOR, dash="dash"),
         ) + traces
         points = np.concatenate([points, circle])
 
-    return ControlFigure(
+    return FigureSpec(
         title=style.PZMAP_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
+        figsize=style.PANEL_FIGSIZE,
         panels=(
             Panel(
-                traces=traces,
+                layers=(*traces, *zero_lines()),
+                title=channel_subtitle(sys, of, wrt),
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
-                zero_lines=True,
                 x_lim=style.padded_limits(np.concatenate([points.real, [0.0]])),
                 y_lim=style.padded_limits(np.concatenate([points.imag, -points.imag])),
             ),
@@ -672,17 +676,19 @@ def root_markers(p, z):
         Trace(
             p.real,
             p.imag,
-            style.SYSTEM_COLOR,
+            color=style.SYSTEM_COLOR,
             mode="markers",
             marker="x",
+            size=8.0,
             hover=tuple(root_text(s) for s in p),
         ),
         Trace(
             z.real,
             z.imag,
-            style.SYSTEM_COLOR,
+            color=style.SYSTEM_COLOR,
             mode="markers",
-            marker="o",
+            marker="o-open",
+            size=8.0,
             hover=tuple(root_text(s) for s in z),
         ),
     )
@@ -714,7 +720,7 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None, perio
         Trace(
             roots[:, j].real,
             roots[:, j].imag,
-            style.SYSTEM_COLOR,
+            color=style.SYSTEM_COLOR,
             hover=tuple(
                 f"K = {k:.3g}<br>" + root_text(s) for k, s in zip(gains, roots[:, j])
             ),
@@ -727,23 +733,31 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None, perio
     if period is not None:
         circle = unit_circle()
         traces = (
-            Trace(circle.real, circle.imag, style.AXIS_COLOR, dash="dash"),
+            Trace(circle.real, circle.imag, color=style.AXIS_COLOR, dash="dash"),
         ) + traces
         near = np.concatenate([near, circle])
 
-    return ControlFigure(
+    return FigureSpec(
         title=style.ROOT_LOCUS_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
+        figsize=style.PANEL_FIGSIZE,
         panels=(
             Panel(
-                traces=traces,
+                layers=(*traces, *zero_lines()),
+                title=channel_subtitle(sys, of, wrt),
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
-                zero_lines=True,
                 x_lim=style.padded_limits(np.concatenate([near.real, [0.0]])),
                 y_lim=style.padded_limits(np.concatenate([near.imag, -near.imag])),
             ),
         ),
+    )
+
+
+def zero_lines():
+    """The real and imaginary axes of the s- or z-plane, in the axis colour."""
+    return (
+        RefLine("y", 0.0, color=style.AXIS_COLOR, dash="solid"),
+        RefLine("x", 0.0, color=style.AXIS_COLOR, dash="solid"),
     )
 
 
@@ -770,25 +784,32 @@ def nyquist_figure(w, G, sys, of, wrt):
     critical = Trace(
         np.array([-1.0]),
         np.array([0.0]),
-        style.CRITICAL_COLOR,
+        color=style.CRITICAL_COLOR,
         mode="markers",
         marker="+",
         size=10.0,
     )
 
-    return ControlFigure(
+    return FigureSpec(
         title=style.NYQUIST_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
+        figsize=style.PANEL_FIGSIZE,
         panels=(
             Panel(
-                traces=(
-                    Trace(G.real, G.imag, style.SYSTEM_COLOR, hover=hover, arrows=True),
-                    Trace(G.real, -G.imag, style.SYSTEM_COLOR, dash="dash"),
+                layers=(
+                    Trace(
+                        G.real,
+                        G.imag,
+                        color=style.SYSTEM_COLOR,
+                        hover=hover,
+                        arrows=True,
+                    ),
+                    Trace(G.real, -G.imag, color=style.SYSTEM_COLOR, dash="dash"),
                     critical,
+                    *zero_lines(),
                 ),
+                title=channel_subtitle(sys, of, wrt),
                 x_label="Real Axis",
                 y_label="Imaginary Axis",
-                zero_lines=True,
                 x_lim=style.padded_limits(points.real),
                 y_lim=style.padded_limits(points.imag),
             ),

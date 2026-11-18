@@ -399,7 +399,7 @@ def test_animating_a_loop_reads_the_recorded_plant_input():
         return original(*args, **kwargs)
 
     port.compute = counting
-    loop.animate(run, show=False, html=False)
+    loop.animate(run, show=False)
 
     # The run recorded the plant's input: the frames read it, evaluating nothing
     assert len(calls) == 0

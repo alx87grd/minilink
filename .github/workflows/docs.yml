@@ -40,6 +40,7 @@ jobs:
       - name: Build docs
         env:
           MPLBACKEND: Agg
+          MINILINK_HEADLESS: "1"
           MPLCONFIGDIR: .mpl
         run: sphinx-build -W --keep-going -b html docs docs/_build/html
 

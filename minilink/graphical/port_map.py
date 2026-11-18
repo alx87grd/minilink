@@ -8,11 +8,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.roles import plot_space_of, require_command, subsystem_roles
-from minilink.graphical.common import PlotResult
-from minilink.graphical.phase_plane.phase_plane import (
-    format_axis_label,
-    require_grid_shape,
-)
+from minilink.graphical.common.labels import label_with_unit
+from minilink.graphical.common.matplotlib_style import FIGSIZE_BASE
+from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
+from minilink.graphical.phase_plane.phase_plane import require_grid_shape
 
 # The sweep range of a coordinate whose bounds are not finite
 _DEFAULT_BOUNDS = (-10.0, 10.0)
@@ -40,8 +40,9 @@ def plot_input_output_map(
     cmap="bwr",
     vmin=None,
     vmax=None,
+    renderer="matplotlib",
+    show=None,
     ax=None,
-    show=True,
 ) -> PlotResult:
     """Plot one output component of ``block`` over swept input components.
 
@@ -67,7 +68,11 @@ def plot_input_output_map(
         ``True`` draws a 3-D surface instead of a heatmap.
     params : dict, optional
         Alternative parameter set passed through to the port compute.
-    ax : matplotlib axes, optional
+    renderer : str, optional
+        ``"matplotlib"``, ``"plotly"``, or ``None`` for the description alone.
+    show : bool, optional
+        Show the figure; by default unless it is drawn into ``ax``.
+    ax : matplotlib axes or PlotResult, optional
         Draw into an existing subplot (side-by-side comparisons).
 
     Returns
@@ -101,7 +106,7 @@ def plot_input_output_map(
     # The output component, swept over the axes with every other input pinned
     output = block.outputs[out_port]
     out_axis = require_axis(out_axis, output.dim, "out_axis")
-    spec = build_spec(
+    spec = port_map_figure(
         block,
         output,
         out_axis,
@@ -112,9 +117,11 @@ def plot_input_output_map(
         title=title or f"{block.name}: {output.labels[out_axis]} map",
         vmin=vmin,
         vmax=vmax,
+        is_3d=is_3d,
+        cmap=cmap,
     )
 
-    return render_port_map_matplotlib(spec, is_3d=is_3d, cmap=cmap, ax=ax, show=show)
+    return draw(spec, renderer=renderer, show=show, ax=ax)
 
 
 def plot_control_law(
@@ -134,8 +141,9 @@ def plot_control_law(
     cmap="bwr",
     vmin=None,
     vmax=None,
+    renderer="matplotlib",
+    show=None,
     ax=None,
-    show=True,
 ) -> PlotResult:
     """Plot the textbook slice of a controller block's control law.
 
@@ -175,6 +183,8 @@ def plot_control_law(
         ``True`` draws a 3-D surface instead of a heatmap.
     params : dict, optional
         Alternative parameter set (gain sweeps, trained vs. untrained).
+    renderer, show, ax : optional
+        As in :func:`plot_input_output_map`.
 
     Returns
     -------
@@ -209,7 +219,7 @@ def plot_control_law(
         u_base[block.get_input_port_slice(roles.ref)] = rbar
 
     # The law, swept over the chosen coordinates
-    spec = build_spec(
+    spec = port_map_figure(
         block,
         output,
         u_axis,
@@ -220,10 +230,12 @@ def plot_control_law(
         title=title or f"{block.name}: control law",
         vmin=vmin,
         vmax=vmax,
+        is_3d=is_3d,
+        cmap=cmap,
         u_base=u_base,
     )
 
-    return render_port_map_matplotlib(spec, is_3d=is_3d, cmap=cmap, ax=ax, show=show)
+    return draw(spec, renderer=renderer, show=show, ax=ax)
 
 
 @dataclass(frozen=True)
@@ -243,123 +255,6 @@ class SweepAxis:
     bounds: tuple[float, float]
     base: float = 0.0
     sign: float = 1.0
-
-
-@dataclass(frozen=True)
-class PortMapSpec:
-    """Backend-neutral input-output map plot request."""
-
-    title: str
-    x_values: np.ndarray
-    y_values: np.ndarray | None
-    U: np.ndarray
-    x_label: str
-    x_unit: str
-    y_label: str | None
-    y_unit: str | None
-    out_label: str
-    out_unit: str
-    vmin: float | None
-    vmax: float | None
-
-
-def render_port_map_matplotlib(
-    spec: PortMapSpec,
-    *,
-    is_3d: bool = False,
-    cmap: str = "bwr",
-    ax=None,
-    show: bool = True,
-    figsize=None,
-    dpi=None,
-    block: bool | None = None,
-    pause: float = 0.0,
-) -> PlotResult:
-    """Render a port-map specification with matplotlib."""
-    import matplotlib
-    import matplotlib.pyplot as plt
-
-    # Lazy import: the graphics load on first use, not with the core
-    from minilink.graphical.common.environment import is_blocking_needed
-    from minilink.graphical.common.matplotlib_style import (
-        DPI_FIGURE,
-        FIGSIZE_BASE,
-        FONT_SIZE,
-    )
-
-    # TrueType (Type 42) fonts in PDF and PostScript exports: their text stays editable
-    matplotlib.rcParams["pdf.fonttype"] = 42
-    matplotlib.rcParams["ps.fonttype"] = 42
-
-    # A new figure, 3-D for a surface, or the one that holds the given axes
-    surface = spec.y_values is not None and is_3d
-    owns_figure = ax is None
-    if owns_figure:
-        fig = plt.figure(
-            figsize=FIGSIZE_BASE if figsize is None else figsize,
-            dpi=DPI_FIGURE if dpi is None else dpi,
-        )
-        ax = fig.add_subplot(projection="3d") if surface else fig.add_subplot()
-    else:
-        fig = ax.figure
-
-    # The window's title, when the canvas has a window
-    manager = getattr(fig.canvas, "manager", None)
-    set_window_title = getattr(manager, "set_window_title", None)
-    if callable(set_window_title):
-        set_window_title(spec.title)
-
-    x_label = format_axis_label(spec.x_label, spec.x_unit)
-    out_label = format_axis_label(spec.out_label, spec.out_unit)
-
-    if spec.y_values is None:
-        # One swept axis: a line, within the output's limits when both are known
-        ax.plot(spec.x_values, spec.U)
-        ax.set_ylabel(out_label, fontsize=FONT_SIZE)
-        ax.grid(True, alpha=0.3)
-        if spec.vmin is not None and spec.vmax is not None:
-            ax.set_ylim(spec.vmin, spec.vmax)
-    else:
-        # Two swept axes: a surface, or a heatmap with its colorbar
-        y_label = format_axis_label(spec.y_label, spec.y_unit)
-        if surface:
-            X, Y = np.meshgrid(spec.x_values, spec.y_values)
-            ax.plot_surface(X, Y, spec.U, cmap=cmap, vmin=spec.vmin, vmax=spec.vmax)
-            ax.set_ylabel(y_label, fontsize=FONT_SIZE)
-            ax.set_zlabel(out_label, fontsize=FONT_SIZE)
-        else:
-            mesh = ax.pcolormesh(
-                spec.x_values,
-                spec.y_values,
-                spec.U,
-                shading="auto",
-                cmap=cmap,
-                vmin=spec.vmin,
-                vmax=spec.vmax,
-            )
-            fig.colorbar(mesh, ax=ax, label=out_label)
-            ax.set_ylabel(y_label, fontsize=FONT_SIZE)
-
-    # The axis label and the title; the layout only on a figure of its own
-    ax.set_xlabel(x_label, fontsize=FONT_SIZE)
-    ax.set_title(spec.title, fontsize=FONT_SIZE)
-    if owns_figure:
-        fig.tight_layout()
-
-    # A window, unless the backend draws off screen
-    if show and plt.get_backend().lower() != "agg":
-        if block is None:
-            block = is_blocking_needed()
-        plt.show(block=block)
-        if pause > 0.0:
-            plt.pause(pause)
-
-    return PlotResult(
-        renderer="matplotlib",
-        payload=(fig, ax),
-        figure=fig,
-        axes=ax,
-    )
 
 
 ###############################################################################
@@ -440,7 +335,7 @@ def apply_bounds_override(axes, bounds) -> list[SweepAxis]:
     ]
 
 
-def build_spec(
+def port_map_figure(
     block,
     output,
     out_axis,
@@ -452,9 +347,11 @@ def build_spec(
     title,
     vmin,
     vmax,
+    is_3d,
+    cmap,
     u_base=None,
-) -> PortMapSpec:
-    """The spec of ``output[out_axis]`` swept over ``axes``, with its labels and limits."""
+) -> FigureSpec:
+    """``output[out_axis]`` swept over ``axes``: a line, a heatmap or a surface, as a description."""
     # The pinned point: the nominal inputs (or u_base) and the block's x0
     u_base = block.u_nominal.astype(float) if u_base is None else u_base
     x_base = np.asarray(block.x0, dtype=float).copy()
@@ -477,25 +374,50 @@ def build_spec(
     if vmax is None and np.isfinite(output.upper[out_axis]):
         vmax = float(output.upper[out_axis])
 
-    # The second axis' label and unit, on a two-axis sweep only
-    y_axis = axes[1] if len(axes) == 2 else None
-    y_label = None if y_axis is None else y_axis.label
-    y_unit = None if y_axis is None else y_axis.unit
+    x_label = label_with_unit(axes[0].label, axes[0].unit)
+    out_label = label_with_unit(output.labels[out_axis], output.units[out_axis])
 
-    return PortMapSpec(
+    # One swept axis: a line, within the output's limits when both are known
+    if y_values is None:
+        has_limits = vmin is not None and vmax is not None
+        panel = Panel(
+            layers=(Trace(x_values, U),),
+            title=title,
+            x_label=x_label,
+            y_label=out_label,
+            y_lim=(vmin, vmax) if has_limits else None,
+            legend=True,
+        )
+        return FigureSpec(panels=(panel,), figsize=FIGSIZE_BASE)
+
+    # Two swept axes: a surface, or a heatmap with its colour bar
+    y_label = label_with_unit(axes[1].label, axes[1].unit)
+    if is_3d:
+        layer = Surface(
+            x=x_values, y=y_values, z=U, cmap=cmap, vmin=vmin, vmax=vmax, colorbar=None
+        )
+    else:
+        layer = Heatmap(
+            x=x_values,
+            y=y_values,
+            z=U,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            shading="cells",
+            colorbar=out_label,
+        )
+    panel = Panel(
+        layers=(layer,),
         title=title,
-        x_values=x_values,
-        y_values=y_values,
-        U=U,
-        x_label=axes[0].label,
-        x_unit=axes[0].unit,
+        x_label=x_label,
         y_label=y_label,
-        y_unit=y_unit,
-        out_label=output.labels[out_axis],
-        out_unit=output.units[out_axis],
-        vmin=vmin,
-        vmax=vmax,
+        z_label=out_label if is_3d else "",
+        is_3d=is_3d,
+        legend=True,
     )
+
+    return FigureSpec(panels=(panel,), figsize=FIGSIZE_BASE)
 
 
 def evaluate_axes(

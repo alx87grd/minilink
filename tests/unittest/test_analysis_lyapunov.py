@@ -276,3 +276,24 @@ def test_plot_overlays_leave_the_system_run_and_start_untouched():
     assert len(ax.lines) >= 4  # each overlay: its path and its start
     assert sys.traj is traj
     np.testing.assert_array_equal(sys.x0, [1.0, -1.0])
+
+
+@pytest.mark.plotting
+def test_the_plot_draws_with_plotly():
+    pytest.importorskip("plotly")
+    sys = StableLinear()
+    region = region_of_attraction(sys)
+
+    drawn = plot_region_of_attraction(
+        sys,
+        region,
+        basin=True,
+        trajectories=[[2.0, 1.0]],
+        renderer="plotly",
+        show=False,
+    )
+    kinds = [type(trace).__name__ for trace in drawn.figure.data]
+    assert kinds[0] == "Heatmap"  # the basin, a filled band
+    assert "Contour" in kinds and kinds.count("Scatter") == 4
+    names = {trace.name for trace in drawn.figure.data}
+    assert {"converges in simulation", "region", "trajectory", "equilibrium"} <= names

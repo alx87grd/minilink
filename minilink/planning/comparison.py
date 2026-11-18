@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
+from minilink.graphical.figure import TAB10, FigureSpec, Panel, Trace, draw
+from minilink.graphical.signals.time_signals import TIME_ABSCISSA_LABEL
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import ProblemEvaluator
 from minilink.planning.plotting import (
     controller_law_figure,
-    cost_to_go_heatmap,
-    maybe_show,
-    plot_result_of,
+    cost_to_go_panel,
     sample_field,
 )
 from minilink.planning.problems import PlanningProblem
@@ -22,8 +22,8 @@ from minilink.planning.results import (
     require_cost_to_go,
 )
 
-# Matplotlib is imported inside each view, so the planning layer stays importable
-# without a display backend until a plot is requested.
+# One colour per solution, the same on every row
+SOLUTION_COLORS = TAB10
 
 
 ###############################################################################
@@ -142,16 +142,17 @@ class Comparison:
         bounds=None,
         grid_shape=(101, 101),
         t=0.0,
-        show=True,
+        title="",
+        renderer="matplotlib",
+        show=None,
+        ax=None,
     ):
-        """One panel per feedback law, side by side, one colour scale from the problem's inputs: a :class:`PlotResult` (``.figure``, ``.axes``)."""
-        import matplotlib.pyplot as plt
-
+        """One panel per feedback law, side by side, one colour scale from the problem's inputs: a :class:`PlotResult`, ``title`` above the panels."""
         # One panel per law, each the controller's own, titled by its name
-        fig, axes = panels(plt, len(self))
-        for ax, (name, solution) in zip(axes, self.items()):
+        laws = []
+        for name, solution in self.items():
             solution.require_feedback_law()
-            controller_law_figure(
+            law = controller_law_figure(
                 solution,
                 x_axis=x_axis,
                 y_axis=y_axis,
@@ -159,14 +160,11 @@ class Comparison:
                 bounds=bounds,
                 grid_shape=grid_shape,
                 t=t,
-                ax=ax,
-                show=False,
             )
-            ax.set_title(name)
+            laws.append(replace(law.panels[0], title=name))
+        spec = side_by_side(laws, title)
 
-        maybe_show(plt, show)
-
-        return plot_result_of((fig, axes))
+        return draw(spec, renderer=renderer, show=show, ax=ax)
 
     def plot_cost_to_go(
         self,
@@ -178,11 +176,12 @@ class Comparison:
         grid_shape=(51, 51),
         t=0.0,
         jmax=None,
-        show=True,
+        title="",
+        renderer="matplotlib",
+        show=None,
+        ax=None,
     ):
-        """One panel per cost-to-go field, side by side, one colour scale (``jmax`` or the largest finite value): a :class:`PlotResult`."""
-        import matplotlib.pyplot as plt
-
+        """One panel per cost-to-go field, side by side, one colour scale (``jmax`` or the largest finite value): a :class:`PlotResult`, ``title`` above the panels."""
         sweep = dict(
             x_axis=x_axis,
             y_axis=y_axis,
@@ -209,56 +208,65 @@ class Comparison:
             jmax = max(float(np.nanmax(J)) for _, _, J in samples.values())
 
         # One panel per field, titled by its name
-        fig, axes = panels(plt, len(fields))
-        for ax, (name, (x_level, y_level, J)) in zip(axes, samples.items()):
-            problem = fields[name].problem
-            cost_to_go_heatmap(
-                problem, x_level, y_level, J, x_axis, y_axis, jmax, name, ax
+        heatmaps = [
+            cost_to_go_panel(
+                fields[name].problem, x_level, y_level, J, x_axis, y_axis, jmax, name
             )
+            for name, (x_level, y_level, J) in samples.items()
+        ]
+        spec = side_by_side(heatmaps, title)
 
-        maybe_show(plt, show)
+        return draw(spec, renderer=renderer, show=show, ax=ax)
 
-        return plot_result_of((fig, axes))
-
-    def plot_trajectory(self, *, signals=("x", "u"), show=True):
-        """The plans and the controllers' runs overlaid, one row per signal component, legend by name: a :class:`PlotResult`."""
-        import matplotlib.pyplot as plt
-
+    def plot_trajectory(
+        self,
+        *,
+        signals=("x", "u"),
+        title="plans and runs",
+        renderer="matplotlib",
+        show=None,
+        ax=None,
+    ):
+        """The plans and the controllers' runs overlaid, one row per signal component, legend by name: a :class:`PlotResult`, ``title`` over the first row."""
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.signals.time_signals import build_signal_plot_spec
+        from minilink.graphical.signals.time_signals import signal_figure
 
-        # One plot spec per solution, on the first solution's system
+        # One description per solution, on the first solution's system
         first = next(iter(self.solutions.values()))
         sys = first.problem.sys
         specs = {
-            name: build_signal_plot_spec(
-                sys, drawn_trajectory_of(solution), signals=signals
-            )
+            name: signal_figure(sys, drawn_trajectory_of(solution), signals=signals)
             for name, solution in self.items()
         }
 
-        # One row per signal component
-        n_rows = len(next(iter(specs.values())).traces)
-        fig, axes = plt.subplots(n_rows, 1, sharex=True, figsize=(8.0, 1.8 * n_rows))
-        axes = [axes] if n_rows == 1 else list(axes)
+        # One row per signal component, each solution in its colour on every row; the
+        # rows labelled from the first spec, the names, the legend and the title on
+        # the first
+        rows = next(iter(specs.values())).panels
+        n_rows = len(rows)
+        panels = [
+            Panel(
+                layers=tuple(
+                    Trace(
+                        spec.panels[k].layers[0].x,
+                        spec.panels[k].layers[0].y,
+                        color=SOLUTION_COLORS[m % len(SOLUTION_COLORS)],
+                        label=name if k == 0 else "",
+                    )
+                    for m, (name, spec) in enumerate(specs.items())
+                ),
+                title=title if k == 0 else "",
+                x_label=TIME_ABSCISSA_LABEL if k == n_rows - 1 else "",
+                y_label=row.y_label.replace("\n", " "),
+                legend=True,
+            )
+            for k, row in enumerate(rows)
+        ]
+        spec = FigureSpec(
+            panels=tuple(panels), share_x=True, figsize=(8.0, 1.8 * n_rows)
+        )
 
-        # Every solution's traces, labelled by its name
-        for name, spec in specs.items():
-            for ax, trace in zip(axes, spec.traces):
-                ax.plot(spec.t, trace.values, label=name)
-
-        # The rows labelled from the first spec, then the legend and the title
-        for ax, trace in zip(axes, next(iter(specs.values())).traces):
-            unit = f" [{trace.unit}]" if trace.unit else ""
-            ax.set_ylabel(trace.label + unit)
-            ax.grid(True, alpha=0.3)
-        axes[0].legend(loc="upper right", fontsize=8)
-        axes[0].set_title("plans and runs")
-        axes[-1].set_xlabel("Time [s]")
-
-        maybe_show(plt, show)
-
-        return plot_result_of((fig, axes))
+        return draw(spec, renderer=renderer, show=show, ax=ax)
 
     # Display
 
@@ -423,10 +431,13 @@ def require_solutions(named):
             )
 
 
-def panels(plt, n):
-    """One row of ``n`` panels side by side: the figure and the list of its axes."""
-    fig, axes = plt.subplots(1, n, figsize=(4.5 * n, 4.0), squeeze=False)
-    return fig, list(axes[0])
+def side_by_side(panels, title):
+    """One row of panels side by side, ``title`` above them, as a description."""
+    n = len(panels)
+
+    return FigureSpec(
+        panels=tuple(panels), title=title, n_cols=n, figsize=(4.5 * n, 4.0)
+    )
 
 
 def require_some_cost_to_go(fields):

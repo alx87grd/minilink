@@ -112,8 +112,6 @@ def animate_modal(
     renderer="matplotlib",
     is_3d=False,
     show=True,
-    html=None,
-    native=True,
 ):
     """
     Linearize, excite selected mode(s), and animate them on ``sys``.
@@ -136,8 +134,9 @@ def animate_modal(
 
     Returns
     -------
-    poles, modes
-        Same as :func:`modal_analysis`.
+    AnimationResult, or a list of them
+        One mode's animation, or one per mode for ``mode="all"``; the poles and
+        mode shapes are :func:`modal_analysis`'s.
     """
     # The operating point: the one given, else the nominal
     x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
@@ -147,6 +146,7 @@ def animate_modal(
 
     # The modes to animate: the one asked for, or every one
     indices = range(len(poles)) if mode == "all" else [int(mode)]
+    animations = []
     for index in indices:
         # Mode i: its pole λᵢ and its shape vᵢ
         pole = poles[index]
@@ -165,19 +165,18 @@ def animate_modal(
         # The mode as an absolute trajectory, drawn by the system's own kinematics
         traj = Trajectory(t=time, x=x, u=u)
         title = f"Mode {index}: {pole.real:.1f}{pole.imag:+.1f}j"
-        inline = sys.animate(
-            traj,
-            speed=speed,
-            is_3d=is_3d,
-            html=html,
-            renderer=renderer,
-            native=native,
-            scene_title=title,
-            show=show,
+        animations.append(
+            sys.animate(
+                traj,
+                speed=speed,
+                is_3d=is_3d,
+                renderer=renderer,
+                scene_title=title,
+                show=show,
+            )
         )
-        display_inline(inline)
 
-    return poles, modes
+    return animations if mode == "all" else animations[0]
 
 
 ###############################################################################
@@ -197,22 +196,3 @@ def mode_horizon(pole, tf):
         horizon = float(np.clip(4.0 * np.pi / norm + 1.0, 1.0, 30.0))
 
     return horizon
-
-
-def display_inline(animation):
-    """Show the inline animation a notebook renderer returned (``html=True``); nothing otherwise."""
-    if animation is None:
-        return
-
-    # IPython is optional: it loads only to show a notebook's inline animation
-    from IPython.display import display
-
-    display(animation)
-
-
-if __name__ == "__main__":
-    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-
-    poles, modes = modal_analysis(Pendulum(), x_bar=[0.0, 0.0])
-    for index, pole in enumerate(poles):
-        print(index, pole)

@@ -20,7 +20,6 @@ from minilink.core.geometry import Sphere
 from minilink.core.shaping import inverse_barrier
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import mount, point_probe
-from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.plotting import plot_cost_field
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.trajectory_optimization.planner import (
@@ -102,22 +101,19 @@ sys.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45)])
 
 # Plot the obstacle cost field
 
-cost_grid = sample_field_costs(
+ax = plot_cost_field(
     [obstacle_cost],
     bounds=PLOT_BOUNDS,
     state_dim=sys.n,
     grid=(120, 120),
     u=np.zeros(sys.m),
-)
-_, ax = plot_cost_field(
-    cost_grid,
     show=False,
     log_scale=True,
     title=(
         f"Obstacle cost map (w={OBSTACLE_REPULSION_WEIGHT}, "
         f"eps={OBSTACLE_REPULSION_EPS})"
     ),
-)
+).axes
 scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title="")
 ax.plot(traj.x[0, :], traj.x[1, :], color="k", linewidth=1.5, label="planned")
 ax.legend(loc="upper left")
