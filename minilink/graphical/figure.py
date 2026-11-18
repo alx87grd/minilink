@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
 from dataclasses import dataclass, replace
 from typing import Any
+
+import numpy as np
 
 ###############################################################################
 # Public API
@@ -217,8 +220,6 @@ RENDERER_MODULES = {
 
 def renderer_module(renderer):
     """The module that draws with ``renderer``."""
-    import importlib
-
     require_renderer(renderer)
 
     return importlib.import_module(RENDERER_MODULES[renderer])
@@ -292,3 +293,27 @@ def distinct_colours(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
 def has_colorbar(panel) -> bool:
     """Whether a panel holds a layer with a colour bar."""
     return any(getattr(layer, "colorbar", None) is not None for layer in panel.layers)
+
+
+def grid_of(spec: FigureSpec) -> tuple[int, int]:
+    """The ``(n_rows, n_cols)`` of ``spec``'s panel grid, read row by row; no more columns than panels."""
+    n = len(spec.panels)
+    n_cols = min(spec.n_cols, n)
+    n_rows = -(-n // n_cols)
+
+    return n_rows, n_cols
+
+
+def direction_arrow_spans(n_samples: int, count: int = 3) -> list:
+    """The ``(start, end)`` samples of ``count`` direction arrows on a line; none under 3 samples.
+
+    The arrows spread over the middle 70 % of the samples, each 1/50 of them
+    long, none past the end.
+    """
+    if n_samples < 3:
+        return []
+    span = max(1, n_samples // 50)
+    starts = np.linspace(n_samples * 0.15, n_samples * 0.85, count).astype(int)
+    starts = np.minimum(starts, n_samples - 1 - span)
+
+    return [(k, k + span) for k in starts]

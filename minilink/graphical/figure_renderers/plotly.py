@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import numpy as np
+import plotly.figure_factory as ff
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from scipy.interpolate import RegularGridInterpolator
 
 from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.common.plotly_style import PLOTLY_TEMPLATE
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import (
     Arrows,
@@ -17,6 +20,8 @@ from minilink.graphical.figure import (
     RefLine,
     Surface,
     Trace,
+    direction_arrow_spans,
+    grid_of,
     overlay,
 )
 
@@ -45,8 +50,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
 
     # The subplot grid, a 3-D scene where a panel is 3-D
     n = len(spec.panels)
-    n_cols = min(spec.n_cols, n)
-    n_rows = -(-n // n_cols)
+    n_rows, n_cols = grid_of(spec)
     kinds = [{"type": "scene"} if panel.is_3d else {} for panel in spec.panels]
     kinds += [{}] * (n_rows * n_cols - n)
     fig = make_subplots(
@@ -62,7 +66,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
         draw_panel(fig, panel, *cell_of(k, n_cols), axis_names(fig, k, panel))
     fig.update_layout(
         title=spec.title or None,
-        template="plotly_white",
+        template=PLOTLY_TEMPLATE,
         legend={
             "x": 0.99,
             "y": 0.99,
@@ -81,7 +85,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
 
 def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
     """Add the layers of ``spec`` to the panels of the drawn Plotly figure ``host``."""
-    n_cols = min(host.spec.n_cols, len(host.spec.panels))
+    _, n_cols = grid_of(host.spec)
     for k, panel in enumerate(spec.panels):
         row, col = cell_of(k, n_cols)
         for layer in panel.layers:
@@ -205,21 +209,14 @@ def draw_trace(fig, trace: Trace, row, col):
         draw_direction_arrows(fig, x, y, trace.color or "#1f77b4", row, col)
 
 
-def draw_direction_arrows(fig, x, y, color, row, col, count: int = 3):
+def draw_direction_arrows(fig, x, y, color, row, col):
     """Direction arrows spread over the middle of a line, as annotations."""
-    if x.size < 3:
-        return
-
-    # Over the middle 70 % of the samples, each 1/50 of them long, none past the end
-    span = max(1, x.size // 50)
-    starts = np.linspace(x.size * 0.15, x.size * 0.85, count).astype(int)
-    starts = np.minimum(starts, x.size - 1 - span)
-    for k in starts:
+    for start, end in direction_arrow_spans(x.size):
         fig.add_annotation(
-            x=x[k + span],
-            y=y[k + span],
-            ax=x[k],
-            ay=y[k],
+            x=x[end],
+            y=y[end],
+            ax=x[start],
+            ay=y[start],
             xref="x",
             yref="y",
             axref="x",
@@ -382,8 +379,6 @@ def colorbar_of(layer):
 
 def draw_vector_field(fig, arrows: Arrows, row, col):
     """Arrows scaled so the longest spans 0.9 of a grid cell, or streamlines."""
-    import plotly.figure_factory as ff
-
     X, Y = np.asarray(arrows.x, dtype=float), np.asarray(arrows.y, dtype=float)
     U, V = np.asarray(arrows.u, dtype=float), np.asarray(arrows.v, dtype=float)
     x_values, y_values = X[0, :], Y[:, 0]
@@ -407,7 +402,6 @@ def square_grid(x_values, y_values, U, V):
     """The field on an ``n × n`` grid over the same window: Plotly's streamlines need one."""
     if x_values.size == y_values.size:
         return x_values, y_values, U, V
-    from scipy.interpolate import RegularGridInterpolator
 
     n = max(x_values.size, y_values.size)
     xs = np.linspace(x_values[0], x_values[-1], n)

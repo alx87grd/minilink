@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import PowerNorm
 
-from minilink.graphical.common.matplotlib_style import DPI_FIGURE
+from minilink.graphical.common.matplotlib_style import DPI_FIGURE, FONT_SIZE
 from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import (
@@ -17,20 +18,18 @@ from minilink.graphical.figure import (
     RefLine,
     Surface,
     Trace,
+    direction_arrow_spans,
+    grid_of,
     overlay,
 )
 
-# The description's marker names in matplotlib's spelling
+# The description's marker and dash names in matplotlib's spelling
 MARKERS = {"o": "o", "o-open": "o", "s": "s", "x": "x", "+": "+", "*": "*"}
+DASHES = {"solid": "-", "dash": "--", "dot": ":"}
 
 # TrueType (Type 42) fonts in PDF and PostScript exports: their text stays editable
 plt.rcParams["pdf.fonttype"] = 42
 plt.rcParams["ps.fonttype"] = 42
-
-# The description's dash names in matplotlib's spelling
-DASHES = {"solid": "-", "dash": "--", "dot": ":"}
-
-FONT_SIZE = 10
 
 
 ###############################################################################
@@ -90,8 +89,7 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
 def new_axes(spec: FigureSpec):
     """A figure of ``spec``'s panels on its grid: ``(fig, axes)``, 3-D panels on 3-D axes."""
     n = len(spec.panels)
-    n_cols = min(spec.n_cols, n)
-    n_rows = -(-n // n_cols)
+    n_rows, n_cols = grid_of(spec)
     fig = plt.figure(figsize=spec.figsize, dpi=DPI_FIGURE)
     axes = []
     for k, panel in enumerate(spec.panels):
@@ -242,8 +240,6 @@ def draw_note(ax, note: Note):
 
 def draw_heatmap(ax, heatmap: Heatmap):
     """A heatmap on the mesh, smooth between the nodes or one cell per value, and its colour bar."""
-    from matplotlib.colors import PowerNorm
-
     norm = None
     if heatmap.gamma != 1.0:
         norm = PowerNorm(gamma=heatmap.gamma, vmin=heatmap.vmin, vmax=heatmap.vmax)
@@ -293,8 +289,6 @@ def draw_contour(ax, contour: Contour):
 
 def draw_surface(ax, surface: Surface):
     """A 3-D surface over the mesh, coloured by value, and its colour bar."""
-    from matplotlib.colors import PowerNorm
-
     mesh_x, mesh_y = np.meshgrid(surface.x, surface.y)
     scale = {"vmin": surface.vmin, "vmax": surface.vmax}
     if surface.gamma != 1.0:
@@ -336,20 +330,13 @@ def draw_vector_field(ax, arrows: Arrows):
         ax.plot([], [], color=arrows.color, label=arrows.label)
 
 
-def draw_direction_arrows(ax, x, y, color, count: int = 3):
+def draw_direction_arrows(ax, x, y, color):
     """Direction arrows spread over the middle of a line."""
-    if x.size < 3:
-        return
-
-    # Over the middle 70 % of the samples, each 1/50 of them long, none past the end
-    span = max(1, x.size // 50)
-    starts = np.linspace(x.size * 0.15, x.size * 0.85, count).astype(int)
-    starts = np.minimum(starts, x.size - 1 - span)
-    for k in starts:
+    for start, end in direction_arrow_spans(x.size):
         ax.annotate(
             "",
-            xy=(x[k + span], y[k + span]),
-            xytext=(x[k], y[k]),
+            xy=(x[end], y[end]),
+            xytext=(x[start], y[start]),
             arrowprops={"arrowstyle": "-|>", "color": color, "lw": 1.5},
         )
 
