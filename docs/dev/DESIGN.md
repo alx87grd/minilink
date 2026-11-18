@@ -1357,7 +1357,8 @@ trajectory=, title=, ax=, renderer=, show=`) that the planners repeat as a thin 
 their latest solution (value iteration adds only `field=`, another table of its grid), a
 grid planner's table drawn on the grid's own nodes unless the call asks for another mesh;
 these plots, like every plot, return a `PlotResult` and the animations an
-`AnimationResult` (§7); `plot_trajectory`, `animate` and `plot_cost` draw the
+`AnimationResult` (§7); `is_3d=True` draws the surface of the field in place of the
+heatmap, one figure; `plot_trajectory`, `animate` and `plot_cost` draw the
 plan when there is one, else the controller run once from the problem's start through
 the problem's evaluator (`problem.compile(controller, dt)`, the loop the score runs: a
 continuous law integrated on the views' optional `dt`, `None` the evaluator's automatic
@@ -1937,7 +1938,8 @@ Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`
 `graphical/figure.py`, exported on `minilink.graphical` (not on the root): a `FigureSpec`
 is a title and a grid of `Panel`s read row by row (`n_cols`, `share_x`, `figsize`); a
 `Panel` holds its labels, limits, `x_log`, `y_ticks`, `equal_aspect`, `is_3d`, `legend`
-and an ordered tuple of layers, of seven kinds: `Trace` (a polyline or a point set, NaN
+(a bool: a legend when a layer is labelled; matplotlib places it where it fits best, Plotly
+draws one per figure, none when no panel asks) and an ordered tuple of layers, of seven kinds: `Trace` (a polyline or a point set, NaN
 breaking a line, `fill=True` closing and filling it), `RefLine`, `Note`, `Heatmap`,
 `Contour`, `Surface`, `Arrows` (quiver or stream). The objects are frozen; a colour is a
 CSS name or a hex code, and a `Trace` with `color=None` takes the renderer's colour cycle.
@@ -1947,9 +1949,10 @@ caller's own call on `result.figure` or `result.axes`.
 
 `draw(spec, *, renderer="matplotlib", show=None, ax=None)` draws with
 `figure_renderers/matplotlib.py` or `figure_renderers/plotly.py`; both draw every layer.
-Those two, the animation renderers, the show step and the matplotlib-only figures (the
-grid and search animations, the live figures, the colour maps) are the only modules that
-import a drawing library. Every public `plot_*` takes `renderer=`, `show=None` and `ax=`
+Those two, the animation renderers, the show and save steps and the matplotlib-only
+figures (the grid and line animations, the live figures, the colour maps) are the only
+modules that import a drawing library; the search plot builds its animation and live frames
+as data, and graphics import no planning module for them. Every public `plot_*` takes `renderer=`, `show=None` and `ax=`
 and returns a `PlotResult`; `plot_diagram` is the one exception (below).
 `tests/unittest/test_plot_contract.py` checks both rules on the source.
 
@@ -1957,17 +1960,21 @@ and returns a `PlotResult`; `plot_diagram` is the one exception (below).
   (matplotlib's or Plotly's; Graphviz's graph), `axes` matplotlib's `Axes` for a one-panel
   figure and a list in panel order for several (`None` on the other renderers), `spec` the
   description drawn. It does not unpack into a pair. `.show()` shows it as `show=True`
-  does; `.save(file_name)` writes it in the format of the extension (matplotlib any format
-  it knows, Plotly an `.html` page or an image through kaleido, Graphviz `.pdf`, `.svg`,
+  does; `.save(file_name)` writes it in the format of the extension and returns the path
+  written (matplotlib any format it knows, a `.png` without an extension; Plotly an `.html`
+  page, the default, or an image through kaleido; Graphviz `.pdf`, the default, `.svg`,
   `.png`). Saving is that one call, on the record.
 - **`renderer=None`** draws nothing: the record holds `spec` alone, for tests and for grids
   assembled from descriptions.
 - **Composition, `ax=`:** a matplotlib `Axes` (a list of them for a multi-panel plot) or a
   `PlotResult`. The plot adds its layers to the host's panels, panel by panel, and sets a
-  panel's title, labels, limits and scales only where the host has none. Refused by name:
-  another panel count, a 3-D layer into a 2-D panel, a second colour bar in one panel, a
-  host with no description, a `renderer=` other than the host's. A legend entry that
-  repeats a host label is not added again. The returned record holds the host's
+  panel's title, labels, limits and scales only where the host has none, and a figure
+  title only where the figure has none. Refused by name: another panel count, a 3-D layer
+  into a 2-D panel or a 2-D one into a 3-D panel, a second colour bar in one panel, a host
+  with no description, a host that holds a description only (`renderer=None`: draw it
+  first). The default `renderer=` follows the host's. A line in a colour its host panel
+  draws takes a free colour, one per clashing colour; a legend entry that repeats a host
+  label is not added again. The returned record holds the host's
   description with the overlay's layers.
 - **`show=None`** shows unless `ax=` is given: a plot drawn into a host leaves the showing
   to the host.
@@ -1994,9 +2001,12 @@ first.save("two_runs.pdf")
 
 - **Shown at the line that draws it,** in code order: in a notebook a figure is displayed at
   its call, and an inline matplotlib figure is then closed, so a cell with a diagram, an
-  animation and a plot shows each once, in that order. The records display nothing as a
-  cell's last expression. A change made after the call starts from `show=False`, then
-  `.show()`.
+  animation and a plot shows each once, in that order. A matplotlib figure built and not
+  shown is closed too where the inline backend would show it at the cell's end; its
+  record's `.show()` still displays it, and a figure on the caller's own axes is left to
+  the caller. The records display nothing as a cell's last expression. A change made after
+  the call starts from `show=False`, then `.show()`. A window shows its own figure alone,
+  and a bare script blocks on that figure until it closes.
 - **Nowhere to show:** `show=True` shows nothing where the place cannot show it (a
   non-interactive matplotlib backend such as Agg, Linux without `DISPLAY` or
   `WAYLAND_DISPLAY`); an explicit `"inline"` or `"window"` there is refused by name, and so
@@ -2004,17 +2014,21 @@ first.save("two_runs.pdf")
 - **`MINILINK_HEADLESS=1`** (any value but empty or `0`) shows nothing, explicit places
   included: the switch of the test suite, the demo and notebook runners and CI.
 
-**Animations.** Every animation (`render`, `animate` on a system, a sampled loop or a
-planner, `animate_modal`, the grid and search animations) takes `renderer=` and `show=True`
-and returns an `AnimationResult(renderer, figure, animation)` with `.show()` and
-`.save(file_name)`; `animate_modal(mode="all")` returns a list of them, and `render(x, u, t)`
-a record of one frame. `figure` is matplotlib's or Plotly's figure or Meshcat's viewer
-(`None` on pygame); `animation` matplotlib's `FuncAnimation` or Meshcat's `Animation`
-(`None` on Plotly, whose frames sit in its figure, and on pygame). The clip is built on
-first use, so a record made with `show=False` starts no Meshcat viewer until it is shown or
-saved. `.save` writes matplotlib's `.gif` (the default) or a video through ffmpeg (`.mp4`),
-and Meshcat's and Plotly's self-contained `.html` page; a pygame record has nothing to save
-and refuses by name.
+**Animations.** Every animation returns an `AnimationResult` with `.show()` and
+`.save(file_name)`. `render`, `animate` on a system, a sampled loop or a planner, and
+`animate_modal` take `renderer=` and `show=True`; `animate_modal(mode="all")` returns a list
+of records, and `render(x, u, t)` a record of one frame. The DP and search animations
+(`animate_cost_to_go`, `animate_control_law`, `animate_search`, `animate_convergence`, on
+the module and the planner) are drawn with matplotlib alone: they take
+`renderer="matplotlib"` (any other refused by name), `show=None` (played unless drawn into
+`ax=`), `ax=` and `interval=`. The record holds the renderer and its clip; its `figure`
+and `animation` are properties of the clip: `figure` is matplotlib's or Plotly's figure or
+Meshcat's viewer (`None` on pygame); `animation` matplotlib's `FuncAnimation` or Meshcat's
+`Animation` (`None` on Plotly, whose frames sit in its figure, and on pygame). The clip is
+built on first use, so a record made with `show=False` starts no Meshcat viewer until it is
+shown or saved. `.save` writes matplotlib's `.gif` (the default) or a video through ffmpeg
+(`.mp4`), any other suffix refused by name, and Meshcat's and Plotly's self-contained
+`.html` page; a pygame record has nothing to save and refuses by name.
 
 Matplotlib, Plotly and Meshcat always play a clip; pygame, which has none, draws the frames
 live. Meshcat keyframes rigid poses (and the camera's slide, below), and turns
