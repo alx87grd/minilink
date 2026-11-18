@@ -12,15 +12,8 @@ from minilink.analysis.linearization import (
 )
 from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
 from minilink.graphical.common import PlotResult
-from minilink.graphical.control import (
-    ControlFigure,
-    Note,
-    Panel,
-    RefLine,
-    Trace,
-    render_control_figure,
-    style,
-)
+from minilink.graphical.control import style
+from minilink.graphical.figure import FigureSpec, Note, Panel, RefLine, Trace, draw
 
 ###############################################################################
 # Public API
@@ -158,7 +151,8 @@ def plot_step_response(
     method: str = "auto",
     eps: float = 1e-6,
     renderer="matplotlib",
-    show: bool = True,
+    show=None,
+    ax=None,
 ) -> PlotResult:
     """Step response of the selected channel with rise time, settling time and overshoot.
 
@@ -186,7 +180,7 @@ def plot_step_response(
 
     figure = step_figure(time, y, info, sys, of, wrt, discrete_period(sys))
 
-    return render_control_figure(figure, renderer=renderer, show=show)
+    return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################
@@ -243,33 +237,39 @@ def step_figure(time, y, info, sys, of, wrt, period=None):
     # The response, hovered sample by sample, and its peak; in z, the samples y_k
     hover = tuple(f"t = {tk:.3g} s<br>{output} = {yk:.3g}" for tk, yk in zip(time, y))
     if period is None:
-        response = Trace(time, y, style.SYSTEM_COLOR, hover=hover)
+        response = Trace(time, y, color=style.SYSTEM_COLOR, hover=hover)
     else:
         response = Trace(
             time,
             y,
-            style.SYSTEM_COLOR,
+            color=style.SYSTEM_COLOR,
             mode="markers",
-            marker="o",
+            marker="o-open",
             size=5.0,
             hover=hover,
         )
     t_peak = np.array([info["peak_time"]])
     y_peak = np.array([info["peak"]])
-    peak = Trace(t_peak, y_peak, style.SYSTEM_COLOR, mode="markers", marker="o")
+    peak = Trace(
+        t_peak,
+        y_peak,
+        color=style.SYSTEM_COLOR,
+        mode="markers",
+        marker="o-open",
+        size=8.0,
+    )
 
     # One panel, with room under the response for the note
     notes = (Note(note, x=0.55, y=0.04),) if note else ()
     y_lim = (min(0.0, float(y.min())) - 0.35 * span, float(y.max()) + 0.1 * span)
     panel = Panel(
-        traces=(response, peak),
-        lines=lines,
-        notes=notes,
+        layers=(response, peak, *lines, *notes),
+        title=subtitle,
         x_label=style.TIME_LABEL,
         y_label=y_label,
         y_lim=y_lim,
     )
 
-    figure = ControlFigure(title=title, subtitle=subtitle, panels=(panel,))
+    figure = FigureSpec(title=title, panels=(panel,), figsize=style.PANEL_FIGSIZE)
 
     return figure

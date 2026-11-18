@@ -432,22 +432,18 @@ class TestPlots(unittest.TestCase):
         r = plot_bode(self.plant, renderer="plotly", show=False)
         self.assertEqual(r.figure.layout.xaxis.type, "log")
         self.assertIn("Bode Diagram", r.figure.layout.title.text)
-        self.assertIn("From: tau", r.figure.layout.title.text)
+        panel_titles = [note.text for note in r.figure.layout.annotations]
+        self.assertTrue(any("From: tau" in text for text in panel_titles))
         self.assertTrue(r.figure.data[0].hovertext[0].startswith("ω ="))
         r = plot_root_locus(self.plant, renderer="plotly", show=False)
         self.assertIn("K =", r.figure.data[0].hovertext[1])
 
     def test_unknown_backend_is_refused(self):
-        with self.assertRaisesRegex(ValueError, "Unknown renderer"):
+        with self.assertRaisesRegex(ValueError, "renderer must be one of"):
             plot_bode(self.plant, renderer="bokeh", show=False)
 
     def test_a_short_trace_draws_its_three_arrows_on_both_backends(self):
-        from minilink.graphical.control import (
-            ControlFigure,
-            Panel,
-            Trace,
-            render_control_figure,
-        )
+        from minilink.graphical import FigureSpec, Panel, Trace, draw
 
         backends = ["matplotlib"]
         try:
@@ -459,11 +455,11 @@ class TestPlots(unittest.TestCase):
         for n in (3, 4, 5, 6):
             x = np.linspace(0.0, 1.0, n)
             trace = Trace(x=x, y=x**2, color="#1f77b4", arrows=True)
-            panel = Panel(traces=(trace,), x_label="x", y_label="y")
-            spec = ControlFigure(title="arrows", panels=(panel,))
+            panel = Panel(layers=(trace,), x_label="x", y_label="y")
+            spec = FigureSpec(title="arrows", panels=(panel,))
             for backend in backends:
                 with self.subTest(n=n, backend=backend):
-                    r = render_control_figure(spec, renderer=backend, show=False)
+                    r = draw(spec, renderer=backend, show=False)
                     if backend == "plotly":
                         arrows = r.figure.layout.annotations
                     else:

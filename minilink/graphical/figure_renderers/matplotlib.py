@@ -22,6 +22,10 @@ from minilink.graphical.figure import (
 # The description's marker names in matplotlib's spelling
 MARKERS = {"o": "o", "o-open": "o", "s": "s", "x": "x", "+": "+", "*": "*"}
 
+# TrueType (Type 42) fonts in PDF and PostScript exports: their text stays editable
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
+
 # The description's dash names in matplotlib's spelling
 DASHES = {"solid": "-", "dash": "--", "dot": ":"}
 
@@ -49,6 +53,8 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
         draw_panel(target, panel, fill_only=fill_only)
     if spec.title:
         fig.suptitle(spec.title, fontsize=FONT_SIZE + 1)
+    if ax is None:
+        fig.tight_layout()
 
     show_figure(fig, "matplotlib", show)
 
@@ -131,6 +137,8 @@ def draw_panel(ax, panel, *, fill_only):
         ax.grid(True, which="minor", linestyle=":", alpha=0.25)
     else:
         ax.grid(True, alpha=0.3)
+    if panel.y_ticks is not None:
+        ax.set_yticks(panel.y_ticks)
     if panel.equal_aspect:
         ax.set_aspect("equal", adjustable="box")
 

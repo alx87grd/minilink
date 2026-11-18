@@ -146,7 +146,13 @@ def draw_panel(fig, panel, row, col, names):
         row=row,
         col=col,
     )
-    fig.update_yaxes(title_text=panel.y_label, range=panel.y_lim, row=row, col=col)
+    fig.update_yaxes(
+        title_text=panel.y_label,
+        range=panel.y_lim,
+        tickvals=None if panel.y_ticks is None else list(panel.y_ticks),
+        row=row,
+        col=col,
+    )
     if panel.equal_aspect:
         fig.update_yaxes(scaleanchor=names[0].replace("axis", ""), row=row, col=col)
 
@@ -195,6 +201,36 @@ def draw_trace(fig, trace: Trace, row, col):
         )
         return
     fig.add_trace(go.Scatter(x=x, y=y, **style, **common), row=row, col=col)
+    if trace.arrows and trace.mode != "markers":
+        draw_direction_arrows(fig, x, y, trace.color or "#1f77b4", row, col)
+
+
+def draw_direction_arrows(fig, x, y, color, row, col, count: int = 3):
+    """Direction arrows spread over the middle of a line, as annotations."""
+    if x.size < 3:
+        return
+
+    # Over the middle 70 % of the samples, each 1/50 of them long, none past the end
+    span = max(1, x.size // 50)
+    starts = np.linspace(x.size * 0.15, x.size * 0.85, count).astype(int)
+    starts = np.minimum(starts, x.size - 1 - span)
+    for k in starts:
+        fig.add_annotation(
+            x=x[k + span],
+            y=y[k + span],
+            ax=x[k],
+            ay=y[k],
+            xref="x",
+            yref="y",
+            axref="x",
+            ayref="y",
+            showarrow=True,
+            arrowhead=2,
+            arrowcolor=color,
+            arrowwidth=1.2,
+            row=row,
+            col=col,
+        )
 
 
 def draw_ref_line(fig, line: RefLine, row, col):

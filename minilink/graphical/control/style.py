@@ -25,6 +25,10 @@ TIME_LABEL = "Time (seconds)"
 AMPLITUDE_LABEL = "Amplitude"
 DEVIATION_LABEL = "Deviation Δy"  # A linearization's response, from its operating point
 
+# The figure sizes: one panel, and the Bode stack of two at 0.8 of its height each
+PANEL_FIGSIZE = (4.0, 3.0)
+STACK_FIGSIZE = (4.0, 4.8)
+
 
 ###############################################################################
 # Public API

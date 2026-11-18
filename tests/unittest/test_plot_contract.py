@@ -13,19 +13,9 @@ NOT_FIGURES = {"plot_space_of", "plot_result_of"}
 # The plots that do not take every keyword yet, and the keywords they lack. The
 # list only shrinks: a name that takes them all must leave it.
 NOT_YET = {
-    ("analysis/frequency.py", "plot_bode"): {"ax"},
-    ("analysis/frequency.py", "plot_pzmap"): {"ax"},
-    ("analysis/frequency.py", "plot_root_locus"): {"ax"},
-    ("analysis/frequency.py", "plot_nyquist"): {"ax"},
-    ("analysis/time_response.py", "plot_step_response"): {"ax"},
     ("core/facades/plotting.py", "plot_trajectory"): {"ax"},
     ("core/facades/plotting.py", "plot_cost"): {"ax"},
     ("core/facades/plotting.py", "plot_diagram"): {"renderer", "ax"},
-    ("core/facades/plotting.py", "plot_bode"): {"ax"},
-    ("core/facades/plotting.py", "plot_root_locus"): {"ax"},
-    ("core/facades/plotting.py", "plot_pzmap"): {"ax"},
-    ("core/facades/plotting.py", "plot_nyquist"): {"ax"},
-    ("core/facades/plotting.py", "plot_step_response"): {"ax"},
     ("core/facades/plotting.py", "plot_rollout"): {"ax"},
     ("graphical/diagrams/dot.py", "plot_diagram"): {"renderer", "ax"},
     ("graphical/signals/time_signals.py", "plot_time_signals"): {"ax"},
@@ -83,8 +73,6 @@ RENDERER_MODULES = {
     "graphical/animation/renderers/pygame_renderer.py",
     "graphical/signals/matplotlib_backend.py",
     "graphical/signals/plotly_backend.py",
-    "graphical/control/matplotlib_backend.py",
-    "graphical/control/plotly_backend.py",
 }
 
 DRAWING_LIBRARIES = ("matplotlib", "plotly", "mpl_toolkits")

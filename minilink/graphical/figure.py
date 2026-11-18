@@ -35,6 +35,7 @@ class Panel:
     x_lim: tuple[float, float] | None = None
     y_lim: tuple[float, float] | None = None
     x_log: bool = False
+    y_ticks: tuple[float, ...] | None = None
     equal_aspect: bool = False
     is_3d: bool = False
     legend: str | None = "best"

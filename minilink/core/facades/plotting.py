@@ -272,7 +272,8 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
         title=None,
     ):
         """Bode diagram of one SISO channel, gain and phase margins marked.
@@ -297,6 +298,7 @@ class LinearPlotting:
             eps=eps,
             renderer=renderer,
             show=show,
+            ax=ax,
             title=title,
         )
 
@@ -315,7 +317,8 @@ class LinearPlotting:
         minimal=None,
         radius=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Root locus of one SISO channel closed with ``u = -K y``.
 
@@ -339,6 +342,7 @@ class LinearPlotting:
             radius=radius,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_pzmap(
@@ -355,7 +359,8 @@ class LinearPlotting:
         minimal=None,
         radius=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Plot poles and zeros of one SISO channel.
 
@@ -378,6 +383,7 @@ class LinearPlotting:
             radius=radius,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_nyquist(
@@ -394,7 +400,8 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Nyquist diagram of one SISO channel, with the critical point ``-1``.
 
@@ -417,6 +424,7 @@ class LinearPlotting:
             eps=eps,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_step_response(
@@ -433,7 +441,8 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """Step response of one SISO channel of the linear model, with rise time, settling time and overshoot.
 
@@ -456,6 +465,7 @@ class LinearPlotting:
             eps=eps,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
 
