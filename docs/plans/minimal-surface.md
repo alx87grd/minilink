@@ -1,31 +1,37 @@
 # The minimal surface: the inputs of the end-of-v0.4 rebuild
 
-**Status:** the plan's decisions are ruled (MS-D1 to MS-D7); what landed in v0.4 is the CI
-shape (MS-D3), the short-term test restructure (the `slow` marker and `--runslow`), the
-notebooks (MS-D5) and the benchmarks reduced to the regression gate (MS-D6). Left: the
-maintainer's demo rebuild, then the tests' clean slate (MS-D1), the last steps of v0.4. This
-doc keeps what those two need: the constraint, the test layers and their open options, and
-the draft of the demo set (§4). Its decision ids carry the `MS-` prefix
-(docs/plans/README.md). The row and its "done when": [TODO.md](TODO.md) §1.12.
+**What it is:** the inputs of the two last steps of v0.4: the maintainer's pass over the demos
+and the features, then the tests' clean slate (MS-D1). It holds the constraint, the test
+layers and their open options, and the draft of the demo set (§4). Its decision ids carry the
+`MS-` prefix (docs/plans/README.md). The row and its "done when": [TODO.md](TODO.md) §1.12.
+The candidates by area of the repository are in
+[consolidation-recap.md](consolidation-recap.md); those behind the kept surface in
+[internals-cleanup.md](internals-cleanup.md).
 
 ## 1. The goal and the rulings
 
 **The goal:** a surface designed from the core outward, small enough that the maintainer
 knows every demo and every test layer, and a CI that answers in minutes.
 
-- **MS-D1, tests (2026-11-07):** restructure on the short term, the net for v0.4's sweeps
-  (landed); at the end of v0.4 the maintainer deletes all demos and rebuilds a minimalist set
-  himself; once the new demos are what he wants, the test infrastructure is rebuilt from
-  scratch around the new library.
+- **MS-D1, tests (2026-11-07):** at the end of v0.4 the maintainer rebuilds a minimalist
+  demo set himself; once the new demos are what he wants, the test infrastructure is rebuilt
+  from scratch around the new library.
+- **Nothing is deleted before the maintainer's pass.** He decides himself which demos and
+  which features stay; this document and the two beside it list candidates and drafts, not
+  decisions. `examples/demos/` (94 scripts) and `examples/demos_proposed_minimal/` (9) both
+  stay as they are until then.
+- **The value-iteration animations stay** (`animate_cost_to_go`, `animate_control_law`): they
+  are used in class, whatever the demo set.
 - **MS-D4, the demo set (2026-11-07):** the maintainer's, decided in that rebuild (§4 is the
   draft he reviews).
-- **MS-D5, notebooks (2026-11-07):** the course notebooks keep their paths, their content the
-  maintainer's; the five unique topic pages stay until the repository-structure decision (K5,
-  v0.9).
+- **The notebooks (2026-11-13):** the course and topic notebooks live in the teaching
+  repository ([repository-structure.md](repository-structure.md)); their content and their
+  teaching are the maintainer's, and no row here changes what one does.
 
-**The constraint:** the course PDFs link course notebooks by path (`Notes_OptiRL.pdf` 12,
-`Notes_SystemesAsservis.pdf` 4, checked 2026-10-30). A deleted or renamed course notebook
-breaks a student's link unless the PDF changes with it.
+**The constraint:** the course PDFs link course notebooks by path, on minilink's `main`
+(`Notes_OptiRL.pdf` 12, `Notes_SystemesAsservis.pdf` 4, checked 2026-10-30). The links move
+with the merge of `dev` into `main` after the term (repository-structure.md §2); a notebook
+on an active course's list is not renamed or moved during its term.
 
 ## 2. What the audit found (2026-10-31)
 
@@ -78,9 +84,8 @@ The slowest cases (`pytest --durations=40`) are flagged in the sort.
 
 ## 4. The demo set (MS-D4): a draft for the maintainer's review
 
-**Status:** a draft of 2026-11-12, written on the maintainer's go after he read the proposal;
-the list is his, and each row is open until he rules it. It replaces the 19-row starting list
-of 2026-10-31 (one demo per feature), which kept the shape this section argues against.
+A draft of 2026-11-12, written on the maintainer's go after he read the proposal; the list is
+his, and each row is open until he rules it.
 
 ### 4.1 The problem: a demo per plant and per tool
 
@@ -95,7 +100,7 @@ The 94 scripts of `examples/demos/` as counted on 2026-11-12:
 - 31 use the pendulum, each with another tool: one row of the table, in 31 files;
 - six racecar scripts and six value-iteration scripts are variants of one another;
 - 29 walk one tool (10 analysis, 7 wiring, 6 step systems, 4 plotting, 2 optimizer), as the
-  19 tutorial notebooks already do, in the same order;
+  18 tutorial notebooks already do, in the same order;
 - seven say in their title that they port a Pyro script.
 
 ### 4.2 One home per need
@@ -139,11 +144,12 @@ Open in the list, each the maintainer's:
   demo 8; past the bar the script splits in two.
 - **Demo 5's model:** the kinematic racecar (shortest) or the dynamic one (the flagship).
 - **Demo 8's plant:** the rocket, or the drone or the cart-pole (its budget was an open row).
-- **Demo 9 runs outside the 3-D car's stated validity** (hills of 0.8 m; vehicle-models.md
-  §10.7): a flat course with the formula preset is the alternative.
+- **Demo 9 runs outside the 3-D car's stated validity** (hills of 0.8 m; the model is good on
+  mostly flat ground, as `SuspensionCar3D`'s docstring says and vehicle-models.md §5
+  explains): a flat course with the formula preset is the alternative.
 - **The folder and the file names:** student-facing, not proposed here.
-- The rows the 2026-10-31 list attached (a tabular Q-learning demo beside value iteration,
-  the MPC hyperparameter-tuning demo) are not in the thirteen; they return only as a story.
+- A tabular Q-learning demo beside value iteration and an MPC hyperparameter-tuning demo are
+  not in the thirteen; they return only as a story.
 
 ### 4.4 Where the other scripts go
 
@@ -164,20 +170,21 @@ Open in the list, each the maintainer's:
 | `realtime/` | 4 | 12 kept; the gamepad games to the private repository or kept as extras |
 | `evaluation/` | 1 | into 1 |
 
-"Out" is the maintainer's private repository, after the snapshot tag: nothing is deleted
-without a copy. Before a tool's walk-through leaves the demos, its tutorial section is
+"Out" is the maintainer's private repository, after the snapshot tag and after his pass:
+nothing is deleted without a copy, and nothing before he rules it. Before a tool's walk-through leaves the demos, its tutorial section is
 checked to exist; the tutorials are reduced after the demos, not with them.
 
-### 4.5 The tutorials beside the demos (reviewed 2026-11-12)
+### 4.5 The tutorials beside the demos
 
-The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled the same day:
+The 18 tutorial notebooks (code lines counted 2026-11-18), and what the maintainer ruled on
+2026-11-12:
 
 | Layer | Notebooks | Code lines | What it is | Ruling |
 | --- | --- | --- | --- | --- |
-| `basics/` | 3 | 228 | story-led: a model, a loop, analysis, a plan | kept |
-| `advanced/` | 5 | 470 | one topic each | kept |
-| `core/` | 8 | 799 | the core objects listed method by method, written for the maintainer's API review | **kept until that review is done,** then they go: a stand-in for the documentation of the core classes, not teaching material |
-| showcases | 3 | 670 | landing pages | **one showcase** |
+| `basics/` | 3 | 201 | story-led: a model, a loop, analysis, a plan | kept |
+| `advanced/` | 5 | 480 | one topic each | kept |
+| `core/` | 9 | 806 | the core objects listed method by method, written for the maintainer's API review; the ninth is the plots and animations | **kept until that review is done,** then they go: a stand-in for the documentation of the core classes, not teaching material |
+| the showcase | 1 | 176 | the landing page | **one showcase** |
 
 - **The one showcase** is `showcase_minilink.ipynb`. A first rewrite (2026-11-12) opened on
   a 40-line hand-written pendulum class; the maintainer refused it the same day: a showcase
@@ -186,10 +193,10 @@ The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled 
   the catalog pendulum; diagrams as code, the loop then on a clock; a short model of one's
   own; one `f` differentiated (Jacobians, LQR, a batch of rollouts); one problem for three
   planners and an MPC; the one optimization boundary (a program, two optimizers); a law
-  learned by reinforcement and scored; the same lines on the UR5. 40 cells, 218 code
+  learned by reinforcement and scored; the same lines on the UR5. 40 cells, 176 code
   lines, about a minute. The pendulum family's 2-D look was redrawn for it (a dark rod, a
   blue bob, a hub on a grey mount).
-- **`showcase_jax` and `showcase_from_rl_to_bode` are deleted** (the maintainer,
+- **`showcase_jax` and `showcase_from_rl_to_bode` are gone** (the maintainer,
   2026-11-12). The first is covered by `advanced/05_differentiable`; what it showed that no
   tutorial does (identification by gradient, the C export) is to be covered in the API
   walk-through or not at all. The second was first kept as a demo script, then deleted too
@@ -210,20 +217,20 @@ The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled 
   `success_rate`, `rollout_cost`, `terminal_cost`, `cvar`; `Particles`, `MarginField`,
   `SampledCost`, `Batched`, `angle_features`, `as_step_system`, the function
   `value_iteration`. With one or two users in the repository: `region_of_attraction`
-  (one demo, a 910-line module), `TransferFunction`, `Lead`, `step_response`,
+  (one demo, a 400-line module), `TransferFunction`, `Lead`, `step_response`,
   `find_equilibrium`, `discretize`, `QuadraticField`, `JointImpedance`, `IntegralImpedance`,
   `LowPassFilter`.
 - **Found while writing the showcase:**
   - `array_module`, the one line a hand-written `f` needs to run on both backends, has no
-    public import: the showcase and five demos reach `minilink.core.backends` through the
-    import allowlist;
+    public import: two core notebooks and five demos reach `minilink.core.backends` through
+    the import allowlist;
   - the comparison table of `advanced/02_optimal_control` reports value iteration as not
     converged (3000 sweeps, the change still 20) and three of its four answers as missing
     the goal on the judged run, on the catalog pendulum as on a hand-written one.
 
-### 4.6 The tutorials made ready and the demos drafted (2026-11-12)
+### 4.6 The tutorials and the drafted demos (2026-11-12)
 
-On the maintainer's go, in one run:
+What each layer is for, and the draft the maintainer reviews:
 
 - **Each layer for its reader.** `basics/` is for engineering students who design an LQR on
   a pendulum and a cart-pole and simulate it: the cart-pole balance and its animation join
@@ -311,8 +318,11 @@ pick:
 
 A first input for the core cut. Every notebook and script of the surface as proposed was
 run under line coverage of `minilink/`: the showcase, the 16 tutorials, the 9 proposed
-demos and the 25 course and topic notebooks, 51 runs on one cloud machine. The library has
-32 741 executable statements.
+demos and the 25 course and topic notebooks, 51 runs on one cloud machine. The library had
+32 741 executable statements. Not repeated since: the plotting contract rewrote the plot
+code of `graphical` and `planning`, the region of attraction went from 910 lines to 400, and
+a ninth core notebook (plots and animations) joined, so the `graphical`, `planning` and
+`analysis` rows are the ones to re-run before they decide anything.
 
 | Package | Statements | Run by the showcase, basics, advanced and demos | + core notebooks | + course notebooks |
 | --- | ---: | ---: | ---: | ---: |
@@ -330,10 +340,10 @@ demos and the 25 course and topic notebooks, 51 runs on one cloud machine. The l
 | **all** | **32 741** | **54 %** | **57 %** | **61 %** |
 
 - **Never imported by anything kept:** 29 files, 3 258 statements: `experimental/` whole
-  (1 326); `analysis/lyapunov.py` (321) and `modal.py`; `control/geometric.py`,
+  (1 326); `analysis/lyapunov.py` (321 statements then) and `modal.py`; `control/geometric.py`,
   `modelbased.py` and `stochastic.py` (454 together); `dp_jax.py` and `approximation.py`
   of dynamic programming (306); the boat and the three bodies with the boat's skin; the
-  Plotly backends of the signal and control plots; `multiple_shooting.py`; the static
+  Plotly live signal plot (the Plotly control-plot backend is gone); `multiple_shooting.py`; the static
   simulator.
 - **Imported and mostly not run:** catalog plants nothing kept uses (the plane, the arms
   other than the UR5, the double pendulum, the longitudinal cars, the mountain car, the

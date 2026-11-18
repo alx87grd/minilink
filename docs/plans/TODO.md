@@ -526,11 +526,19 @@ wait for his pass over the demos and features (§1.12):
   (`Tree.extract_trajectory`'s `u` of shape `(0, 1)`), so `solve(evaluate=True)` raises: the
   root-only path holds the plant's nominal input (KNOWN_ISSUES, "A tree search that never
   leaves its root cannot be scored").
+- [ ] **The NumPy-against-JAX draw tests compare to the last digit** (KNOWN_ISSUES, Tooling):
+  on NumPy 2.5 with JAX 0.12 the standard normal differs by one unit in the last place
+  (`log` and `cos` round differently), and three tests fail (`test_random.py`,
+  `test_stochastic_policy.py`, `test_blocks.py`'s white-noise test). Compare the normals to a
+  tolerance, keep the bits exact, and reword `standard_normal`'s "identical on NumPy and
+  JAX". Done when the suite is green on a fresh install.
+- [ ] **`vi_cartpole_swingup.py` exceeds the demo sweep's 300 s limit** (about 320 s on a
+  cloud machine, before and after the plotting contract): shrink its grid or raise its
+  limit in the sweep's manifest.
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;
-  details in the 2026-09-22 improvement suggestions §2.4, in git history): `step_diagram % dt`
-  adds boundary ports to a user `StepDiagramSystem`; the sampled `@` copy of a one-block
+  details in the 2026-09-22 improvement suggestions §2.4, in git history): the sampled `@` copy of a one-block
   plant diagram drops a diagram-level function output port; an explicit `backend='jax'` on a
   NumPy-only set or cost raises a raw trace error; a raising params setter can leave a diagram
   half-updated;
@@ -898,6 +906,9 @@ One line each; open a plan doc only when a design needs a writeup.
   `live_plot.py` and `plotting.py` cut to what the two RRT demos use; the facade verbs no
   pillar needs (`get_diagram`, `plot_input_output_map`, `render`) decided before V3.
 - A `ClippedCost`, when a saturating cost is needed (planned with the cost).
+- Event-triggered replanning as an option of the MPC's tick.
+- A `library=` keyword on the `Optimizer`, beside `method=` and `backend=`, if one method ever
+  has two implementations on one array module.
 - A tutorial on gradient descent and the `Optimizer`, once the generic optimizer and the
   mathematical-program system are extended; until then the closing PID example teaches it.
 - **A plant that owns its noise ports, as a real example**: a disturbance the loop cannot

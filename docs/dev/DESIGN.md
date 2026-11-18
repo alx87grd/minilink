@@ -540,6 +540,23 @@ surface) multiplies every tire's `mu`; the car declares them with `param_parts()
 whole-tree assignment is routed to the parts. The 3-D car also holds each corner's
 spring-damper at `params["suspension"][wheel]`; a `TerrainBlock` holds its terrain's dict
 at `"terrain"`.
+The car models form a ladder (`dynamics/catalog/vehicles/`):
+  - **The ladder appends.** Each rung keeps the states of the rung below it, in order, and
+    adds its own after them: `x, y, psi`, then `vx, vy, yaw_rate`, then `w_rear, delta`, then
+    `P`; the 3-D car adds `z, phi, theta, vz, p, q`, and the wheel rolling angles of
+    `wheel_angles=True` come last. A law written for a rung reads the first states of every
+    rung above it.
+  - **A tire is a map from slip to force:** `tire.slip(vx, vy, w, R, params) -> (kappa,
+    alpha)` and `tire.forces(kappa, alpha, Fz, friction, params) -> (Fx, Fy)`
+    (`LinearSaturation`, the bicycles' default, `LinearTire`, `BrushTire`,
+    `MagicFormulaTire`). The normal load `Fz` is an argument, never computed in the law.
+  - **A terrain is three fields over the plane:** `height(x, y, t, params)`,
+    `gradient(x, y, t, params)` and `friction(x, y, t, params)`. Every car holds one, flat by
+    default; `TerrainBlock` gives the same fields as a static block.
+  - **One input layout.** Every car takes one stacked `u`; `named_ports=True` gives the named
+    ports. A model that differs by its numbers is a preset class with no equations
+    (`UdeSRacecar`, `UdeSRacecarDyn`, `FormulaCar3D`, `OffRoadCar3D`); one that differs by its
+    look is a skin.
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the

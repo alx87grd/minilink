@@ -2,7 +2,7 @@
 
 Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) local checkout (2026-06-29).
 
-Status: open — the parity rows and the pyro → minilink migration guide (C1), v0.5 (moved from v0.3). Open rows plus the landed name map; re-audit against the code before the migration guide.
+The parity rows and the source of the pyro → minilink migration guide (C1, v0.5): the open rows, then the name map of what has an equivalent. Re-audit against the code before the migration guide is written.
 
 Status legend: **Done** = equivalent landed · **Partial** = framework exists, gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal
 
@@ -18,7 +18,7 @@ once in the name map at the end. Counts recounted from the tables below on 2026-
 | Library symbols | 105 | 85 | 10 | 4 | 6 |
 | Example scripts | 195 | 29 | 47 | 83 | 36 |
 
-Parity is part of the **v0.5** milestone (moved from v0.3; [ROADMAP.md §5.5](../dev/ROADMAP.md#55-v05--features-on-the-core)); v0.1 is GRO860 end to end.
+Parity is part of the **v0.5** milestone ([ROADMAP.md §5.5](../dev/ROADMAP.md#55-v05--features-on-the-core)).
 Release criterion carried over: every **in-scope** pyro library module has a minilink home or a documented drop; representative closed-loop demo per major plant family; README pyro → minilink migration guide (built from the name map below).
 
 ## 1. Library modules — pyro → minilink
@@ -51,7 +51,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Minilink | What | Notes |
 | --- | --- | --- |
 | `minilink/core/compile/` | `compile`, the execution plans (`plan.py`), one evaluator per system kind on either backend (`DynamicEvaluator`, `DiagramEvaluator`, `StaticEvaluator`, `StepEvaluator`, `StepDiagramEvaluator`) | Compile band; pyro has no separate compile layer |
-| `minilink/core/geometry/shapes.py` | SDF shapes (`Shape`, `Sphere`, `Box`, `Union`, `Inflated`); the cost algebra is `core/costs.py` | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
+| `minilink/core/geometry/shapes.py` | SDF shapes (`Shape`, `Sphere`, `Box`, `Union`, `Inflated`); the cost algebra is `core/costs.py` | Spatial primitives; the rest of the package is [geometry-module.md](geometry-module.md) |
 | `minilink/optimization/` | MathematicalProgram, Optimizer | General NLP; pyro trajopt is narrower |
 | `minilink/planning/spatial/` | Scene, WorkspaceField, CollisionBody (`mount`) | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
 | `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |
@@ -64,7 +64,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 
 ## 3. Example scripts — full inventory
 
-The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 shrink are not listed), grouped by top-level folder; a script landed since is marked **Done** in place.
+The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 shrink are not listed), grouped by top-level folder; a script landed since is marked **Done** in place. The minilink scripts named in the notes are those of `examples/demos/`, the set the maintainer's pass over the demos decides ([minimal-surface.md](minimal-surface.md) §4): the notes are re-audited after it.
 
 ### 3.1 `courses/`
 
@@ -281,13 +281,8 @@ Ordered by unblock count:
 
 | Priority | Work | Unblocks |
 | --- | --- | --- |
-| prio 2 | ~~`Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
-| prio 2 | ~~`TrajectoryLQRController`~~ (landed: `lqr_trajectory`) | trajectory_stabilization/ demos |
 | prio 3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
-| prio 3 | ~~`estimation/luenberger.py`, `kalman.py`~~ (landed: `luenberger`, `kalman` in `estimation/design.py`) | LQG demos |
-| prio 3 | `identification/fitting.py` | params-gradient workflow |
-| prio 3 | ~~`interfaces/gymnasium.py`~~ (landed) | GRO860 course notebooks |
-| prio 3 | ~~Frequency tools (pole-zero, Nyquist, margins, `ss2tf`)~~ (landed 2026-09-07) | transfer_functions/ completion |
+| prio 3 | Identification by fitting, in `minilink.learning` (C4) | params-gradient workflow |
 | prio 3 | `planning/filters.py` TrajectoryFilter | traj post-processing |
 | prio 4 | Representative closed-loop demo per `demos_by_system/*` plant band | ~93 TODO demos shrink to ~20 targets |
 | prio 4 | README pyro → minilink API mapping table | migration guide |
@@ -342,7 +337,7 @@ Record of every symbol marked Done, at the 2026-09-05 shrink and since; the sour
 | KinematicBicyleModel | KinematicBicycle | `minilink/dynamics/catalog/vehicles/steering.py` |
 | HolonomicMobileRobot | HolonomicMobileRobot | `minilink/dynamics/catalog/vehicles/steering.py` |
 | Holonomic3DMobileRobot | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
-| KinematicCarModel | KinematicBicycle (with a four-wheel skin; `KinematicCar` retired) | `minilink/dynamics/catalog/vehicles/steering.py` |
+| KinematicCarModel | KinematicBicycle (with a four-wheel skin) | `minilink/dynamics/catalog/vehicles/steering.py` |
 | ConstantSpeedKinematicCarModel | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
 | UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
 | Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |

@@ -20,14 +20,14 @@ maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan d
 in the same change; the commit message carries its why. It then leaves QUESTIONS.md.
 
 Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
-(v0.5; open rows plus the landed name map). Landed contracts move into
+(v0.5; open rows plus the name map). Landed contracts move into
 [DESIGN.md](../dev/DESIGN.md) and the plan doc is deleted; one-line ideas go
 to a Later bullet in [TODO.md](TODO.md) first — open a plan doc only when the
 design needs a writeup.
 
 Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only. A plan doc numbers
-its own steps locally (geometry-module.md's steps 1–6, cited as "steps 1–6 of geometry-module.md") or with a
-prefix of its own (`CBF-1`, `OPW-1`, `AM-1`, `MS-D1`), never with a bare workboard-style id. The prefix
+its own steps locally (geometry-module.md's steps 1–4, cited as "steps 1–4 of geometry-module.md") or with a
+prefix of its own (`CBF-1`, `NS-3`, `PP-7`, `MS-D1`), never with a bare workboard-style id. The prefix
 also marks a plan's rulings and the ids it cites from an audit, so they never collide with a
 workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 `P4`, `G1`, …) stay bare. In prose, an id never opens a sentence: the plain title comes first.
@@ -36,19 +36,17 @@ workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
-| [plans-as-policies.md](plans-as-policies.md) | The compiled faces of LQR and value iteration on one contract (two axes: open loop or feedback, stationary or time-varying), the MPC and the follower reading the state; the rulings that shape it (its first two changes landed in v0.4) | v0.4 or after the tag (TODO §1.8) |
-| [consolidation-recap.md](consolidation-recap.md) | One recommendation per chunk of the repository (keep, clean, minimize, reduce to core, move to the teaching, research or scratchpad repository, delete), with priority and confidence, judged against the three courses and the direction of the library | v0.4, the input of the maintainer's consolidation choices (TODO §1.12) |
-| [internals-cleanup.md](internals-cleanup.md) | Behind the kept surface: the twins, the reporting extras built for old demos, the options nobody passes and the leftovers of removed designs, each with its size, risk and confidence | v0.4, candidates for the cleaning pass (TODO §1.12) |
-| [minimal-surface.md](minimal-surface.md) | The inputs of the end-of-v0.4 rebuild: the test layers and their open options (`MS-D2a`–`e`), a starting demo list, the course-link constraint | v0.4, the last steps (TODO §1.12) |
-| [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves, implicit differentiation, least squares, constraints, convergence as stability; the stochastic program (§7); NS-2's rest to NS-7 | v0.5 (the proof of concept landed in v0.3) |
-| [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.5; v0.9 |
-| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes and paths landed; track, scene, `mount`, spatial fields, course catalog left); `planning.spatial` retires | v0.5 (A3) |
+| [consolidation-recap.md](consolidation-recap.md) | One recommendation per chunk of the repository (keep, clean, minimize, reduce to core, move to the teaching, research or scratchpad repository, delete), with size, priority and confidence, judged against the three courses and the direction of the library. Candidates, not decisions | v0.4, an input of the maintainer's pass over the demos and the features (TODO §1.12) |
+| [internals-cleanup.md](internals-cleanup.md) | Behind the kept surface: the twins, the reporting extras built for old demos, the large drawing code (Plotly, the MeshCat renderer, the port map, the skins), the options nobody passes and the leftovers of removed designs, each with its size, its callers, what its removal costs and a confidence. Candidates, not decisions | v0.4, an input of the same pass and of the cleaning after it (TODO §1.12) |
+| [minimal-surface.md](minimal-surface.md) | The demo set as a draft for the maintainer (thirteen stories, the nine drafted scripts, where the 94 old scripts would go), the tutorials beside it, what the kept surface runs of the library, and the test layers with their open options (`MS-D2a`–`e`) for the clean slate | v0.4, the last steps (TODO §1.12) |
+| [plans-as-policies.md](plans-as-policies.md) | The compiled faces of LQR and value iteration on one contract (two axes: open loop or feedback, stationary or time-varying), the MPC and the follower reading the state; the rulings that shape them | v0.4 or after the tag (TODO §1.8) |
+| [vehicle-models.md](vehicle-models.md) | The car family, what is left to build: the tire and slip switch (the brush law by default, one smooth slip, the longitudinal car on the tire module), the UdeS Racecar on the 3-D car, `Car3D` (the double track with quasi-static load transfer), the 3-D car's options (wheel hop, an open differential, the contact along the suspension axis), and the choices taken while building that wait for the maintainer's look | after the maintainer's pass over the demos; the options unscheduled |
+| [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves, implicit differentiation, least squares, constraints, convergence as stability; the stochastic program (§7); steps NS-2's rest to NS-7 | v0.5 (TODO §4) |
+| [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the later estimators and their slots (§3, §6) | v0.5; v0.9 |
+| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/`: the track, the scene, `mount`, the spatial fields, a catalog of courses; `planning.spatial` retires | v0.5 (A3) |
+| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: the open rows and the name map, the source of the migration guide | v0.5 (C1) |
+| [repository-structure.md](repository-structure.md) | The repositories around minilink (the teaching one, the private ones) and what is left of the move; the layout of the examples tree, its options and the asks | v0.9 (K5, K6); the examples tree with the demo pass |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control barrier functions: SDF interpolation, DCBF with slacks, HOCBF, the safety-filter block; the barrier a `Field` | unscheduled (TODO §6) |
-| [plotting-contract.md](plotting-contract.md) | One plotting contract: the design, the maintainer's rulings (R1–R26), the run that implemented them and its progress log | any release, infrastructure; merged into `dev-consolidation`, leaves after the maintainer's review of the contract |
-| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.5 (C1) |
-| [repository-structure.md](repository-structure.md) | The examples tree and where the teaching material lives; options, a recommendation, the asks | v0.9 (K5, K6) |
 | [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for the RL planner (RS-1–RS-4) | unscheduled (TODO §6) |
-| [vehicle-models.md](vehicle-models.md) | The car models: a ladder from the point to a 3-D car with suspension (one idea per rung, states appended), the shared pieces (a swappable tire with three laws, a terrain of height, gradient and friction, a per-corner normal-load law), load transfer on the double track only, the UdeS Racecar as thin preset classes, three phases, and how the pieces are written (§10); the questions answered in the maintainer's interview and the review of 2026-11-11 | v0.4, the car part of the catalog clean-up (K8-0); the 3-D car after it |
-| [vehicle-models-run.md](vehicle-models-run.md) | The brief of the automatic runs that build the car plan: steps `VM-0` to `VM-18`, one commit each, the measured bar (same behaviour, not same bytes), when to stop and ask, the decisions log and the ledger | v0.4 for run 1 (the foundations, K8-0); run 2 (the 3-D car) after it |
 
 Landed or superseded plan docs are deleted. Their history is git.

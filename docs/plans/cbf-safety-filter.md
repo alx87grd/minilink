@@ -1,6 +1,6 @@
 # Control Barrier Functions (CBF) & Spatial Safety Filters
 
-**Status:** Design draft (2026-09-11), amended 2026-10-12 (§3 and CBF-2: the barrier a `Field`, DESIGN §4 "Fields"); not started; research lane, unscheduled; CBF-1 and CBF-2 after the geometry package (A3); the `Field` object landed (v0.3).  
+**What it is:** a design draft (2026-09-11; §3 and CBF-2 amended 2026-10-12: the barrier is a `Field`, DESIGN §4 "Fields"). CBF-1 and CBF-2 come after the rest of the geometry package (A3).  
 **Where it sits:** unscheduled; a feature on the core's Fields pillar (v0.3) and the workspace geometry (A3, v0.5) ([TODO.md](TODO.md) §4, §6).  
 **Lane:** Research lane $\to$ provisional (`minilink.control.cbf`; workspace SDF in `minilink.core.geometry`, [geometry-module.md](geometry-module.md)).  
 **Audience:** Graduate research and GRO860 advanced topics (safe control, MPC, RL deployment).
@@ -39,7 +39,7 @@ For a system $\dot{x} = f(x, u)$ with position map $p = \phi(x)$:
 
 $$\frac{\partial h}{\partial u} = \nabla_p h(p) \cdot \frac{\partial \phi}{\partial x} \cdot \frac{\partial f}{\partial u}$$
 
-Minilink's JAX compile backend (`sys.jacobian()`) propagates these derivatives automatically from the digital map's spatial field all the way back to actuator inputs (e.g. steering angle, motor torque).
+Minilink's JAX compile backend (the compiled evaluator's `jacobian`) propagates these derivatives automatically from the digital map's spatial field all the way back to actuator inputs (e.g. steering angle, motor torque).
 
 ### 2.4 High-Order CBF (HOCBF) for Relative Degree $r > 1$
 When $u$ controls acceleration (e.g., dynamic vehicle models, torque-driven manipulators), the spatial barrier $h(x)$ has **relative degree $r = 2$** ($\frac{\partial \dot{h}}{\partial u} = 0$). A standard CBF cannot directly constrain $u$.

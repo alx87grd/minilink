@@ -120,5 +120,6 @@ machine, JAX 0.12, NumPy backend unless the snippet says otherwise).
   2026-11-18 (NumPy 2.5.3, JAX 0.12.1, Python 3.13).
 - **Workaround:** compare the two backends' draws to a tolerance (`rtol=1e-14`); deselect
   the three tests on such an install.
-- **Fix:** none planned yet: the three tests compare the normals to a tolerance, the bits
-  staying exact, and the docstrings say so.
+- **Fix:** the hardening row of TODO §3 ("The NumPy-against-JAX draw tests compare to the
+  last digit"): the three tests compare the normals to a tolerance, the bits staying exact,
+  and the docstrings say so.

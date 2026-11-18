@@ -1,13 +1,14 @@
 # Plans as policies: the faces of LQR and value iteration, and the MPC reading the state
 
-Status: ruled 2026-11-06 (the maintainer's design session, then two independent reviews; no
-decision open). Three changes, ordered by value; the first two landed in v0.4 and their
-contracts are DESIGN's: the pure cores, `GridField` and the planners' cost-to-go as fields,
-discounted LQR (DESIGN §4, "Fields", and §6), value iteration's finite horizon and the law past
-the horizon for both planners (DESIGN §6). This doc holds the design of the third: the compiled
-faces of LQR and value iteration and the MPC protocol that reads the state. Lane: core. The row
-and its "done when": [TODO.md](TODO.md) §1.8. It is additive (no public name breaks, the
-open-loop loops byte-identical), so it may land after the `0.4.0` tag.
+Ruled 2026-11-06 (the maintainer's design session, then two independent reviews; no decision
+open). The design of what is not in the code: the compiled faces of LQR and value iteration,
+and the MPC protocol that reads the state. Lane: core. It is additive: no public name breaks,
+and the open-loop loops stay byte-identical. The row and its "done when":
+[TODO.md](TODO.md) §1.8.
+
+**What exists.** The pure cores, `GridField` and the planners' cost-to-go as fields, the
+discounted LQR, value iteration's finite horizon and the law past the horizon for both
+planners: DESIGN §4, "Fields", and §6.
 
 ## 1. The goal
 
@@ -174,10 +175,7 @@ The agent's to settle, recorded here:
 
 ## 9. The rulings that shape this change (2026-11-06)
 
-The rulings `PP-D2`, `PP-D4` to `PP-D6`, `PP-D8` to `PP-D10`, `PP-D12`, `PP-D13`, `PP-D15` and
-`PP-D16` landed with changes 1 and 2 (their contracts are DESIGN §4 "Fields" and §6); `PP-D17`
-(the GRO860 notebooks unchanged, their wording revisited when the course is next taught) is a
-note in TODO §1.8. Those that shape the faces:
+The rulings that shape the faces (the others are DESIGN's contracts, §4 "Fields" and §6):
 
 - `PP-D1` **The contract** of §2: two axes (open loop or feedback; stationary or
   time-varying); `command(z, x, t)` always receives the state; a time-varying `z` carries `t0`;

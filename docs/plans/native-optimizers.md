@@ -1,10 +1,8 @@
 # Native optimizers: the solve as a rollout
 
-Status: written 2026-10-25 from the maintainer's vision (§1), with the agent's read (§3–§4);
-its asks answered (§6). Lane: research. The proof of concept landed in v0.3 (§2); the rest is a
-v0.5 row, [TODO.md](TODO.md) §4 ("Native solvers beyond the proof of concept"). Contracts in
-code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP, the planner's compiled face, the
-MPC).
+Written 2026-10-25 from the maintainer's vision (§1), with the agent's read (§3–§4); its asks
+answered (§6). Lane: research. The design of the native solvers beyond what the code holds: a
+v0.5 row, [TODO.md](TODO.md) §4 ("Native solvers beyond the proof of concept").
 
 **Choices of 2026-10-27** (the architecture of record since 2026-10-28):
 - the two-layer split of §3: a pure kernel run by `Optimizer`, a step-system view for the
@@ -20,7 +18,7 @@ MPC).
 | Idea | Home |
 | --- | --- |
 | Native solvers as pure laws, program categories, the solve as a rollout, the three ways to differentiate a solve | this doc, §3–§4 |
-| The fixed-iteration MPC, MPPI on the face, the planner's compiled face, the program's parameters | DESIGN §6 (landed) |
+| The fixed-iteration MPC, MPPI on the face, the planner's compiled face, the program's parameters | DESIGN §6 |
 | Convergence analysed as stability (goal 2) | this doc, §4.7, NS-5 |
 | The sampled loop as one scan; its differentiable evaluation | DESIGN §5 and §6 |
 | A gradient-descent tutorial on the extended `Optimizer` | [TODO.md](TODO.md) §6 |
@@ -49,17 +47,14 @@ MPC).
 2. **Long term: analyse the convergence of an optimization process with the control tools**:
    the algorithm as a feedback loop, its convergence as stability.
 
-## 2. What landed (the proof of concept, v0.3)
+## 2. What exists
 
-NS-1, NS-2's fixed-`K` form, NS-8 and NS-9: the laws `GradientDescentLaw` and `AdamLaw`
-(`optimizers/first_order.py`), `Optimizer(..., n_iterations=K)` (a native method on a
-box-bounded JAX program is a pure loop: `jit`, `vmap` over starts, `grad` through the solve; a
-traced solve returns its `OptimizationResult` with JAX arrays), `optimizer.as_step_system()`
-(the solve as a step system, the iterates its rollout), the fixed-iteration MPC on the
-planner's compiled face and its closed loop as one scan tuned by gradient
-(`problem.compile(mpc % Δ)`), and MPPI on the same face with `n_iterations` per tick. The
-parametric program folded into `MathematicalProgram(..., params=)`. Still open: the
-`lax.while_loop` form of `n_iterations=None` (NS-2's rest), and NS-3 to NS-7 (§5).
+The laws `GradientDescentLaw` and `AdamLaw` (`optimizers/first_order.py`),
+`Optimizer(..., n_iterations=K)` (a native method on a box-bounded JAX program is a pure
+loop: `jit`, `vmap` over starts, `grad` through the solve), `optimizer.as_step_system()`,
+the fixed-iteration MPC on the planner's compiled face and MPPI on the same face, and the
+program's parameters, `MathematicalProgram(..., params=)`: DESIGN §6. Not in the code: the
+`lax.while_loop` form of `n_iterations=None`, and the steps of §5.
 
 ## 3. The agent's read: the optimizer as a step system
 
@@ -144,10 +139,10 @@ the first solver that needs it):
 
 | Category | The form | What it unlocks | First consumer |
 | --- | --- | --- | --- |
-| unconstrained / bounded / constrained | as today | the method table of S74 | every program |
+| unconstrained / bounded / constrained | as today | the optimizer's method table | every program |
 | **least squares** | `J(z) = ½‖r(z)‖²`, the residual `r` given | Gauss–Newton, Levenberg–Marquardt (native); `scipy.optimize.least_squares` | identification (C4), inverse kinematics (`Manipulator` calls `scipy.optimize.least_squares` by hand today) |
 | **stochastic** | the seed a leaf of `params` (no `J(z, key)`); comes with the optimizer seed strategies | SGD and Adam on minibatches | the Monte Carlo evaluator's objective, the ML lessons |
-| **parametric** | `J(z, params)`, `h(z, params)`, `g(z, params)` on the one noun | one compile, many solves; `vmap` over `params`; the sensitivity `dz*/dp` | the MPC (S76, landed) |
+| **parametric** | `J(z, params)`, `h(z, params)`, `g(z, params)` on the one noun | one compile, many solves; `vmap` over `params`; the sensitivity `dz*/dp` | the MPC |
 
 A category is read from the program's fields (a `residual` field makes it least squares, as `h`
 makes it constrained today), not from a modelling language: CONSTITUTION §1.4 ("not an
@@ -179,13 +174,14 @@ is a later step.
 ### 4.4 Wrapped backends
 
 Unchanged in contract: an adapter takes a compiled evaluator and `z0` and returns an
-`OptimizationResult`. They stay host code; their improvements are OPW-1–OPW-5 (one backend
-table for the offline and the compiled paths, landed in v0.3).
+`OptimizationResult`. They stay host code, on one backend table for the offline and the
+compiled paths.
 
 ### 4.5 The surface, sketched
 
-`n_iterations=`, `backend=`, `params=` and `z0=` on the solve and
-`as_step_system` landed; the other names are placeholders.
+`n_iterations=`, `backend=`, `params=` and `z0=` on the solve and `as_step_system` are in the
+code; the other names (`gradient_loop`, `GradientStep`, `GradientOracle`, `traj.plot`) are
+placeholders.
 
 ```python
 # Today, unchanged: a hand-written program, solved to a tolerance (maxiter its cap)
@@ -205,7 +201,7 @@ loop = gradient_loop(GradientStep(eta=0.1), GradientOracle(program))  # a StepDi
 loop.linearize(z_star).poles()                       # the convergence rate
 ```
 
-### 4.6 The first target, landed: a fixed-iteration MPC
+### 4.6 The first target: a fixed-iteration MPC
 
 The fixed-iteration MPC is no special block: a trajectory-optimization planner whose method is
 native and whose `n_iterations=K` is forwarded to its `Optimizer`, wrapped by
@@ -242,7 +238,7 @@ analysis family for GRO501; goal 2 needed only the linearization of a step syste
 fixed point and its eigenvalues against the unit circle. Since v0.4 the linear tools read a
 step or sampled system in `z` (DESIGN §3, `analysis/`).
 
-## 5. Steps left (local ids; NS-1, NS-8, NS-9 and NS-2's fixed-`K` form landed)
+## 5. Steps left (local ids)
 
 The order and each row's "done when" are TODO §4's.
 
@@ -255,7 +251,7 @@ The order and each row's "done when" are TODO §4's.
   `Manipulator`'s inverse kinematics can use it in place of its hand SciPy call.
 - **NS-5 The teaching face**: the loop of §3.1 wired from `as_step_system`, rolled out and
   linearized; one notebook-sized demo (the step-size stability lesson).
-- **NS-6 Constraints natively**: augmented Lagrangian over NS-1's kernel, then its implicit
+- **NS-6 Constraints natively**: augmented Lagrangian over the native kernel (§3.3), then its implicit
   derivative through the KKT system.
 - **NS-7 The stochastic category**: the optimizer seed strategies, SGD and Adam advancing
   the seed, the problem evaluator's Monte Carlo objective their first consumer.
@@ -266,7 +262,7 @@ The order and each row's "done when" are TODO §4's.
    **yes.**
 2. Which categories and native algorithms (§4.1, §4.2): **added with the first solver that
    needs them, minimalist.**
-3. The rung: a proof of concept in v0.3 (landed), the rest in v0.5.
+3. The rung: a proof of concept in v0.3, the rest in v0.5.
 4. The fixed-count keyword: **`n_iterations=K` on `Optimizer`**; rejected, an `iterate`
    verb and `solve(n_iterations=K)`.
 5. The discrete step analysis comes back with NS-5 (§4.7).

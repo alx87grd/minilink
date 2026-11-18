@@ -1,8 +1,10 @@
 # Workspace geometry module
 
-**Status:** core contract — design agreed 2026-09-21. Landed: the `core/geometry/` package with the shapes and the paths (2026-11-06; the path names left `planning.spatial` 2026-11-07), the path-tracking laws reading a path, and the `Field` the spatial fields subclass (v0.3, DESIGN §4). The rest is open.  
+**What it is:** the design of the workspace geometry that is not yet in `core/geometry/`: the track, the scene, the probes and `mount`, the spatial fields, the grid, a catalog of courses; `planning.spatial` retires. Design agreed 2026-09-21.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Rung:** v0.5, step A3 of [TODO.md](TODO.md) §4, a feature on the core.
+**Where it sits:** v0.5, step A3 of [TODO.md](TODO.md) §4, a feature on the core.
+
+**What exists.** The shapes (`core/geometry/shapes.py`: `Shape`, `Sphere`, `Box`, `Union`, `Inflated`) and the paths (`core/geometry/paths.py`: `ReferencePath`, `PolylinePath`, `from_waypoints`, `circuit_waypoints`, `is_closed`), the path-tracking laws reading a path, and the `Field` the spatial fields subclass (DESIGN §4).
 
 Workspace math is split today: SDF solids and paths in [`core/geometry/`](../../minilink/core/geometry/), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2); the path-tracking laws of [`control/geometric.py`](../../minilink/control/geometric.py) read a path from core. Demos rebuild the same oval and cones by hand.
 
@@ -13,29 +15,26 @@ track, scene = racecar_circuit()
 body = mount(point_probe(), on=car)
 cost = track.distance_field(body).as_cost() + scene.clearance_field(body).as_cost(shaping=quadratic_hinge())
 loop = PurePursuit(track) @ car
-J_t = cost.integrate(loop.compute_trajectory(tf=10))   # the running integral J(t_k), no problem needed (total_cost leaves the cost)
+J_t = cost.integrate(loop.compute_trajectory(tf=10))   # the running integral J(t_k), no problem needed
 ```
 
-Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review §4.6, in git history): glyphs, skins, S30, S44 are not this module. Constitution still holds: a few textbook objects (`Shape`, `Path`, `Track`, `Scene`, posed probes), not a computational-geometry library.
+Graphics stay a second vocabulary on purpose: glyphs, skins, S30, S44 are not this module. Constitution still holds: a few textbook objects (`Shape`, `Path`, `Track`, `Scene`, posed probes), not a computational-geometry library.
 
 ## Before and after
 
 | Object | Before | After |
 | --- | --- | --- |
-| `Shape`, `Sphere`, `Box`, `Union`, `Inflated` | `core/geometry.py` | [`core/geometry/shapes.py`](../../minilink/core/geometry/shapes.py) (landed, same names) |
 | `SE2`, `SE3`, `Rx/Ry/Rz`, `translation`, `inv`, `apply` | [`core/kinematics.py`](../../minilink/core/kinematics.py) | **unchanged** — pose algebra, sibling of geometry |
-| `ReferencePath`, `PolylinePath`, `from_waypoints`, `circuit_waypoints` | `planning/spatial/paths.py` | [`core/geometry/paths.py`](../../minilink/core/geometry/paths.py) (landed; a polyline takes `closed=`) |
-| `is_closed` | `control/geometric.py` | `core/geometry/paths.py` (landed) |
 | `ReferenceTrack` | [`planning/spatial/track.py`](../../minilink/planning/spatial/track.py) | `core/geometry/track.py` |
 | `Scene` | [`planning/spatial/scene.py`](../../minilink/planning/spatial/scene.py) | `core/geometry/scene.py` |
 | `WorkspaceField`, `GaussianField` | [`planning/spatial/workspace_fields.py`](../../minilink/planning/spatial/workspace_fields.py) | `core/geometry/` beside Scene |
 | `disc`, `point_probe`, `car_outline` | [`planning/spatial/collision.py`](../../minilink/planning/spatial/collision.py) | `core/geometry/probes.py` |
 | `CollisionBody`, `mount` | same file | `core/geometry/collision.py` |
-| `Field`, `FieldSet`, `FieldCost` (was `StateField`) | [`core/fields.py`](../../minilink/core/fields.py) (moved in the v0.3 run) | stays |
+| `Field`, `FieldSet`, `FieldCost` | [`core/fields.py`](../../minilink/core/fields.py) | stays |
 | `ClearanceField`, `CostDensityField`, `PathDistanceField`, `CorridorMarginField` | `planning/spatial/state_fields.py` | `core/geometry/fields.py` (subclass `Field`) |
-| `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`core/shaping.py`](../../minilink/core/shaping.py) (moved in the v0.3 run) | stays, beside `core/fields.py` |
+| `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`core/shaping.py`](../../minilink/core/shaping.py) | stays, beside `core/fields.py` |
 | `sample_grid` | [`planning/spatial/grid.py`](../../minilink/planning/spatial/grid.py) | `core/geometry/grid.py` |
-| `plot_scene`, `plot_track`, cost rasters | [`planning/spatial/plotting.py`](../../minilink/planning/spatial/plotting.py) | `graphical/` (lazy; `scene.plot()` / `track.plot()` stay on the object) |
+| `plot_scene`, `plot_track`, `plot_cost_field` (the raster, and the surface with `is_3d=True`) | [`planning/spatial/plotting.py`](../../minilink/planning/spatial/plotting.py) | `graphical/` (lazy; `scene.plot()` / `track.plot()` stay on the object). Each builds a figure description and returns a `PlotResult` (DESIGN §7); the mesh keyword `grid=` of `plot_scene` and `plot_cost_field` is renamed with the move, if at all |
 | `TrackCorridorOverlay` | [`planning/spatial/overlays.py`](../../minilink/planning/spatial/overlays.py) | `graphical/` |
 | named courses | copy-pasted in demos | `core/geometry/catalog.py` |
 | `planning.spatial` | owner | re-export, then **delete** |
@@ -104,12 +103,9 @@ minilink/dynamics/           # plants that emit tf
 minilink/graphical/          # drawing only
 ```
 
-## Implementation, what is left
+## Implementation
 
-Landed: the shapes (`core/geometry/shapes.py`), the paths (`core/geometry/paths.py`; every
-caller imports the path names from `minilink.core.geometry`, or from the `minilink.planning`
-facade that exports two of them), the path-tracking laws reading a `Path`, and the minimal
-`Field`. Left, in order:
+In order:
 
 1. Move Track, Scene, probes, `mount`, the spatial fields (subclasses of `Field`) and the grid;
    plots and overlays under `graphical/` with lazy methods on Scene/Track.
