@@ -55,7 +55,7 @@ The lane contract is [ROADMAP.md §2](ROADMAP.md#2-two-lanes). The teaching surf
 root prelude plus the band facades, registered in `minilink/__init__.py` and the band
 `__init__` files, and checked as a set by `test_teaching_surface.py`. A name reaches the root
 when a lesson uses it: `StepPlanningProblem` (`minilink.planning`), `StepCost` and
-`SampledCost` (`minilink.core`) stay on their bands until one does; `StepSystem` is
+`SampledCost` (`minilink.core`) are on their bands only; `StepSystem` is
 on the root. The core band facade exports the core's mathematical types, the composites
 included (`MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
 `ScaledCost`, `SampledSystem`, `SampledDiagramSystem`) and the shaping functions
@@ -76,7 +76,7 @@ describes package ownership. Every package belongs to one of four bands; schedul
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (the package `core/geometry/`: `shapes.py`, the solids by their signed distance, and `paths.py`, the reference paths, a polyline open or `closed`; the track, the scene, `mount` and the spatial fields stay in `planning/spatial/` until the geometry plan moves them: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (the package `core/geometry/`: `shapes.py`, the solids by their signed distance, and `paths.py`, the reference paths, a polyline open or `closed`; the track, the scene, `mount` and the spatial fields are in `planning/spatial/`) |
 | `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `SampledSystem` (`sampled_system.py`: a system on a clock), `StepDiagramSystem` (`step_diagram.py`), `SampledDiagramSystem` (`sampled_diagram.py`: the sampled loop, its holds and the plant's run inside it) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
@@ -101,8 +101,8 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`clock_runner.py`: the host clock runner of a sampled loop); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LinearizedSystem`, `ẋ = f(x̄, ū) + A (x − x̄) + B (u − ū)` in the plant's own coordinates, ports, labels and units, `deviation_model()` its pure `LTISystem`; a step or sampled system → `LinearizedStepSystem`, `x_{k+1} = F(x̄, ū) + A_d (x_k − x̄) + B_d (u_k − ū)`, a tick law as `DiscreteLTISystem` (no period of its own: seconds come from a clock, `model % Δ`), its poles in `z`, its frequency tools at `G(e^{jω})` per tick and at `G(e^{jωΔ})` up to `π/Δ` on `model % Δ`, its `plot_pzmap` and `plot_root_locus` with the unit circle, its `step_response` the samples `y_k` at `t_k = k` (`k Δ` on the clock)), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function` (continuous only: a step or sampled system refused), the sensitivity functions `sensitivity(plant, controller, x_bar, …, *, filter=, of=, wrt=)`, the plant read on `bode`'s channel, the controller and the filter SISO) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal` (`poles(sys, x_bar)`, the eigenvalues of the linear model's `A`, in `z` on a step system; `modal_analysis` with the mode shapes), `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `step_problems.py` (the step problem, which answers its own equations) and `step_model.py` (the internal evaluator they delegate to), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `plotting.py` (a solution's cost-to-go, control-law and trajectory views), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`) |
-| `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
+| `planning/` | `problems.py`, `step_problems.py` (the step problem, which answers its own equations) and `step_model.py` (the internal evaluator they delegate to), `planner.py` (the `Planner` base every planner subclasses), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `plotting.py` (a solution's cost-to-go, control-law and trajectory views), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`) |
+| `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | the figure description and `draw` (`figure.py`), its two renderers (`figure_renderers/`), the records and the show step (`common/`); the plots' builders (signals, phase plane, port map, the control style), diagrams, animation (`animation/`, its four renderers in `animation/renderers/`) and the matplotlib-only figures (the grid and search animations, the live figures) |
 | `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium in the `full` extra; stable-baselines3 from `environment.yml`) |
@@ -295,7 +295,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   evolution `f(x,u,t,params)` is on :class:`DynamicSystem` only (and stacked on
   :class:`DiagramSystem`). **Default output:** on :class:`DynamicSystem` and
   :class:`StepSystem`, `h` returns the full state `y = x` when the `y` port has
-  the state dimension (`p == n`) and zeros otherwise — the pyro convention, so a
+  the state dimension (`p == n`) and zeros otherwise, so a
   plant declared with `output_dim=n` composes with `controller @ plant` without
   overriding `h`.
 - **Dims:** `n` defaults to 0 (static IO shell); `m` from input ports; `p` from primary output
@@ -395,10 +395,10 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   period is a `NativeSampledSystem(state_dim, sample_period=Δ)`: its period set at construction, `%`
   on it refused; `output_dim=` gives it the output `y = h(x, u, t)`, its own `h` in seconds (a
   law that writes none is refused: the inherited `h` reads its first output port). Out of the MPC's contract: a shrinking horizon (`N` is structural) and
-  event-triggered replanning (a later option in the tick).
+  event-triggered replanning.
 - **Observer:** a block that reads the plant's `u` and `y` and gives the estimate on `x`
-  (`StateObserver`; later filters keep the ports, their state may be larger than the
-  estimate). Under the id `observer`, top level or inside the controller box, `roles()`
+  (`StateObserver`; the ports define the role, and an estimator's state may be larger
+  than its estimate). Under the id `observer`, top level or inside the controller box, `roles()`
   finds it. A block that reads a measurement and gives the state back with no `u` and no
   `y` is refused as a controller by `@`, `closed_loop`, `%` and `plot_control_law`
   (`core.roles.require_command`): pass it with its gain as
@@ -531,10 +531,11 @@ law on both backends (`params=None` its defaults, the same values twice, the JAX
 NumPy ones, a finite gradient through a float leaf); `tests/unittest/test_params_model.py`
 pins the seven rules. The leaves are numbers and numeric arrays, an integer leaf (a seed)
 never in `wrt`; every function is deterministic given its parameters, the seed among them.
-A car is assembled from parts the same way: each wheel's tire owns its numbers (`mu`, the
-stiffnesses, its slip floor, its shape), and the car holds each tire's dict at
+A car is assembled from parts the same way: a tire given to a car (`tire=`) owns its numbers
+(`mu`, the stiffnesses, its slip floor, its shape), and the car holds each wheel's tire's dict at
 `params["tire"][wheel]` (`car.params["tire"]["f"] is car.tire["f"].params`), beside its own
-numbers, and its terrain's dict at `"terrain"`, whose friction factor (1 on the reference
+numbers (a bicycle built without `tire=` keeps the default tire's `Ca`, `Ck`, `mu` and
+`v_min_epsilon` among its own), and its terrain's dict at `"terrain"`, whose friction factor (1 on the reference
 surface) multiplies every tire's `mu`; the car declares them with `param_parts()`, so a
 whole-tree assignment is routed to the parts. The 3-D car also holds each corner's
 spring-damper at `params["suspension"][wheel]`; a `TerrainBlock` holds its terrain's dict
@@ -588,10 +589,7 @@ at `"terrain"`.
   read each part's own parameters; a random plant's nominal draw is
   `nominal_plant_params(problem)`.
   A new start is a number of the tree like a mass: offline, `planner.solve(params=p)` with
-  the new `p["x0"]`; in real time, the compiled face `pv.solve(p, z0)` (§6); moving obstacles
-  online wait for the geometry module. **Gap:** the base `Shape` and the workspace fields take
-  no call-time `params`, and the fields' wrappers hand their field no tree; both are the
-  geometry plan's ([geometry-module.md](../plans/geometry-module.md)).
+  the new `p["x0"]`; in real time, the compiled face `pv.solve(p, z0)` (§6).
 
 ### `DiagramSystem`
 
@@ -677,8 +675,7 @@ keeps its subsystems, wiring, ports, name and camera settings, which `+` and `>>
 carry into the result (its `x0` comes with the shared subsystems, which own it); a `>>` chain is named after every operand
 (`"Step >> PID >> Pendulum"`). Subsystems are shared, never copied, so `a >> b >> c`
 chains stay cheap. `connect()`, `autowire()` and `expose()` are methods and
-change the diagram they are called on. Known gap (on the workboard): `step_diagram % dt`
-on a user-built `StepDiagramSystem` adds its boundary ports to that diagram.
+change the diagram they are called on.
 
 **`A >> B` connects one output of A to one input of B** by a fixed rule on their
 edges, with no memory of how either was built: A has one output and B one input;
@@ -806,7 +803,7 @@ they read and what the zero-argument sweep draws:
 | `siso.py` (`P`, `PI`, `PD`, `PID`) | `e` per axis, or `y` with `r` (decoupled loops) | error per axis |
 | `robotic.py` (task laws) | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
 | `robotic.py` (kinematic laws) | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement (`plot_space = "measurement"`: the task reference is not a joint error) |
-| `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
+| `modelbased.py` | ``y = [q; dq]``; computed torque; sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
 
 **Controller naming conventions.** PID-style gain params keys are
 uppercase (`Kp`, `Ki`, `Kd`, `K_null`) across `impedance`, `siso`, `robotic`,
@@ -836,7 +833,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   between the samples and held outside (`interpolate_schedule`, the one time-interpolation
   the gain schedules read too); a diagram's run carries `roles`, every subsystem's state slice by
   id, so `traj.of("plant")` is the plant's run by static indexing (its input recorded by
-  default, `DiagramSystem` below).
+  default, `DiagramSystem` above).
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
   boolean under JAX); `sample(key, n=None, params=None)` follows the distributions' draw
@@ -909,7 +906,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   law's own covariance); so a family of noise levels vmaps like a family of masses. Sets are
   support, distributions are probability.
 - Randomness (`blocks/sources.py`, `core/distributions.py`): a `Distribution` has no time; a
-  noise signal is a block holding draws over a sample period. `WhiteNoise(p, *, psd,
+  noise signal is a block holding draws over a sample period. `WhiteNoise(dim, *, psd,
   sample_period, seed, hold)` is white noise of two-sided intensity `psd`, each sample
   `w_k ~ N(0, psd / Δ)` held over `Δ` (`hold="zoh"`; `"linear"` interpolates), so the physics
   does not change with the period; `seed`, `sample_period` and `psd` are params, and `h`
@@ -931,8 +928,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `dt` tightens it). A step that does not divide `Δ`, a forced
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
-  continuous filter (`kalman(sys, Q_n, R_n)`, the intensities); the discrete filter's
-  `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` are the estimation plan's (ROADMAP §5.6).
+  continuous filter (`kalman(sys, Q_n, R_n)`, the intensities).
   `NoiseSource(law, *, sample_period, seed, hold)` is sampled noise: `w_k` the law drawn
   at the counter key `CounterKey(seed, k)` by the same cipher (each library law and `BoxSet`
   draw from one), held over `Δ`, the law's numbers under `params["law"]`; a per-sample
@@ -943,7 +939,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   unless a subclass writes one, a 0-d array on `x`'s array module, so a running cost writes
   `g` only); attach
   to `PlanningProblem`, not the plant. The cost is the integrand only: `integrate(traj, *,
-  discount_rate, params)` is its trapezoid on the trajectory's array module, `g_max(X, U)`
+  discount_rate, params, t0)` is its trapezoid on the trajectory's array module, `g_max(X, U)`
   and `h_max(X)` its upper bounds over boxes (exact for a quadratic, sampled otherwise),
   `traj.with_cost(cost)` the plotting signals `"dJ"` (the discounted rate) and `"J"` (its
   integral, `h` added at the last sample, so its last value is the run's `J`). Compose with `+` → `SumCost` and `*` →
@@ -952,8 +948,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
 - Geometry (`core/geometry/shapes.py`; the rest of its package is in §3): `Shape.sdf(p)` is the signed distance to a workspace
   *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
   Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
-  JAX-traceable). `sdf(p, t, params)` is threaded by the spatial scene pipeline;
-  primitives read frozen dataclass fields only (the gap in 'Parameters'). Foundation for hard obstacles in a :class:`~minilink.planning.spatial.scene.Scene`,
+  JAX-traceable). `sdf(p, t=0.0, params=None)` reads the shape's own numbers when `params` is
+  `None` (`{"center", "radius"}` on a sphere, `{"lower", "upper"}` on a box, the members'
+  trees by class name on a union, `{"base", "radius"}` on an inflated shape). Foundation for hard obstacles in a :class:`~minilink.planning.spatial.scene.Scene`,
   exported as a free-space `Set` (hard constraint) or soft `CostFunction`.
 - **Sign convention** (shared): nonnegative ⇒ feasible/free — `Shape.sdf > 0` outside,
   `ClearanceField.value ≥ 0` collision-free, `Set.margin ≥ 0` feasible. The core stores
@@ -997,8 +994,9 @@ backend (`backend` picked at construction; JAX imported only by a JAX evaluator)
 - :class:`DiagramSystem` → `DiagramEvaluator` (`evaluators/diagram.py`): the same, and the
   internal `signals`
 - static :class:`System` (`n=0`) → `StaticEvaluator` (`evaluators/static.py`): `outputs` only
-- :class:`StepSystem` → `StepEvaluator`, a step diagram → `StepDiagramEvaluator`
-  (`evaluators/discrete.py`): `step`, `outputs`, state-only `rollout`; no `f`
+- :class:`StepSystem` → `StepEvaluator`, a step diagram → `StepDiagramEvaluator`, a sampled
+  diagram → `SampledDiagramEvaluator` (`evaluators/discrete.py`): `step`, `outputs`,
+  state-only `rollout`; no `f`
 
 On JAX a continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0,
 dt, n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
@@ -1111,7 +1109,7 @@ face (`is_tick_law` is true). The sample time is `dt` alone, never a key of the 
 hold belongs to sequences (`rollout`), never to a step.
 
 Layout of `core/compile/`: `compiler.py` (`compile`, `compile_auto`, `compile_diagram`,
-`compile_step_diagram`, the shape probe), `plan.py` (`ExecutionPlan` and `StepExecutionPlan`, their
+`compile_step_diagram`, `compile_sampled_diagram`, the shape probe), `plan.py` (`ExecutionPlan`, `StepExecutionPlan` and `SampledExecutionPlan`, their
 operation rows, and the builders),
 and `evaluators/`: `base.py` (the `Evaluator` base, the continuous step
 model, `gather_u`), `dynamic.py`, `diagram.py`, `static.py`, `discrete.py` (one class per
@@ -1163,8 +1161,8 @@ Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous di
 `Simulator` with the diagram evaluator (signal-flow on a time grid).
 
 **Unconnected inputs read their port nominal value — by design, and silently.**
-An input left unwired is a constant at its declared `nominal_value` (the
-Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
+An input left unwired is a constant at its declared `nominal_value`,
+never an error or a warning; `plot_diagram()`
 shows it as unconnected. Time-varying sources belong in the diagram; forcing
 via `compute_trajectory(u=)`. Facades default `backend="numpy"`.
 
@@ -1183,7 +1181,7 @@ last step as it is.
 **Automatic grid.** With neither `n_samples` nor `dt`, the solver is chosen first
 (user choice, else `euler` for discontinuous plants, else `rk4` when a block
 holds a signal over a `sample_period`, else `scipy`) and the grid
-is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
+is sized to it: adaptive solvers report on `DEFAULT_N_SAMPLES = 10001` points (`simulation/time_grid.py`; a
 plotting resolution — the integrator picks its own steps); fixed-step solvers
 step at the automatic step, one rule wherever a fixed-step run picks its own step (a
 continuous diagram, discontinuous loops included; a sampled loop's plant; `problem.compile(law
@@ -1250,9 +1248,8 @@ algorithm, `gd` and `adam` (the first-order backend, projected on the box), `l-b
 `backend=` is the array module the program is evaluated on (`"numpy"`, `"jax"`, default the
 program's), and the pair selects the implementation through one table keyed
 `(method, backend)` (`optimizer.METHODS`); a pair the table lacks is refused with the methods
-that run on that backend. Each algorithm has one implementation today on either backend
-(SciPy and Ipopt on the host, the first-order loop on the program's array module); a
-`library=` keyword may come later without a break. The program's class is read from its
+that run on that backend. Each algorithm has one implementation on either backend
+(SciPy and Ipopt on the host, the first-order loop on the program's array module). The program's class is read from its
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
 constraint rows) is refused. `z0` defaults to the program's own start, `program.z0` (an exported program sets it). A program may
@@ -1269,14 +1266,13 @@ deterministic given its parameters, the seed one of them, an integer leaf found 
 merge at the boundary; sizes structural (the knots `N`, the iterations `K`, a batch size are
 constructor arguments, never parameters); the warm start an argument of the solve (`z0=`). The
 core's sample-average export is `pe.program(wrt, key=, n_trials=)`: the draws realized once
-from `key`, so `J` is deterministic and any method solves it; how a solver uses the seed
-(advanced per iteration, `vmap`ped) is an `Optimizer` strategy for later. **The native
+from `key`, so `J` is deterministic and any method solves it. **The native
 methods** `gd` and `adam` are pure laws on the array module of their input
 (`optimizers/first_order.py`: `law.init(z0) -> state`, `law.update(grad, state) -> state`, the
 gradient oracle beside it, the box projection in the step). `Optimizer(program, method=,
 n_iterations=K)` takes exactly `K` steps: one `lax.scan` on a JAX program, so
 `solve(params=, z0=)` traces under `jit`, `vmap` and `grad` (the result then holds JAX arrays,
-`success=True`, `cost` the final `J`), and a loop of the same steps on NumPy; no callback.
+`success=True`, `J` the final cost), and a loop of the same steps on NumPy; no callback.
 `n_iterations=None` runs to the method's tolerance `tol` on the host (`max_iterations` its cap,
 Adam's update jitted when JAX is at hand, plain NumPy without it). A native method's numbers are
 keywords (`Optimizer(program, method="gd", max_iterations=50, tol=1e-6, learning_rate=0.1)`);
@@ -1401,7 +1397,7 @@ constraints in every tool: a run that leaves them is a failure. **The failure sw
 `penalize_failure` (a bool, default off: an evaluation reports the plain cost and the
 facts) adds the **failure cost** to a failed or missed run's `J`; `failure_cost` is that cost (a
 number, `None` for the cost bound). **The cost bound** is one formula owned by the problem,
-`cost_bound(horizon=None, *, discount_rate=None, dt=None)`: `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max`
+`cost_bound(horizon=None, *, discount_rate=None, dt=None, params=None)`: `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max`
 over the declared boxes for the continuous judge, and with a tool's `dt` the same maxima on its
 own sum, `g_max dt Σ_{k<N} γᵏ + γᴺ h_max`, `γ = e^{−ρ dt}` (it bounds every stage,
 `c_k ≤ g_max dt`), else the plant's declared ranges; always finite (`1e6` with a warning naming
@@ -1577,8 +1573,7 @@ of its grid is another controller, `law % dt`, scored as such:
   long horizons, saturations and stiff dynamics the second.
 - **Crossover margins jump.** A gain or phase margin is read at a crossover that can appear,
   vanish or switch during a descent, and an eigenvalue has no derivative at a repeated pole:
-  the margins are the numbers a course reports, not an NLP objective (a smooth bound, the
-  sensitivity peak `M_s`, is the traceable-analysis row of TODO §4).
+  the margins are the numbers a course reports, not an NLP objective.
 
 **The step problem answers its own equations (`planning/step_problems.py`):**
 `problem.discretize(dt, solver="rk4", substeps=1)` is the textbook's discrete-time optimal
@@ -1656,14 +1651,14 @@ map); the learned law's runs with draws are
 from `hidden=` and `features=`), updated in place every learning iteration, is `planner.actor`; the plant steps trained so far,
 `planner.n_timesteps`. `solve` is the one verb: each call continues the training where the last
 one stopped and hands out a copy of the law at its weights (no `learn`); the law is read as
-`solution.controller` or `planner.actor.action(x)` (no `predict`, which is Stable-Baselines3's
-own word, read through the bridge's `SB3Controller`).
+`solution.controller` or `planner.actor.action(x)` (no `predict`; a Stable-Baselines3 model is read
+through the bridge's `SB3Controller`).
 What the algorithm trains is an `ExplorationPolicy` (`planner.exploration_policy`): the actor's
 mean action (its `actor`, the planner's) with an exploration head around it (`GaussianHead` for the policy-gradient family,
 `SquashedGaussianHead` for SAC), one pytree `theta = {"mlp", "head"}`, and the methods
 `sample`, `log_prob`, `entropy` and `input(a)`. Critics `ValueFunction` and `QFunction` sit
 on the same features; their `value(w, x)` and `value(w, x, a)` take the weights first, the
-`jax.grad` idiom, an internal exception to the one signature (the maintainer, 2026-11-11). One file per algorithm under `algorithms/` (`REINFORCE`,
+`jax.grad` idiom, an internal exception to the one signature. One file per algorithm under `algorithms/` (`REINFORCE`,
 `ActorCritic`, `PPO`, `SAC`), each owning only its update rule and train state; three class
 attributes declare the family (`on_policy`, `head_kind`, `critic_kind`). Bare JAX, no
 Flax/Optax dependency. Training is quiet by default; `solve(verbose=True)` prints one line per
@@ -1699,8 +1694,7 @@ through the network, and the step model (`ev.step(x, u, t, params, dt=…)` with
 `params={"controller": ..., "plant": ...}`) gives gradients of a rollout with respect
 to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
 drone, rocket); the tutorial chapter is
-`examples/tutorial/advanced/04_reinforcement_learning.ipynb`; native teaching
-notebooks are GRO860's `pendulum_value_iteration_vs_lqr_vs_rl` and `drone_ppo`. The
+`examples/tutorial/advanced/04_reinforcement_learning.ipynb`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `mount`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos
@@ -1733,8 +1727,7 @@ bounds is structure, not a leaf). Two routes replan from new numbers, a new star
 offline, `planner.solve(params=p, guess=prev)` with the new `p["x0"]` builds each call; in real
 time, `pv = planner.compile()` then `pv.solve(p, z)`, which the MPC uses, compiles once and never
 for new numbers (`params` is `None` or the complete tree, checked, an unknown or a missing path
-raising and naming the known ones). The
-reserved key ``scene`` raises ``NotImplementedError`` until the geometry plan binds the scene. Carrying the
+raising and naming the known ones). Carrying the
 tree stays under 2× the compile, the solve and an evaluator call of the same program with it
 frozen (the bicycle MPC is the check). Every transcription's objective is the
 problem's, discounted from `t0`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
@@ -1843,10 +1836,9 @@ own way at the successors (SciPy's interpolator on NumPy, `map_coordinates` with
 mask on JAX, zero off the grid); the
 `method="loop"` engine stays the double loop written for teaching (the raw tables, `J` and `pi`
 as action ids by node, are `solution.record.J` and `solution.record.pi`); out-of-domain
-transitions are charged a finite `out_of_bound_cost` (pyro's
-`cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
+transitions are charged a finite `out_of_bound_cost`, or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
 such transition's successor. Three interchangeable
-backward steps share this workflow: `method="loop"` (per-node Python, pyro's reference),
+backward steps share this workflow: `method="loop"` (per-node Python, the reference),
 and the table method (`method="table"`, the default) on `backend="numpy"` (vectorized over
 the precomputed lookup table, the default) or `backend="jax"` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, a finite
 horizon's `N` sweeps one `lax.scan` stacking the stages, on tables
@@ -1866,10 +1858,10 @@ refused), so the loop and table engines and the policy evaluation read one owner
 features — `QuadraticFeatures(x_bar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads
 `(c, b, S)` back) and `RadialBasisFeatures` (Gaussian bumps, `on_grid` for a mesh of centres),
 stacked with `+` — and a `LinearApproximator` that fits by least squares (`fit`) or one
-stochastic-gradient step per sample (`sgd_step`). It is the seed of approximate dynamic
-programming: fit a cost-to-go from value iteration, or learn one online.
+stochastic-gradient step per sample (`sgd_step`): a cost-to-go fitted from value
+iteration, or learned online.
 
-**Spatial scene** (`planning/spatial/`; its move to `core/geometry/` is in §3): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
+**Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
 `Scene` (`obstacles`, `workspace_fields`). On X: a `Field`'s `value(x)` fuses the robot
 placement with scene queries (`clearance_field`, `cost_field`). Export separately —
@@ -1885,8 +1877,9 @@ geometry: :func:`~minilink.planning.spatial.collision.disc`,
 :func:`~minilink.planning.spatial.collision.car_outline`. A soft obstacle cost shapes the
 clearance with `quadratic_hinge` or `inverse_barrier` (`core/shaping.py`). Compose at
 `PlanningProblem`: `X = bounds & free`, `cost = base + w * terrain`. A scene's numbers are
-not yet leaves of a planner's tree (the reserved `scene` key, above): to move an
-obstacle, rebuild the `Scene` and solve again.
+leaves of the tree of every set and cost built from it, under `"scene"` in the field's tree
+(`problem.params["X"]["FieldSet"]["field"]["scene"]["obstacles"]["Sphere"]["center"]` for
+`X = box & scene.clearance_field(body).as_set()`), so an obstacle moves by an edit of the tree.
 
 **Reference track** (`core/geometry/paths.py`, `planning/spatial/track.py`): workspace centerlines
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`; `closed=True` adds the
@@ -1899,7 +1892,7 @@ switch held on the path, not in its `params`; `path.at(s)` is the point at arc l
 clearance (subtract body radius). Compose with obstacles:
 `X = bounds & scene.clearance_field(body).as_set() & track.corridor_field(body).as_set()`.
 
-**Workspace cost raster** (`plotting.plot_cost_field`, a heatmap or with `is_3d=True` a surface,
+**Workspace cost raster** (`plot_cost_field` in `planning/spatial/plotting.py`, a heatmap or with `is_3d=True` a surface,
 sampling its costs on a `grid=` of workspace points): rasterize shaped ``FieldCost`` terms
 at workspace points ``p = (x, y)`` with a **point probe** body (heading-independent).
 Build viz costs with ``mount(point_probe(), on=sys)``; MPC may still use ``car_outline``.
