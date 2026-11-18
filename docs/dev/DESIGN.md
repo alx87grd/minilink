@@ -1895,8 +1895,8 @@ switch held on the path, not in its `params`; `path.at(s)` is the point at arc l
 clearance (subtract body radius). Compose with obstacles:
 `X = bounds & scene.clearance_field(body).as_set() & track.corridor_field(body).as_set()`.
 
-**Workspace cost raster** (`plotting.plot_cost_field` / `plot_cost_field_3d` /
-`plot_cost_field_exports`, each sampling its own costs on a `grid=` of workspace points): rasterize shaped ``FieldCost`` terms
+**Workspace cost raster** (`plotting.plot_cost_field` / `plot_cost_field_3d`, each
+sampling its own costs on a `grid=` of workspace points): rasterize shaped ``FieldCost`` terms
 at workspace points ``p = (x, y)`` with a **point probe** body (heading-independent).
 Build viz costs with ``mount(point_probe(), on=sys)``; MPC may still use ``car_outline``.
 

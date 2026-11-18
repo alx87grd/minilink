@@ -1905,14 +1905,14 @@ def test_the_cost_field_of_an_obstacle_is_radially_symmetric():
     assert heatmap.cmap == "turbo" and heatmap.vmin == 0.0
 
 
-def test_plot_cost_field_exports_smoke(tmp_path):
+def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
     import os
 
     os.environ.setdefault("MPLBACKEND", "Agg")
     import matplotlib
 
     matplotlib.use("Agg", force=True)
-    from minilink.planning.spatial.plotting import plot_cost_field_exports
+    from minilink.planning.spatial.plotting import plot_cost_field, plot_cost_field_3d
 
     scene = Scene(obstacles=(Sphere([1.0, 0.0], 0.4),))
     body = _holonomic_point()
@@ -1920,32 +1920,19 @@ def test_plot_cost_field_exports_smoke(tmp_path):
     path = scene.clearance_field(body).as_cost(weight=1.0)
     corridor = scene.clearance_field(body).as_cost(weight=2.0)
     obstacle = scene.clearance_field(body).as_cost(weight=3.0)
-    layers = {
-        "path": [path],
-        "corridor": [corridor],
-        "obstacle": [obstacle],
-        "combined": [path, corridor, obstacle],
-    }
-    out = plot_cost_field_exports(
-        layers,
-        bounds=bounds,
-        grid=(16, 14),
-        scene=scene,
-        overlay_bounds=bounds,
-        log_scale=True,
-        show=False,
+    costs = [path, corridor, obstacle]
+    flat = plot_cost_field(
+        costs, bounds=bounds, grid=(16, 14), log_scale=True, title="2D", show=False
     )
-    assert set(out) == {"path", "corridor", "obstacle", "combined"}
-    assert out["obstacle"]["2d"].axes.get_title() == "Obstacle cost (2D)"
-    assert out["combined"]["3d"].axes.get_title() == "Combined cost (3D)"
-    for entry in out.values():
-        assert entry["2d"].axes is not None and entry["3d"].axes is not None
-        assert len(entry["2d"].figure.axes) == 2
-        assert len(entry["3d"].figure.axes) == 2
-    out["combined"]["2d"].save(tmp_path / "combined_2d.png")
-    out["combined"]["3d"].save(tmp_path / "combined_3d.png")
-    assert (tmp_path / "combined_2d.png").exists()
-    assert (tmp_path / "combined_3d.png").exists()
+    both = scene.plot(ax=flat, bounds=bounds, show_density=False, title="")
+    surface = plot_cost_field_3d(
+        costs, bounds=bounds, grid=(16, 14), log_scale=True, title="3D", show=False
+    )
+    assert flat.axes.get_title() == "2D" and surface.axes.get_title() == "3D"
+    assert len(flat.figure.axes) == 2 and len(surface.figure.axes) == 2
+    assert both.figure is flat.figure and len(both.spec.panels[0].layers) > 1
+    assert flat.save(tmp_path / "flat.png").exists()
+    assert surface.save(tmp_path / "surface.png").exists()
 
 
 def test_the_spatial_plots_draw_on_plotly():

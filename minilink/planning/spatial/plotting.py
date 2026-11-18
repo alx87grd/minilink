@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
@@ -15,7 +13,6 @@ from minilink.graphical.figure import (
     Surface,
     Trace,
     draw,
-    overlay,
 )
 from minilink.planning.spatial.collision import iter_probes
 from minilink.planning.spatial.grid import sample_grid
@@ -190,87 +187,6 @@ def plot_cost_field_3d(
     )
 
     return draw(spec, renderer=renderer, show=show, ax=ax)
-
-
-def plot_cost_field_exports(
-    layers,
-    *,
-    bounds,
-    grid=(200, 200),
-    state_dim: int = 2,
-    u=None,
-    t: float = 0.0,
-    params=None,
-    track=None,
-    scene=None,
-    overlay_bounds=None,
-    traj=None,
-    log_scale: bool = True,
-    cmap=COST_FIELD_CMAP,
-    renderer="matplotlib",
-    show=None,
-    ax=None,
-):
-    """
-    Plot each named cost layer in 2-D and 3-D with the same colour map.
-
-    Parameters
-    ----------
-    layers : dict[str, list]
-        The cost terms of each layer, e.g. ``{"path": [path_cost],
-        "combined": [path_cost, corridor_cost]}``, sampled on ``bounds`` and
-        ``grid`` as :func:`plot_cost_field` does.
-    track, scene
-        Optional overlays drawn on the 2-D figures (``overlay_bounds`` for limits).
-    traj
-        Optional executed path ``(x, y)`` polyline on 2-D figures.
-    ax
-        ``None``: each layer draws two figures of its own.
-
-    Returns
-    -------
-    dict
-        ``{name: {"2d": PlotResult, "3d": PlotResult}}``; ``.save`` writes each.
-    """
-    require_own_figures(ax)
-
-    out = {}
-    for name, costs in layers.items():
-        xs, ys, Z = sampled_costs(
-            costs,
-            bounds=bounds,
-            grid=grid,
-            state_dim=state_dim,
-            u=u,
-            t=t,
-            params=params,
-        )
-        title = name.replace("_", " ").title()
-        shared = {"cmap": cmap, "log_scale": log_scale, "vmax": None, "gamma": 0.55}
-
-        # The heatmap, under the track, the scene and the executed path when given
-        heatmap = cost_field_figure(
-            xs, ys, Z, title=f"{title} cost (2D)", figsize=(9.0, 7.0), **shared
-        )
-        spec_2d = export_overlay(heatmap, track, scene, overlay_bounds, traj)
-
-        # The surface, every second mesh line
-        spec_3d = cost_surface_figure(
-            xs,
-            ys,
-            Z,
-            title=f"{title} cost (3D)",
-            figsize=(9.0, 7.0),
-            stride=2,
-            **shared,
-        )
-
-        out[name] = {
-            "2d": draw(spec_2d, renderer=renderer, show=show),
-            "3d": draw(spec_3d, renderer=renderer, show=show),
-        }
-
-    return out
 
 
 def scene_figure(
@@ -733,62 +649,3 @@ def cost_field_array(Z, *, log_scale=False, vmax=None, vmax_percentile=99.0):
         vmax = 1.0
 
     return z, vmin, vmax, label
-
-
-# The exports' overlays
-
-
-def require_own_figures(ax):
-    """Refuse axes for the exports: each layer draws two figures of its own."""
-    if ax is not None:
-        raise ValueError(
-            "plot_cost_field_exports draws two figures per layer; pass ax=None "
-            "and compose with each record it returns"
-        )
-
-
-def export_overlay(heatmap, track, scene, overlay_bounds, traj):
-    """The cost heatmap with the track, the scene and the executed path over it, framed on ``overlay_bounds``."""
-    layers = []
-    frame = None
-    if track is not None:
-        drawn = track_figure(
-            track,
-            bounds=overlay_bounds,
-            n_samples=200,
-            show_waypoints=True,
-            title="",
-            figsize=None,
-        ).panels[0]
-        layers += drawn.layers
-        frame = (drawn.x_lim, drawn.y_lim)
-    if scene is not None:
-        drawn = scene_figure(
-            scene,
-            bounds=overlay_bounds,
-            grid=(120, 120),
-            show_obstacles=True,
-            show_density=False,
-            show_clearance_contour=False,
-            body=None,
-            x=None,
-            states=None,
-            t=0.0,
-            params=None,
-            title="",
-            figsize=None,
-        ).panels[0]
-        layers += drawn.layers
-        frame = (drawn.x_lim, drawn.y_lim)
-    if traj is not None:
-        layers.append(
-            Trace(traj[0, :], traj[1, :], color="black", width=1.0, alpha=0.85)
-        )
-
-    # The overlays' frame, else the heatmap's own
-    spec = overlay(heatmap, [layers])
-    if frame is not None:
-        panel = replace(spec.panels[0], x_lim=frame[0], y_lim=frame[1])
-        spec = replace(spec, panels=(panel,))
-
-    return spec

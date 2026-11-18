@@ -29,7 +29,10 @@ from minilink.core.shaping import (
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import pad_bounds
-from minilink.planning.spatial.plotting import plot_cost_field_exports
+from minilink.planning.spatial.plotting import (
+    plot_cost_field,
+    plot_cost_field_3d,
+)
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (
@@ -217,24 +220,39 @@ if SHOW_PLOTS:
     )
     cost_bounds = pad_bounds(plot_bounds, 3.0)
     layers = {
-        "path": [path_viz],
-        "corridor": [corridor_viz],
-        "obstacle": [obstacle_viz],
-        "combined": [path_viz, corridor_viz, obstacle_viz],
+        "Path": [path_viz],
+        "Corridor": [corridor_viz],
+        "Obstacle": [obstacle_viz],
+        "Combined": [path_viz, corridor_viz, obstacle_viz],
     }
     ax = scene.plot(show=False, bounds=plot_bounds, title="", show_density=False).axes
     track.plot(show=False, ax=ax, bounds=plot_bounds, title="")
     ax.set_title("Wide circuit + keepouts")
     plt.tight_layout()
     plt.show()
-    plot_cost_field_exports(
-        layers,
-        bounds=cost_bounds,
-        state_dim=sys_mpc.n,
-        grid=(120, 120),
-        track=track,
-        scene=scene,
-        overlay_bounds=plot_bounds,
-        log_scale=True,
-        show=True,
-    )
+    # Each cost layer: its heatmap under the track and the obstacles, then its surface
+    for name, costs in layers.items():
+        drawn = plot_cost_field(
+            costs,
+            bounds=cost_bounds,
+            state_dim=sys_mpc.n,
+            grid=(120, 120),
+            log_scale=True,
+            title=f"{name} cost (2D)",
+            figsize=(9.0, 7.0),
+            show=False,
+        )
+        track.plot(ax=drawn, show=False, bounds=plot_bounds, title="")
+        scene.plot(ax=drawn, bounds=plot_bounds, show_density=False, title="")
+        drawn.axes.set_xlim(plot_bounds[0])
+        drawn.axes.set_ylim(plot_bounds[1])
+        drawn.show()
+        plot_cost_field_3d(
+            costs,
+            bounds=cost_bounds,
+            state_dim=sys_mpc.n,
+            grid=(120, 120),
+            log_scale=True,
+            title=f"{name} cost (3D)",
+            figsize=(9.0, 7.0),
+        )
