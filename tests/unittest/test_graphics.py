@@ -2052,9 +2052,11 @@ class TestGifExport(unittest.TestCase):
         traj = Trajectory(
             t=np.array([0.0, 0.1]), x=np.array([[0.0, 1.0]]), u=np.zeros((0, 2))
         )
+        before = plt.get_fignums()
         for name in ("clip.html", "clip.png"):
             with self.assertRaisesRegex(ValueError, r"\.gif or an \.mp4"):
                 sys.animate(traj, show=False).save(name)
+        self.assertEqual(plt.get_fignums(), before)  # refused before any figure
 
 
 # --- the catalog's drawing pieces: skins keyed to frames, primitives as declared ---

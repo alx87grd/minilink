@@ -550,6 +550,7 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def save_clip(self, clip, path):
         """A ``.gif`` (the default) or a video through ffmpeg (``.mp4``)."""
+        require_clip_suffix(path)
         return save_matplotlib_clip(clip.built()[1], path, clip.schedule.target_fps)
 
 
@@ -579,9 +580,9 @@ def show_matplotlib_clip(fig, ani, place):
 def save_matplotlib_clip(ani, path, fps):
     """Write ``ani`` to ``path``: a GIF without a suffix or with ``.gif``, an ``.mp4`` video through ffmpeg."""
     path = Path(path)
+    require_clip_suffix(path)
     if not path.suffix:
         path = path.with_suffix(".gif")
-    require_clip_suffix(path)
     writer = "pillow" if path.suffix.lower() == ".gif" else "ffmpeg"
     ani.save(str(path), writer=writer, fps=fps, dpi=DPI_EXPORT)
 
@@ -589,8 +590,8 @@ def save_matplotlib_clip(ani, path, fps):
 
 
 def require_clip_suffix(path):
-    """Refuse a file a matplotlib animation cannot be: only ``.gif`` and ``.mp4``."""
-    if path.suffix.lower() not in (".gif", ".mp4"):
+    """Refuse a file a matplotlib animation cannot be: only ``.gif`` and ``.mp4`` (a GIF without a suffix)."""
+    if path.suffix.lower() not in ("", ".gif", ".mp4"):
         raise ValueError(
             "a matplotlib animation saves as a .gif or an .mp4 video, "
             f"got {path.name!r}; pass a file name ending in .gif or .mp4"
