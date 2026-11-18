@@ -195,8 +195,6 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
      (positional), `"auto"` on `problem.compile`;
   10. `Field.as_set(*, lower, upper)` is keyword-only with a sentinel; `FieldSet(field,
       lower=0.0, upper=None)` is positional with another default;
-  11. `plot_diagram(file_name, show, *, expand)`: `show` is positional there and keyword-only
-      on every other plot;
   12. `StepPlanningProblem.transition(x, u, k, params)` has no default for `k`, and
       `terminal(x, t, params)` takes `t` where its sibling takes `k`;
   13. `SingletonSet.residual(z, params)` has no `t`; `margin(z, t, params)` has.

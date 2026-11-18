@@ -216,13 +216,14 @@ class AnimationResult:
 
   The clips played correctly in headless Chromium (screenshots at two times); the per-frame
   loop runs slower than real time on all three.
-- `animate_modal` takes the same keywords; it returns its analysis result `(poles, modes)` as
-  today.
+- `animate_modal` takes the same keywords and returns an `AnimationResult`; the poles and
+  modes are read from the modal analysis, and its callers change.
 - The live paths (`game`, the realtime simulator, live plots) are sessions, not results.
 
 ### 4.3 Block diagrams (ruling 6e)
 
-- `plot_diagram` returns a `PlotResult(renderer="graphviz", figure=<Digraph>)`, shown at call
+- `plot_diagram(sys, *, file_name=None, show=True, expand=True)`, every keyword keyword-only,
+  returns a `PlotResult(renderer="graphviz", figure=<Digraph>)`, shown at call
   time: inline SVG in a notebook (it was shown only as a cell's last expression), the vector
   PDF in the system viewer elsewhere. `show="pdf"` and the matplotlib PNG window go;
   `"window"` names the viewer.
@@ -247,7 +248,7 @@ class AnimationResult:
   the phase-plane window warning, the region plot's `sys.x0`).
 - QUESTIONS, "What the check of the core notebooks found in the API", item 15 (`Comparison`
   without `renderer`, `ax`, `title`) is answered by this contract; item 11 (`plot_diagram`'s
-  positional `show`) waits for the maintainer.
+  positional `show`) is ruled: keyword-only (§4.3).
 - Building the animation frames dominates an animation's cost (22 s on the Stanley lap, 40 s on
   the kinematic MPC, 120 s on MPPI, before either playback); a TODO row profiles it.
 
@@ -268,6 +269,10 @@ class AnimationResult:
 9. **D6.** The time signals and the phase plane merge onto `FigureSpec` in the run, behind
    the stop rule of §8, step 5.
 10. Both renderers draw all six layers, the stream arrows included.
+11. `animate_modal` returns an `AnimationResult` as every animation; `plot_diagram`'s
+    keywords are keyword-only. Public signatures change freely: every caller is updated.
+12. The run is on the branch `plotting-contract`, with a pull request into
+    `dev-consolidation`.
 
 ## 8. The run
 
