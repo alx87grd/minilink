@@ -470,9 +470,18 @@ class DynamicPlotting(LinearPlotting):
         *,
         x_axis=0,
         y_axis=None,
+        u=None,
+        x_ref=None,
+        t=0.0,
+        bounds=None,
+        grid_shape=(21, 21),
+        params=None,
+        title=None,
+        streamplot=False,
+        figsize=None,
         renderer="matplotlib",
-        show=True,
-        **kwargs,
+        show=None,
+        ax=None,
     ):
         """
         Convenience shortcut to plot a phase-plane vector field.
@@ -493,9 +502,18 @@ class DynamicPlotting(LinearPlotting):
             traj,
             x_axis=x_axis,
             y_axis=y_axis,
+            u=u,
+            x_ref=x_ref,
+            t=t,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            params=params,
+            title=title,
+            streamplot=streamplot,
+            figsize=figsize,
             renderer=renderer,
             show=show,
-            **kwargs,
+            ax=ax,
         )
 
 

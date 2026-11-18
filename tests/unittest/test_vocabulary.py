@@ -962,6 +962,9 @@ SHORTCUTS = {
     "minilink.core.facades.plotting.SystemPlotting.plot_control_law": (
         "minilink.graphical.port_map.plot_control_law"
     ),
+    "minilink.core.facades.plotting.DynamicPlotting.plot_phase_plane": (
+        "minilink.graphical.phase_plane.phase_plane.plot_phase_plane"
+    ),
     "minilink.core.discrete.sampled_diagram.SampledDiagramSystem.animate": (
         "minilink.core.facades.animation.SystemAnimation.animate"
     ),
