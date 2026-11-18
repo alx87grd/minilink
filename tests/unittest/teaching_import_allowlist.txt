@@ -35,4 +35,3 @@ examples/demos/udes_racecar/mpc_racecar_dynamic.py minilink.graphical.catalog.ra
 examples/demos/udes_racecar/mpc_racecar_kinematic.py minilink.graphical.catalog.racecar_skin
 examples/tutorial/core/01_systems.ipynb minilink.core.backends
 examples/tutorial/core/04_costs.ipynb minilink.core.backends
-examples/tutorial/core/09_plots_and_animations.ipynb minilink.graphical
