@@ -15,7 +15,7 @@ from minilink.planning.dynamic_programming import plotting as grid_plotting
 ###############################################################################
 
 
-def cost_to_go_figure(
+def draw_cost_to_go(
     problem,
     field,
     *,
@@ -44,8 +44,8 @@ def cost_to_go_figure(
     on a mesh over ``bounds``, the problem's state box by default, ``anchor``
     the goal, else the start. ``jmax`` tops the colour scale, by default the
     field's value past its grid (the failure cost) when it has one; an
-    infinite ``jmax`` hands the scale to the renderer. ``is_3d`` adds the
-    surface, on a figure of its own; ``trajectory`` overlays a run on the
+    infinite ``jmax`` hands the scale to the renderer. ``is_3d`` draws the
+    surface instead of the heatmap; ``trajectory`` overlays a run on the
     heatmap.
     """
     grid_plotting.require_flat_overlay(is_3d, trajectory)
@@ -68,7 +68,7 @@ def cost_to_go_figure(
             ax=ax,
         )
 
-    # Else the field sampled on a mesh: the heatmap with the run over it
+    # Else the field sampled on a mesh
     x_level, y_level, J = sample_field(
         problem,
         field,
@@ -80,6 +80,15 @@ def cost_to_go_figure(
         t=t,
     )
     title = f"cost-to-go ({family})" if title is None else title
+
+    # The surface
+    if is_3d:
+        surface = cost_to_go_surface(
+            problem, x_level, y_level, J, x_axis, y_axis, jmax, title
+        )
+        return draw(surface, renderer=renderer, show=show, ax=ax)
+
+    # The heatmap with the run over it
     overlay = grid_plotting.trajectory_layers(
         trajectory, x_axis, y_axis, ("closed loop", "start", "end")
     )
@@ -87,20 +96,8 @@ def cost_to_go_figure(
         problem, x_level, y_level, J, x_axis, y_axis, jmax, title, overlay
     )
     heatmap = FigureSpec(panels=(panel,))
-    if not is_3d:
-        return draw(heatmap, renderer=renderer, show=show, ax=ax)
 
-    # The surface on a figure of its own, both shown once drawn
-    surface = cost_to_go_surface(
-        problem, x_level, y_level, J, x_axis, y_axis, jmax, title
-    )
-    heatmap_result = draw(heatmap, renderer=renderer, show=False, ax=ax)
-    result = draw(surface, renderer=renderer, show=False)
-    grid_plotting.show_each(
-        (heatmap_result, result), ax is None if show is None else show
-    )
-
-    return result
+    return draw(heatmap, renderer=renderer, show=show, ax=ax)
 
 
 def plot_control_law(

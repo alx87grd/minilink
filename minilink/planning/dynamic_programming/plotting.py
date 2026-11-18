@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink.graphical.common.labels import state_axis_label
-from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
 
 # The value-iteration result is a node-indexed field over the state grid: these
@@ -40,7 +39,7 @@ def plot_cost_to_go(
     ``J`` is by grid node: value iteration's ``solution.record.J``, or a
     policy's ``J^π``. ``x_axis`` and ``y_axis`` are the two state axes of the
     slice, integers, or two lists of one length for several slices.
-    ``is_3d`` draws the surface too, on a figure of its own.
+    ``is_3d`` draws the surface of ``J`` instead of the heatmap.
     """
     require_single_slice(trajectory, x_axis, y_axis)
 
@@ -67,6 +66,20 @@ def plot_cost_to_go(
 
     require_flat_overlay(is_3d, trajectory)
 
+    # The 3-D surface of J, clipped to 0 ≤ J (≤ jmax when given)
+    if is_3d:
+        J_plot = J if jmax is None else np.clip(J, 0.0, jmax)
+        surface = value_surface_figure(
+            grid,
+            np.clip(J_plot, 0.0, np.inf),
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            cmap=cmap,
+            title=title,
+        )
+        return draw(surface, renderer=renderer, show=show, ax=ax)
+
     # The heatmap with the closed-loop trajectory over it
     heatmap = field_figure(
         grid,
@@ -80,26 +93,8 @@ def plot_cost_to_go(
         title=title,
         overlay=trajectory_layers(trajectory, x_axis, y_axis, overlay_labels),
     )
-    if not is_3d:
-        return draw(heatmap, renderer=renderer, show=show, ax=ax)
 
-    # The 3-D surface of J, clipped to 0 ≤ J (≤ jmax when given), on a figure of
-    # its own; both shown once drawn
-    J_plot = J if jmax is None else np.clip(J, 0.0, jmax)
-    surface = value_surface_figure(
-        grid,
-        np.clip(J_plot, 0.0, np.inf),
-        x_axis=x_axis,
-        y_axis=y_axis,
-        anchor=anchor,
-        cmap=cmap,
-        title=title,
-    )
-    result = draw(heatmap, renderer=renderer, show=False, ax=ax)
-    surface_result = draw(surface, renderer=renderer, show=False)
-    show_each((result, surface_result), ax is None if show is None else show)
-
-    return result
+    return draw(heatmap, renderer=renderer, show=show, ax=ax)
 
 
 def plot_control_law(
@@ -186,7 +181,7 @@ def animate_cost_to_go(
     """
     require_history(record)
 
-    return animate(
+    return animate_field(
         grid,
         record.history,
         kind="value",
@@ -213,7 +208,7 @@ def animate_control_law(
     """Animate the control-law sweeps a solve recorded on ``record.history``, on ``grid``."""
     require_history(record)
 
-    return animate(
+    return animate_field(
         grid,
         record.history,
         kind="policy",
@@ -226,66 +221,26 @@ def animate_control_law(
     )
 
 
-def plot_value(
-    grid,
-    J,
-    *,
-    x_axis=0,
-    y_axis=1,
-    anchor=None,
-    vmin=0.0,
-    vmax=None,
-    cmap="YlOrRd",
-    title="Cost-to-go",
-    renderer="matplotlib",
-    show=None,
-    ax=None,
-):
-    """Draw a 2-D heatmap of a node-indexed value field ``J``."""
-    return plot_field(
-        grid,
-        J,
-        x_axis=x_axis,
-        y_axis=y_axis,
-        anchor=anchor,
-        vmin=vmin,
-        vmax=vmax,
-        cmap=cmap,
-        title=title,
-        renderer=renderer,
-        show=show,
-        ax=ax,
-    )
+def cost_scale_limit(failure_cost):
+    """
+    Default top of the cost-to-go colour scale: the cost of leaving the grid.
+
+    States that must leave saturate at that cost, so clipping there keeps the
+    feasible states readable. A callable ``failure_cost(x, t)`` has no single level and
+    an infinite one is no limit: both leave the scale to the renderer (``None``).
+    """
+    if failure_cost is None or callable(failure_cost) or not np.isfinite(failure_cost):
+        return None
+
+    return float(failure_cost)
 
 
-def plot_value_3d(
-    grid,
-    J,
-    *,
-    x_axis=0,
-    y_axis=1,
-    anchor=None,
-    cmap="YlOrRd",
-    title="Cost-to-go",
-    renderer="matplotlib",
-    show=None,
-    ax=None,
-):
-    """Draw a 3-D surface of a node-indexed value field ``J``."""
-    spec = value_surface_figure(
-        grid,
-        J,
-        x_axis=x_axis,
-        y_axis=y_axis,
-        anchor=anchor,
-        cmap=cmap,
-        title=title,
-    )
-
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
-def animate(
+def animate_field(
     grid,
     history,
     *,
@@ -339,25 +294,6 @@ def animate(
         interval=interval,
         show=show,
     )
-
-
-def cost_scale_limit(failure_cost):
-    """
-    Default top of the cost-to-go colour scale: the cost of leaving the grid.
-
-    States that must leave saturate at that cost, so clipping there keeps the
-    feasible states readable. A callable ``failure_cost(x, t)`` has no single level and
-    an infinite one is no limit: both leave the scale to the renderer (``None``).
-    """
-    if failure_cost is None or callable(failure_cost) or not np.isfinite(failure_cost):
-        return None
-
-    return float(failure_cost)
-
-
-###############################################################################
-# Internal machinery
-###############################################################################
 
 
 def require_single_slice(trajectory, x_axis, y_axis):
@@ -551,10 +487,3 @@ def trajectory_layers(trajectory, x_axis, y_axis, labels):
             label=labels[2],
         ),
     )
-
-
-def show_each(results, show):
-    """Show each drawn figure where ``show`` resolves, in order."""
-    for result in results:
-        if result.renderer is not None:
-            show_figure(result.figure, result.renderer, show)

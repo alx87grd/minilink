@@ -22,7 +22,7 @@ from minilink.planning.planner import (
     planner_evidence,
     require_solution,
 )
-from minilink.planning.plotting import cost_to_go_figure
+from minilink.planning.plotting import draw_cost_to_go
 from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution, solve_time_text
@@ -777,7 +777,7 @@ class DynamicProgrammingPlanner(Planner):
             return require_solution(self).plot_cost_to_go(**drawn)
 
         # Another table of this grid, drawn as the solution's own
-        return cost_to_go_figure(
+        return draw_cost_to_go(
             self.problem, field, grid=self.grid, family="value iteration", **drawn
         )
 

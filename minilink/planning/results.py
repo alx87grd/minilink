@@ -15,7 +15,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import EPISODE_LENGTH
 from minilink.planning.plotting import (
-    cost_to_go_figure,
+    draw_cost_to_go,
     plot_control_law,
     plot_solution_trajectory,
 )
@@ -238,8 +238,8 @@ class PlanningSolution:
         problem's state box) at the time ``t``, the other axes pinned at
         ``anchor`` (the goal, else the start). ``jmax`` tops the colour scale,
         by default the field's value past its grid (the failure cost) when it
-        has one, ``np.inf`` for the renderer's own scale; ``is_3d`` adds the
-        surface on a figure of its own, ``trajectory`` overlays a run,
+        has one, ``np.inf`` for the renderer's own scale; ``is_3d`` draws the
+        surface instead of the heatmap, ``trajectory`` overlays a run,
         ``title`` replaces the title; ``renderer`` is ``"matplotlib"`` or
         ``"plotly"``, ``ax`` draws into matplotlib axes or a drawn
         ``PlotResult``, and ``show=None`` shows the figure unless it is drawn
@@ -248,7 +248,7 @@ class PlanningSolution:
         field = require_cost_to_go(self)
         grid = getattr(self.controller, "grid", None)
 
-        return cost_to_go_figure(
+        return draw_cost_to_go(
             self.problem,
             field,
             grid=grid,

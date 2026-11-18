@@ -40,6 +40,7 @@ race = compare(VI=sol_vi, LQR=sol_lqr)
 print(race)
 race.plot_control_law()
 race.plot_cost_to_go(jmax=INF)
+planner.plot_cost_to_go(jmax=INF)
 planner.plot_cost_to_go(jmax=INF, is_3d=True)
 
 # The LQR law measured on the nonlinear plant: the Bellman expectation equation on VI's grid

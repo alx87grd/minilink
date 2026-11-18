@@ -454,32 +454,36 @@ class StateSpaceGrid:
         fitted approximation. The heatmap's colours span ``[vmin, vmax]``,
         ``vmin`` 0 by default; the surface is the field clipped to the limits
         given. ``x_axis``, ``y_axis`` and ``anchor`` pick the slice, as in
-        :func:`~minilink.planning.dynamic_programming.plotting.plot_value`.
+        :func:`~minilink.planning.dynamic_programming.plotting.plot_cost_to_go`.
         """
         # Lazy import: the graphics load on first use, not with the core
+        from minilink.graphical.figure import draw
         from minilink.planning.dynamic_programming import plotting
 
         values = np.asarray(values, dtype=float)
-        drawn = dict(
-            x_axis=x_axis,
-            y_axis=y_axis,
-            anchor=anchor,
-            cmap=cmap,
-            title=title,
-            renderer=renderer,
-            show=show,
-            ax=ax,
-        )
+        slice_of = dict(x_axis=x_axis, y_axis=y_axis, anchor=anchor)
 
         # A surface takes no colour limits: the field itself is clipped to [vmin, vmax]
         if is_3d:
             if vmin is not None or vmax is not None:
                 values = np.clip(values, vmin, vmax)
-            return plotting.plot_value_3d(self, values, **drawn)
+            spec = plotting.value_surface_figure(
+                self, values, **slice_of, cmap=cmap, title=title
+            )
+            return draw(spec, renderer=renderer, show=show, ax=ax)
 
-        return plotting.plot_value(
-            self, values, vmin=0.0 if vmin is None else vmin, vmax=vmax, **drawn
+        # The heatmap, its colours over [vmin, vmax], vmin 0 by default
+        spec = plotting.field_figure(
+            self,
+            values,
+            **slice_of,
+            vmin=0.0 if vmin is None else vmin,
+            vmax=vmax,
+            cmap=cmap,
+            title=title,
         )
+
+        return draw(spec, renderer=renderer, show=show, ax=ax)
 
     # Persistence
 

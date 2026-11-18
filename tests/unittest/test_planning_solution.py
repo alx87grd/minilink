@@ -792,6 +792,19 @@ def test_the_planning_plots_take_one_keyword_set_and_return_a_plot_result():
             assert isinstance(drawn, PlotResult) and drawn.figure is not None
 
 
+def test_the_3d_cost_to_go_draws_the_surface_alone():
+    """is_3d draws one figure, the surface: on the grid's nodes and on a sampled field."""
+    import matplotlib.pyplot as plt
+
+    problem, vi, lqr = solved_pendulum()
+    for solution in (vi, lqr):
+        plt.close("all")
+        drawn = solution.plot_cost_to_go(is_3d=True, show=False)
+        assert [panel.is_3d for panel in drawn.spec.panels] == [True]
+        assert plt.get_fignums() == [drawn.figure.number]
+    plt.close("all")
+
+
 def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
     problem, vi, lqr = solved_pendulum()
     grid = vi.controller.grid
