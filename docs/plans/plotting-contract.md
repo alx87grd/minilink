@@ -375,6 +375,12 @@ fed by the planners' data, and are the import test's allow-list.
 - **R22.** A tutorial notebook on plotting and animation closes the run (§8, step 8).
 - **R23.** The run is on the branch `plotting-contract`, with a pull request into
   `dev-consolidation`.
+- **R24.** `is_3d=True` on the cost-to-go draws the surface alone, one record; a caller
+  that wants the heatmap too makes the second call.
+- **R25.** The DP and search animations take the plot keywords: `renderer="matplotlib"`
+  (another renderer is refused by name), `show=None`, `ax=`; `interval=` stays.
+- **R26.** `plot_cost_field_exports` goes; its callers loop over the layers and save each
+  record.
 
 ## 8. The run
 
@@ -483,6 +489,9 @@ in a session:
 | 5 | The seven families on `FigureSpec`, by two agents in worktrees, picked here: the mesh family (DP, the planning views, `Comparison` as one n-panel figure, `Discretizer`, the port map; the DP animations to `graphical/animation/grid_animations.py`), the region of attraction, the phase plane (`phase_plane_figure`; its own renderers gone), the learning curves and gain schedule, the search tree (edges one NaN-broken line: 4 records moved, checked equal data), the MPC futures, the spatial plots (R6, R7: `FieldGrid`, `sample_field_costs` gone; `show_waypoints`; obstacles as filled Traces: 4 records moved by artist kind only, data equal). `Heatmap` and `Surface` gain the colour-bar fields the cost field needs (11 each). `LiveSearchPlot` keeps its home in `planning/`, its drawing in `graphical/live_plots.py`. The import test of §1 passes (the signal and control backends allowed until step 6); `maybe_show` gone. 2 944 unit tests pass; baseline moved 0 | c066946d..be406f5c | done | step 6: the control plots and the time signals onto `FigureSpec` |
 | 6a | The control plots (Bode, pole-zero, root locus, Nyquist, step) build a `FigureSpec`: the subtitle is the first panel's title, the s-plane axes two solid `RefLine`s, the open-circle zeros `marker="o-open"`; `Panel` gains `y_ticks`; the plotly renderer draws a trace's direction arrows. `ControlFigure` and its two renderers removed (`graphical/control/` keeps `style.py`); the five plots and their facades take `ax=`. The matplotlib renderer sets editable PDF fonts and lays out a new figure. Baseline moved 0 | 8fac233b | done | 6b: the time signals and their live handle, behind the stop rule |
 | 6b | The time signals on `FigureSpec`: `signal_figure` (one panel per component, shared time axis, no legend, title empty unless given, as the matplotlib figure was) replaces `SignalPlotSpec` and `SignalTrace`; `plot_time_signals`, `plot_trajectory`, `plot_cost`, `plot_rollout` and the planning mirrors take `ax=`; the planning solution's plot passes its title into the description (Plotly shows it too); the live handles draw through `draw()` and move their lines in place; the signal palette is hex (its name map goes); both renderers write a unit under its label. The matplotlib renderer draws new figures at `DPI_FIGURE` and hides the inner panels' tick labels on a shared x axis. **Stop rule held:** data moved 0; 2 948 unit tests pass; live update plus draw 82 and 90 ms against 90 and 101 ms before (median of 30, 2 000 samples, this container, two runs each). The plot contract's list holds only `plot_diagram` | this commit | done | step 7: the docs, then the review and simplification pass |
+| 7 | The docs: DESIGN §7 holds the contract, the API page of `minilink.graphical`, README, the ROADMAP ledger, TODO, the plans index | 28a4065f..123cae9f | done | step 8 |
+| 8 | The tutorial `examples/tutorial/core/09_plots_and_animations.ipynb`: notebook, console and Colab, composition, saving, headless | 9742554d | done | the review pass |
+| 9 | Review pass (dead helpers, shared renderer grid, lazy imports, timeless words) and the backend-registry fix; two independent reviewers; their confirmed findings and R24–R26 applied (20 commits). Gates on the final tree: ruff, full unit suite, docs build, the notebook check, the demos; baseline moved only by R24 and R26, recorded. `vi_cartpole_swingup` exceeds the demo sweep's 300 s on both sides (324 s on a7e0c1f3, 321 s here, one run each, back to back): not a regression | 928b104d..d8e0f78d | done | the pull request |
 
 ### Decisions taken during the run
 
@@ -519,3 +528,9 @@ in a session:
 - Plotly's figure size is the description's (100 px per inch), one size for both renderers.
 - The DP and search animations build their `FuncAnimation` themselves and are wrapped in
   an `AnimationResult` (`animation_result_of`); they move under `graphical/` in step 5.
+- `Panel.legend` is a bool: on or off, its place chosen by the renderer.
+- A matplotlib figure drawn with `show` off is closed in a notebook whose inline backend
+  would show it at the cell's end, unless it was drawn on the caller's axes; `.show()` on
+  its record still displays it. In a window, a script blocks on that one figure.
+- The graphics import nothing from `planning`: the search animations build their frames as
+  data and play them through `graphical/animation/line_animations.py`.
