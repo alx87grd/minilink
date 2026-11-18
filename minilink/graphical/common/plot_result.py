@@ -39,9 +39,10 @@ class PlotResult:
         Write the figure to ``file_name``, in the format of its extension.
 
         Matplotlib writes any format it knows (``.png``, ``.pdf``, ``.svg``,
-        …); Plotly an interactive ``.html`` page, or an image (``.png``,
-        ``.svg``, ``.pdf``) through kaleido; Graphviz the format of the
-        extension.
+        …), a ``.png`` without an extension; Plotly an interactive ``.html``
+        page (the default), or an image (``.png``, ``.svg``, ``.pdf``) through
+        kaleido; Graphviz the format of the extension, a ``.pdf`` without one.
+        Returns the path written.
         """
         require_drawn(self)
 
@@ -73,20 +74,28 @@ def require_drawn(result):
 
 
 def save_matplotlib(fig, path):
-    """A matplotlib figure in the format of the path's extension."""
-    fig.savefig(path, bbox_inches="tight")
+    """A matplotlib figure in the format of the path's extension, a PNG without one."""
+    # Lazy import: pyplot loads with the first matplotlib figure, not with Plotly's
+    import matplotlib.pyplot as plt
 
-    return path
+    target = path if path.suffix else path.with_suffix(".png")
+
+    # TrueType (Type 42) fonts in PDF and PostScript files: their text stays editable
+    with plt.rc_context({"pdf.fonttype": 42, "ps.fonttype": 42}):
+        fig.savefig(target, bbox_inches="tight")
+
+    return target
 
 
 def save_plotly(fig, path):
-    """A Plotly figure as an interactive page (``.html``), else an image through kaleido."""
-    if path.suffix.lower() in (".html", ".htm"):
-        fig.write_html(path)
+    """A Plotly figure as an interactive page (``.html``, the default), else an image through kaleido."""
+    target = path if path.suffix else path.with_suffix(".html")
+    if target.suffix.lower() in (".html", ".htm"):
+        fig.write_html(target)
     else:
-        fig.write_image(path)
+        fig.write_image(target)
 
-    return path
+    return target
 
 
 def save_graphviz(graph, path):

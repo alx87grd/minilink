@@ -171,6 +171,25 @@ def test_a_record_saves_in_the_format_of_its_extension(renderer, suffix, tmp_pat
     plt.close("all")
 
 
+@pytest.mark.parametrize(
+    "renderer, suffix", [("matplotlib", ".png"), ("plotly", ".html")]
+)
+def test_a_record_saved_without_an_extension_returns_the_file_written(
+    renderer, suffix, tmp_path
+):
+    result = draw(LAYERS["trace"], renderer=renderer, show=False)
+    written = result.save(tmp_path / "figure")
+    assert written == tmp_path / f"figure{suffix}" and written.exists()
+    plt.close("all")
+
+
+def test_saving_leaves_the_global_font_settings_alone(tmp_path):
+    draw(LAYERS["trace"], show=False).save(tmp_path / "figure.pdf")
+    for key in ("pdf.fonttype", "ps.fonttype"):
+        assert matplotlib.rcParams[key] == matplotlib.rcParamsDefault[key]
+    plt.close("all")
+
+
 @pytest.mark.parametrize("renderer", RENDERERS)
 def test_an_overlay_line_in_the_hosts_colour_takes_a_free_one(renderer):
     host = draw(one_panel(Trace(X, X, color="#1f77b4")), renderer=renderer, show=False)

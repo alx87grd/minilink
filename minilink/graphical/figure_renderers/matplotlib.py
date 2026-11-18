@@ -27,10 +27,6 @@ from minilink.graphical.figure import (
 MARKERS = {"o": "o", "o-open": "o", "s": "s", "x": "x", "+": "+", "*": "*"}
 DASHES = {"solid": "-", "dash": "--", "dot": ":"}
 
-# TrueType (Type 42) fonts in PDF and PostScript exports: their text stays editable
-plt.rcParams["pdf.fonttype"] = 42
-plt.rcParams["ps.fonttype"] = 42
-
 
 ###############################################################################
 # Public API

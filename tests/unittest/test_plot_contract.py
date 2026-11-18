@@ -48,12 +48,13 @@ def test_a_plot_takes_renderer_show_and_ax(path, name, keywords):
 
 
 # The modules that draw with a renderer's own library: the renderers, the show
-# step, and the matplotlib-only animations and live figures
+# and save steps, and the matplotlib-only animations and live figures
 RENDERER_MODULES = {
     "graphical/figure_renderers/matplotlib.py",
     "graphical/figure_renderers/plotly.py",
     "graphical/common/environment.py",
     "graphical/common/show.py",
+    "graphical/common/plot_result.py",
     "graphical/colormaps.py",
     "graphical/live_plots.py",
     "graphical/animation/grid_animations.py",

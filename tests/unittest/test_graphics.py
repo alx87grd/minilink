@@ -2046,6 +2046,16 @@ class TestGifExport(unittest.TestCase):
                     sys.animate(traj, show=False).save(os.path.join(tmp, name))
             self.assertEqual(sorted(os.listdir(tmp)), ["clip.gif", "plain.gif"])
 
+    def test_save_refuses_a_format_that_is_not_a_clip(self):
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
+        traj = Trajectory(
+            t=np.array([0.0, 0.1]), x=np.array([[0.0, 1.0]]), u=np.zeros((0, 2))
+        )
+        for name in ("clip.html", "clip.png"):
+            with self.assertRaisesRegex(ValueError, r"\.gif or an \.mp4"):
+                sys.animate(traj, show=False).save(name)
+
 
 # --- the catalog's drawing pieces: skins keyed to frames, primitives as declared ---
 
