@@ -37,8 +37,6 @@ NOT_YET = {
     ("planning/plotting.py", "plot_solution_trajectory"): {"ax"},
     ("planning/results.py", "plot_trajectory"): {"ax"},
     ("planning/results.py", "plot_cost"): {"ax"},
-    ("planning/search/plotting.py", "plot_tree"): {"renderer"},
-    ("planning/search/rrt.py", "plot_tree"): {"renderer", "show", "ax"},
     ("planning/spatial/plotting.py", "plot_scene"): {"renderer"},
     ("planning/spatial/plotting.py", "plot_track"): {"renderer"},
     ("planning/spatial/plotting.py", "plot_cost_field"): {"renderer"},

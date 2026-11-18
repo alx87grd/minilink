@@ -54,7 +54,7 @@ class Trace:
     z: Any = None
     color: str | None = None
     mode: str = "lines"  # "lines" | "markers"
-    marker: str = "o"  # "o" | "o-open" | "x" | "+" | "*"
+    marker: str = "o"  # "o" | "o-open" | "s" | "x" | "+" | "*"
     size: float = 6.0
     width: float = 1.5
     dash: str = "solid"  # "solid" | "dash" | "dot"

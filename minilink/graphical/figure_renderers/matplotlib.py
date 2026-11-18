@@ -20,7 +20,7 @@ from minilink.graphical.figure import (
 )
 
 # The description's marker names in matplotlib's spelling
-MARKERS = {"o": "o", "o-open": "o", "x": "x", "+": "+", "*": "*"}
+MARKERS = {"o": "o", "o-open": "o", "s": "s", "x": "x", "+": "+", "*": "*"}
 
 # The description's dash names in matplotlib's spelling
 DASHES = {"solid": "-", "dash": "--", "dot": ":"}

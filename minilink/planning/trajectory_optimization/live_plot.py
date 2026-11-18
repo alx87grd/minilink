@@ -1,5 +1,6 @@
 """The live trajectory-optimization plot: each iterate's trajectory drawn as the solver runs."""
 
+from minilink.graphical.live_plots import pause_figures
 
 ###############################################################################
 # Public API
@@ -64,10 +65,8 @@ class LiveTrajectoryPlotCallback:
         self.handle.update(trajectory, title=title)
 
         # A short pause lets the matplotlib window redraw while the solver runs
-        if self.pause > 0.0 and self.renderer == "matplotlib":
-            import matplotlib.pyplot as plt
-
-            plt.pause(self.pause)
+        if self.renderer == "matplotlib":
+            pause_figures(self.pause)
 
     ###########################################################################
     # Internal machinery

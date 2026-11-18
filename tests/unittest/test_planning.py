@@ -1221,6 +1221,28 @@ def test_plot_tree_and_animate_search_smoke():
     assert anim is not None
 
 
+def test_plot_tree_draws_on_plotly():
+    pytest.importorskip("plotly")
+    problem, _ = make_holonomic_obstacle_problem()
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS),
+        seed=0,
+        max_iterations=2000,
+    )
+    planner.solve()
+    result = planner.plot_tree(renderer="plotly", show=False)
+    assert result.renderer == "plotly"
+    assert {trace.type for trace in result.figure.data} == {"scatter"}
+    names = {trace.name for trace in result.figure.data}
+    assert {"path", "start", "goal"} <= names
+
+    # The tree's edges are one line, broken by NaN between edges
+    edges = [n.edge.states for n in planner.tree.nodes if n.parent is not None]
+    tree = result.spec.panels[0].layers[0]
+    assert np.isnan(tree.x).sum() == len(edges) - 1
+
+
 def make_steering_extender():
     return SteeringExtender(
         StraightLineSteering(speed=1.0), max_distance=0.6, resolution=0.05

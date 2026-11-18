@@ -2,12 +2,11 @@
 
 import numpy as np
 
-from minilink.graphical.common.animation_result import animation_result_of
-from minilink.graphical.common.plot_result import plot_result_of
-from minilink.planning.plotting import maybe_show
+from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
 
-# Matplotlib is imported inside each view, so the planners stay usable without a
-# display backend until a plot is requested.
+# The tree's edges and the solution path
+TREE_COLOR = "#999999"
+PATH_COLOR = "#1f77b4"
 
 
 ###############################################################################
@@ -20,289 +19,178 @@ def plot_tree(
     *,
     x_axis: int = 0,
     y_axis: int = 1,
-    ax=None,
-    show: bool = True,
-    figsize=(6.0, 5.0),
-    tree_color="0.6",
-    path_color="tab:blue",
     title: str | None = None,
     path_style: str = "dense",
+    figsize=(6.0, 5.0),
+    renderer="matplotlib",
+    show=None,
+    ax=None,
 ):
     """
     Plot the final tree and solution in the ``(x_axis, y_axis)`` state projection.
 
-    Returns ``(fig, ax)``. Tree edges are grey, the solution path is highlighted,
-    and the start, goal, and goal region are marked. Reached through
-    ``RRTPlanner.plot_tree``; pass an ``ax`` (e.g. from ``scene.plot(...)``) to
-    overlay the tree on a scene heatmap.
+    Tree edges are grey, the solution path is highlighted, and the start, goal,
+    and goal region are marked. ``path_style="waypoints"`` draws the path
+    through the tree's nodes, ``"dense"`` along its trajectory. Reached through
+    ``RRTPlanner.plot_tree``; pass ``ax`` (e.g. ``scene.plot(...)``'s record)
+    to overlay the tree on a scene.
     """
-    import matplotlib.pyplot as plt
+    spec = tree_figure(
+        planner,
+        planner.last_solution,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        title=title,
+        path_style=path_style,
+        figsize=figsize,
+    )
 
+    return draw(spec, renderer=renderer, show=show, ax=ax)
+
+
+def tree_figure(planner, solution, *, x_axis, y_axis, title, path_style, figsize):
+    """The search tree, the solution path and the endpoints, as a description."""
     tree = require_tree(planner)
-    problem = planner.problem
 
-    # A new figure, or the one that holds the given axes
-    created = ax is None
-    if created:
-        fig, ax = plt.subplots(figsize=figsize, frameon=True)
-    else:
-        fig = ax.figure
+    # The tree: each edge along the states its extension swept, one NaN-broken line
+    edges = [node.edge.states for node in tree.nodes if node.parent is not None]
+    layers = [edge_trace(edges, x_axis, y_axis, width=0.4)]
 
-    # The tree: each edge drawn along the states its extension swept
-    for node in tree.nodes:
-        if node.parent is not None:
-            states = node.edge.states
-            ax.plot(
-                states[:, x_axis], states[:, y_axis], color=tree_color, lw=0.4, zorder=1
-            )
-
-    # The solution path: through the tree's nodes, or along the dense trajectory
-    if planner.last_solution is not None:
-        if path_style == "waypoints":
-            waypoints = solution_waypoints(planner)
-            if waypoints is not None:
-                ax.plot(
-                    waypoints[:, x_axis],
-                    waypoints[:, y_axis],
-                    color=path_color,
-                    lw=2.5,
-                    zorder=3,
+    # The goal region, then the solution path: through the tree's nodes, or along the trajectory
+    layers += goal_region_layers(planner, x_axis, y_axis)
+    if solution is not None:
+        path = solution_path(planner, solution, path_style)
+        if path is not None:
+            layers.append(
+                Trace(
+                    path[:, x_axis],
+                    path[:, y_axis],
+                    color=PATH_COLOR,
+                    width=2.5,
                     label="path",
                 )
-        else:
-            traj = planner.last_solution.trajectory
-            ax.plot(
-                traj.x[x_axis],
-                traj.x[y_axis],
-                color=path_color,
-                lw=2.5,
-                zorder=3,
-                label="path",
             )
 
-    # The start and the goal, the labels and the title
-    mark_endpoints(ax, planner, x_axis, y_axis)
-    label_axes(ax, problem.sys, x_axis, y_axis)
-    if title is not None:
-        ax.set_title(title)
-    elif created:
-        ax.set_title(f"RRT tree ({len(tree.nodes)} nodes)")
-    ax.legend(loc="best")
-
-    maybe_show(fig, show)
-
-    return plot_result_of((fig, ax))
-
-
-def animate_search(
-    planner,
-    *,
-    x_axis: int = 0,
-    y_axis: int = 1,
-    ax=None,
-    step: int = 5,
-    interval: int = 30,
-    show: bool = True,
-    figsize=(6.0, 5.0),
-    tree_color="0.6",
-    path_color="tab:blue",
-):
-    """
-    Replay the tree growth as an animation in the ``(x_axis, y_axis)`` projection.
-
-    ``step`` edges are revealed per frame, in node insertion order; the solution
-    path is drawn at the end. Returns the
-    :class:`AnimationResult`; ``.save("tree.gif")`` writes it.
-    """
-    import matplotlib.pyplot as plt
-    from matplotlib.animation import FuncAnimation
-
-    tree = require_tree(planner)
-
-    # A new figure, or the one that holds the given axes
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize, frameon=True)
-    else:
-        fig = ax.figure
-
-    # The frame: the limits, labels, endpoints and title stay fixed while the tree grows
-    set_limits(ax, planner, x_axis, y_axis)
-    label_axes(ax, planner.problem.sys, x_axis, y_axis)
-    mark_endpoints(ax, planner, x_axis, y_axis)
-    ax.set_title("RRT search")
-
-    # The edges in insertion order, and the lines drawn so far
-    edges = [node for node in tree.nodes if node.parent is not None]
-    drawn: list = []
-
-    def update(frame):
-        # Reveal up to step more edges, in insertion order
-        target = min(len(edges), (frame + 1) * step)
-        while len(drawn) < target:
-            states = edges[len(drawn)].edge.states
-            (line,) = ax.plot(
-                states[:, x_axis], states[:, y_axis], color=tree_color, lw=0.4, zorder=1
-            )
-            drawn.append(line)
-
-        # Once every edge is shown, the solution path
-        if target >= len(edges) and planner.last_solution is not None:
-            traj = planner.last_solution.trajectory
-            ax.plot(traj.x[x_axis], traj.x[y_axis], color=path_color, lw=2.5, zorder=3)
-
-        return drawn
-
-    # One frame per batch of step edges, and a last one for the path
-    n_frames = (len(edges) + step - 1) // step + 1
-    anim = FuncAnimation(
-        fig, update, frames=n_frames, interval=interval, blit=False, repeat=False
+    # The start and the goal on top
+    layers += endpoint_layers(planner, x_axis, y_axis)
+    panel = Panel(
+        layers=tuple(layers),
+        title=f"RRT tree ({len(tree.nodes)} nodes)" if title is None else title,
+        x_label=axis_label(planner.problem.sys, x_axis),
+        y_label=axis_label(planner.problem.sys, y_axis),
     )
-    return animation_result_of(fig, anim, fps=max(1, int(1000 / interval)), show=show)
+
+    return FigureSpec(panels=(panel,), figsize=figsize)
 
 
-def animate_convergence(
-    planner,
-    *,
-    x_axis: int = 0,
-    y_axis: int = 1,
-    ax=None,
-    interval: int = 50,
-    show: bool = True,
-    figsize=(7.0, 6.0),
-    tree_color="0.75",
-    path_color="tab:blue",
-    title_prefix: str = "RRT* convergence",
-):
-    """
-    Animate recorded RRT* history showing tree growth and best-path refinement.
+def edge_trace(edges, x_axis, y_axis, *, width, color=TREE_COLOR):
+    """Every edge's states in the ``(x_axis, y_axis)`` projection, as one line broken by NaN."""
+    if not edges:
+        return Trace(np.array([]), np.array([]), color=color, width=width)
+    gap = np.full(1, np.nan)
+    x = np.concatenate([np.r_[np.asarray(s, float)[:, x_axis], gap] for s in edges])
+    y = np.concatenate([np.r_[np.asarray(s, float)[:, y_axis], gap] for s in edges])
 
-    Requires the latest solution's ``record.history``, from a solve with
-    ``record_history=True``.
-    Each frame redraws the full tree (including rewiring) and highlights the
-    current best goal path. Returns the
-    :class:`~matplotlib.animation.FuncAnimation` (keep a reference).
-    """
-    import matplotlib.pyplot as plt
-    from matplotlib.animation import FuncAnimation
-
-    history = require_history(planner)
-
-    # A new figure, or the one that holds the given axes
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize, frameon=True)
-    else:
-        fig = ax.figure
-
-    # The frame: the limits, labels and endpoints stay fixed while the tree rewires
-    set_limits(ax, planner, x_axis, y_axis)
-    label_axes(ax, planner.problem.sys, x_axis, y_axis)
-    mark_endpoints(ax, planner, x_axis, y_axis)
-
-    # The lines of the current frame, and the title that reports its progress
-    tree_lines: list = []
-    path_line = None
-    title = ax.set_title(title_prefix)
-
-    def update(frame):
-        nonlocal path_line
-        snapshot = history[frame]
-
-        # Clear the previous frame's tree and path
-        clear_search_artists(tree_lines, path_line)
-        path_line = None
-
-        # The tree as recorded, rewired edges included
-        for edge_states in snapshot.tree_edges:
-            (line,) = ax.plot(
-                edge_states[:, x_axis],
-                edge_states[:, y_axis],
-                color=tree_color,
-                lw=0.35,
-                zorder=1,
-            )
-            tree_lines.append(line)
-
-        # The best path to the goal so far
-        if snapshot.path_states is not None:
-            (path_line,) = ax.plot(
-                snapshot.path_states[:, x_axis],
-                snapshot.path_states[:, y_axis],
-                color=path_color,
-                lw=2.5,
-                zorder=3,
-            )
-
-        # The iteration, and the best cost once the goal is reached
-        if snapshot.reached_goal and snapshot.best_cost_to_come is not None:
-            title.set_text(
-                f"{title_prefix}  iter={snapshot.iteration}  "
-                f"best cost={snapshot.best_cost_to_come:.2f}"
-            )
-        else:
-            title.set_text(f"{title_prefix}  iter={snapshot.iteration}  searching...")
-
-        return tree_lines + ([path_line] if path_line is not None else [])
-
-    # One frame per recorded snapshot, looping
-    anim = FuncAnimation(
-        fig,
-        update,
-        frames=len(history),
-        interval=interval,
-        blit=False,
-        repeat=True,
-    )
-    return animation_result_of(fig, anim, fps=max(1, int(1000 / interval)), show=show)
+    return Trace(x[:-1], y[:-1], color=color, width=width)
 
 
-def draw_search_state(
-    ax,
-    planner,
-    *,
-    reached_goal: bool = False,
-    x_axis: int = 0,
-    y_axis: int = 1,
-    tree_color="0.75",
-    path_color="tab:blue",
-):
-    """
-    Draw the current search tree on ``ax``, and the best path once ``reached_goal``.
-
-    Returns ``(tree_lines, path_line)`` artist handles for live updates.
-    """
-    # The tree: each edge drawn along the states its extension swept
-    tree_lines = []
-    for node in planner.tree.nodes:
-        if node.parent is None:
-            continue
-        states = np.asarray(node.edge.states, dtype=float)
-        (line,) = ax.plot(
-            states[:, x_axis],
-            states[:, y_axis],
-            color=tree_color,
-            lw=0.35,
-            zorder=1,
+def endpoint_layers(planner, x_axis, y_axis):
+    """The start (a black square) and the goal (a red star), as layers."""
+    problem = planner.problem
+    x0 = np.asarray(problem.x0, dtype=float)
+    layers = [
+        Trace(
+            [x0[x_axis]],
+            [x0[y_axis]],
+            color="black",
+            mode="markers",
+            marker="s",
+            label="start",
         )
-        tree_lines.append(line)
-
-    # The path to the goal node, once the goal is reached
-    path_line = None
-    path_states = best_path_states(planner, reached_goal)
-    if path_states is not None:
-        (path_line,) = ax.plot(
-            path_states[:, x_axis],
-            path_states[:, y_axis],
-            color=path_color,
-            lw=2.5,
-            zorder=3,
+    ]
+    if problem.Xf is not None:
+        xg = problem.goal_point()
+        layers.append(
+            Trace(
+                [xg[x_axis]],
+                [xg[y_axis]],
+                color="red",
+                mode="markers",
+                marker="*",
+                size=13.0,
+                label="goal",
+            )
         )
 
-    return tree_lines, path_line
+    return layers
 
 
-###############################################################################
-# Internal machinery
-###############################################################################
+def goal_region_layers(planner, x_axis, y_axis):
+    """The dashed circle of a ball goal region, as layers; none for another goal."""
+    problem = planner.problem
+    radius = goal_radius(planner)
+    if problem.Xf is None or radius is None:
+        return []
+    xg = problem.goal_point()
+
+    # The circle c + r (cos φ, sin φ)
+    phi = np.linspace(0.0, 2.0 * np.pi, 101)
+    x = xg[x_axis] + radius * np.cos(phi)
+    y = xg[y_axis] + radius * np.sin(phi)
+
+    return [Trace(x, y, color="red", width=1.0, dash="dash")]
+
+
+def tree_limits(planner, x_axis, y_axis):
+    """The ``(x_lim, y_lim)`` around the tree's nodes and the goal, with a 5 % margin."""
+    pts = np.array([node.x for node in planner.tree.nodes], dtype=float)
+    if planner.problem.Xf is not None:
+        pts = np.vstack([pts, planner.problem.goal_point()])
+
+    limits = []
+    for axis in (x_axis, y_axis):
+        lo = float(pts[:, axis].min())
+        hi = float(pts[:, axis].max())
+        pad = 0.05 * (hi - lo or 1.0)
+        limits.append((lo - pad, hi + pad))
+
+    return tuple(limits)
+
+
+def axis_label(sys, i):
+    """The label and unit of state ``i``, ``x[i]`` without labels."""
+    labels = getattr(sys.state, "labels", None)
+    units = getattr(sys.state, "units", None)
+    name = labels[i] if labels and i < len(labels) else f"x[{i}]"
+    unit = f" [{units[i]}]" if units and i < len(units) and units[i] else ""
+
+    return name + unit
+
+
+def search_title(step):
+    """The live plot's title for one search step."""
+    if step.reached_goal and step.best_cost_to_come is not None:
+        return (
+            f"RRT search  phase={step.phase}  iter={step.iteration}  "
+            f"nodes={step.n_nodes}  best cost={step.best_cost_to_come:.2f}"
+        )
+
+    return (
+        f"RRT search  phase={step.phase}  iter={step.iteration}  "
+        f"nodes={step.n_nodes}  searching..."
+    )
+
+
+def best_path_states(planner, reached_goal):
+    """The states along the path to the planner's goal node, or ``None`` before the goal."""
+    node = getattr(planner, "solution_node", None)
+    if node is None or not reached_goal:
+        return None
+
+    if hasattr(planner, "path_states"):
+        return planner.path_states(node)
+
+    return None
 
 
 def require_tree(planner):
@@ -311,6 +199,33 @@ def require_tree(planner):
         raise ValueError("No search tree yet; call solve() first")
 
     return planner.tree
+
+
+def require_history(planner):
+    """Refuse a planner whose latest solution recorded no search history; return that history."""
+    # Lazy import: the planner base loads with the planners, the plots after them
+    from minilink.planning.planner import require_solution
+
+    history = require_solution(planner).record.history
+    if not history:
+        raise ValueError(
+            "No search history recorded; run solve with record_history=True"
+        )
+
+    return history
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def solution_path(planner, solution, path_style):
+    """The solution's states, one row per point: the tree's nodes, or the dense trajectory."""
+    if path_style == "waypoints":
+        return solution_waypoints(planner)
+
+    return np.asarray(solution.trajectory.x, dtype=float).T
 
 
 def solution_waypoints(planner):
@@ -337,34 +252,6 @@ def solution_waypoints(planner):
     return waypoints
 
 
-def mark_endpoints(ax, planner, x_axis, y_axis):
-    """Mark the start, the goal and the goal radius."""
-    import matplotlib.pyplot as plt
-
-    problem = planner.problem
-
-    # The start
-    x0 = np.asarray(problem.x0, dtype=float)
-    ax.plot([x0[x_axis]], [x0[y_axis]], "ks", zorder=4, label="start")
-
-    # The goal, and the circle of the goal region around it
-    if problem.Xf is not None:
-        xg = problem.goal_point()
-        ax.plot([xg[x_axis]], [xg[y_axis]], "r*", markersize=13, zorder=4, label="goal")
-        radius = goal_radius(planner)
-        if radius is not None:
-            ax.add_patch(
-                plt.Circle(
-                    (xg[x_axis], xg[y_axis]),
-                    radius,
-                    color="r",
-                    fill=False,
-                    ls="--",
-                    zorder=2,
-                )
-            )
-
-
 def goal_radius(planner):
     """The radius of a ball goal region, else ``None``."""
     # Lazy import: the core sets load on first use, not with the plots
@@ -375,80 +262,3 @@ def goal_radius(planner):
         return float(Xf.radius)
 
     return None
-
-
-def label_axes(ax, sys, x_axis, y_axis):
-    """Label the axes with the state's labels and units."""
-    labels = getattr(sys.state, "labels", None)
-    units = getattr(sys.state, "units", None)
-
-    def axis_label(i):
-        name = labels[i] if labels and i < len(labels) else f"x[{i}]"
-        unit = f" [{units[i]}]" if units and i < len(units) and units[i] else ""
-        return name + unit
-
-    ax.set_xlabel(axis_label(x_axis))
-    ax.set_ylabel(axis_label(y_axis))
-
-
-def set_limits(ax, planner, x_axis, y_axis):
-    """Fit the axes to the tree's nodes and the goal, with a 5 % margin."""
-    pts = np.array([node.x for node in planner.tree.nodes], dtype=float)
-    if planner.problem.Xf is not None:
-        pts = np.vstack([pts, planner.problem.goal_point()])
-
-    for axis, setter in ((x_axis, ax.set_xlim), (y_axis, ax.set_ylim)):
-        lo = float(pts[:, axis].min())
-        hi = float(pts[:, axis].max())
-        pad = 0.05 * (hi - lo or 1.0)
-        setter(lo - pad, hi + pad)
-
-
-def require_history(planner):
-    """Refuse a planner whose latest solution recorded no search history; return that history."""
-    # Lazy import: the planner base loads with the planners, the plots after them
-    from minilink.planning.planner import require_solution
-
-    history = require_solution(planner).record.history
-    if not history:
-        raise ValueError(
-            "No search history recorded; run solve with record_history=True"
-        )
-
-    return history
-
-
-def clear_search_artists(tree_lines, path_line):
-    """Remove the tree and path lines of the previous redraw."""
-    for line in list(tree_lines):
-        line.remove()
-    tree_lines.clear()
-
-    if path_line is not None:
-        path_line.remove()
-
-
-def best_path_states(planner, reached_goal):
-    """The states along the path to the planner's goal node, or ``None`` before the goal."""
-    node = getattr(planner, "solution_node", None)
-    if node is None or not reached_goal:
-        return None
-
-    if hasattr(planner, "path_states"):
-        return planner.path_states(node)
-
-    return None
-
-
-def search_title(step):
-    """The live plot's title for one search step."""
-    if step.reached_goal and step.best_cost_to_come is not None:
-        return (
-            f"RRT search  phase={step.phase}  iter={step.iteration}  "
-            f"nodes={step.n_nodes}  best cost={step.best_cost_to_come:.2f}"
-        )
-
-    return (
-        f"RRT search  phase={step.phase}  iter={step.iteration}  "
-        f"nodes={step.n_nodes}  searching..."
-    )

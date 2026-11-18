@@ -21,7 +21,14 @@ from minilink.graphical.figure import (
 )
 
 # The description's marker names in Plotly's spelling
-MARKERS = {"o": "circle", "o-open": "circle-open", "x": "x", "+": "cross", "*": "star"}
+MARKERS = {
+    "o": "circle",
+    "o-open": "circle-open",
+    "s": "square",
+    "x": "x",
+    "+": "cross",
+    "*": "star",
+}
 
 # The colour maps whose matplotlib name Plotly spells otherwise
 COLOR_MAPS = {"bwr": "RdBu_r", "coolwarm": "RdBu_r", "seismic": "RdBu_r"}
