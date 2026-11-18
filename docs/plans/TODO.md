@@ -406,17 +406,15 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   documented): one colour keyword, `jmax`, across DP, tabular RL, the policy evaluation and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); the operators' named forms
   exported together (scan: core#9).
-- [ ] **One plotting contract** (any time, agent; infrastructure, CONSTITUTION §6; the design,
-  its steps and the decisions it waits for: [plotting-contract.md](plotting-contract.md)): every
-  `plot_*` takes `renderer=` (a matplotlib-only plot refuses `"plotly"` by name), `ax=` on
-  matplotlib (draw into an existing axes; refused with plotly) and `show=`, and returns a
-  `PlotResult`; every `animate*` takes `renderer=`, `show=`, `file_name=` and returns one too,
-  the animation its payload; one finishing helper does the layout, the show and the record.
-  The heatmaps of `planning/spatial` sample their own field (`plot_cost_field(costs, bounds=…)`),
-  so the `FieldGrid` intermediate between `sample_field_costs` and the plot goes.
-  Today the 76 plot and animate functions mix the three keywords and return a `PlotResult`,
-  `(figure, axes)` (the planning plots) or another call's result. Done when every one follows
-  the contract and its tests read `result.figure` and `result.axes`.
+- [ ] **One plotting contract** (any time, agent; infrastructure, CONSTITUTION §6; ruled
+  2026-11-18, the design, the rulings and the run: [plotting-contract.md](plotting-contract.md)):
+  one figure description (`FigureSpec`) drawn by matplotlib and Plotly; every `plot_*` takes
+  `renderer=`, `show=`, `ax=` and returns a `PlotResult`, every animation `renderer=`, `show=`,
+  `file_name=` and an `AnimationResult`; every figure shown at the line that draws it.
+  Done when the import test, the contract test and the call-time display test pass.
+- [ ] **Profile the animation frames** (any time, agent): `Animator.build_frames` takes 22 s on
+  the Stanley lap, 40 s on the kinematic MPC racecar and 120 s on MPPI (335 frames, this
+  container, 2026-11-18), before either playback; find where it goes and cut it.
 
 ### Wave B — GRO501, the carry-over (0.2.0 shipped)
 
@@ -564,12 +562,11 @@ pick):
   maintainer's reference machine, then keep the default off, turn it on, or drop the flag and
   always flatten if parity holds (reviewer A's lean) **[ask — core]**.
 - [ ] **One plot vocabulary** (S67) (scan: graphics#0, graphics#4, graphics#5, graphics#6,
-  graphics#8, graphics#9, analysis#9, analysis#10): `title`, `ax`, `renderer` and `show`
-  honoured by every plot verb, one `PlotResult.axes` shape; `plot_trajectory` selects a
-  leaf's named output ports; one axis-label formatter, one unit convention, one renderer
-  resolver; the renderers silent (RULES 4.6); a warning on the ±10 phase-plane window; one
-  keyword set for the five control plots; the region plot overlays trajectories without
-  touching `sys.x0`.
+  graphics#8, graphics#9, analysis#9, analysis#10): the keywords, the record and the show
+  are the plotting contract's (row above); left here: `plot_trajectory` selects a leaf's
+  named output ports; one axis-label formatter, one unit convention; the renderers silent
+  (RULES 4.6); a warning on the ±10 phase-plane window; one keyword set for the five control
+  plots; the region plot overlays trajectories without touching `sys.x0`.
 - [ ] **Contracts as tests** (S68) (RULES 6.12; scan: tests-ci#3, tests-ci#5, tests-ci#9,
   tests-ci#10, tests-ci#11, tests-ci#14, docs-gov#1, docs-gov#2, examples#8, control#11,
   planning#10, dynamics#11; the RULES 5.8 ratchet landed as
