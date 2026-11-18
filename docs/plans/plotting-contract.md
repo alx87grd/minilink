@@ -204,7 +204,8 @@ matplotlib-only is a fact of the renderer, not of the plot function.
 class PlotResult:
     renderer: str
     figure: Any       # the renderer's figure (matplotlib Figure, plotly Figure), as today
-    axes: Any         # matplotlib's Axes, one per panel; None on plotly, as today
+    axes: Any         # matplotlib: the Axes of a one-panel figure, a list in panel order
+                      # for several; None on plotly
     spec: FigureSpec  # what was drawn, overlays included: re-render it, test it
 ```
 
@@ -329,12 +330,10 @@ the two TODO rows are gone.
   with `result.description`), `Panel` and the layer names (six, or eight if the spike splits
   `Mesh`); the module (`minilink.graphical.figure`); whether they are public. Recommendation: `FigureSpec`, public
   in `minilink.graphical`, not in the top-level namespace.
-- **D3. The record's fields.** As §3.3 (`figure` stays the renderer's object, about 120 reads
-  in examples, tests and the teaching notebooks keep working), or `figure` becomes the
-  description and the renderer's object is renamed. Recommendation: §3.3.
-- **D4. `payload`.** Remove with step 1, or keep as an alias for one release. Recommendation:
-  remove; one test reads it and nothing else does
-  ([internals-cleanup.md](internals-cleanup.md) already lists it as written and never read).
+- **D3. The record's fields.** Ruled: §3.3. `figure` is the renderer's figure, the
+  description is `spec`, and `axes` is the `Axes` of a one-panel figure, a list in panel order
+  for several.
+- **D4. `payload`.** Ruled: removed with step 1; nothing reads it but one test.
 - **D5. Composition.** `ax=` taking a matplotlib `Axes` or a `PlotResult` (§3.4), or a separate
   keyword for the second. Recommendation: `ax=` alone.
 - **D6. The merge of step 4.** Decide after step 3 (recommended), commit to it now, or drop it.
