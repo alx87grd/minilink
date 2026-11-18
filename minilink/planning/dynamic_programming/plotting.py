@@ -69,10 +69,10 @@ def plot_cost_to_go(
 
     # The 3-D surface of J, clipped to 0 ≤ J (≤ jmax when given)
     if is_3d:
-        J_plot = J if jmax is None else np.clip(J, 0.0, jmax)
+        J_plot = np.clip(J, 0.0, np.inf if jmax is None else jmax)
         surface = value_surface_figure(
             grid,
-            np.clip(J_plot, 0.0, np.inf),
+            J_plot,
             x_axis=x_axis,
             y_axis=y_axis,
             anchor=anchor,

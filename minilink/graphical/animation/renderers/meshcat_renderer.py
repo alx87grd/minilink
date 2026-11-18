@@ -1073,6 +1073,7 @@ class MeshcatRenderer(AnimationRenderer):
         """Play the clip inline (a self-contained page) or in the browser viewer."""
         vis = clip.built()[0]
         if place == "inline":
+            # Lazy import: IPython is optional, needed only in a notebook
             from IPython.display import display
 
             display(vis.render_static(height=480))

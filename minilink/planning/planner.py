@@ -138,11 +138,21 @@ class Planner(ABC):
     # Views of the latest solution
 
     def plot_trajectory(
-        self, *, signals=("x", "u"), renderer="matplotlib", show=None, ax=None
+        self,
+        *,
+        dt=None,
+        signals=("x", "u"),
+        renderer="matplotlib",
+        show=None,
+        ax=None,
     ):
-        """The latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_trajectory`)."""
+        """The latest solution's plan, else its controller's run on ``dt``, by default the planner's (:meth:`PlanningSolution.plot_trajectory`)."""
         return require_solution(self).plot_trajectory(
-            dt=self.dt, signals=signals, renderer=renderer, show=show, ax=ax
+            dt=self.dt if dt is None else dt,
+            signals=signals,
+            renderer=renderer,
+            show=show,
+            ax=ax,
         )
 
     def animate(self, **kwargs):

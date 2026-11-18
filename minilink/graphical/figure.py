@@ -190,8 +190,11 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
     ``show=None`` shows the figure unless it is drawn into ``ax``.
     ``renderer=None`` draws nothing: the record holds the description alone.
     """
+    require_panels(spec)
     if show is None:
         show = ax is None
+    if isinstance(renderer, str):
+        renderer = renderer.strip().lower()
 
     # The description alone
     if renderer is None:
@@ -235,6 +238,12 @@ def renderer_module(renderer):
     require_renderer(renderer)
 
     return importlib.import_module(RENDERER_MODULES[renderer])
+
+
+def require_panels(spec):
+    """Refuse a figure without a panel: there is nothing to draw."""
+    if not spec.panels:
+        raise ValueError("a figure needs at least one panel; this one has none")
 
 
 def require_renderer(renderer):

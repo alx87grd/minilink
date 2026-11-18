@@ -295,7 +295,11 @@ class PlotlyRenderer(AnimationRenderer):
     ):
         """The trajectory as a Plotly figure with frames and a play control: ``(fig, None)``."""
         self.is_3d = is_3d
-        return self._build_animation_figure(primitives, frames, schedule), None
+        fig = self._build_animation_figure(primitives, frames, schedule)
+        if scene_title:
+            fig.update_layout(title=scene_title)
+
+        return fig, None
 
     def show_clip(self, clip, place):
         """Play the figure inline, displayed now and playing, or in a browser tab."""

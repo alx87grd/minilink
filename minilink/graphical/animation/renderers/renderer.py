@@ -80,6 +80,10 @@ class AnimationRenderer(ABC):
             self.present(block=False, interval_s=schedule.interval_ms / 1000.0)
             if self.poll_events().get("quit", False):
                 break
+
+        # A single frame is a still: it stays until its window closes
+        if len(frames) == 1:
+            self.present(block=True)
         self.close_scene()
 
     def save_clip(self, clip, path):

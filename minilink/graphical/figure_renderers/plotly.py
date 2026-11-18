@@ -12,6 +12,7 @@ from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.common.plotly_style import PLOTLY_TEMPLATE
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import (
+    TAB10,
     Arrows,
     Contour,
     FigureSpec,
@@ -34,6 +35,9 @@ MARKERS = {
     "+": "cross",
     "*": "star",
 }
+
+# The markers a 3-D scatter does not draw, each as the nearest it does
+MARKERS_3D = {"star": "diamond"}
 
 # The colour maps whose matplotlib name Plotly spells otherwise
 COLOR_MAPS = {"bwr": "RdBu_r", "coolwarm": "RdBu_r", "seismic": "RdBu_r"}
@@ -63,7 +67,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
 
     # The panels, then the figure's title and size
     for k, panel in enumerate(spec.panels):
-        draw_panel(fig, panel, *cell_of(k, n_cols), axis_names(fig, k, panel))
+        draw_panel(fig, panel, *cell_of(k, n_cols))
     fig.update_layout(
         title=spec.title or None,
         template=PLOTLY_TEMPLATE,
@@ -96,6 +100,10 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
         row, col = cell_of(k, n_cols)
         for layer in panel.layers:
             DRAW[type(layer)](host.figure, layer, row, col)
+
+        # A labelled overlay shows the legend, whatever the host's panels asked
+        if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
+            host.figure.update_layout(showlegend=True)
 
     # A legend entry the host already shows is not added again
     for trace in host.figure.data[n_before:]:
@@ -133,16 +141,7 @@ def cell_of(k, n_cols):
     return k // n_cols + 1, k % n_cols + 1
 
 
-def axis_names(fig, k, panel):
-    """The layout keys of panel ``k``'s axes: ``scene{k}`` in 3-D, ``xaxis{k}``, ``yaxis{k}`` else."""
-    suffix = "" if k == 0 else str(k + 1)
-    if panel.is_3d:
-        return ("scene" + suffix,)
-
-    return ("xaxis" + suffix, "yaxis" + suffix)
-
-
-def draw_panel(fig, panel, row, col, names):
+def draw_panel(fig, panel, row, col):
     """Draw one panel's layers, then its labels, limits and scales."""
     for layer in panel.layers:
         DRAW[type(layer)](fig, layer, row, col)
@@ -174,7 +173,8 @@ def draw_panel(fig, panel, row, col, names):
         col=col,
     )
     if panel.equal_aspect:
-        fig.update_yaxes(scaleanchor=names[0].replace("axis", ""), row=row, col=col)
+        x_ref = fig.get_subplot(row, col).xaxis.plotly_name.replace("axis", "")
+        fig.update_yaxes(scaleanchor=x_ref, row=row, col=col)
 
 
 def log_range(limits, is_log):
@@ -212,6 +212,9 @@ def draw_trace(fig, trace: Trace, row, col):
         style["fill"] = "toself"
         style["fillcolor"] = trace.color
     if trace.z is not None:
+        if trace.mode == "markers":
+            symbol = style["marker"]["symbol"]
+            style["marker"]["symbol"] = MARKERS_3D.get(symbol, symbol)
         fig.add_trace(
             go.Scatter3d(
                 x=x, y=y, z=np.asarray(trace.z, dtype=float), **style, **common
@@ -222,7 +225,7 @@ def draw_trace(fig, trace: Trace, row, col):
         return
     fig.add_trace(go.Scatter(x=x, y=y, **style, **common), row=row, col=col)
     if trace.arrows and trace.mode != "markers":
-        draw_direction_arrows(fig, x, y, trace.color or "#1f77b4", row, col)
+        draw_direction_arrows(fig, x, y, trace.color or TAB10[0], row, col)
 
 
 def draw_direction_arrows(fig, x, y, color, row, col):
@@ -231,6 +234,8 @@ def draw_direction_arrows(fig, x, y, color, row, col):
     x_ref = subplot.xaxis.plotly_name.replace("axis", "")
     y_ref = subplot.yaxis.plotly_name.replace("axis", "")
     for start, end in direction_arrow_spans(x.size):
+        if not np.isfinite([x[start], y[start], x[end], y[end]]).all():
+            continue
         fig.add_annotation(
             x=x[end],
             y=y[end],
@@ -251,7 +256,12 @@ def draw_direction_arrows(fig, x, y, color, row, col):
 
 def draw_ref_line(fig, line: RefLine, row, col):
     """A vertical (``axis="x"``) or horizontal reference line."""
-    style = {"line_color": line.color, "line_dash": line.dash, "line_width": 1}
+    style = {
+        "line_color": line.color,
+        "line_dash": line.dash,
+        "line_width": 1,
+        "exclude_empty_subplots": False,
+    }
     if line.axis == "x":
         fig.add_vline(x=line.value, row=row, col=col, **style)
     else:
@@ -299,7 +309,7 @@ def draw_contour(fig, contour: Contour, row, col):
     """Level lines, one trace per level, or a filled band as a mask between the outer levels."""
     x, y = np.asarray(contour.x, dtype=float), np.asarray(contour.y, dtype=float)
     z = np.asarray(contour.z, dtype=float)
-    color = contour.color or "#1f77b4"
+    color = contour.color or TAB10[0]
 
     # A filled band: the mesh points between the lowest and highest level
     if contour.filled:
@@ -389,7 +399,7 @@ def draw_vector_field(fig, arrows: Arrows, row, col):
     X, Y = np.asarray(arrows.x, dtype=float), np.asarray(arrows.y, dtype=float)
     U, V = np.asarray(arrows.u, dtype=float), np.asarray(arrows.v, dtype=float)
     x_values, y_values = X[0, :], Y[:, 0]
-    line = {"color": arrows.color or "#1f77b4", "width": 1}
+    line = {"color": arrows.color or TAB10[0], "width": 1}
     if arrows.style == "stream":
         x_values, y_values, U, V = square_grid(x_values, y_values, U, V)
         field = ff.create_streamline(x_values, y_values, U, V, density=1.2, line=line)

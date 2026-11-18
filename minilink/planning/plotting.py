@@ -89,11 +89,11 @@ def draw_cost_to_go(
         return draw(surface, renderer=renderer, show=show, ax=ax)
 
     # The heatmap with the run over it
-    overlay = grid_plotting.trajectory_layers(
+    run = grid_plotting.trajectory_layers(
         trajectory, x_axis, y_axis, ("closed loop", "start", "end")
     )
     panel = cost_to_go_panel(
-        problem, x_level, y_level, J, x_axis, y_axis, jmax, title, overlay
+        problem, x_level, y_level, J, x_axis, y_axis, jmax, title, run
     )
     heatmap = FigureSpec(panels=(panel,))
 

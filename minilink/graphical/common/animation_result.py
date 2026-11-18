@@ -15,7 +15,7 @@ from minilink.graphical.common.show import hold_back
 @dataclass
 class AnimationResult:
     """
-    An animation drawn with ``renderer``: its ``figure`` (matplotlib's or
+    An animation drawn with ``renderer``. Two properties read its clip: its ``figure`` (matplotlib's or
     Plotly's figure, Meshcat's viewer; ``None`` on pygame, which draws live)
     and its ``animation`` (matplotlib's ``FuncAnimation``, Meshcat's
     ``Animation``; ``None`` on Plotly, whose frames sit in the figure).

@@ -274,3 +274,58 @@ def test_drawing_into_user_axes_keeps_the_users_figure_title():
     draw(FigureSpec(panels=(Panel(layers=(Trace(X, X),)),), title="plot"), ax=ax)
     assert fig.get_suptitle() == "mine"
     plt.close(fig)
+
+
+def test_plotly_draws_a_reference_line_before_the_panels_first_trace():
+    spec = one_panel(RefLine("y", 0.5), RefLine("x", 0.3), Trace(X, X))
+    assert len(draw(spec, renderer="plotly", show=False).figure.layout.shapes) == 2
+
+
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_a_star_marker_draws_in_3d(renderer):
+    star = Trace([0.0], [0.0], [0.0], mode="markers", marker="*")
+    draw(FigureSpec(panels=(Panel(layers=(star,), is_3d=True),)), renderer=renderer)
+    plt.close("all")
+
+
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_direction_arrows_skip_a_break_in_the_line(renderer):
+    x = np.r_[np.linspace(0.0, 1.0, 30), np.nan, np.linspace(2.0, 3.0, 30)]
+    draw(one_panel(Trace(x, x, arrows=True)), renderer=renderer, show=False)
+    plt.close("all")
+
+
+def test_plotly_keeps_an_equal_aspect_after_a_3d_panel():
+    spec = FigureSpec(
+        panels=(
+            Panel(layers=(Surface(X, Y, Z),), is_3d=True),
+            Panel(layers=(Trace(X, X),), equal_aspect=True),
+        ),
+        n_cols=2,
+    )
+    layout = draw(spec, renderer="plotly", show=False).figure.layout
+    assert layout.yaxis.scaleanchor == "x"
+
+
+def test_a_labelled_plotly_overlay_shows_the_legend_its_host_hid():
+    host = draw(one_panel(Trace(X, X), legend=False), renderer="plotly", show=False)
+    both = draw(one_panel(Trace(X, -X, label="run")), ax=host, show=False)
+    assert both.figure.layout.showlegend is True
+
+
+def test_a_colour_bars_offset_ticks_stay_inside_its_range():
+    spec = one_panel(Heatmap(X, Y, Z, colorbar="J", tick_offset=10.0))
+    result = draw(spec, show=False)
+    bar = result.figure.axes[-1]
+    low, high = bar.get_ylim()
+    assert low == pytest.approx(np.min(Z)) and high == pytest.approx(np.max(Z))
+    plt.close("all")
+
+
+def test_a_figure_without_a_panel_is_refused_by_name():
+    with pytest.raises(ValueError, match="at least one panel"):
+        draw(FigureSpec(panels=()), show=False)
+
+
+def test_the_renderers_name_is_read_in_any_case():
+    assert draw(LAYERS["trace"], renderer="Plotly", show=False).renderer == "plotly"

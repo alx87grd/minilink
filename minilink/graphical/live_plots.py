@@ -1,5 +1,7 @@
 """Live plots in matplotlib: figures redrawn while a planner or a solver runs."""
 
+import matplotlib.pyplot as plt
+
 from minilink.graphical.animation.line_animations import (
     clear_lines,
     draw_lines,
@@ -22,9 +24,6 @@ def redraw_lines(plot, frame, under, over, title) -> None:
     ``under`` and ``over`` are :class:`~minilink.graphical.figure.Trace`
     lines drawn under and over its layers.
     """
-    # Lazy import: matplotlib loads with the first redraw
-    import matplotlib.pyplot as plt
-
     # A new figure on the first update, or the one that holds the given axes
     if plot.ax is None:
         plot.fig, plot.ax = plt.subplots(figsize=(7.0, 6.0), frameon=True)
@@ -53,8 +52,5 @@ def redraw_lines(plot, frame, under, over, title) -> None:
 
 def pause_figures(seconds):
     """Let the open matplotlib windows redraw for ``seconds``; nothing for 0."""
-    # Lazy import: matplotlib loads with the first live figure
-    import matplotlib.pyplot as plt
-
     if seconds > 0.0:
         plt.pause(seconds)

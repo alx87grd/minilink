@@ -1,4 +1,4 @@
-"""Time-signal plots in Plotly: one subplot row per trace, drawn once or kept live."""
+"""Live time-signal plots in Plotly: a drawn figure whose traces an update moves in place."""
 
 from __future__ import annotations
 
@@ -45,6 +45,7 @@ def open_plotly_signal_plot(figure, *, figure_of=None, show=True):
             )
 
         try:
+            # Lazy import: IPython is optional, needed only in a notebook
             from IPython.display import display
 
             display(fw)

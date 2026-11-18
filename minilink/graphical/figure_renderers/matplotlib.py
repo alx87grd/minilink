@@ -313,7 +313,7 @@ def draw_surface(ax, surface: Surface):
 def offset_ticks(bar, offset):
     """Label each colour-bar tick ``t`` as ``t + offset``, to one decimal; nothing for 0."""
     if offset:
-        ticks = bar.get_ticks()
+        ticks = [t for t in bar.get_ticks() if bar.vmin <= t <= bar.vmax]
         bar.set_ticks(ticks)
         bar.set_ticklabels([f"{t + offset:.1f}" for t in ticks])
 
@@ -329,6 +329,8 @@ def draw_vector_field(ax, arrows: Arrows):
 def draw_direction_arrows(ax, x, y, color):
     """Direction arrows spread over the middle of a line."""
     for start, end in direction_arrow_spans(x.size):
+        if not np.isfinite([x[start], y[start], x[end], y[end]]).all():
+            continue
         ax.annotate(
             "",
             xy=(x[end], y[end]),

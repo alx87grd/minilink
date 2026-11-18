@@ -703,7 +703,7 @@ def test_the_planner_mirrors_its_latest_solution(make, monkeypatch):
     )
     for name in retired:
         assert not hasattr(planner, name)
-    planner.plot_trajectory(show=False)
+    planner.plot_trajectory(dt=0.05, show=False)
     planner.plot_cost(show=False)
     plt.close("all")
 

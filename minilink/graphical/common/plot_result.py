@@ -65,8 +65,13 @@ class PlotResult:
 
 
 def require_drawn(result):
-    """Refuse showing or saving a record that holds a description only."""
-    if result.renderer is None or result.figure is None:
+    """Refuse showing or saving a record that holds no figure: a description only, or a diagram Graphviz did not draw."""
+    if result.renderer is not None and result.figure is None:
+        raise ValueError(
+            f"this record holds no figure: the {result.renderer} drawing was skipped; "
+            "there is nothing to show or save"
+        )
+    if result.renderer is None:
         raise ValueError(
             "this record holds a description only (renderer=None); draw it with "
             "minilink.graphical.draw(result.spec, renderer=...) first"

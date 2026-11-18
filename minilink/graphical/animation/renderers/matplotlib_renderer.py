@@ -36,7 +36,7 @@ from minilink.graphical.common.matplotlib_style import (
     FONT_SIZE,
     style_animation_axes,
 )
-from minilink.graphical.common.show import show_in_window
+from minilink.graphical.common.show import hold_back, show_in_window
 
 
 def _camera_3d_view_init(camera):
@@ -551,7 +551,13 @@ class MatplotlibRenderer(AnimationRenderer):
     def save_clip(self, clip, path):
         """A ``.gif`` (the default) or a video through ffmpeg (``.mp4``)."""
         require_clip_suffix(path)
-        return save_matplotlib_clip(clip.built()[1], path, clip.schedule.target_fps)
+        fig, ani = clip.built()
+        written = save_matplotlib_clip(ani, path, clip.schedule.target_fps)
+
+        # A figure built for the file alone is not left for the notebook to show
+        hold_back(fig, "matplotlib")
+
+        return written
 
 
 # Playing and saving a clip
