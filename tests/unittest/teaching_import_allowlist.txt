@@ -6,7 +6,6 @@ examples/demos/hybrid/step_accumulator.py minilink.core.backends
 examples/demos/hybrid/step_fibonacci.py minilink.core.backends
 examples/demos/hybrid/step_unity_feedback.py minilink.core.backends
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.collision
-examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.grid
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.plotting
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.scene
 examples/demos/mpc/mpc_car_circuit.py minilink.core.shaping

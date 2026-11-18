@@ -2829,6 +2829,54 @@
    }
   ]
  },
+ "tests/unittest/test_control_analysis.py::TestPhasePlane::test_a_second_trajectory_draws_into_the_first_plot": {
+  "artists": [
+   [
+    [
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Quiver",
+     "Quiver"
+    ]
+   ]
+  ],
+  "data": [
+   {
+    "axes": [
+     {
+      "data": [
+       "81ab0b7638d6",
+       "c09ddc45ce79",
+       "cdc54819c929",
+       "d9f447ea54bb",
+       "d9f447ea54bb"
+      ],
+      "legend": [
+       "end",
+       "start",
+       "trajectory"
+      ],
+      "texts": [],
+      "title": "Phase plane for PhasePlaneTestSystem",
+      "xlabel": "position [m]",
+      "xlim": [
+       -1.0,
+       1.0
+      ],
+      "xscale": "linear",
+      "ylabel": "velocity [m/s]",
+      "ylim": [
+       -1.5,
+       1.5
+      ],
+      "yscale": "linear"
+     }
+    ],
+    "suptitle": ""
+   }
+  ]
+ },
  "tests/unittest/test_control_analysis.py::TestPhasePlane::test_plot_phase_plane_matplotlib_with_overlay": {
   "artists": [
    [

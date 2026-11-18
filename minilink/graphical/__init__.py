@@ -1,9 +1,4 @@
-"""Graphics: the plots, animations and diagrams of systems and their trajectories.
-
-A plot builds a :class:`FigureSpec`, panels of layers as plain data, and
-:func:`draw` hands it to a renderer (matplotlib or Plotly); every plot returns
-a :class:`PlotResult`, every animation an :class:`AnimationResult`.
-"""
+"""Graphics: figure descriptions, their renderers, and the records every plot and animation returns."""
 
 from minilink.graphical.common.animation_result import AnimationResult
 from minilink.graphical.common.plot_result import PlotResult

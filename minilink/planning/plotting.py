@@ -15,16 +15,6 @@ from minilink.planning.dynamic_programming import plotting as grid_plotting
 ###############################################################################
 
 
-def maybe_show(fig, show):
-    """Show the matplotlib figure ``fig`` where ``show`` resolves; ``fig=None`` shows every open figure."""
-    # Lazy import: the graphics load on first use, not with the planning layer
-    import matplotlib.pyplot as plt
-
-    figures = [fig] if fig is not None else [plt.figure(n) for n in plt.get_fignums()]
-    for figure in figures:
-        show_figure(figure, "matplotlib", show)
-
-
 def cost_to_go_figure(
     problem,
     field,
