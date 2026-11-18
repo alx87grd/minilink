@@ -1555,6 +1555,22 @@ class TestPlotlyRenderer(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, ".html page"):
                 result.save(Path(tmp) / "swing.png")
 
+    def test_a_plotly_clip_plays_inline_through_a_renderer_that_runs_the_autoplay(self):
+        import plotly.io as pio
+
+        from minilink.graphical.animation.renderers.plotly_renderer import (
+            inline_renderer_of,
+        )
+
+        default = pio.renderers.default
+        try:
+            pio.renderers.default = "plotly_mimetype+notebook"
+            self.assertEqual(inline_renderer_of(pio.renderers), "notebook_connected")
+            pio.renderers.default = "colab"
+            self.assertIsNone(inline_renderer_of(pio.renderers))
+        finally:
+            pio.renderers.default = default
+
 
 @pytest.mark.plotting
 class TestPlotlySignalPlot(unittest.TestCase):

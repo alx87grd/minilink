@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import types
-
 import matplotlib.colors as mcolors
 import numpy as np
 
@@ -59,56 +57,6 @@ def _import_plotly():
             "Plotly rendering requires Plotly. Install with: pip install plotly",
         ) from exc
     return go
-
-
-def _attach_plotly_animation_ipython_display(fig) -> None:
-    """
-    Attach IPython display logic so framed animations autoplay per figure.
-
-    JupyterLab / VS Code default to the ``plotly_mimetype`` renderer, which serializes
-    JSON only and never runs Plotly's HTML ``auto_play`` bootstrap. When that renderer
-    is active, force ``notebook_connected`` (HTML + CDN Plotly.js) with
-    ``auto_play=True``. Classic notebook stacks use ``pio.show(..., auto_play=True)``
-    on the default renderer chain instead.
-
-    ``fig._minilink_plotly_animation_opts`` must be set before calling this function so
-    autoplay uses the same frame timing as the Play control (Plotly's default
-    ``Plotly.animate(..., null)`` pacing is much slower).
-    """
-
-    def _ipython_display_(self):
-        import plotly.io as pio
-
-        if not (pio.renderers.render_on_display and pio.renderers.default):
-            print(repr(self))
-            return
-
-        default = (pio.renderers.default or "").strip()
-        tokens = [s.strip() for s in default.split("+") if s.strip()] if default else []
-
-        uses_plotly_mimetype = False
-        for name in tokens:
-            try:
-                renderer = pio.renderers[name]
-            except Exception:
-                continue
-            if type(renderer).__name__ == "PlotlyRenderer":
-                uses_plotly_mimetype = True
-                break
-
-        anim_opts = getattr(self, "_minilink_plotly_animation_opts", None)
-
-        if uses_plotly_mimetype:
-            pio.show(
-                self,
-                renderer="notebook_connected",
-                auto_play=True,
-                animation_opts=anim_opts,
-            )
-        else:
-            pio.show(self, auto_play=True, animation_opts=anim_opts)
-
-    fig._ipython_display_ = types.MethodType(_ipython_display_, fig)
 
 
 def _plotly_color(color: str) -> str:
@@ -309,6 +257,9 @@ class PlotlyRenderer(AnimationRenderer):
         self.show = True
         self.title = None
 
+        # The play options of the latest clip: frame timing for autoplay and the page
+        self.animation_opts = None
+
     def open_scene(
         self,
         *,
@@ -347,31 +298,28 @@ class PlotlyRenderer(AnimationRenderer):
         return self._build_animation_figure(primitives, frames, schedule), None
 
     def show_clip(self, clip, place):
-        """Play the figure inline, displayed now, or in a browser tab."""
+        """Play the figure inline, displayed now and playing, or in a browser tab."""
         fig = clip.built()[0]
         if place == "inline":
-            # Lazy import: IPython is optional, needed only in a notebook
-            from IPython.display import display
+            # Lazy import: Plotly's display chain loads with the first inline clip
+            import plotly.io as pio
 
-            display(fig)
+            pio.show(
+                fig,
+                renderer=inline_renderer_of(pio.renderers),
+                auto_play=True,
+                animation_opts=self.animation_opts,
+            )
             return
 
-        fig.show(
-            renderer="browser",
-            auto_play=True,
-            animation_opts=getattr(fig, "_minilink_plotly_animation_opts", None),
-        )
+        fig.show(renderer="browser", auto_play=True, animation_opts=self.animation_opts)
 
     def save_clip(self, clip, path):
         """A self-contained ``.html`` page that plays the frames."""
         require_html_path(path)
         path = path if path.suffix else path.with_suffix(".html")
         fig = clip.built()[0]
-        fig.write_html(
-            path,
-            auto_play=True,
-            animation_opts=getattr(fig, "_minilink_plotly_animation_opts", None),
-        )
+        fig.write_html(path, auto_play=True, animation_opts=self.animation_opts)
 
         return path
 
@@ -408,7 +356,7 @@ class PlotlyRenderer(AnimationRenderer):
         frame_duration = max(1, int(round(schedule.interval_ms)))
         # Plotly HTML autoplay calls Plotly.animate(gd, null, opts). Without opts,
         # plotly.js uses a slow default step duration; match the Play button / FuncAnimation pacing.
-        fig._minilink_plotly_animation_opts = {
+        self.animation_opts = {
             "frame": {"duration": frame_duration, "redraw": True},
             "fromcurrent": True,
             "transition": {"duration": 0},
@@ -480,7 +428,6 @@ class PlotlyRenderer(AnimationRenderer):
                 }
             ],
         )
-        _attach_plotly_animation_ipython_display(fig)
         return fig
 
     def _build_figure(self, traces, camera, *, title: str):
@@ -751,6 +698,20 @@ class PlotlyRenderer(AnimationRenderer):
             )
 
         return _empty_trace(go, is_3d=self.is_3d, name=name)
+
+
+def inline_renderer_of(renderers):
+    """
+    The notebook renderer that plays a clip: ``"notebook_connected"`` where the
+    default chain holds the JSON-only mimetype renderer, which never runs the
+    autoplay, else ``None`` (the default chain).
+    """
+    names = [name.strip() for name in (renderers.default or "").split("+")]
+    for name in names:
+        if name in renderers and type(renderers[name]).__name__ == "PlotlyRenderer":
+            return "notebook_connected"
+
+    return None
 
 
 def require_html_path(path):
