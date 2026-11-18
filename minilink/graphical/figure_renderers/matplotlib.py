@@ -265,10 +265,8 @@ def draw_contour(ax, contour: Contour):
     style = {"levels": None if contour.levels is None else list(contour.levels)}
     if contour.color is not None:
         style["colors"] = [contour.color]
-    elif contour.cmap is not None:
-        style["cmap"] = contour.cmap
     if contour.filled:
-        ax.contourf(contour.x, contour.y, contour.z, alpha=contour.alpha, **style)
+        ax.contourf(contour.x, contour.y, contour.z, **style)
         if contour.label:
             ax.fill([], [], color=contour.color, label=contour.label)
         return
@@ -279,7 +277,6 @@ def draw_contour(ax, contour: Contour):
         contour.z,
         linewidths=contour.width,
         linestyles=DASHES.get(contour.dash, "-"),
-        alpha=contour.alpha,
         **style,
     )
     if contour.label:
@@ -327,8 +324,6 @@ def draw_vector_field(ax, arrows: Arrows):
         ax.streamplot(arrows.x, arrows.y, arrows.u, arrows.v, color=arrows.color)
     else:
         ax.quiver(arrows.x, arrows.y, arrows.u, arrows.v, color=arrows.color)
-    if arrows.label:
-        ax.plot([], [], color=arrows.color, label=arrows.label)
 
 
 def draw_direction_arrows(ax, x, y, color):

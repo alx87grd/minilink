@@ -31,8 +31,6 @@ _COST_SIGNAL_LABELS = {"dJ": "dJ/dt", "J": "J"}
 class LivePlotHandle:
     """Base class for live signal plot handles."""
 
-    supports_live = True
-
     def update(self, traj_or_figure, *, title: str | None = None) -> None:
         """Update an existing plot from a new trajectory or its description."""
         raise NotImplementedError

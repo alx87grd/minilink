@@ -117,7 +117,7 @@ class Contour:
     """Level sets of ``z[j, i]`` at ``(x[i], y[j])``: lines, or bands between levels when ``filled``.
 
     ``levels`` are the values drawn (``None`` lets the renderer choose);
-    ``color`` draws every level in one colour, ``cmap`` colours them by value.
+    ``color`` draws every level in one colour.
     """
 
     x: Any
@@ -126,10 +126,8 @@ class Contour:
     levels: tuple[float, ...] | None = None
     filled: bool = False
     color: str | None = None
-    cmap: str | None = None
     width: float = 1.0
     dash: str = "solid"
-    alpha: float = 1.0
     label: str = ""
 
 
@@ -165,7 +163,6 @@ class Arrows:
     v: Any
     style: str = "quiver"  # "quiver" | "stream"
     color: str | None = None
-    label: str = ""
 
 
 def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):

@@ -315,7 +315,6 @@ def draw_contour(fig, contour: Contour, row, col):
                 z=inside,
                 colorscale=[[0.0, color], [1.0, color]],
                 showscale=False,
-                opacity=contour.alpha,
                 name=contour.label or None,
                 showlegend=bool(contour.label),
                 hoverinfo="skip",
@@ -328,10 +327,7 @@ def draw_contour(fig, contour: Contour, row, col):
     # Level lines: the levels given, each its own trace, else Plotly's own
     levels = [None] if contour.levels is None else list(contour.levels)
     for k, level in enumerate(levels):
-        contours = {
-            "coloring": "lines" if contour.cmap else "none",
-            "showlabels": False,
-        }
+        contours = {"coloring": "none", "showlabels": False}
         if level is not None:
             contours.update(start=level, end=level, size=1.0)
         fig.add_trace(
@@ -340,16 +336,8 @@ def draw_contour(fig, contour: Contour, row, col):
                 y=y,
                 z=z,
                 contours=contours,
-                line={
-                    "color": None if contour.cmap else color,
-                    "width": contour.width,
-                    "dash": contour.dash,
-                },
-                colorscale=COLOR_MAPS.get(contour.cmap, contour.cmap)
-                if contour.cmap
-                else None,
+                line={"color": color, "width": contour.width, "dash": contour.dash},
                 showscale=False,
-                opacity=contour.alpha,
                 name=contour.label or None,
                 showlegend=bool(contour.label) and k == 0,
             ),
@@ -407,9 +395,8 @@ def draw_vector_field(fig, arrows: Arrows, row, col):
         field = ff.create_quiver(
             X, Y, U, V, scale=0.9 * cell / longest, arrow_scale=0.3, line=line
         )
-    for k, trace in enumerate(field.data):
-        trace.name = arrows.label or None
-        trace.showlegend = bool(arrows.label) and k == 0
+    for trace in field.data:
+        trace.showlegend = False
         fig.add_trace(trace, row=row, col=col)
 
 
