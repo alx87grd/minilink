@@ -1962,7 +1962,7 @@ and returns a `PlotResult`; `plot_diagram` is the one exception (below).
   description drawn. It does not unpack into a pair. `.show()` shows it as `show=True`
   does; `.save(file_name)` writes it in the format of the extension (matplotlib any format
   it knows, Plotly an `.html` page or an image through kaleido, Graphviz `.pdf`, `.svg`,
-  `.png`). Saving is that one call: no plot takes `file_name=`.
+  `.png`). Saving is that one call, on the record.
 - **`renderer=None`** draws nothing: the record holds `spec` alone, for tests and for grids
   assembled from descriptions.
 - **Composition, `ax=`:** a matplotlib `Axes` (a list of them for a multi-panel plot) or a
@@ -2017,7 +2017,7 @@ a record of one frame. `figure` is matplotlib's or Plotly's figure or Meshcat's 
 first use, so a record made with `show=False` starts no Meshcat viewer until it is shown or
 saved. `.save` writes matplotlib's `.gif` (the default) or a video through ffmpeg (`.mp4`),
 and Meshcat's and Plotly's self-contained `.html` page; a pygame record has nothing to save
-and refuses by name. No animation takes `html=`, `native=`, `save=` or `file_name=`.
+and refuses by name.
 
 Matplotlib, Plotly and Meshcat always play a clip; pygame, which has none, draws the frames
 live. Meshcat keyframes rigid poses (and the camera's slide, below), and turns
