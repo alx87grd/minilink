@@ -1,6 +1,11 @@
 """The one show step: a drawn figure displayed where the environment puts it."""
 
-from minilink.graphical.common.environment import is_blocking_needed, resolve_show
+from minilink.graphical.common.environment import (
+    detect_env,
+    is_blocking_needed,
+    mpl_backend_is_inline,
+    resolve_show,
+)
 
 ###############################################################################
 # Public API
@@ -13,13 +18,43 @@ def show_figure(figure, renderer, show) -> None:
 
     Inline in a notebook it is displayed now, at the line that drew it, and a
     matplotlib figure is then closed so the cell does not show it again; in a
-    window, matplotlib blocks in a bare script until the window closes.
+    window, matplotlib shows that figure alone and blocks in a bare script
+    until it closes. A matplotlib figure not shown is closed in a notebook
+    whose inline backend would show it at the cell's end; ``.show()`` on its
+    record still displays it.
     """
+    if figure is None:
+        return
+
     place = resolve_show(show, renderer)
-    if place is None or figure is None:
+    if place is None:
+        hold_back(figure, renderer)
         return
 
     PRESENT[renderer](figure, place)
+
+
+def show_in_window(fig) -> None:
+    """Show the matplotlib figure ``fig`` in its window, alone; a bare script blocks on it until it closes."""
+    fig.show()
+    if is_blocking_needed():
+        fig.canvas.mpl_connect(
+            "close_event", lambda event: fig.canvas.stop_event_loop()
+        )
+        fig.canvas.start_event_loop(0)
+
+
+def hold_back(figure, renderer):
+    """Close a matplotlib figure not shown, where the notebook's inline backend would show every open figure at the cell's end."""
+    if renderer != "matplotlib" or detect_env() not in ("jupyter", "colab"):
+        return
+    if not mpl_backend_is_inline():
+        return
+
+    # Lazy import: pyplot loads with the first matplotlib figure, not with Plotly's
+    import matplotlib.pyplot as plt
+
+    plt.close(figure)
 
 
 ###############################################################################
@@ -37,7 +72,7 @@ def present_matplotlib(fig, place):
         plt.close(fig)
         return
 
-    plt.show(block=True if is_blocking_needed() else None)
+    show_in_window(fig)
 
 
 def present_plotly(fig, place):

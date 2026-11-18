@@ -36,6 +36,7 @@ from minilink.graphical.common.matplotlib_style import (
     FONT_SIZE,
     style_animation_axes,
 )
+from minilink.graphical.common.show import show_in_window
 
 
 def _camera_3d_view_init(camera):
@@ -569,10 +570,10 @@ def show_matplotlib_clip(fig, ani, place):
         plt.close(fig)
         return
 
-    # A window: held until it closes; a bare script blocks on it
+    # A window, alone: held until it closes; a bare script blocks on it
     PLAYING.add(ani)
     fig.canvas.mpl_connect("close_event", lambda event: PLAYING.discard(ani))
-    plt.show(block=True if is_blocking_needed() else None)
+    show_in_window(fig)
 
 
 def save_matplotlib_clip(ani, path, fps):

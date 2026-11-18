@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from minilink.graphical.common.environment import resolve_show
+from minilink.graphical.common.show import hold_back
 
 ###############################################################################
 # Public API
@@ -57,6 +58,34 @@ class AnimationResult:
 
     def _ipython_display_(self):
         """Display nothing in a notebook: the animate call has already played it."""
+
+
+def show_animation(figure, animation, *, fps, show, ax=None):
+    """
+    A matplotlib ``FuncAnimation`` a plot function built, as a record, played where ``show`` resolves.
+
+    ``show=None`` plays it unless it is drawn into the caller's ``ax``, whose
+    figure is then left to the caller.
+    """
+    if show is None:
+        show = ax is None
+    result = AnimationResult(
+        renderer="matplotlib", clip=BuiltClip(figure, animation, fps)
+    )
+
+    # Played now, or held back from a notebook's end-of-cell display when the figure is ours
+    place = resolve_show(show, "matplotlib")
+    if place is not None:
+        result.clip.show(place)
+    elif ax is None:
+        hold_back(figure, "matplotlib")
+
+    return result
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
 class Clip:
@@ -124,15 +153,3 @@ class BuiltClip:
         )
 
         return save_matplotlib_clip(self.clip[1], path, self.fps)
-
-
-def animation_result_of(figure, animation, *, fps, show):
-    """A matplotlib ``FuncAnimation`` a plot function built, as a record, shown where ``show`` resolves."""
-    result = AnimationResult(
-        renderer="matplotlib", clip=BuiltClip(figure, animation, fps)
-    )
-    place = resolve_show(show, "matplotlib")
-    if place is not None:
-        result.clip.show(place)
-
-    return result

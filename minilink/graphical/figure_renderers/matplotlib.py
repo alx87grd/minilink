@@ -56,7 +56,9 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     if ax is None:
         fig.tight_layout()
 
-    show_figure(fig, "matplotlib", show)
+    # The caller's own figure is left to the caller unless asked to show
+    if ax is None or show is not False:
+        show_figure(fig, "matplotlib", show)
 
     return PlotResult(
         renderer="matplotlib",
@@ -72,7 +74,9 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
     for target, panel in zip(axes, spec.panels):
         draw_panel(target, panel, fill_only=True)
 
-    show_figure(host.figure, "matplotlib", show)
+    # The host is shown, or held back, by the call that drew it
+    if show is not False:
+        show_figure(host.figure, "matplotlib", show)
 
     combined = overlay(host.spec, [panel.layers for panel in spec.panels])
 

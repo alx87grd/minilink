@@ -3,7 +3,7 @@
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
-from minilink.graphical.common.animation_result import animation_result_of
+from minilink.graphical.common.animation_result import show_animation
 
 ###############################################################################
 # Public API
@@ -50,4 +50,4 @@ def animate_heatmap(
 
     ani = animation.FuncAnimation(fig, update, n_frames, interval=interval, blit=False)
 
-    return animation_result_of(fig, ani, fps=max(1, int(1000 / interval)), show=show)
+    return show_animation(fig, ani, fps=max(1, int(1000 / interval)), show=show)

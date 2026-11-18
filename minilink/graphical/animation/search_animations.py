@@ -1,6 +1,6 @@
 """Search animations in matplotlib: the RRT family's tree growing, and RRT*'s recorded convergence."""
 
-from minilink.graphical.common.animation_result import animation_result_of
+from minilink.graphical.common.animation_result import show_animation
 from minilink.graphical.common.labels import state_axis_label
 from minilink.planning.search.plotting import (
     PATH_COLOR,
@@ -82,7 +82,7 @@ def animate_search(
     anim = FuncAnimation(
         fig, update, frames=n_frames, interval=interval, blit=False, repeat=False
     )
-    return animation_result_of(fig, anim, fps=max(1, int(1000 / interval)), show=show)
+    return show_animation(fig, anim, fps=max(1, int(1000 / interval)), show=show, ax=ax)
 
 
 def animate_convergence(
@@ -161,7 +161,7 @@ def animate_convergence(
         blit=False,
         repeat=True,
     )
-    return animation_result_of(fig, anim, fps=max(1, int(1000 / interval)), show=show)
+    return show_animation(fig, anim, fps=max(1, int(1000 / interval)), show=show, ax=ax)
 
 
 ###############################################################################
