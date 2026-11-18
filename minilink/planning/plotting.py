@@ -49,7 +49,7 @@ def draw_cost_to_go(
     heatmap.
     """
     grid_plotting.require_flat_overlay(is_3d, trajectory)
-    jmax = colour_top(field, jmax)
+    jmax = color_top(field, jmax)
 
     # On the grid's own nodes: the table itself
     if is_grid_table(field, grid) and on_the_nodes(bounds, grid_shape, (51, 51), t):
@@ -286,7 +286,7 @@ def require_no_anchor(anchor):
         )
 
 
-def colour_top(field, jmax):
+def color_top(field, jmax):
     """The top of the cost-to-go colour scale: ``jmax``, else the field's value past its grid; an infinite one is no top (``None``)."""
     if jmax is None:
         jmax = (field.params or {}).get("outside")
