@@ -78,6 +78,17 @@ def test_colab_refuses_pygame_by_name(place):
         place(True, "pygame", env="colab", display=False)
 
 
+def test_colab_refuses_pygame_even_with_the_off_screen_driver(monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    monkeypatch.delenv("MINILINK_HEADLESS", raising=False)
+    override_env("colab")
+    try:
+        with pytest.raises(ValueError, match="window"):
+            resolve_show(True, "pygame")
+    finally:
+        override_env(None)
+
+
 @pytest.mark.parametrize("renderer", ["plotly", "meshcat", "graphviz"])
 def test_without_a_display_show_true_is_silent_and_a_window_is_refused(place, renderer):
     assert place(True, renderer, env="script", display=False) is None

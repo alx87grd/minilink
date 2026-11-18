@@ -4,7 +4,6 @@ import os
 import sys
 
 __all__ = [
-    "EnvName",
     "detect_env",
     "resolve_show",
     "is_headless",
@@ -12,8 +11,6 @@ __all__ = [
     "allow_tall_stacked_figures",
     "override_env",
 ]
-
-EnvName = str
 
 # One cached detection, so every environment-sensitive site (the show resolver,
 # figure blocking, the meshcat prompt, the stacked plot height) reads the same
@@ -42,8 +39,9 @@ def detect_env():
         _CACHE = "colab"
         return _CACHE
 
-    # The running IPython shell, if any: IPython is optional
+    # The running IPython shell, if any
     try:
+        # Lazy import: IPython is optional, loaded only to find a running shell
         from IPython import get_ipython
 
         ip = get_ipython()
@@ -167,11 +165,13 @@ def can_show(place, env, renderer) -> bool:
             return False
         return renderer != "matplotlib" or mpl_backend_is_inline()
 
-    # A window: a display (pygame's off-screen driver counts), and for matplotlib
-    # an interactive backend
+    # A window: none in Colab; a display (pygame's off-screen driver counts), and
+    # for matplotlib an interactive backend
+    if env == "colab":
+        return False
     if renderer == "pygame" and os.environ.get("SDL_VIDEODRIVER") == "dummy":
         return True
-    if env == "colab" or not has_display():
+    if not has_display():
         return False
     if renderer == "matplotlib":
         return not mpl_backend_is_non_interactive()
