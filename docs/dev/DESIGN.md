@@ -104,7 +104,7 @@ state-feedback block):
 | `planning/` | `problems.py`, `step_problems.py` (the step problem, which answers its own equations) and `step_model.py` (the internal evaluator they delegate to), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `plotting.py` (a solution's cost-to-go, control-law and trajectory views), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
-| `graphical/` | signals, phase plane, diagrams, animation |
+| `graphical/` | the figure description and `draw` (`figure.py`), its two renderers (`figure_renderers/`), the records and the show step (`common/`); the plots' builders (signals, phase plane, port map, the control style), diagrams, animation (`animation/`, its four renderers in `animation/renderers/`) and the matplotlib-only figures (the grid and search animations, the live figures) |
 | `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium in the `full` extra; stable-baselines3 from `environment.yml`) |
 
 **Experimental tier** — unproven modules under `experimental/`:
@@ -138,6 +138,9 @@ state-feedback block):
   (its plots draw the track).
 - **Exception:** `graphical/animation` imports `planning.spatial.Scene`, to
   draw a scene as an overlay.
+- **Exception:** `graphical/live_plots.py` and `graphical/animation/search_animations.py`
+  import `planning.search.plotting` (its colours, labels, limits and layers): the live
+  search figure and the search animations draw the tree the search plot describes.
 - **Exception:** the LQR planner (`planning/dynamic_programming/lqr.py`) imports
   `control.design` and `control.state`: it solves with the design verb and returns its
   state-feedback law.
@@ -417,15 +420,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   (``vehicle:body``). Controllers may own their own visualization frames the
   same way (e.g. optional `TaskImpedance` `task_force` → `controller:task_force`); the
   arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
-  Meshcat `native=True` keyframes rigid poses, and turns geometry that changes
-  (`Arrow`, `TorqueArrow`, the MPC trail and horizon) into a flipbook: one page
-  per run of frames with the same geometry, each shown by a `visible` track. The
-  live clip, the saved page and the inline view are frame-accurate; their size
-  grows with the number of distinct geometries. `native=False` stays the
-  per-frame Python loop. In 3-D, polylines are thin ribbons (matplotlib dash
-  and width), not 1-pixel WebGL lines.
-  `animate(save=True)` writes the backend file: matplotlib a GIF, meshcat a
-  standalone HTML page of that native animation.
+  How each renderer plays and saves the frames: §7, "Animations".
 - **Facades:** user shortcuts only (lazy simulation/graphics); split across
   `core/facades/` by what they do, one mixin per category and system kind:
   `simulation.py` (`SystemSimulation`: `compile`, static `compute_trajectory` (the nominal
@@ -1364,11 +1359,8 @@ the failure cost, when it has one), both on one written-out keyword set
 trajectory=, title=, ax=, renderer=, show=`) that the planners repeat as a thin call to
 their latest solution (value iteration adds only `field=`, another table of its grid), a
 grid planner's table drawn on the grid's own nodes unless the call asks for another mesh;
-the solution's `plot_control_law` and `plot_cost_to_go`, and the comparison's plots,
-return a `PlotResult` (`.figure`, `.axes`); `plot_scene`, `plot_track`,
-`plot_cost_field`, `plot_cost_field_3d`, `plot_tree`, `plot_sampled_futures` and the
-dynamic-programming module plots return `(fig, ax)`; and `plot_trajectory`, `animate`
-and `plot_cost`: the
+these plots, like every plot, return a `PlotResult` and the animations an
+`AnimationResult` (§7); `plot_trajectory`, `animate` and `plot_cost` draw the
 plan when there is one, else the controller run once from the problem's start through
 the problem's evaluator (`problem.compile(controller, dt)`, the loop the score runs: a
 continuous law integrated on the views' optional `dt`, `None` the evaluator's automatic
@@ -1906,8 +1898,8 @@ switch held on the path, not in its `params`; `path.at(s)` is the point at arc l
 clearance (subtract body radius). Compose with obstacles:
 `X = bounds & scene.clearance_field(body).as_set() & track.corridor_field(body).as_set()`.
 
-**Workspace cost raster** (`grid.sample_field_costs`, `plotting.plot_cost_field` /
-`plot_cost_field_3d` / `plot_cost_field_exports`): rasterize shaped ``FieldCost`` terms
+**Workspace cost raster** (`plotting.plot_cost_field` / `plot_cost_field_3d` /
+`plot_cost_field_exports`, each sampling its own costs on a `grid=` of workspace points): rasterize shaped ``FieldCost`` terms
 at workspace points ``p = (x, y)`` with a **point probe** body (heading-independent).
 Build viz costs with ``mount(point_probe(), on=sys)``; MPC may still use ``car_outline``.
 
@@ -1942,8 +1934,110 @@ selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 ## 7. Graphics And Benchmarks
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
-Phase plane: matplotlib default. Diagrams: Graphviz layout (notebook SVG;
-script Matplotlib window).
+
+**Plots.** A plot builds a description of its figure and draws it:
+`plot_x(...)` is `draw(x_figure(...), renderer=, show=, ax=)`. The description lives in
+`graphical/figure.py`, exported on `minilink.graphical` (not on the root): a `FigureSpec`
+is a title and a grid of `Panel`s read row by row (`n_cols`, `share_x`, `figsize`); a
+`Panel` holds its labels, limits, `x_log`, `y_ticks`, `equal_aspect`, `is_3d`, `legend`
+and an ordered tuple of layers, of seven kinds: `Trace` (a polyline or a point set, NaN
+breaking a line, `fill=True` closing and filling it), `RefLine`, `Note`, `Heatmap`,
+`Contour`, `Surface`, `Arrows` (quiver or stream). The objects are frozen; a colour is a
+CSS name or a hex code, and a `Trace` with `color=None` takes the renderer's colour cycle.
+A field enters a layer only when a plot of the library needs it and both renderers honour
+it; no renderer keyword passes through, and a finish one library alone offers is the
+caller's own call on `result.figure` or `result.axes`.
+
+`draw(spec, *, renderer="matplotlib", show=None, ax=None)` draws with
+`figure_renderers/matplotlib.py` or `figure_renderers/plotly.py`; both draw every layer.
+Those two, the animation renderers, the show step and the matplotlib-only figures (the
+grid and search animations, the live figures, the colour maps) are the only modules that
+import a drawing library. Every public `plot_*` takes `renderer=`, `show=None` and `ax=`
+and returns a `PlotResult`; `plot_diagram` is the one exception (below).
+`tests/unittest/test_plot_contract.py` checks both rules on the source.
+
+- **The record:** `PlotResult(renderer, figure, axes, spec)`. `figure` is the drawn figure
+  (matplotlib's or Plotly's; Graphviz's graph), `axes` matplotlib's `Axes` for a one-panel
+  figure and a list in panel order for several (`None` on the other renderers), `spec` the
+  description drawn. It does not unpack into a pair. `.show()` shows it as `show=True`
+  does; `.save(file_name)` writes it in the format of the extension (matplotlib any format
+  it knows, Plotly an `.html` page or an image through kaleido, Graphviz `.pdf`, `.svg`,
+  `.png`). Saving is that one call: no plot takes `file_name=`.
+- **`renderer=None`** draws nothing: the record holds `spec` alone, for tests and for grids
+  assembled from descriptions.
+- **Composition, `ax=`:** a matplotlib `Axes` (a list of them for a multi-panel plot) or a
+  `PlotResult`. The plot adds its layers to the host's panels, panel by panel, and sets a
+  panel's title, labels, limits and scales only where the host has none. Refused by name:
+  another panel count, a 3-D layer into a 2-D panel, a second colour bar in one panel, a
+  host with no description, a `renderer=` other than the host's. A legend entry that
+  repeats a host label is not added again. The returned record holds the host's
+  description with the overlay's layers.
+- **`show=None`** shows unless `ax=` is given: a plot drawn into a host leaves the showing
+  to the host.
+
+```python
+first = plant.plot_trajectory(traj_a, show=False)
+plant.plot_trajectory(traj_b, ax=first)    # the second run on the first one's panels
+first.show()
+first.save("two_runs.pdf")
+```
+
+**Where a figure is shown.** `show=` takes `None`, `True`, `False`, `"inline"` or
+`"window"`. One resolver, `resolve_show(show, renderer)` in
+`graphical/common/environment.py`, decides for every plot, animation and diagram
+(`tests/unittest/test_show.py` enumerates its table). `show=True` goes to:
+
+| Renderer | Script, terminal IPython | Jupyter | Colab |
+| --- | --- | --- | --- |
+| matplotlib | its window (blocks in a script) | inline with the inline backend; another backend shows it its own way | inline |
+| plotly | a browser tab | inline | inline |
+| meshcat | the browser viewer | inline, a self-contained page | inline |
+| pygame | its window | its window | refused by name |
+| graphviz | the vector PDF in the system viewer | inline SVG | inline SVG |
+
+- **Shown at the line that draws it,** in code order: in a notebook a figure is displayed at
+  its call, and an inline matplotlib figure is then closed, so a cell with a diagram, an
+  animation and a plot shows each once, in that order. The records display nothing as a
+  cell's last expression. A change made after the call starts from `show=False`, then
+  `.show()`.
+- **Nowhere to show:** `show=True` shows nothing where the place cannot show it (a
+  non-interactive matplotlib backend such as Agg, Linux without `DISPLAY` or
+  `WAYLAND_DISPLAY`); an explicit `"inline"` or `"window"` there is refused by name, and so
+  is pygame without a window (its off-screen driver counts as one).
+- **`MINILINK_HEADLESS=1`** (any value but empty or `0`) shows nothing, explicit places
+  included: the switch of the test suite, the demo and notebook runners and CI.
+
+**Animations.** Every animation (`render`, `animate` on a system, a sampled loop or a
+planner, `animate_modal`, the grid and search animations) takes `renderer=` and `show=True`
+and returns an `AnimationResult(renderer, figure, animation)` with `.show()` and
+`.save(file_name)`; `animate_modal(mode="all")` returns a list of them, and `render(x, u, t)`
+a record of one frame. `figure` is matplotlib's or Plotly's figure or Meshcat's viewer
+(`None` on pygame); `animation` matplotlib's `FuncAnimation` or Meshcat's `Animation`
+(`None` on Plotly, whose frames sit in its figure, and on pygame). The clip is built on
+first use, so a record made with `show=False` starts no Meshcat viewer until it is shown or
+saved. `.save` writes matplotlib's `.gif` (the default) or a video through ffmpeg (`.mp4`),
+and Meshcat's and Plotly's self-contained `.html` page; a pygame record has nothing to save
+and refuses by name. No animation takes `html=`, `native=`, `save=` or `file_name=`.
+
+Matplotlib, Plotly and Meshcat always play a clip; pygame, which has none, draws the frames
+live. Meshcat keyframes rigid poses (and the camera's slide, below), and turns
+geometry that changes (`Arrow`, `TorqueArrow`, the MPC trail and horizon, sampled
+trajectories) into a flipbook: one page per run of frames with the same geometry, each shown
+by a `visible` track. The clip, the saved page and the inline view are frame-accurate; their
+size grows with the number of distinct geometries. In 3-D, polylines are thin ribbons
+(matplotlib dash and width), not 1-pixel WebGL lines.
+
+The live paths (`game`, `RealtimeSimulator`, the evaluator's `live_plot`, `LiveSearchPlot`,
+the trajectory-optimization live plot) are sessions, not records: they draw as they run and
+take `renderer=` or `ax=` where they draw into a figure.
+
+**Diagrams.** `plot_diagram(sys, *, show=True, expand=True)` lays the blocks out with
+Graphviz and returns `PlotResult(renderer="graphviz", figure=<Digraph>)` (`axes` and `spec`
+`None`); a graph takes no `renderer=` or `ax=`. Shown at the call: inline SVG in a notebook,
+elsewhere the vector PDF in the system viewer (written to a per-user temp folder, named by
+the diagram and a short hash of its source). `.save("loop.svg")` writes the format of the
+extension (`.pdf`, `.svg`, `.png`; a PDF without one). Without Graphviz the diagram is
+skipped with a warning and the record holds no figure.
 
 **Inspect (`core/inspect.py`).** One text layout for textbook objects:
 line 1 is `{TypeName}, …` identity tokens; further lines are two-space
@@ -1962,8 +2056,7 @@ matrices, `TransferFunction` `G(s)`, `StateObserver` gain and poles).
 **Notebook-rich repr.** A bare last expression on a `System` prefers
 `_repr_mimebundle_`: `text/plain` inspect plus `image/svg+xml` diagram
 when Graphviz is available; `_repr_svg_` remains for SVG-only consumers.
-`PlotResult` displays nothing so plots
-are not doubled. Optional `_repr_latex_` on `LTISystem`, `QuadraticCost`,
+Optional `_repr_latex_` on `LTISystem`, `QuadraticCost`,
 and `MathematicalProgram` renders the textbook equation shape (not the
 callable bodies). Optimizer `verbose=True` frames the same inspect lines
 inside the solve panel (`core/reporting.py` rules).
@@ -1983,8 +2076,8 @@ scene yourself. Meshcat consumes the same matrix: the mouse orbit of its viewer
 is anchored at the origin, so the target is honoured by sliding the drawn world
 (with the viewer's grid and axes) until the target sits there, and the eye sits
 on the view-out side at the `T[3, 3]` distance (elevation capped at the
-viewer's default); orbit, pan and zoom stay with the mouse, and a native
-animation keyframes the slide alongside the bodies. One backdrop hint sits
+viewer's default); orbit, pan and zoom stay with the mouse, and the
+clip keyframes the slide alongside the bodies. One backdrop hint sits
 beside the camera's: `scene_grid=False` hides the viewer's ground grid and axes
 (an underwater or open-sea scene); the flat renderers ignore it.
 
