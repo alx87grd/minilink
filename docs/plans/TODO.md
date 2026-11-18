@@ -406,12 +406,6 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   documented): one colour keyword, `jmax`, across DP, tabular RL, the policy evaluation and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); the operators' named forms
   exported together (scan: core#9).
-- [ ] **One plotting contract** (any time, agent; infrastructure, CONSTITUTION §6; ruled
-  2026-11-18, the design, the rulings and the run: [plotting-contract.md](plotting-contract.md)):
-  one figure description (`FigureSpec`) drawn by matplotlib and Plotly; every `plot_*` takes
-  `renderer=`, `show=`, `ax=` and returns a `PlotResult`, every animation `renderer=`, `show=`,
-  `file_name=` and an `AnimationResult`; every figure shown at the line that draws it.
-  Done when the import test, the contract test and the call-time display test pass.
 - [ ] **Profile the animation frames** (any time, agent): `Animator.build_frames` takes 22 s on
   the Stanley lap, 40 s on the kinematic MPC racecar and 120 s on MPPI (335 frames, this
   container, 2026-11-18), before either playback; find where it goes and cut it.
@@ -562,10 +556,11 @@ pick):
   maintainer's reference machine, then keep the default off, turn it on, or drop the flag and
   always flatten if parity holds (reviewer A's lean) **[ask — core]**.
 - [ ] **One plot vocabulary** (S67) (scan: graphics#0, graphics#4, graphics#5, graphics#6,
-  graphics#8, graphics#9, analysis#9, analysis#10): the keywords, the record and the show
-  are the plotting contract's (row above); left here: `plot_trajectory` selects a leaf's
-  named output ports; one axis-label formatter, one unit convention; the renderers silent
-  (RULES 4.6); a warning on the ±10 phase-plane window; one keyword set for the five control
+  graphics#8, graphics#9, analysis#9, analysis#10): the keywords `renderer=`, `show=`,
+  `ax=`, the records and the show are the plotting contract's (DESIGN §7); left here:
+  `plot_trajectory` selects a leaf's named output ports; one axis-label formatter, one unit
+  convention; the renderers silent (RULES 4.6: the Meshcat and Plotly animation renderers
+  still print); a warning on the ±10 phase-plane window; one keyword set for the five control
   plots; the region plot overlays trajectories without touching `sys.x0`.
 - [ ] **Contracts as tests** (S68) (RULES 6.12; scan: tests-ci#3, tests-ci#5, tests-ci#9,
   tests-ci#10, tests-ci#11, tests-ci#14, docs-gov#1, docs-gov#2, examples#8, control#11,
