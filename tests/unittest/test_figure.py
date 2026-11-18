@@ -168,3 +168,12 @@ def test_a_record_saves_in_the_format_of_its_extension(renderer, suffix, tmp_pat
     written = result.save(tmp_path / f"figure{suffix}")
     assert written.exists() and written.stat().st_size > 0
     plt.close("all")
+
+
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_an_overlay_line_in_the_hosts_colour_takes_a_free_one(renderer):
+    host = draw(one_panel(Trace(X, X, color="#1f77b4")), renderer=renderer, show=False)
+    both = draw(one_panel(Trace(X, -X, color="#1f77b4")), ax=host, show=False)
+    first, second = both.spec.panels[0].layers
+    assert first.color == "#1f77b4" and second.color not in ("#1f77b4", None)
+    plt.close("all")

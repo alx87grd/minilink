@@ -170,7 +170,8 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
     Draw ``spec`` with ``renderer`` and return its :class:`PlotResult`.
 
     ``ax`` is where to draw: a matplotlib ``Axes`` (a list of them for several
-    panels), or a :class:`PlotResult`, whose panels receive these layers.
+    panels), or a :class:`PlotResult`, whose panels receive these layers; a
+    line in a colour its host panel already draws takes the next free one.
     ``show=None`` shows the figure unless it is drawn into ``ax``.
     ``renderer=None`` draws nothing: the record holds the description alone.
     """
@@ -189,7 +190,7 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
         require_same_renderer(renderer, ax.renderer)
         require_composable(ax.spec, spec)
         module = renderer_module(ax.renderer)
-        return module.draw_into(ax, spec, show=show)
+        return module.draw_into(ax, distinct_colours(ax.spec, spec), show=show)
 
     module = renderer_module(renderer)
     return module.draw_figure(spec, show=show, ax=ax)
@@ -260,6 +261,34 @@ def require_composable(host: FigureSpec, spec: FigureSpec):
             raise ValueError(
                 "the host panel already has a colour bar; draw the overlay without one"
             )
+
+
+# The colours an overlay's line takes when its own is already the host panel's
+OVERLAY_COLOURS = (
+    "#ff7f0e",
+    "#2ca02c",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#17becf",
+    "#bcbd22",
+)
+
+
+def distinct_colours(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
+    """``spec`` with each line whose colour its host panel already draws in the next colour that panel does not use."""
+    panels = []
+    for host_panel, panel in zip(host.panels, spec.panels):
+        used = {getattr(layer, "color", None) for layer in host_panel.layers}
+        free = [colour for colour in OVERLAY_COLOURS if colour not in used]
+        layers = []
+        for layer in panel.layers:
+            if isinstance(layer, Trace) and layer.color in used and free:
+                layer = replace(layer, color=free[0])
+            layers.append(layer)
+        panels.append(replace(panel, layers=tuple(layers)))
+
+    return replace(spec, panels=tuple(panels))
 
 
 def has_colorbar(panel) -> bool:

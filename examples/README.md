@@ -90,6 +90,7 @@ folders on GitHub, then open a notebook badge.
 | [06_compile_and_evaluate](tutorial/core/06_compile_and_evaluate.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/06_compile_and_evaluate.ipynb) |
 | [07_program](tutorial/core/07_program.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/07_program.ipynb) |
 | [08_planners](tutorial/core/08_planners.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/08_planners.ipynb) |
+| [09_plots_and_animations](tutorial/core/09_plots_and_animations.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/09_plots_and_animations.ipynb) |
 #### Advanced — tools: discrete and hybrid loops, optimal control, MPC and MPPI, reinforcement learning, differentiable loops
 
 | Notebook | Colab |
