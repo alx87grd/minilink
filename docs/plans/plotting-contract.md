@@ -446,6 +446,34 @@ fixed. Every other open choice takes the recommended option and is logged below.
 plot's return, pass `html=`, `save=`, `native=`, `file_name=` or `show="pdf"`, or adjust a
 figure after a shown call.
 
+### Resuming the run
+
+The run is expected to stop and restart (credits, a reclaimed container). Nothing lives only
+in a session:
+
+- **Small commits, pushed at once.** Every commit is one small item that passes ruff and its
+  narrow tests, and is pushed to `origin/plotting-contract` right after. A half-done item is
+  never left uncommitted at a break: it is finished, or reverted.
+- **The progress log below** is updated in the same commit as the work it records: the step,
+  the item, its commit, and the next action. A restart reads it first.
+- **The baseline tooling and records live on the branch**, in `docs/plans/plotting-run/`
+  (`baseline.py`, `baseline.json`), and leave before the pull request is merged.
+- **A restart:** `git fetch && git checkout plotting-contract && git pull --ff-only`; install
+  the environment (below); read the progress log; re-run `baseline.py --check`; continue at
+  the next action.
+- **The environment** (a fresh container):
+  ```bash
+  apt-get install -y graphviz coinor-libipopt-dev liblapack-dev libblas-dev libmumps-seq-dev gfortran pkg-config
+  pip install -e ".[full,dev]" ipympl anywidget kaleido cyipopt
+  ```
+  pygame runs headless with `SDL_VIDEODRIVER=dummy`.
+
+### Progress log
+
+| Step | Item | Commit | State | Next action |
+| --- | --- | --- | --- | --- |
+| 0 | Plan and environment | this commit | done | baseline tooling |
+
 ### Decisions taken during the run
 
 (none yet)
