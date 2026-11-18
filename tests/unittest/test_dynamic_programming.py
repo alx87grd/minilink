@@ -603,6 +603,22 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
                 del animation
                 plt.close(fig)
 
+    def test_the_sweep_animations_draw_into_axes_and_refuse_another_renderer(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        planner, result = solve(make_problem(), record_history=True)
+        for animate in (plotting.animate_cost_to_go, plotting.animate_control_law):
+            with self.subTest(animate=animate.__name__):
+                fig, ax = plt.subplots()
+                drawn = animate(planner.grid, result, ax=ax)
+                self.assertIs(drawn.figure, fig)
+                with self.assertRaisesRegex(ValueError, "matplotlib alone"):
+                    animate(planner.grid, result, renderer="plotly")
+                plt.close(fig)
+
     def test_batch_cost2go_draws_the_surfaces(self):
         import matplotlib
 

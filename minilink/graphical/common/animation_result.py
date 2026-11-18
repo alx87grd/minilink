@@ -83,6 +83,15 @@ def show_animation(figure, animation, *, fps, show, ax=None):
     return result
 
 
+def require_matplotlib_animation(renderer):
+    """Refuse a renderer other than matplotlib for an animation drawn with matplotlib alone."""
+    if renderer != "matplotlib":
+        raise ValueError(
+            f"this animation is drawn with matplotlib alone, got renderer={renderer!r}; "
+            'pass renderer="matplotlib"'
+        )
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################

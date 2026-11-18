@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.animation_result import require_matplotlib_animation
 from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
 
@@ -171,14 +172,18 @@ def animate_cost_to_go(
     jmax=None,
     anchor=None,
     interval=60,
-    show=True,
+    renderer="matplotlib",
+    show=None,
+    ax=None,
 ):
     """
     Animate the cost-to-go sweeps a solve recorded on ``record.history``, on ``grid``.
 
     The colours span ``[0, jmax]``; without ``jmax``, the range of the last
-    sweep's slice.
+    sweep's slice. Drawn with matplotlib, on a new figure or into ``ax``;
+    ``show=None`` plays it unless it is drawn into ``ax``.
     """
+    require_matplotlib_animation(renderer)
     require_history(record)
 
     return animate_field(
@@ -191,6 +196,7 @@ def animate_cost_to_go(
         vmax=jmax,
         interval=interval,
         show=show,
+        ax=ax,
     )
 
 
@@ -203,9 +209,17 @@ def animate_control_law(
     y_axis=1,
     anchor=None,
     interval=60,
-    show=True,
+    renderer="matplotlib",
+    show=None,
+    ax=None,
 ):
-    """Animate the control-law sweeps a solve recorded on ``record.history``, on ``grid``."""
+    """
+    Animate the control-law sweeps a solve recorded on ``record.history``, on ``grid``.
+
+    Drawn with matplotlib, on a new figure or into ``ax``; ``show=None`` plays
+    it unless it is drawn into ``ax``.
+    """
+    require_matplotlib_animation(renderer)
     require_history(record)
 
     return animate_field(
@@ -218,6 +232,7 @@ def animate_control_law(
         anchor=anchor,
         interval=interval,
         show=show,
+        ax=ax,
     )
 
 
@@ -251,7 +266,8 @@ def animate_field(
     anchor=None,
     vmax=None,
     interval=60,
-    show=True,
+    show=None,
+    ax=None,
 ):
     """
     Animate a recorded value or policy field over the sweeps of ``history``.
@@ -293,6 +309,7 @@ def animate_field(
         y_label=state_axis_label(grid.sys, y_axis),
         interval=interval,
         show=show,
+        ax=ax,
     )
 
 

@@ -23,31 +23,39 @@ def animate_heatmap(
     x_label="",
     y_label="",
     interval=60,
-    show=True,
+    show=None,
+    ax=None,
 ):
     """
     Animate the heatmaps ``frame_of(i)`` (values ``z[j, i]`` at ``(x[i], y[j])``) for ``i < n_frames``.
 
     The first frame is drawn once, each later frame swaps its values into the
     same mesh and titles the axes ``title_of(i)``; the colours span
-    ``[vmin, vmax]`` when given, every frame on one scale. Returns an
+    ``[vmin, vmax]`` when given, every frame on one scale. Drawn on a new
+    figure, or into ``ax``; ``show=None`` plays it unless it is drawn into
+    ``ax``. Returns an
     :class:`~minilink.graphical.common.animation_result.AnimationResult`.
     """
+    # A new figure, or the one that holds the given axes
+    if ax is None:
+        fig, target = plt.subplots()
+    else:
+        fig, target = ax.figure, ax
+
     # The first frame, drawn once, on one colour scale
-    fig, ax = plt.subplots()
-    mesh = ax.pcolormesh(x, y, frame_of(0), shading="gouraud", cmap=cmap)
+    mesh = target.pcolormesh(x, y, frame_of(0), shading="gouraud", cmap=cmap)
     if vmin is not None or vmax is not None:
         mesh.set_clim(vmin=vmin, vmax=vmax)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    fig.colorbar(mesh, ax=ax)
+    target.set_xlabel(x_label)
+    target.set_ylabel(y_label)
+    fig.colorbar(mesh, ax=target)
 
     # Each frame swaps its values into the same mesh
     def update(i):
         mesh.set_array(frame_of(i).ravel())
-        ax.set_title(title_of(i))
+        target.set_title(title_of(i))
         return (mesh,)
 
     ani = animation.FuncAnimation(fig, update, n_frames, interval=interval, blit=False)
 
-    return show_animation(fig, ani, fps=max(1, int(1000 / interval)), show=show)
+    return show_animation(fig, ani, fps=max(1, int(1000 / interval)), show=show, ax=ax)

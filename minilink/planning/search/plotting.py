@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.animation_result import require_matplotlib_animation
 from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
 
@@ -57,18 +58,22 @@ def animate_search(
     ax=None,
     step: int = 5,
     interval: int = 30,
-    show=True,
+    renderer="matplotlib",
+    show=None,
     figsize=(6.0, 5.0),
 ):
     """
     Replay the tree growth as an animation in the ``(x_axis, y_axis)`` projection.
 
     ``step`` edges are revealed per frame, in node insertion order; the solution
-    path is drawn at the end. Returns the
+    path is drawn at the end. Drawn with matplotlib, on a new figure or into
+    ``ax``; ``show=None`` plays it unless it is drawn into ``ax``. Returns the
     :class:`AnimationResult`; ``.save("tree.gif")`` writes it.
     """
     # Lazy import: the graphics load on first use, not with the planners
     from minilink.graphical.animation.line_animations import animate_lines
+
+    require_matplotlib_animation(renderer)
 
     tree = require_tree(planner)
     solution = planner.last_solution
@@ -106,7 +111,8 @@ def animate_convergence(
     y_axis: int = 1,
     ax=None,
     interval: int = 50,
-    show=True,
+    renderer="matplotlib",
+    show=None,
     figsize=(7.0, 6.0),
     title_prefix: str = "RRT* convergence",
 ):
@@ -116,10 +122,14 @@ def animate_convergence(
     Requires the latest solution's ``record.history``, from a solve with
     ``record_history=True``.
     Each frame redraws the full tree (including rewiring) and highlights the
-    current best goal path. Returns the :class:`AnimationResult`.
+    current best goal path. Drawn with matplotlib, on a new figure or into
+    ``ax``; ``show=None`` plays it unless it is drawn into ``ax``. Returns the
+    :class:`AnimationResult`.
     """
     # Lazy import: the graphics load on first use, not with the planners
     from minilink.graphical.animation.line_animations import animate_lines
+
+    require_matplotlib_animation(renderer)
 
     history = require_history(planner)
 
