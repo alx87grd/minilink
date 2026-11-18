@@ -386,7 +386,7 @@ def port_map_figure(
             x_label=x_label,
             y_label=out_label,
             y_lim=(vmin, vmax) if has_limits else None,
-            legend="upper right",
+            legend=True,
         )
         return FigureSpec(panels=(panel,), figsize=FIGSIZE_BASE)
 
@@ -414,7 +414,7 @@ def port_map_figure(
         y_label=y_label,
         z_label=out_label if is_3d else "",
         is_3d=is_3d,
-        legend="upper right",
+        legend=True,
     )
 
     return FigureSpec(panels=(panel,), figsize=FIGSIZE_BASE)

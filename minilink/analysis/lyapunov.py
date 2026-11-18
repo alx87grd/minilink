@@ -314,7 +314,7 @@ def plot_region_of_attraction(
         y_label=labels[y_axis],
         x_lim=(grid_x[0], grid_x[-1]),
         y_lim=(grid_y[0], grid_y[-1]),
-        legend="upper right",
+        legend=True,
     )
     spec = FigureSpec(panels=(panel,), figsize=(7.0, 5.5))
 

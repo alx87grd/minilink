@@ -78,6 +78,10 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     if spec.figsize is not None:
         fig.update_layout(width=100 * spec.figsize[0], height=100 * spec.figsize[1])
 
+    # One legend per figure: none when no panel asks for one
+    if not any(panel.legend for panel in spec.panels):
+        fig.update_layout(showlegend=False)
+
     show_figure(fig, "plotly", show)
 
     return PlotResult(renderer="plotly", figure=fig, axes=None, spec=spec)

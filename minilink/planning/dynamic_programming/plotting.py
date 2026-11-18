@@ -458,7 +458,7 @@ def field_figure(
         title=title,
         x_label=state_axis_label(grid.sys, x_axis),
         y_label=state_axis_label(grid.sys, y_axis),
-        legend="upper right",
+        legend=True,
     )
 
     return FigureSpec(panels=(panel,))

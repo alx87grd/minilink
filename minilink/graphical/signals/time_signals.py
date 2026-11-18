@@ -170,7 +170,7 @@ def signal_figure(
                 label=labels[i],
             )
             y_label = label_with_unit(labels[i], units[i], separator="\n")
-            panels.append(Panel(layers=(trace,), y_label=y_label, legend=None))
+            panels.append(Panel(layers=(trace,), y_label=y_label, legend=False))
 
     require_traces(panels)
 
@@ -179,7 +179,7 @@ def signal_figure(
         layers=panels[-1].layers,
         y_label=panels[-1].y_label,
         x_label=abscissa_label,
-        legend=None,
+        legend=False,
     )
     figsize = trajectory_stack_figsize(
         len(panels), allow_tall=allow_tall_stacked_figures()

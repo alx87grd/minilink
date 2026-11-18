@@ -258,7 +258,7 @@ class Comparison:
                 title=title if k == 0 else "",
                 x_label=TIME_ABSCISSA_LABEL if k == n_rows - 1 else "",
                 y_label=row.y_label.replace("\n", " "),
-                legend="upper right",
+                legend=True,
             )
             for k, row in enumerate(rows)
         ]

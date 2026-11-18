@@ -165,7 +165,7 @@ def draw_panel(ax, panel, *, fill_only):
     if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
         handles, labels = ax.get_legend_handles_labels()
         unique = dict(zip(labels, handles))
-        ax.legend(unique.values(), unique.keys(), loc=panel.legend, fontsize=8)
+        ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
 
 
 def set_text(setter, current, text, fill_only):

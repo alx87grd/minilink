@@ -255,7 +255,7 @@ def scene_figure(
         x_lim=(x_lo, x_hi),
         y_lim=(y_lo, y_hi),
         equal_aspect=True,
-        legend=None,
+        legend=False,
     )
 
     return FigureSpec(panels=(panel,), figsize=figsize)

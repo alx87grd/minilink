@@ -56,7 +56,7 @@ class Panel:
     y_ticks: tuple[float, ...] | None = None
     equal_aspect: bool = False
     is_3d: bool = False
-    legend: str | None = "best"
+    legend: bool = True  # A legend when a layer is labelled
 
 
 @dataclass(frozen=True)

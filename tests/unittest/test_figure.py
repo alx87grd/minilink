@@ -154,6 +154,19 @@ def test_a_repeated_legend_label_shows_once():
     plt.close("all")
 
 
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_a_panel_without_a_legend_draws_none(renderer):
+    spec = one_panel(
+        Trace(X, X, label="run"), Trace(X, -X, label="other"), legend=False
+    )
+    result = draw(spec, renderer=renderer, show=False)
+    if renderer == "matplotlib":
+        assert result.axes.get_legend() is None
+    else:
+        assert result.figure.layout.showlegend is False
+    plt.close("all")
+
+
 def test_traces_without_a_colour_take_the_colour_cycle():
     result = draw(one_panel(Trace(X, X), Trace(X, -X)), show=False)
     first, second = result.axes.lines
