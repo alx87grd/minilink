@@ -8,9 +8,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.roles import plot_space_of, require_command, subsystem_roles
-from minilink.graphical.common import PlotResult
 from minilink.graphical.common.labels import label_with_unit
 from minilink.graphical.common.matplotlib_style import FIGSIZE_BASE
+from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
 from minilink.graphical.phase_plane.phase_plane import require_grid_shape
 

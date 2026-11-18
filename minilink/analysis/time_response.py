@@ -11,7 +11,7 @@ from minilink.analysis.linearization import (
     siso_matrices,
 )
 from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
-from minilink.graphical.common import PlotResult
+from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.control import style
 from minilink.graphical.figure import FigureSpec, Note, Panel, RefLine, Trace, draw
 

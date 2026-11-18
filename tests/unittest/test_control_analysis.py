@@ -901,7 +901,7 @@ class TestModalAPI(unittest.TestCase):
 
 from minilink.analysis.frequency import bode, margins, pzmap, transfer_function
 from minilink.analysis.time_response import step_response
-from minilink.graphical.common import PlotResult
+from minilink.graphical.common.plot_result import PlotResult
 
 
 class FrequencyPlant(DynamicSystem):

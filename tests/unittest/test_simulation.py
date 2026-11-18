@@ -1038,7 +1038,7 @@ class TestRealtimeSimulator(unittest.TestCase):
         # The renderer is plot_renderer; a name passed as plot is refused and says so
         with self.assertRaisesRegex(ValueError, "plot_renderer"):
             RealtimeSimulator(sys, renderer=None, plot="plotly")
-        with self.assertRaisesRegex(ValueError, "Unknown signal renderer"):
+        with self.assertRaisesRegex(ValueError, "renderer must be one of"):
             RealtimeSimulator(
                 sys, renderer=None, plot=("y",), plot_renderer="invalid_renderer"
             )

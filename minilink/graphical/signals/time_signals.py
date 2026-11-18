@@ -6,11 +6,17 @@ import numpy as np
 
 from minilink.core.diagram import DiagramSystem, subsystem_run
 from minilink.core.system import System
-from minilink.graphical.common import PlotResult
 from minilink.graphical.common.environment import allow_tall_stacked_figures
 from minilink.graphical.common.labels import label_with_unit
 from minilink.graphical.common.matplotlib_style import trajectory_stack_figsize
-from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
+from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.figure import (
+    FigureSpec,
+    Panel,
+    Trace,
+    draw,
+    require_renderer,
+)
 from minilink.graphical.signals.signal_colors import (
     color_for_signal,
     is_internal_signal,
@@ -226,8 +232,8 @@ def open_time_signal_plot(
             abscissa_label=abscissa_label,
         )
 
-    key = require_signal_renderer(renderer)
-    if key == "matplotlib":
+    require_renderer(renderer)
+    if renderer == "matplotlib":
         # A real cycle: matplotlib_backend imports from this module
         from minilink.graphical.signals.matplotlib_backend import (
             open_matplotlib_signal_plot,
@@ -494,20 +500,6 @@ def require_traces(panels):
     """Refuse a plot without a single signal component."""
     if not panels:
         raise ValueError("No signal components were selected for plotting.")
-
-
-def require_signal_renderer(renderer):
-    """Refuse a renderer other than ``"matplotlib"`` or ``"plotly"``; return its key."""
-    if not isinstance(renderer, str):
-        raise TypeError("Signal plotting renderer must be a string.")
-
-    key = renderer.strip().lower()
-    if key not in ("matplotlib", "plotly"):
-        raise ValueError(
-            f"Unknown signal renderer {renderer!r}. Expected 'matplotlib' or 'plotly'."
-        )
-
-    return key
 
 
 def figure_of_update(traj_or_figure, figure_of, *, title=None):

@@ -15,7 +15,7 @@ from minilink.analysis.linearization import (
     discrete_period,
     siso_matrices,
 )
-from minilink.graphical.common import PlotResult
+from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.control import style
 from minilink.graphical.figure import FigureSpec, Note, Panel, RefLine, Trace, draw
 

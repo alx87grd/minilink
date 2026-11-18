@@ -1,6 +1,5 @@
 """Time-signal plots: a trajectory's signals described, drawn once or kept live, on matplotlib or plotly."""
 
-from minilink.graphical.common import PlotResult
 from minilink.graphical.signals.time_signals import (
     STEP_ABSCISSA_LABEL,
     TIME_ABSCISSA_LABEL,
@@ -13,7 +12,6 @@ from minilink.graphical.signals.time_signals import (
 
 __all__ = [
     "LivePlotHandle",
-    "PlotResult",
     "STEP_ABSCISSA_LABEL",
     "TIME_ABSCISSA_LABEL",
     "open_time_signal_plot",

@@ -10,6 +10,21 @@ import numpy as np
 
 from minilink.graphical.common.plot_result import PlotResult
 
+# The ten categorical colours in hex, which every renderer reads: blue, orange,
+# green, red, purple, brown, pink, grey, olive, cyan
+TAB10 = (
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+)
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -272,16 +287,9 @@ def require_composable(host: FigureSpec, spec: FigureSpec):
             )
 
 
-# The colours an overlay's line takes when its own is already the host panel's
-OVERLAY_COLORS = (
-    "#ff7f0e",
-    "#2ca02c",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#17becf",
-    "#bcbd22",
-)
+# The colours an overlay's line takes when its own is already the host panel's:
+# the palette after its blue, the first line's colour
+OVERLAY_COLORS = TAB10[1:]
 
 
 def distinct_colors(host: FigureSpec, spec: FigureSpec) -> FigureSpec:

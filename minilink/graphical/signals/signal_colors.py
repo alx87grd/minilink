@@ -4,20 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# The colours in hex, which every renderer reads (matplotlib's tab palette)
-STATE_COLOR = "#1f77b4"  # Blue
-INPUT_COLOR = "#d62728"  # Red
+from minilink.graphical.figure import TAB10
 
-INTERNAL_SIGNAL_COLORS = (
-    "#2ca02c",  # Green
-    "#ff7f0e",  # Orange
-    "#9467bd",  # Purple
-    "#bcbd22",  # Olive
-    "#8c564b",  # Brown
-    "#e377c2",  # Pink
-    "#17becf",  # Cyan
-    "#7f7f7f",  # Gray
-)
+# The state in blue, the input in red, from the one palette
+STATE_COLOR = TAB10[0]
+INPUT_COLOR = TAB10[3]
+
+# Every other signal: green, orange, purple, olive, brown, pink, cyan, grey
+INTERNAL_SIGNAL_COLORS = tuple(TAB10[k] for k in (2, 1, 4, 8, 5, 6, 9, 7))
 
 CORE_INPUT_NAMES = frozenset({"u", "u_cmd"})
 CORE_STATE_NAMES = frozenset({"x"})

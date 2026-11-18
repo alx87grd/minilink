@@ -6,7 +6,8 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
+from minilink.graphical.figure import TAB10, FigureSpec, Panel, Trace, draw
+from minilink.graphical.signals.time_signals import TIME_ABSCISSA_LABEL
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import ProblemEvaluator
 from minilink.planning.plotting import (
@@ -22,18 +23,7 @@ from minilink.planning.results import (
 )
 
 # One colour per solution, the same on every row
-SOLUTION_COLORS = (
-    "#1f77b4",
-    "#ff7f0e",
-    "#2ca02c",
-    "#d62728",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#7f7f7f",
-    "#bcbd22",
-    "#17becf",
-)
+SOLUTION_COLORS = TAB10
 
 
 ###############################################################################
@@ -266,7 +256,7 @@ class Comparison:
                     for m, (name, spec) in enumerate(specs.items())
                 ),
                 title=title if k == 0 else "",
-                x_label="Time [s]" if k == n_rows - 1 else "",
+                x_label=TIME_ABSCISSA_LABEL if k == n_rows - 1 else "",
                 y_label=row.y_label.replace("\n", " "),
                 legend="upper right",
             )

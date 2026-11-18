@@ -6,9 +6,9 @@ import operator
 
 import numpy as np
 
-from minilink.graphical.common import PlotResult
 from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.common.matplotlib_style import FIGSIZE_BASE
+from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.figure import Arrows, FigureSpec, Panel, Trace, draw
 
 ###############################################################################

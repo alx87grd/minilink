@@ -28,7 +28,7 @@ from minilink.analysis.time_response import (
     step_response,
 )
 from minilink.dynamics.abstraction.state_space import DiscreteLTISystem
-from minilink.graphical.common import PlotResult
+from minilink.graphical.common.plot_result import PlotResult
 
 PLOTLY = pytest.importorskip
 
