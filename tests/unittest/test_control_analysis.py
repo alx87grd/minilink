@@ -527,6 +527,14 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         ax = ctl.plot_gain_schedule(show=False).axes
         self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
 
+    def test_gain_schedule_plot_draws_on_plotly(self):
+        pytest.importorskip("plotly")
+        ctl = lqr_finite_horizon(
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), horizon=1.0
+        )
+        result = ctl.plot_gain_schedule(renderer="plotly", show=False)
+        self.assertEqual([trace.type for trace in result.figure.data], ["scatter"] * 2)
+
     def test_finite_horizon_after_stationary_keeps_regulating(self):
         ctl = lqr_finite_horizon(
             LTISystem(self.A, self.B),

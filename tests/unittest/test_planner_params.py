@@ -300,6 +300,16 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
     assert ax.get_xlabel() == "episode"
 
 
+def test_the_learning_curve_draws_on_plotly():
+    pytest.importorskip("plotly")
+    build, _ = PLANNERS["tabular"]
+    planner = build()
+    solve_of(planner)
+    result = planner.plot_learning_curve(renderer="plotly", show=False)
+    assert result.renderer == "plotly"
+    assert [trace.type for trace in result.figure.data] == ["scatter", "scatter"]
+
+
 @pytest.mark.jax
 def test_an_mppi_solve_prints_its_record_when_verbose(capsys):
     from minilink.planning import MPPIPlanner
