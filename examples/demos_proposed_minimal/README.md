@@ -4,7 +4,7 @@ A draft for the maintainer's review: the scripts proposed as the whole demo set 
 consolidated library, written beside the existing `examples/demos/`, which they do not
 replace until he rules. Seven are the shortlist; `racecar_mppi.py` and
 `racecar_fast_lap.py` are two prototypes added after it. The reasoning is in
-[docs/plans/minimal-surface.md](../../docs/plans/minimal-surface.md), §4: the tutorials
+[docs/plans/consolidation.md](../../docs/plans/consolidation.md), §4: the tutorials
 carry what fits in a notebook, and a demo is kept only for a story a notebook tells badly.
 Each script tells one story, shows the diagram where the wiring is the point, and ends on
 one plot and one animation.

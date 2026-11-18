@@ -923,9 +923,7 @@ review left it (2026-11-18), tracked `.py` files and notebooks only, and the two
   the first part of his pass. Go through `examples/` (the demos and the projects) and the
   top-level `experimental/` folder, and decide for each item: a minilink example (one of the
   minimal set), a prototype in `workbench`, a notebook in `teaching`, or deleted. Its inputs,
-  none of them a decision: [consolidation-recap.md](../plans/consolidation-recap.md),
-  [internals-cleanup.md](../plans/internals-cleanup.md),
-  [minimal-surface.md](../plans/minimal-surface.md) and the draft scripts of
+  none of them a decision: [consolidation.md](../plans/consolidation.md) and the draft scripts of
   `examples/demos_proposed_minimal/`.
 - **The order:** the snapshot tag; the list of examples, each naming the core tools it
   shows (the maintainer's); the new examples built, the rest moved out; the core cut, one

@@ -64,7 +64,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 
 ## 3. Example scripts — full inventory
 
-The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 shrink are not listed), grouped by top-level folder; a script landed since is marked **Done** in place. The minilink scripts named in the notes are those of `examples/demos/`, the set the maintainer's pass over the demos decides ([minimal-surface.md](minimal-surface.md) §4): the notes are re-audited after it.
+The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 shrink are not listed), grouped by top-level folder; a script landed since is marked **Done** in place. The minilink scripts named in the notes are those of `examples/demos/`, the set the maintainer's pass over the demos decides ([consolidation.md](consolidation.md) §4): the notes are re-audited after it.
 
 ### 3.1 `courses/`
 

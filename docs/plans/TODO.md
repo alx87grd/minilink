@@ -250,10 +250,9 @@ experimental moves of §2, the consolidation picks of §3, the cuts of §6) wait
 Ruled already: the value-iteration animations (`animate_cost_to_go`, `animate_control_law`)
 stay, the maintainer uses them in class.
 
-The inputs of the pass, none of them a decision: [consolidation-recap.md](consolidation-recap.md)
-(one recommendation per chunk of the repository), [internals-cleanup.md](internals-cleanup.md)
-(candidates behind the kept surface), [minimal-surface.md](minimal-surface.md) (the test
-layers' options and a starting demo list) and the draft scripts of
+The inputs of the pass, none of them a decision: [consolidation.md](consolidation.md) (the
+draft demo set, one recommendation per area of the repository, the candidates behind the kept
+surface, the test layers' options) and the draft scripts of
 `examples/demos_proposed_minimal/`. The order and the size orientations are ROADMAP §5.4's.
 
 - [ ] **The maintainer's pass over the demos and features, then the tests' clean slate**

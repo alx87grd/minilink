@@ -6,7 +6,7 @@ repositories the other material lives in (ruled 2026-11-13; what is left of the 
 **Where it sits:** the decision "Where the course material and the projects live" (steps K5
 and K6 of [TODO.md](TODO.md), v0.9); the pinned Colab cell waits in step V6. The examples
 tree is decided with the maintainer's pass over the demos
-([minimal-surface.md](minimal-surface.md) §4).
+([consolidation.md](consolidation.md) §4).
 
 ## 1. The repositories (ruled 2026-11-13)
 
@@ -115,7 +115,7 @@ repository.
 `git mv`; (3) `projects/` under `research/`. B1's renames are a fallback that keeps the
 option open if B2 has to wait a term.
 
-**To weigh against it:** the draft of the curated demo set (minimal-surface.md §4.2) is one
+**To weigh against it:** the draft of the curated demo set (consolidation.md §4.2) is one
 flat folder of about ten scripts, each named by its plant and its task, with the tutorials as
 the tool-by-tool walk. If that set replaces `demos/`, the chapter folders hold one notebook
 each and B2 reduces to the tutorials' own layers.
@@ -126,7 +126,7 @@ each and B2 reduces to the tutorials' own layers.
 2. **The chapter list** for B2: the three tutorial layers as the spine, and a home for
    `hybrid`, `mpc`, `realtime`, `robotic` and the racecar folder.
 3. **`projects/`:** to the research repository
-   ([consolidation-recap.md](consolidation-recap.md) §4), or kept as `research/projects/`.
+   (consolidation.md §7), or kept as `research/projects/`.
 4. **The form of the pin** in the teaching repository (§3).
 
 When the maintainer rules, the ruling updates this doc and the steps go to
