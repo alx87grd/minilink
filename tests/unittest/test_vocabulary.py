@@ -415,15 +415,29 @@ RETIRED_KEYWORDS = {
     "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
     "minilink.core.facades.plotting.SystemPlotting.plot_diagram": {
         "show_inline": 'show="inline"',
-        "show_pdf": 'show="pdf"',
+        "show_pdf": 'show="window"',
+        "file_name": ".save(file_name)",
     },
     "minilink.graphical.diagrams.dot.plot_diagram": {
         "show_inline": 'show="inline"',
-        "show_pdf": 'show="pdf"',
+        "show_pdf": 'show="window"',
+        "file_name": ".save(file_name)",
     },
-    "minilink.graphical.diagrams.dot.render_diagram_graph": {
-        "show_inline": 'show="inline"',
-        "show_pdf": 'show="pdf"',
+    "minilink.core.facades.animation.SystemAnimation.animate": {
+        "html": 'show="inline"',
+        "native": "a clip always plays",
+        "save": ".save(file_name)",
+        "file_name": ".save(file_name)",
+    },
+    "minilink.core.discrete.sampled_diagram.SampledDiagramSystem.animate": {
+        "html": 'show="inline"',
+        "native": "a clip always plays",
+        "save": ".save(file_name)",
+        "file_name": ".save(file_name)",
+    },
+    "minilink.analysis.modal.animate_modal": {
+        "html": 'show="inline"',
+        "native": "a clip always plays",
     },
     "minilink.core.closed_loop.feedback": {"validate": "the loop check always runs"},
     "minilink.core.closed_loop.closed_loop": {"validate": "the loop check always runs"},

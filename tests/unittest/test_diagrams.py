@@ -1,3 +1,4 @@
+import os
 import unittest
 import pytest
 from minilink.blocks.basic import Integrator
@@ -109,64 +110,84 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("input:out_v:e -> integ:in_u:w", source)
         self.assertIn("integ:out_y:e -> output:in__v:w", source)
 
-    def test_plot_diagram_no_display_returns_graph(self):
+    def test_plot_diagram_no_display_returns_a_record_of_the_graph(self):
         pytest.importorskip("graphviz")
-        graph = plot_diagram(Integrator(), show=False)
-        self.assertIsNotNone(graph)
-        self.assertIn("Integrator", graph.source)
+        result = plot_diagram(Integrator(), show=False)
+        self.assertEqual(result.renderer, "graphviz")
+        self.assertIn("Integrator", result.figure.source)
 
-    def test_plot_diagram_matplotlib_path_with_agg(self):
+    def test_a_window_opens_the_vector_pdf_in_the_viewer(self):
         pytest.importorskip("graphviz")
-        import matplotlib
+        from unittest import mock
 
-        matplotlib.use("Agg", force=True)
+        from minilink.graphical.common import environment
         from minilink.graphical.common.environment import override_env
+        from minilink.graphical.diagrams import dot as dot_module
 
         override_env("script")
         try:
-            graph = plot_diagram(Integrator(), show="window")
+            with (
+                mock.patch.dict(os.environ, {"MINILINK_HEADLESS": ""}),
+                mock.patch.object(environment, "has_display", return_value=True),
+                mock.patch.object(dot_module, "open_in_viewer") as viewer,
+            ):
+                result = plot_diagram(Integrator(), show="window")
         finally:
             override_env(None)
-        self.assertIsNotNone(graph)
-        self.assertIn("Integrator", graph.source)
+        (path,) = viewer.call_args.args
+        self.assertEqual(path.suffix, ".pdf")
+        self.assertTrue(path.read_bytes().startswith(b"%PDF"))
+        self.assertIn("Integrator", result.figure.source)
 
-    def test_inline_plot_diagram_does_not_call_ipython_display(self):
-        """Notebook cells auto-display the returned graph; display() would draw twice."""
+    def test_inline_plot_diagram_displays_once_at_the_call(self):
+        """The diagram shows at the line that draws it, and the record displays nothing more."""
         from unittest import mock
 
         graphviz = pytest.importorskip("graphviz")
+        pytest.importorskip("IPython")
+        from minilink.graphical.common.environment import override_env
+
+        override_env("jupyter")
         try:
-            import IPython.display  # noqa: F401
-        except ImportError:
-            self.skipTest("IPython not installed")
+            with (
+                mock.patch.dict(os.environ, {"MINILINK_HEADLESS": ""}),
+                mock.patch.object(graphviz.Digraph, "pipe", return_value=b"<svg/>"),
+                mock.patch("IPython.display.display") as display,
+            ):
+                result = plot_diagram(Integrator(), show="inline")
+        finally:
+            override_env(None)
+        display.assert_called_once()
+        self.assertIsNone(result._ipython_display_())
+        self.assertIn("Integrator", result.figure.source)
 
-        # dot renders (the binary itself is not needed here), so the graph comes back
-        with (
-            mock.patch.object(graphviz.Digraph, "pipe", return_value=b"<svg/>"),
-            mock.patch("IPython.display.display") as display,
-        ):
-            graph = plot_diagram(Integrator(), show="inline")
-        display.assert_not_called()
-        self.assertIsNotNone(graph)
-        self.assertIn("Integrator", graph.source)
+    def test_save_writes_the_format_of_the_extension(self):
+        pytest.importorskip("graphviz")
+        import tempfile
+        from pathlib import Path
 
-    def test_a_hidden_graph_is_written_only_to_a_requested_file(self):
-        from minilink.graphical.diagrams.dot import render_diagram_graph
+        result = plot_diagram(Integrator(), show=False)
+        with tempfile.TemporaryDirectory() as tmp:
+            svg = result.save(Path(tmp) / "loop.svg")
+            pdf = result.save(Path(tmp) / "loop")
+            self.assertIn(b"<svg", svg.read_bytes())
+            self.assertEqual(pdf.name, "loop.pdf")
+            self.assertTrue(pdf.read_bytes().startswith(b"%PDF"))
+            self.assertEqual(
+                sorted(p.name for p in Path(tmp).iterdir()), ["loop.pdf", "loop.svg"]
+            )
 
-        class RecordedGraph:
-            name = "recorded"
+    def test_the_viewer_file_is_portable_and_named_by_its_source(self):
+        pytest.importorskip("graphviz")
+        from minilink.graphical.diagrams.dot import viewer_path_of
 
-            def __init__(self):
-                self.renders = []
-
-            def render(self, filename=None, view=False):
-                self.renders.append((filename, view))
-
-        graph = RecordedGraph()
-        render_diagram_graph(graph, show=False)
-        self.assertEqual(graph.renders, [])
-        render_diagram_graph(graph, show=False, file_name="out.gv")
-        self.assertEqual(graph.renders, [("out.gv", False)])
+        first = get_diagram(Integrator())
+        first.name = "Step >> PID @ Plant"
+        path = viewer_path_of(first)
+        self.assertRegex(path.name, r"^Step_PID_Plant-[0-9a-f]{8}\.pdf$")
+        other = get_diagram(self._make_diagram())
+        other.name = first.name
+        self.assertNotEqual(viewer_path_of(other), path)
 
     def test_plot_diagram_without_graphviz_warns_once_and_skips(self):
         import sys
@@ -175,8 +196,8 @@ class TestDiagrams(unittest.TestCase):
         # Diagrams are optional: a missing graphviz wrapper skips the figure.
         with mock.patch.dict(sys.modules, {"graphviz": None}):
             with pytest.warns(UserWarning, match="pip install graphviz") as record:
-                graph = plot_diagram(self._make_diagram(), show=False)
-        self.assertIsNone(graph)
+                result = plot_diagram(self._make_diagram(), show=False)
+        self.assertIsNone(result.figure)
         self.assertEqual(len(record), 1)
 
     def test_topology_builder_contains_ports_and_edges(self):
@@ -457,7 +478,9 @@ class TestNestedDiagramPlot(unittest.TestCase):
         self.assertIn("Controller::controller", source)
         self.assertRegex(source, r"ref:\w+:e -> controller:\w+:w")
         self.assertRegex(source, r"controller:\w+:e -> plant:\w+:w")
-        self.assertEqual(source, loop.plot_diagram(show=False, expand=False).source)
+        self.assertEqual(
+            source, loop.plot_diagram(show=False, expand=False).figure.source
+        )
         topology = build_diagram_topology(loop)
         self.assertEqual(
             [node.id for node in topology.nodes],
@@ -914,25 +937,32 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         ):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                dot_module.render_diagram_graph(graph, show="inline")
+                dot_module.present_diagram(graph, "inline")
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
 
-    def test_plot_diagram_returns_nothing_for_the_cell_to_render(self):
-        """A notebook auto-displays the returned graph, which would call ``dot`` and raise."""
+    def test_plot_diagram_in_a_notebook_without_dot_warns_and_returns_the_graph(self):
         import warnings
         from unittest import mock
 
         graphviz = pytest.importorskip("graphviz")
         from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+        from minilink.graphical.common.environment import override_env
 
         loop = Impedance() @ Pendulum()
         missing_dot = RuntimeError("failed to execute PosixPath('dot')")
-        with mock.patch.object(graphviz.Digraph, "pipe", side_effect=missing_dot):
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter("always")
-                graph = loop.plot_diagram(show="inline")
-        self.assertIsNone(graph)
+        override_env("jupyter")
+        try:
+            with (
+                mock.patch.dict(os.environ, {"MINILINK_HEADLESS": ""}),
+                mock.patch.object(graphviz.Digraph, "pipe", side_effect=missing_dot),
+            ):
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    result = loop.plot_diagram(show="inline")
+        finally:
+            override_env(None)
+        self.assertEqual(result.renderer, "graphviz")
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
 
 

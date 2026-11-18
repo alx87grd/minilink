@@ -89,4 +89,4 @@ loop.animate(run, overlays=overlays)
 # The 3-D look: the racecar skin, the camera on the body
 car.camera_follow_frame = "body"
 car.skin = racecar_skin_3d
-loop.animate(run, overlays=overlays, renderer="meshcat", native=False)
+loop.animate(run, overlays=overlays, renderer="meshcat")

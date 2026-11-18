@@ -339,27 +339,40 @@ class PlotlyRenderer(AnimationRenderer):
     def close_scene(self) -> None:
         self.fig = None
 
-    def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
-        self.is_3d = is_3d
-        return self._build_animation_figure(primitives, frames, schedule)
-
-    def play_native(
-        self,
-        primitives,
-        frames,
-        schedule,
-        *,
-        is_3d: bool,
-        scene_title: str | None = None,
+    def build_clip(
+        self, primitives, frames, schedule, *, is_3d=False, scene_title=None
     ):
+        """The trajectory as a Plotly figure with frames and a play control: ``(fig, None)``."""
         self.is_3d = is_3d
-        fig = self._build_animation_figure(primitives, frames, schedule)
+        return self._build_animation_figure(primitives, frames, schedule), None
+
+    def show_clip(self, clip, place):
+        """Play the figure inline, displayed now, or in a browser tab."""
+        fig = clip.built()[0]
+        if place == "inline":
+            from IPython.display import display
+
+            display(fig)
+            return
+
         fig.show(
+            renderer="browser",
             auto_play=True,
             animation_opts=getattr(fig, "_minilink_plotly_animation_opts", None),
         )
-        self.fig = fig
-        return fig
+
+    def save_clip(self, clip, path):
+        """A self-contained ``.html`` page that plays the frames."""
+        require_html_path(path)
+        path = path if path.suffix else path.with_suffix(".html")
+        fig = clip.built()[0]
+        fig.write_html(
+            path,
+            auto_play=True,
+            animation_opts=getattr(fig, "_minilink_plotly_animation_opts", None),
+        )
+
+        return path
 
     def _build_animation_figure(self, primitives, frames, schedule):
         go = _import_plotly()
@@ -737,3 +750,11 @@ class PlotlyRenderer(AnimationRenderer):
             )
 
         return _empty_trace(go, is_3d=self.is_3d, name=name)
+
+
+def require_html_path(path):
+    """Refuse a file an animation page cannot be: only ``.html`` (or no suffix)."""
+    if path.suffix and path.suffix.lower() not in (".html", ".htm"):
+        raise ValueError(
+            f"an animation drawn with this renderer saves as a .html page, got {path.name!r}"
+        )

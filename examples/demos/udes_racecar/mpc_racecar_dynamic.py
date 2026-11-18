@@ -167,5 +167,4 @@ closed_loop.animate(
         result, mpc, loop=closed_loop, scene=scene, track=track
     ),
     renderer="meshcat",
-    native=False,
 )

@@ -842,22 +842,23 @@ class TestAnimateModal(unittest.TestCase):
     @pytest.mark.optional
     def test_animate_one_mode_headless(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode=0, show=False)
-        self.assertEqual(len(poles), 2)
+        result = animate_modal(Pendulum(), [0.0, 0.0], mode=0, show=False)
+        self.assertEqual(result.renderer, "matplotlib")
+        self.assertIsNotNone(result.animation)
 
     @pytest.mark.optional
     def test_animate_all_modes(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode="all", show=False)
-        self.assertEqual(len(poles), 2)
+        results = animate_modal(Pendulum(), [0.0, 0.0], mode="all", show=False)
+        self.assertEqual(len(results), 2)
 
 
 class TestModalFacade(unittest.TestCase):
     @pytest.mark.optional
     def test_facade_animate(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = Pendulum().animate_modal(x_bar=[0.0, 0.0], mode=0, show=False)
-        self.assertEqual(len(poles), 2)
+        result = Pendulum().animate_modal(x_bar=[0.0, 0.0], mode=0, show=False)
+        self.assertEqual(result.renderer, "matplotlib")
 
 
 @pytest.mark.optional

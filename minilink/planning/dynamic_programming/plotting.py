@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.animation_result import animation_result_of
 from minilink.graphical.common.plot_result import plot_result_of
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Trace, draw
 from minilink.planning.plotting import maybe_show
@@ -166,7 +167,6 @@ def animate_cost_to_go(
     jmax=None,
     anchor=None,
     interval=60,
-    file_name=None,
     show=True,
 ):
     """
@@ -187,7 +187,6 @@ def animate_cost_to_go(
         vmax=jmax,
         interval=interval,
         show=show,
-        file_name=file_name,
     )
 
 
@@ -200,7 +199,6 @@ def animate_control_law(
     y_axis=1,
     anchor=None,
     interval=60,
-    file_name=None,
     show=True,
 ):
     """Animate the control-law sweeps a solve recorded on ``record.history``, on ``grid``."""
@@ -216,7 +214,6 @@ def animate_control_law(
         anchor=anchor,
         interval=interval,
         show=show,
-        file_name=file_name,
     )
 
 
@@ -297,7 +294,6 @@ def animate(
     vmax=None,
     interval=60,
     show=True,
-    file_name=None,
 ):
     """
     Animate a recorded value or policy field over the sweeps of ``history``.
@@ -354,12 +350,7 @@ def animate(
     ani = animation.FuncAnimation(
         fig, update, len(history), interval=interval, blit=False
     )
-    if file_name is not None:
-        ani.save(file_name, writer="pillow", fps=max(1, int(1000 / interval)))
-
-    maybe_show(fig, show)
-
-    return ani
+    return animation_result_of(fig, ani, fps=max(1, int(1000 / interval)), show=show)
 
 
 def cost_scale_limit(failure_cost):

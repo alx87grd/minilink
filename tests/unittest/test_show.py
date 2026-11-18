@@ -124,3 +124,58 @@ def test_inline_matplotlib_is_displayed_once_and_closed(place, monkeypatch):
 
     assert shown == [fig]
     assert fig.number not in plt.get_fignums()
+
+
+def test_a_notebook_cell_shows_each_figure_once_in_code_order():
+    """A diagram, an animation and a plot in one cell appear at their lines, once each."""
+    import os
+    import shutil
+
+    nbformat = pytest.importorskip("nbformat")
+    nbclient = pytest.importorskip("nbclient")
+    pytest.importorskip("ipykernel")
+    pytest.importorskip("graphviz")
+    if shutil.which("dot") is None:
+        pytest.skip("the Graphviz binary is not installed")
+
+    cell = (
+        "from minilink import PID, Pendulum\n"
+        "loop = PID(Kp=5.0) >> Pendulum()\n"
+        "traj = Pendulum().compute_trajectory(tf=0.5)\n"
+        "loop.plot_diagram()\n"
+        "Pendulum().animate(traj, speed=4.0)\n"
+        "Pendulum().plot_trajectory(traj)\n"
+        "x = 1\n"
+    )
+    notebook = nbformat.v4.new_notebook(
+        cells=[
+            nbformat.v4.new_code_cell("%matplotlib inline"),
+            nbformat.v4.new_code_cell(cell),
+        ]
+    )
+
+    # A kernel as a person opens it: no headless switch, matplotlib's inline backend
+    environment = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("MPLBACKEND", "MINILINK_HEADLESS")
+    }
+    saved = dict(os.environ)
+    os.environ.clear()
+    os.environ.update(environment)
+    try:
+        nbclient.NotebookClient(notebook, timeout=300, kernel_name="python3").execute()
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+    kinds = []
+    for output in notebook.cells[1].outputs:
+        data = output.get("data", {})
+        if "image/svg+xml" in data:
+            kinds.append("diagram")
+        elif "text/html" in data and "animation" in data["text/html"].lower():
+            kinds.append("animation")
+        elif "image/png" in data:
+            kinds.append("plot")
+    assert kinds == ["diagram", "animation", "plot"]

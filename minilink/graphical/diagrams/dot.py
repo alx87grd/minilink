@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import io
 import tempfile
 import warnings
 from dataclasses import replace
 
-from minilink.core.options import require_one_of
 from minilink.graphical.diagrams.export import (
     TopologyExporter,
     export_diagram_topology,
@@ -63,24 +61,24 @@ class GraphvizTopologyExporter(TopologyExporter):
         return graph
 
 
-# A system's diagram, drawn or returned; where it is shown: True picks the place
-DIAGRAM_SHOWS = (True, False, "inline", "window", "pdf")
-
-
-def plot_diagram(sys_or_diagram, file_name=None, show=True, *, expand=True):
-    """Render a system or assembled diagram.
+def plot_diagram(sys_or_diagram, *, show=True, expand=True):
+    """Draw a system's or an assembled diagram's blocks and wires: a :class:`PlotResult`.
 
     ``expand=True`` draws the blocks of every nested diagram inside a labelled
-    box; ``expand=False`` draws a nested diagram as one block. ``show`` is
-    where the figure goes (:func:`render_diagram_graph`). Returns the
-    Graphviz object, or ``None`` when the figure cannot be drawn, so that a
-    notebook cell without the Graphviz binary shows the warning and no error.
+    box; ``expand=False`` draws a nested diagram as one block. ``show=True``
+    shows it where the session puts it: an SVG under the notebook cell, the
+    vector PDF in the system's viewer elsewhere; ``"inline"`` or ``"window"``
+    names the place. ``.save("loop.svg")`` writes it in the format of the
+    extension. Without Graphviz the figure is skipped with a warning.
     """
-    graph = get_diagram(sys_or_diagram, expand=expand)
-    drawn = render_diagram_graph(graph, show=show, file_name=file_name)
+    # Lazy import: the record loads with the first diagram
+    from minilink.graphical.common.plot_result import PlotResult
+    from minilink.graphical.common.show import show_figure
 
-    # Nothing for the notebook cell to render when the figure could not be drawn
-    return graph if drawn else None
+    graph = get_diagram(sys_or_diagram, expand=expand)
+    show_figure(graph, "graphviz", show)
+
+    return PlotResult(renderer="graphviz", figure=graph)
 
 
 def get_diagram(sys_or_diagram, *, expand=True):
@@ -285,116 +283,46 @@ def escape_port_char(char):
     return "_"
 
 
-def render_diagram_graph(graph, show=True, file_name=None):
-    """
-    Display a Graphviz object.
-
-    ``show=True`` draws it where it belongs: inline SVG in Jupyter / Colab,
-    else a Matplotlib window with the Graphviz PNG (same blocking policy as
-    trajectory plots). ``show="inline"``, ``"window"`` or ``"pdf"`` (the OS
-    PDF viewer) names the place; ``show=False`` builds/returns only. Pass
-    ``file_name`` to write Graphviz output to disk.
-
-    Returns ``False`` when the figure cannot be drawn (no graphviz wrapper, or
-    no ``dot`` binary for the inline SVG), ``True`` otherwise.
-    """
-    # No graph: get_diagram already warned that graphviz is missing
-    if graph is None:
-        return False
-
-    # Lazy import: the graphics load on first use, not with the core
-    from minilink.graphical.common.environment import (
-        is_blocking_needed,
-        is_inline_capable,
-    )
-
-    # The channel: inline SVG in a notebook, else a Matplotlib window or the PDF viewer
-    require_one_of("show", show, DIAGRAM_SHOWS)
-    if show is True:
-        show = "inline" if is_inline_capable() else "window"
-    show_inline = show == "inline"
-    show_pdf = show == "pdf"
-    show = bool(show)
-
-    # Inline SVG in a notebook
-    drawn = True
-    if show and show_inline:
-        # Probe Graphviz here so a missing ``dot`` binary warns instead of
-        # raising. Do not IPython.display the graph: plot_diagram returns it,
-        # and the notebook auto-displays that last expression. Calling
-        # display() *and* returning the object renders the figure twice
-        # (same rule as SystemAnimation.animate).
-        try:
-            graph.pipe(format="svg")
-        except Exception as exc:
-            # The graphviz wrapper raises ExecutableNotFound when the ``dot``
-            # binary is missing (a bare Colab runtime, or a pip install without
-            # the system package). The notebook keeps running; the diagram is
-            # simply not drawn, and nothing is returned for the cell to render.
-            drawn = False
-            warnings.warn(
-                "Could not render the diagram inline. Is the Graphviz binary "
-                "installed? (conda install graphviz / apt install graphviz / "
-                f"brew install graphviz). Error: {exc}",
-                stacklevel=2,
-            )
-
-    # A Matplotlib window showing the Graphviz PNG
-    show_mpl = show and (not show_inline) and (not show_pdf)
-    if show_mpl:
-        try:
-            import matplotlib.pyplot as plt
-
-            # Graphviz default DPI is ~96; bump for a sharper Matplotlib window.
-            prev_dpi = graph.graph_attr.get("dpi")
-            graph.graph_attr["dpi"] = "200"
-            try:
-                png = graph.pipe(format="png")
-            finally:
-                if prev_dpi is None:
-                    graph.graph_attr.pop("dpi", None)
-                else:
-                    graph.graph_attr["dpi"] = prev_dpi
-
-            img = plt.imread(io.BytesIO(png), format="png")
-            height, width = img.shape[:2]
-            fig_dpi = 100.0
-            # High-res PNG; shrink the window a bit vs 1:1 pixel mapping.
-            scale = 0.65
-            fig, ax = plt.subplots(
-                figsize=(scale * width / fig_dpi, scale * height / fig_dpi),
-                dpi=fig_dpi,
-            )
-            ax.imshow(img)
-            ax.axis("off")
-            fig.tight_layout(pad=0)
-            if plt.get_backend().lower() != "agg":
-                plt.show(block=is_blocking_needed())
-        except Exception as exc:
-            warnings.warn(
-                f"Could not show diagram in Matplotlib. "
-                f"Is Graphviz installed? Error: {exc}",
-                stacklevel=2,
-            )
-
-    # To disk: the requested file, or a temporary one for the PDF viewer when shown
-    need_disk = (show and show_pdf) or file_name is not None
-    if not need_disk:
-        return drawn
-
-    if file_name is None:
-        with tempfile.NamedTemporaryFile(
-            suffix="_" + graph.name + ".gv",
-            delete=False,
-        ) as tmp:
-            file_name = tmp.name
-
+def present_diagram(graph, place):
+    """Show ``graph``: its SVG under the notebook cell, or its vector PDF in the system's viewer."""
     try:
-        graph.render(filename=file_name, view=bool(show and show_pdf))
+        if place == "inline":
+            from IPython.display import SVG, display
+
+            display(SVG(graph.pipe(format="svg")))
+            return
+
+        # The viewer's file: one per diagram, named by its name and its source
+        path = viewer_path_of(graph)
+        path.write_bytes(graph.pipe(format="pdf"))
+        open_in_viewer(path)
     except Exception as exc:
+        # The graphviz wrapper raises ExecutableNotFound without the ``dot`` binary
         warnings.warn(
-            f"Could not render graph. Is Graphviz installed? Error: {exc}",
-            stacklevel=2,
+            "Could not draw the diagram. Is the Graphviz binary installed? "
+            "(conda install graphviz / apt install graphviz / brew install graphviz). "
+            f"Error: {exc}",
+            stacklevel=3,
         )
 
-    return drawn
+
+def viewer_path_of(graph):
+    """A per-user temporary PDF for ``graph``: its name made portable, and a hash of its source."""
+    import getpass
+    import hashlib
+    import re
+    from pathlib import Path
+
+    folder = Path(tempfile.gettempdir()) / f"minilink-{getpass.getuser()}"
+    folder.mkdir(parents=True, exist_ok=True)
+    name = re.sub(r"[^A-Za-z0-9_.-]+", "_", graph.name or "diagram").strip("_")[:60]
+    digest = hashlib.sha1(graph.source.encode("utf-8")).hexdigest()[:8]
+
+    return folder / f"{name or 'diagram'}-{digest}.pdf"
+
+
+def open_in_viewer(path):
+    """Open ``path`` in the system's viewer for its type."""
+    import graphviz
+
+    graphviz.view(str(path))

@@ -268,4 +268,4 @@ car.animate(traj_mppi, overlays=overlays)
 # --- the 3-D look: the racecar skin, the camera on the body, frame-accurate overlays ---
 car.camera_follow_frame = "body"
 car.skin = racecar_skin_3d
-car.animate(traj_mppi, overlays=overlays, renderer="meshcat", native=False)
+car.animate(traj_mppi, overlays=overlays, renderer="meshcat")

@@ -8,8 +8,6 @@ __all__ = [
     "detect_env",
     "resolve_show",
     "is_headless",
-    "prefers_inline_animation",
-    "is_inline_capable",
     "is_blocking_needed",
     "allow_tall_stacked_figures",
     "override_env",
@@ -92,33 +90,6 @@ def resolve_show(show, renderer):
 def is_headless() -> bool:
     """True when ``MINILINK_HEADLESS`` is set: no figure is shown, whatever ``show`` asks."""
     return os.environ.get(HEADLESS_VARIABLE, "") not in ("", "0")
-
-
-def prefers_inline_animation() -> bool:
-    """
-    Default value for ``html=None`` in animation APIs.
-
-    Returns True in Colab (always) and in Jupyter when the active matplotlib
-    backend cannot physically pop up a window. Returns False for script,
-    IPython REPL, and Jupyter with an interactive backend (qt, widget/ipympl,
-    macosx, tk, nbagg).
-    """
-    env = detect_env()
-    if env == "colab":
-        return True
-    if env == "jupyter" and mpl_backend_is_non_interactive():
-        return True
-    return False
-
-
-def is_inline_capable() -> bool:
-    """
-    True when the env can render ``IPython.display`` objects (if explicitly asked).
-
-    Used to decide whether honoring an explicit ``html=True`` will actually
-    display something to the user.
-    """
-    return detect_env() in ("jupyter", "colab")
 
 
 def is_blocking_needed() -> bool:

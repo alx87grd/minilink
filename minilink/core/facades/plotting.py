@@ -227,30 +227,25 @@ class SystemPlotting:
 
         return bundle
 
-    def plot_diagram(self, file_name=None, show=True, *, expand=True):
+    def plot_diagram(self, *, show=True, expand=True):
         """
-        Convenience shortcut to render the system diagram.
+        Convenience shortcut to draw the system's diagram: a :class:`PlotResult`.
 
         A diagram that contains another diagram shows the inner blocks inside
         a labelled box, at every depth, with the wires going straight to the
         inner ports. Pass ``expand=False`` to draw each nested diagram as one
         block with its boundary ports.
 
-        ``show`` is where the figure goes: ``True`` picks the place, inline
-        SVG in Jupyter / Colab (the returned Graphviz object is the cell
-        output; this method does not also call ``display()``, which would
-        draw the figure twice) and a Matplotlib window with the Graphviz PNG
-        in bare scripts and IPython REPLs (same blocking policy as trajectory
-        plots); ``"inline"``, ``"window"`` or ``"pdf"`` (the OS PDF viewer)
-        name it; ``False`` builds the Digraph only. Pass ``file_name`` to
-        write Graphviz output to disk.
-        Without the Graphviz binary the figure is skipped with a warning and
-        ``None`` is returned, so a notebook cell does not fail.
+        ``show=True`` shows it where the session puts it: an SVG under the
+        notebook cell, the vector PDF in the system's viewer elsewhere;
+        ``"inline"`` or ``"window"`` names the place, ``False`` builds it only.
+        ``.save("loop.svg")`` writes it in the format of the extension.
+        Without the Graphviz binary the figure is skipped with a warning.
         """
         # A real cycle through minilink.core.system
         from minilink.graphical.diagrams import plot_diagram
 
-        return plot_diagram(self, file_name=file_name, show=show, expand=expand)
+        return plot_diagram(self, show=show, expand=expand)
 
 
 class LinearPlotting:

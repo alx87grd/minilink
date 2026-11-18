@@ -3538,11 +3538,6 @@
    ],
    [
     [
-     "AxesImage"
-    ]
-   ],
-   [
-    [
      "Line2D"
     ],
     [
@@ -3635,31 +3630,6 @@
       "ylim": [
        -5.05,
        5.05
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "843d77155398"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "",
-      "xlabel": "",
-      "xlim": [
-       -0.5,
-       1418.5
-      ],
-      "xscale": "linear",
-      "ylabel": "",
-      "ylim": [
-       290.5,
-       -0.5
       ],
       "yscale": "linear"
      }
@@ -4448,6 +4418,38 @@
      }
     ],
     "suptitle": ""
+   }
+  ]
+ },
+ "tests/unittest/test_control_analysis.py::TestAnimateModal::test_animate_one_mode_headless": {
+  "artists": [
+   [
+    []
+   ]
+  ],
+  "data": [
+   {
+    "axes": [
+     {
+      "data": [],
+      "legend": [],
+      "texts": [],
+      "title": "",
+      "xlabel": "X",
+      "xlim": [
+       -0.672496,
+       0.673004
+      ],
+      "xscale": "linear",
+      "ylabel": "Y",
+      "ylim": [
+       -1.18775,
+       0.15775
+      ],
+      "yscale": "linear"
+     }
+    ],
+    "suptitle": "Mode 0: 0.0+2.2j"
    }
   ]
  },
@@ -5641,42 +5643,6 @@
    }
   ]
  },
- "tests/unittest/test_diagrams.py::TestDiagrams::test_plot_diagram_matplotlib_path_with_agg": {
-  "artists": [
-   [
-    [
-     "AxesImage"
-    ]
-   ]
-  ],
-  "data": [
-   {
-    "axes": [
-     {
-      "data": [
-       "742d2f79afb2"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "",
-      "xlabel": "",
-      "xlim": [
-       -0.5,
-       371.5
-      ],
-      "xscale": "linear",
-      "ylabel": "",
-      "ylim": [
-       166.5,
-       -0.5
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   }
-  ]
- },
  "tests/unittest/test_dynamic_programming.py::TestDynamicProgrammingPlotting::test_animate_cost_to_go_colours_up_to_jmax": {
   "artists": [
    [
@@ -6644,35 +6610,9 @@
   "artists": [
    [
     []
-   ],
-   [
-    []
    ]
   ],
   "data": [
-   {
-    "axes": [
-     {
-      "data": [],
-      "legend": [],
-      "texts": [],
-      "title": "Time = 0.00 s",
-      "xlabel": "X",
-      "xlim": [
-       -10.0,
-       10.0
-      ],
-      "xscale": "linear",
-      "ylabel": "Y",
-      "ylim": [
-       -10.0,
-       10.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
    {
     "axes": [
      {

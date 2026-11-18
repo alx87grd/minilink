@@ -78,4 +78,4 @@ cl.animate(traj)
 
 # from minilink.graphical.catalog.boat_skin import boat_skin_3d
 # boat.skin = boat_skin_3d  # the hull on the water, in the browser
-# cl.animate(traj, renderer="meshcat", native=False)
+# cl.animate(traj, renderer="meshcat")

@@ -89,9 +89,13 @@ def plot_functions():
     return found
 
 
-@pytest.mark.parametrize("path, name, keywords", plot_functions(), ids=lambda v: str(v))
+@pytest.mark.parametrize(
+    "path, name, keywords",
+    [(path, name, sorted(keywords)) for path, name, keywords in plot_functions()],
+    ids=[f"{path}::{name}" for path, name, _ in plot_functions()],
+)
 def test_a_plot_takes_renderer_show_and_ax(path, name, keywords):
-    missing = {"renderer", "show", "ax"} - keywords
+    missing = {"renderer", "show", "ax"} - set(keywords)
     assert missing == NOT_YET.get((path, name), set()), (
         f"{path}::{name} lacks {sorted(missing)}; a plot takes renderer=, show= "
         "and ax= (a name that now takes them all leaves NOT_YET)"

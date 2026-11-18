@@ -31,4 +31,4 @@ diagram.compute_trajectory(tf=TF, n_samples=180, backend="jax")
 diagram.plot_trajectory(signals=((ref, "y"), (arm, "p")))
 
 diagram.animate(renderer="meshcat")
-# diagram.animate(native=False, is_3d=True)
+# diagram.animate(is_3d=True)

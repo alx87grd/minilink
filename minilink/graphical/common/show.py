@@ -48,6 +48,14 @@ def present_plotly(fig, place):
     fig.show(renderer="browser")
 
 
+def present_graphviz(graph, place):
+    """A Graphviz diagram inline (its SVG), or as a vector PDF in the system's viewer."""
+    # Lazy import: the diagrams load with the first one shown
+    from minilink.graphical.diagrams.dot import present_diagram
+
+    present_diagram(graph, place)
+
+
 def display_now(obj):
     """Display ``obj`` in the notebook's output, now."""
     from IPython.display import display
@@ -59,4 +67,5 @@ def display_now(obj):
 PRESENT = {
     "matplotlib": present_matplotlib,
     "plotly": present_plotly,
+    "graphviz": present_graphviz,
 }

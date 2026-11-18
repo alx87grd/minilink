@@ -93,5 +93,4 @@ closed_loop.animate(
     result.resample(n_samples=250),
     overlays=[TrackCorridorOverlay(track)],
     renderer="meshcat",
-    native=False,
 )

@@ -38,18 +38,6 @@ from minilink.graphical.common.matplotlib_style import (
 )
 
 
-def gif_export_path(file_name) -> Path:
-    """Destination of ``animate(save=True)`` with ``renderer="matplotlib"``.
-
-    ``Animation`` becomes ``Animation.gif``. A name that already ends in
-    ``.gif`` is left as written.
-    """
-    path = Path(file_name)
-    if path.suffix.lower() != ".gif":
-        path = Path(str(file_name) + ".gif")
-    return path
-
-
 def _camera_3d_view_init(camera):
     """Decode matplotlib ``view_init(elev, azim)`` from camera-Z (view-out direction)."""
     view_out = np.asarray(camera[:3, 2], dtype=float).reshape(3)
@@ -547,80 +535,53 @@ class MatplotlibRenderer(AnimationRenderer):
         )
         return fig, ani
 
-    def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
-        fig, ani = self._build_animation(
-            primitives,
-            frames,
-            schedule,
-            is_3d=is_3d,
-        )
-        plt.close(fig)
-        try:
-            from IPython.display import HTML
-
-            return HTML(ani.to_jshtml())
-        except ImportError:
-            return ani
-
-    def export_animation(
-        self, primitives, frames, schedule, file_name: str, *, is_3d: bool = False
-    ) -> None:
-        fig, ani = self._build_animation(primitives, frames, schedule, is_3d=is_3d)
-        path = gif_export_path(file_name)
-        print(f"Saving animation to {path} ...")
-        ani.save(
-            str(path),
-            writer="pillow",
-            fps=schedule.target_fps,
-            dpi=DPI_EXPORT,
-        )
-        plt.close(fig)
-
-    def play_native(
-        self,
-        primitives,
-        frames,
-        schedule,
-        *,
-        is_3d: bool,
-        scene_title: str | None = None,
+    def build_clip(
+        self, primitives, frames, schedule, *, is_3d=False, scene_title=None
     ):
-        """
-        Drive playback through ``matplotlib.animation.FuncAnimation`` instead
-        of a Python frame loop.
-
-        Only the window path lands here: Colab and Jupyter-with-non-interactive
-        backend are routed to ``render_inline_animation`` upstream via
-        :func:`minilink.graphical.common.environment.prefers_inline_animation`.
-
-        - Bare script (``is_blocking_needed() is True``): block until the user
-          closes the window, then clean up.
-        - IPython terminal REPL or Jupyter with an interactive backend
-          (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``): show the
-          window non-blocking and intentionally retain strong references to
-          the figure and ``FuncAnimation`` on ``self`` so the backend event
-          loop can drive playback without ``FuncAnimation`` being garbage
-          collected.
-        """
-        fig, ani = self._build_animation(
-            primitives,
-            frames,
-            schedule,
-            is_3d=is_3d,
-            scene_title=scene_title,
+        """The trajectory as a ``FuncAnimation`` on a figure of its own: ``(fig, ani)``."""
+        return self._build_animation(
+            primitives, frames, schedule, is_3d=is_3d, scene_title=scene_title
         )
-        self.fig = fig
-        self.ax = fig.axes[0] if fig.axes else None
-        self.canvas = None
-        self._native_animation = ani
 
-        if is_blocking_needed():
-            plt.show(block=True)
-            plt.close(fig)
-            self.fig = None
-            self.ax = None
-            self._native_animation = None
-        else:
-            plt.show(block=False)
+    def show_clip(self, clip, place):
+        """Play the clip inline (an HTML player) or in its window."""
+        show_matplotlib_clip(*clip.built(), place)
 
-        return ani
+    def save_clip(self, clip, path):
+        """A ``.gif`` (the default) or a video through ffmpeg (``.mp4``)."""
+        return save_matplotlib_clip(clip.built()[1], path, clip.schedule.target_fps)
+
+
+###############################################################################
+# Clips
+###############################################################################
+
+# The animations playing in a window: a FuncAnimation stops when nothing holds it,
+# so each is kept here until its window closes
+PLAYING = set()
+
+
+def show_matplotlib_clip(fig, ani, place):
+    """Play ``ani`` inline, as an HTML player displayed now, or in its window."""
+    if place == "inline":
+        from IPython.display import HTML, display
+
+        display(HTML(ani.to_jshtml()))
+        plt.close(fig)
+        return
+
+    # A window: held until it closes; a bare script blocks on it
+    PLAYING.add(ani)
+    fig.canvas.mpl_connect("close_event", lambda event: PLAYING.discard(ani))
+    plt.show(block=True if is_blocking_needed() else None)
+
+
+def save_matplotlib_clip(ani, path, fps):
+    """Write ``ani`` to ``path``: a GIF without a suffix or with ``.gif``, else ffmpeg's video."""
+    path = Path(path)
+    if not path.suffix:
+        path = path.with_suffix(".gif")
+    writer = "pillow" if path.suffix.lower() == ".gif" else "ffmpeg"
+    ani.save(str(path), writer=writer, fps=fps, dpi=DPI_EXPORT)
+
+    return path

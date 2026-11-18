@@ -23,6 +23,6 @@ flat, id_map = flatten_diagram(nested)
 
 
 # nested.plot_diagram(expand=False)
-nested.plot_diagram(expand=True, show="pdf")
-flat.plot_diagram(expand=False, show="pdf")
-# flat.plot_diagram(expand=True, show_pdf=True)
+nested.plot_diagram(expand=True)
+flat.plot_diagram(expand=False)
+# flat.plot_diagram(expand=True)

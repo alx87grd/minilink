@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-import warnings
-
 import numpy as np
 
 from minilink.graphical.animation.camera import (
@@ -20,6 +17,7 @@ from minilink.graphical.animation.renderers.plotly_renderer import PlotlyRendere
 from minilink.graphical.animation.renderers.pygame_renderer import PygameRenderer
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 from minilink.graphical.animation.renderers.timing import (
+    AnimationFrameSchedule,
     sim_index_for_frame,
     trajectory_frame_schedule,
 )
@@ -27,7 +25,8 @@ from minilink.graphical.animation.visualization import (
     ensure_world_frame,
     flatten_draw_list,
 )
-from minilink.graphical.common.environment import prefers_inline_animation
+from minilink.graphical.common.animation_result import AnimationResult, Clip
+from minilink.graphical.common.environment import resolve_show
 
 __all__ = [
     "Animator",
@@ -78,187 +77,94 @@ class Animator:
     def animate_simulation(
         self,
         traj,
+        *,
         speed=1.0,
         is_3d=False,
-        save=False,
-        file_name="Animation",
-        show=True,
-        html: bool | None = None,
         renderer="matplotlib",
-        native: bool = True,
+        show=True,
         scene_title: str | None = None,
         camera=None,
         overlays=None,
     ):
         """
-        Plays back a full simulation trajectory.
+        Play a trajectory back: an :class:`AnimationResult`, its clip shown where ``show`` resolves.
 
-        The four orthogonal kwargs are:
+        ``renderer`` is the drawing library (``"matplotlib"``, ``"plotly"``,
+        ``"meshcat"``, ``"pygame"``); ``is_3d`` gives the flat renderers 3-D
+        axes (Meshcat is always a 3-D viewer). Every renderer but pygame plays
+        a clip built once from the frames: matplotlib a ``FuncAnimation``,
+        Plotly a figure with frames, Meshcat a keyframed animation whose
+        changing geometry (an arrow's length, a horizon, a trail) flips between
+        pages. Pygame draws the frames live, one after the other.
 
-        - ``renderer``  : graphics tech
-          (``"matplotlib"``, ``"meshcat"``, ``"plotly"``, ``"pygame"``).
-        - ``is_3d``     : 2-D or 3-D axes for the flat renderers (matplotlib,
-          plotly, pygame). Meshcat is always a 3-D viewer and ignores it.
-        - ``html``      : output channel. ``None`` auto-resolves via
-          :func:`minilink.graphical.common.environment.prefers_inline_animation`:
-          ``True`` in Colab and in local Jupyter when the active matplotlib
-          backend is non-interactive (``inline`` / ``agg``), ``False`` for
-          bare script, IPython REPL, and Jupyter with an interactive backend
-          (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``). Explicit
-          ``True``/``False`` is honored.
-        - ``native``    : playback engine. ``True`` (default) drives the
-          backend's own animation engine:
-          ``matplotlib.animation.FuncAnimation`` for matplotlib,
-          ``meshcat.animation.Animation`` + ``set_animation`` for meshcat,
-          and browser-side Plotly frames for plotly.
-          ``False`` falls back to the per-frame Python loop (handy for
-          debugging or when the native path's limitations matter).
-
-        ``camera`` accepts the optional override: a constant 4x4 or a
+        ``camera`` overrides the camera: a constant 4x4 or a
         ``camera(frames, x, u, t)`` callable.
-
-        Notes
-        -----
-        Meshcat native animation keyframes rigid poses (position+quaternion),
-        and plays geometry that changes (``Arrow`` length/direction,
-        ``TorqueArrow`` sweep, ``CustomLine`` trails / horizons) as a flipbook
-        of pages, each shown over its own frames. In 3-D, Meshcat draws line
-        primitives as thin ribbons so matplotlib dash styles and widths remain
-        visible.
-
-        Plotly does not support the per-frame Python loop (``native=False`` with
-        ``html=False``): use ``native=True`` or ``html=True`` for inline/browser
-        playback.
-
-        ``save=True`` writes a file before playback: matplotlib a GIF, meshcat
-        a standalone HTML page of the native keyframed animation.
         """
-
-        # The output channel: inline where the environment prefers it, always inline
-        # for meshcat in Colab, and the per-frame loop refused where it cannot run
-        if html is None:
-            html = prefers_inline_animation()
         renderer_key = renderer.strip().lower()
-        if "google.colab" in sys.modules and renderer_key == "meshcat":
-            html = True
-        require_supported_playback(renderer_key, native, show, html)
+        place = resolve_show(show, renderer_key)
 
         # Every frame of the schedule resolved up front
-        backend = make_renderer(renderer, self)
-        kinematic = self.sys.get_kinematic_geometry()
+        backend = make_renderer(renderer_key, self)
         schedule = trajectory_frame_schedule(traj, speed)
         frames = self.build_frames(
             traj,
             schedule,
-            kinematic=kinematic,
+            kinematic=self.sys.get_kinematic_geometry(),
             camera_override=camera,
             overlays=overlays,
         )
 
-        # The first frame's primitives, a representative list for the APIs that need one
-        primitives = frames[0]["primitives"] if frames else []
+        # The clip, built on first use, played now where show puts it
+        clip = Clip(backend, frames, schedule, is_3d=is_3d, scene_title=scene_title)
+        if place is not None:
+            clip.show(place)
 
-        # Save: the file is written before any playback
-        if save:
-            try:
-                backend.export_animation(
-                    primitives, frames, schedule, file_name, is_3d=is_3d
-                )
-            except NotImplementedError:
-                warnings.warn(
-                    f"save=True is not supported for renderer={renderer!r}; "
-                    "skipping export.",
-                    stacklevel=2,
-                )
+        return AnimationResult(renderer=renderer_key, clip=clip)
 
-        # Inline: the backend's framed playback in the notebook
-        if html:
-            try:
-                return backend.render_inline_animation(
-                    primitives, frames, schedule, is_3d=is_3d
-                )
-            except NotImplementedError:
-                warnings.warn(
-                    f"html=True is not supported for renderer={renderer!r}; "
-                    "ignoring html.",
-                    stacklevel=2,
-                )
-
-        if not show:
-            return None
-
-        # Native: the backend's own animation engine
-        if native:
-            try:
-                return backend.play_native(
-                    primitives,
-                    frames,
-                    schedule,
-                    is_3d=is_3d,
-                    scene_title=scene_title,
-                )
-            except NotImplementedError:
-                warnings.warn(
-                    f"native=True is not supported for renderer={renderer!r}; "
-                    "falling back to the Python-loop path.",
-                    stacklevel=2,
-                )
-
-        # The per-frame Python loop: draw, present at the schedule's pace, stop on quit
-        backend.open_scene(
-            is_3d=is_3d,
-            show=show,
-            camera=frames[0]["camera"],
-            title=scene_title or f"Animation: {self.sys.name}",
-        )
-        for frame in frames:
-            backend.draw_frame(
-                frame["primitives"], frame["transforms"], frame["t"], frame["camera"]
-            )
-            backend.present(block=False, interval_s=schedule.interval_ms / 1000.0)
-            events = backend.poll_events()
-            if events.get("quit", False):
-                break
-        backend.close_scene()
-
-        return None
-
-    def show(
+    def render_frame(
         self,
         x,
         u,
         t=0.0,
+        *,
         is_3d=False,
         renderer="matplotlib",
+        show=True,
         camera=None,
         overlays=None,
     ):
-        """Render a single static frame at state *x*, *u*, *t*."""
-        backend = make_renderer(renderer, self)
-        kinematic = self.sys.get_kinematic_geometry()
+        """One frame at state ``x``, input ``u``, time ``t``: an :class:`AnimationResult` of one frame."""
+        renderer_key = renderer.strip().lower()
+        place = resolve_show(show, renderer_key)
+
+        backend = make_renderer(renderer_key, self)
         frame = self.resolve_frame(
             x,
             u,
             t,
-            kinematic=kinematic,
+            kinematic=self.sys.get_kinematic_geometry(),
             camera_override=camera,
             overlays=overlays,
         )
-
-        # The one frame, presented blocking
-        backend.open_scene(
-            is_3d=is_3d,
-            show=True,
-            camera=frame["camera"],
-            title=f"{self.sys.name} — t = {t:.2f} s",
+        frame["t"] = t
+        schedule = AnimationFrameSchedule(
+            nsteps=1,
+            skip_steps=1,
+            interval_ms=1000.0 / 30.0,
+            n_frames=1,
+            target_fps=30.0,
         )
-        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
-        result = backend.present(block=True)
-        backend.close_scene()
+        clip = Clip(
+            backend,
+            [frame],
+            schedule,
+            is_3d=is_3d,
+            scene_title=f"{self.sys.name}, t = {t:.2f} s",
+        )
+        if place is not None:
+            clip.show(place)
 
-        return result
-
-    # Live-session API (driven by RealtimeSimulator)
+        return AnimationResult(renderer=renderer_key, clip=clip)
 
     def open_live_scene(
         self, backend, x, u, t, *, is_3d=False, kinematic=None, title=None
@@ -448,16 +354,6 @@ def make_renderer(name: str, animator: Animator) -> AnimationRenderer:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def require_supported_playback(renderer_key, native, show, html):
-    """Refuse Plotly's per-frame Python loop, which has no working redraw."""
-    if renderer_key == "plotly" and not native and show and not html:
-        raise ValueError(
-            "renderer='plotly' with native=False is not supported when html=False "
-            "(Plotly has no working per-frame redraw loop). "
-            "Use native=True, or use html=True for inline framed playback."
-        )
 
 
 def split_draw_list(frames, kinematic, dynamic):

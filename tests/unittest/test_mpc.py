@@ -444,7 +444,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
             plant_run(run, loop)
             mpc_plans_from_rollout(run, self.mpc, loop=loop)
             mpc_animation_overlays(run, self.mpc, loop=loop)
-            loop.animate(run, show=False, html=False)
+            loop.animate(run, show=False)
             solves = solve.call_count
         assert solves == 0
 

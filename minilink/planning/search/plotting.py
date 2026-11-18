@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.animation_result import animation_result_of
 from minilink.graphical.common.plot_result import plot_result_of
 from minilink.planning.plotting import maybe_show
 
@@ -102,7 +103,6 @@ def animate_search(
     step: int = 5,
     interval: int = 30,
     show: bool = True,
-    file_name: str | None = None,
     figsize=(6.0, 5.0),
     tree_color="0.6",
     path_color="tab:blue",
@@ -112,8 +112,7 @@ def animate_search(
 
     ``step`` edges are revealed per frame, in node insertion order; the solution
     path is drawn at the end. Returns the
-    :class:`~matplotlib.animation.FuncAnimation` (keep a reference). Pass
-    ``file_name="tree.gif"`` to write it, or ``show=True`` to play it.
+    :class:`AnimationResult`; ``.save("tree.gif")`` writes it.
     """
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation
@@ -158,12 +157,7 @@ def animate_search(
     anim = FuncAnimation(
         fig, update, frames=n_frames, interval=interval, blit=False, repeat=False
     )
-    if file_name is not None:
-        anim.save(file_name)
-
-    maybe_show(fig, show)
-
-    return anim
+    return animation_result_of(fig, anim, fps=max(1, int(1000 / interval)), show=show)
 
 
 def animate_convergence(
@@ -174,7 +168,6 @@ def animate_convergence(
     ax=None,
     interval: int = 50,
     show: bool = True,
-    file_name: str | None = None,
     figsize=(7.0, 6.0),
     tree_color="0.75",
     path_color="tab:blue",
@@ -259,12 +252,7 @@ def animate_convergence(
         blit=False,
         repeat=True,
     )
-    if file_name is not None:
-        anim.save(file_name)
-
-    maybe_show(fig, show)
-
-    return anim
+    return animation_result_of(fig, anim, fps=max(1, int(1000 / interval)), show=show)
 
 
 def draw_search_state(
