@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import FigureSpec, Heatmap, Note, RefLine, Trace, overlay
 
 # The description's marker names in Plotly's spelling
@@ -56,8 +57,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     if spec.figsize is not None:
         fig.update_layout(width=100 * spec.figsize[0], height=100 * spec.figsize[1])
 
-    if show:
-        fig.show()
+    show_figure(fig, "plotly", show)
 
     return PlotResult(renderer="plotly", figure=fig, axes=None, spec=spec)
 
@@ -71,8 +71,7 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
         for layer in panel.layers:
             DRAW[type(layer)](host.figure, layer, row, col)
 
-    if show:
-        host.figure.show()
+    show_figure(host.figure, "plotly", show)
 
     combined = overlay(host.spec, [panel.layers for panel in spec.panels])
 

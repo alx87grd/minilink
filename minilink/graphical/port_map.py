@@ -280,7 +280,6 @@ def render_port_map_matplotlib(
     import matplotlib.pyplot as plt
 
     # Lazy import: the graphics load on first use, not with the core
-    from minilink.graphical.common.environment import is_blocking_needed
     from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
         FIGSIZE_BASE,
@@ -346,13 +345,18 @@ def render_port_map_matplotlib(
     if owns_figure:
         fig.tight_layout()
 
-    # A window, unless the backend draws off screen
-    if show and plt.get_backend().lower() != "agg":
-        if block is None:
-            block = is_blocking_needed()
-        plt.show(block=block)
-        if pause > 0.0:
-            plt.pause(pause)
+    # A live figure stays open in its window to be updated; any other is shown
+    # where the environment puts it
+    if block is False:
+        if show and plt.get_backend().lower() != "agg":
+            plt.show(block=False)
+            if pause > 0.0:
+                plt.pause(pause)
+    else:
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.graphical.common.show import show_figure
+
+        show_figure(fig, "matplotlib", show)
 
     return PlotResult(
         renderer="matplotlib",

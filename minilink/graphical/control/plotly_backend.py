@@ -51,8 +51,10 @@ def render_plotly(spec: ControlFigure, *, show: bool = True) -> PlotResult:
         margin=dict(PLOTLY_2D_MARGIN),
         template=PLOTLY_TEMPLATE,
     )
-    if show:
-        fig.show()
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.common.show import show_figure
+
+    show_figure(fig, "plotly", show)
 
     return PlotResult(renderer="plotly", payload=fig, figure=fig)
 

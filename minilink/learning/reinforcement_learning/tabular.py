@@ -386,7 +386,7 @@ class TabularLearningPlanner(Planner):
         ax.set_xlabel("episode")
         ax.set_ylabel("episode cost")
         ax.grid(True, alpha=0.3)
-        maybe_show(plt, created and show, block_when_needed=True)
+        maybe_show(ax.figure, created and show)
 
         return ax
 

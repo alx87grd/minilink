@@ -104,6 +104,7 @@ def _execute_notebook(path: Path, *, timeout: float) -> tuple[str, str]:
 
     os.environ.setdefault("PYTHONPATH", str(REPO_ROOT))
     os.environ["MPLBACKEND"] = "Agg"
+    os.environ["MINILINK_HEADLESS"] = "1"
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
     try:

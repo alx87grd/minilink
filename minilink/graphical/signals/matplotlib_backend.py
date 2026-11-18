@@ -98,7 +98,6 @@ def create_figure(
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.common.environment import (
         allow_tall_stacked_figures,
-        is_blocking_needed,
     )
     from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
@@ -153,13 +152,18 @@ def create_figure(
 
     axes[-1].set_xlabel(spec.abscissa_label, fontsize=FONT_SIZE)
 
-    # A window, unless the backend draws off screen
-    if show and plt.get_backend().lower() != "agg":
-        if block is None:
-            block = is_blocking_needed()
-        plt.show(block=block)
-        if pause > 0.0:
-            plt.pause(pause)
+    # A live figure stays open in its window to be updated; any other is shown
+    # where the environment puts it
+    if block is False:
+        if show and plt.get_backend().lower() != "agg":
+            plt.show(block=False)
+            if pause > 0.0:
+                plt.pause(pause)
+    else:
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.graphical.common.show import show_figure
+
+        show_figure(fig, "matplotlib", show)
 
     return fig, axes, lines
 

@@ -11,6 +11,7 @@ from minilink.graphical.animation import Animator
 
 def configure_headless() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
+    os.environ.setdefault("MINILINK_HEADLESS", "1")
 
 
 def check_dynamics_f(system) -> None:

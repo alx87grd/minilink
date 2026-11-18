@@ -296,8 +296,10 @@ def plot_region_of_attraction(
     ax.grid(True, alpha=0.3)
     ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
     ax.figure.tight_layout()
-    if show:
-        plt.show()
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.common.show import show_figure
+
+    show_figure(ax.figure, "matplotlib", show)
 
     plot = PlotResult(
         renderer="matplotlib", payload=(ax.figure, ax), figure=ax.figure, axes=ax

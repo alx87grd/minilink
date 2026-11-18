@@ -37,8 +37,10 @@ def render_plotly_signal_plot(
 ) -> PlotResult:
     """Render a one-shot time-signal plot with Plotly."""
     fig = create_figure(spec, **kwargs)
-    if show:
-        fig.show()
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.common.show import show_figure
+
+    show_figure(fig, "plotly", show)
 
     return PlotResult(renderer="plotly", payload=fig, figure=fig)
 

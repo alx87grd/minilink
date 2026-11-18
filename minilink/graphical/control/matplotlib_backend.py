@@ -23,7 +23,6 @@ def render_matplotlib(spec: ControlFigure, *, show: bool = True) -> PlotResult:
     import matplotlib.pyplot as plt
 
     # Lazy import: the graphics load on first use, not with the core
-    from minilink.graphical.common.environment import is_blocking_needed
     from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
         FIGSIZE_BASE,
@@ -62,9 +61,10 @@ def render_matplotlib(spec: ControlFigure, *, show: bool = True) -> PlotResult:
     fig.suptitle(spec.title, fontsize=FONT_SIZE + 1)
     fig.tight_layout()
 
-    # A window, unless the backend draws off screen
-    if show and plt.get_backend().lower() != "agg":
-        plt.show(block=is_blocking_needed())
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.common.show import show_figure
+
+    show_figure(fig, "matplotlib", show)
 
     # One axes for a single panel, the list of them for a stack
     axes_out = axes[0] if n_panels == 1 else axes

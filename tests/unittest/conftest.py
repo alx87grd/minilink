@@ -1,6 +1,10 @@
 import importlib.util
+import os
 
 import pytest
+
+# No figure opens during the tests: every show resolves to nothing
+os.environ.setdefault("MINILINK_HEADLESS", "1")
 
 OPTIONAL_MARKERS = ("jax", "symbolic", "visualization", "plotting", "ipopt", "rl")
 

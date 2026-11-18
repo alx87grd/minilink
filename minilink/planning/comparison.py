@@ -164,7 +164,7 @@ class Comparison:
             )
             ax.set_title(name)
 
-        maybe_show(plt, show)
+        maybe_show(fig, show)
 
         return plot_result_of((fig, axes))
 
@@ -216,7 +216,7 @@ class Comparison:
                 problem, x_level, y_level, J, x_axis, y_axis, jmax, name, ax
             )
 
-        maybe_show(plt, show)
+        maybe_show(fig, show)
 
         return plot_result_of((fig, axes))
 
@@ -256,7 +256,7 @@ class Comparison:
         axes[0].set_title("plans and runs")
         axes[-1].set_xlabel("Time [s]")
 
-        maybe_show(plt, show)
+        maybe_show(fig, show)
 
         return plot_result_of((fig, axes))
 

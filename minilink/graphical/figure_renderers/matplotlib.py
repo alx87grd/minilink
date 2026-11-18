@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import FigureSpec, Heatmap, Note, RefLine, Trace, overlay
 
 # The description's marker names in matplotlib's spelling
@@ -39,7 +40,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     if spec.title:
         fig.suptitle(spec.title, fontsize=FONT_SIZE + 1)
 
-    finish(show)
+    show_figure(fig, "matplotlib", show)
 
     return PlotResult(
         renderer="matplotlib",
@@ -55,7 +56,7 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
     for target, panel in zip(axes, spec.panels):
         draw_panel(target, panel, fill_only=True)
 
-    finish(show)
+    show_figure(host.figure, "matplotlib", show)
 
     combined = overlay(host.spec, [panel.layers for panel in spec.panels])
 
@@ -248,12 +249,6 @@ def draw_arrows(ax, x, y, color, count: int = 3):
             xytext=(x[k], y[k]),
             arrowprops={"arrowstyle": "-|>", "color": color, "lw": 1.5},
         )
-
-
-def finish(show):
-    """Show the figures, unless asked not to or drawn off screen."""
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
 
 
 # One draw function per layer kind

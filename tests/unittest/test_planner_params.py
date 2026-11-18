@@ -282,10 +282,13 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
     build, _ = PLANNERS["tabular"]
     planner = build()
     solve_of(planner)
-    # An interactive backend: the planning views leave Agg silent
+    # A session with a window: show=False shows nothing, the default shows once
     with (
         mock.patch("matplotlib.pyplot.show") as shown,
-        mock.patch("matplotlib.pyplot.get_backend", return_value="TkAgg"),
+        mock.patch(
+            "minilink.graphical.common.show.resolve_show",
+            side_effect=lambda show, renderer: "window" if show else None,
+        ),
     ):
         ax = planner.plot_learning_curve(show=False)
         source = Step()

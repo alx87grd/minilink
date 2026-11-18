@@ -251,8 +251,10 @@ def plot_sampled_futures(
     ax.set_ylabel("t [s]" if y_axis == "t" else f"x[{y_axis}]")
     ax.set_title(f"MPPI: {n_shown} of {pv.K} sampled futures, shaded by weight")
     ax.legend(loc="best", fontsize=8)
-    if show:
-        plt.show()
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.common.show import show_figure
+
+    show_figure(fig, "matplotlib", show)
 
     return fig, ax
 

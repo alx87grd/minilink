@@ -87,7 +87,7 @@ def plot_tree(
         ax.set_title(f"RRT tree ({len(tree.nodes)} nodes)")
     ax.legend(loc="best")
 
-    maybe_show(plt, show, block_when_needed=True)
+    maybe_show(fig, show)
 
     return fig, ax
 
@@ -160,7 +160,7 @@ def animate_search(
     if file_name is not None:
         anim.save(file_name)
 
-    maybe_show(plt, show, block_when_needed=True)
+    maybe_show(fig, show)
 
     return anim
 
@@ -261,7 +261,7 @@ def animate_convergence(
     if file_name is not None:
         anim.save(file_name)
 
-    maybe_show(plt, show, block_when_needed=True)
+    maybe_show(fig, show)
 
     return anim
 

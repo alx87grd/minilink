@@ -279,7 +279,7 @@ def plot_value_3d(
     ax.set_title(title)
     fig.colorbar(surf, ax=ax, shrink=0.6)
 
-    maybe_show(plt, show)
+    maybe_show(fig, show)
 
     return fig, ax
 
@@ -356,7 +356,7 @@ def animate(
     if file_name is not None:
         ani.save(file_name, writer="pillow", fps=max(1, int(1000 / interval)))
 
-    maybe_show(plt, show)
+    maybe_show(fig, show)
 
     return ani
 

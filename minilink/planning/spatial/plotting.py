@@ -138,7 +138,7 @@ def plot_scene(
     ax.set_title(title if title is not None else "Scene")
     ax.grid(True, alpha=0.25, zorder=0)
 
-    maybe_show(plt, show)
+    maybe_show(fig, show)
 
     return fig, ax
 
@@ -243,9 +243,7 @@ def plot_track(
     ax.set_title(title if title is not None else "Reference track")
     ax.legend(loc="best", fontsize=8)
 
-    # Shown whenever asked, on the Agg backend too (the other views skip Agg)
-    if show:
-        plt.show()
+    maybe_show(fig, show)
 
     return fig, ax
 
@@ -316,7 +314,7 @@ def plot_cost_field(
     ax.set_title(title)
     ax.grid(True, alpha=0.25, zorder=0)
 
-    maybe_show(plt, show)
+    maybe_show(fig, show)
 
     return fig, ax
 
@@ -393,7 +391,7 @@ def plot_cost_field_3d(
     ax.set_title(title)
     ax.view_init(elev=elev, azim=azim)
 
-    maybe_show(plt, show)
+    maybe_show(fig, show)
 
     return fig, ax
 
@@ -508,7 +506,7 @@ def plot_cost_field_exports(
             plt.close(fig2d)
             plt.close(fig3d)
 
-    maybe_show(plt, show)
+    maybe_show(None, show)
 
     return out
 

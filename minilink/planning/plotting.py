@@ -16,21 +16,16 @@ from minilink.core.sets import is_finite_box
 ###############################################################################
 
 
-def maybe_show(plt, show, *, block_when_needed=False):
-    """
-    Show the figures, unless asked not to or on the non-interactive Agg backend.
+def maybe_show(fig, show):
+    """Show the matplotlib figure ``fig`` where ``show`` resolves; ``fig=None`` shows every open figure."""
+    import matplotlib.pyplot as plt
 
-    ``block_when_needed`` blocks on the show when the process needs it to stay
-    alive (a bare script), as the search views do.
-    """
-    if show and plt.get_backend().lower() != "agg":
-        if block_when_needed:
-            # Lazy import: the graphics load on first use, not with the core
-            from minilink.graphical.common.environment import is_blocking_needed
+    # Lazy import: the graphics load on first use, not with the planning layer
+    from minilink.graphical.common.show import show_figure
 
-            plt.show(block=is_blocking_needed())
-        else:
-            plt.show()
+    figures = [fig] if fig is not None else [plt.figure(n) for n in plt.get_fignums()]
+    for figure in figures:
+        show_figure(figure, "matplotlib", show)
 
 
 def cost_to_go_figure(
@@ -65,7 +60,6 @@ def cost_to_go_figure(
     infinite ``jmax`` hands the scale to Matplotlib. ``is_3d`` adds the
     surface; ``trajectory`` overlays a run on the heatmap.
     """
-    import matplotlib.pyplot as plt
 
     # Lazy import: the grid's drawing loads on first use, not with the planning layer
     from minilink.planning.dynamic_programming import plotting as grid_plotting
@@ -115,7 +109,7 @@ def cost_to_go_figure(
             ax, trajectory, x_axis, y_axis, ("closed loop", "start", "end")
         )
 
-    maybe_show(plt, show)
+    maybe_show(fig, show)
 
     return plot_result_of((fig, ax))
 
@@ -148,7 +142,6 @@ def plot_control_law(
     nominal values (``anchor`` refused). ``trajectory`` overlays a run on the
     heatmap.
     """
-    import matplotlib.pyplot as plt
 
     # Lazy import: the grid's drawing loads on first use, not with the planning layer
     from minilink.planning.dynamic_programming import plotting as grid_plotting
@@ -183,7 +176,7 @@ def plot_control_law(
         if title is not None:
             for drawn in result if isinstance(result, list) else [result]:
                 drawn.axes.set_title(title)
-            maybe_show(plt, show)
+            maybe_show(None, show)
         return result
 
     # Else the controller's own law over the problem's box, then the overlay
@@ -205,7 +198,7 @@ def plot_control_law(
         grid_plotting.overlay_trajectory(
             result.axes, trajectory, i, j, ("closed loop", "start", "end")
         )
-        maybe_show(plt, show)
+        maybe_show(result.figure, show)
 
     return result
 
@@ -271,10 +264,8 @@ def plot_solution_trajectory(solution, traj, *, signals, renderer, show):
     # The title says which: the plan the planner computed, or the controller's run
     kind = "plan" if solution.trajectory is not None else "run"
     if renderer == "matplotlib":
-        import matplotlib.pyplot as plt
-
         result.figure.suptitle(f"{kind} ({solution.family})")
-        maybe_show(plt, show)
+        maybe_show(result.figure, show)
 
     return result
 

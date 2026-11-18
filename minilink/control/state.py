@@ -265,8 +265,10 @@ def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):
     ax.legend(ncol=max(1, m * n // 2), fontsize=8)
     ax.grid(True, alpha=0.3)
 
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
+    # Lazy import: the graphics load on first use, not with the core
+    from minilink.graphical.common.show import show_figure
+
+    show_figure(ax.figure, "matplotlib", show)
 
     return ax
 
