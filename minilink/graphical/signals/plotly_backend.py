@@ -20,7 +20,7 @@ from minilink.graphical.signals.time_signals import (
 ###############################################################################
 
 
-def open_plotly_signal_plot(figure, *, figure_of=None, show: bool = True):
+def open_plotly_signal_plot(figure, *, figure_of=None, show=True):
     """Draw ``figure`` with Plotly and keep it live: a widget in a notebook, a polled page elsewhere."""
     fig = draw(figure, renderer="plotly", show=False).figure
 

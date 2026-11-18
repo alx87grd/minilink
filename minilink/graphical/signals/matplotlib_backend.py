@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 
-from minilink.graphical.common.environment import is_headless
+from minilink.graphical.common.environment import resolve_show
+from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import draw
 from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
@@ -18,12 +19,17 @@ from minilink.graphical.signals.time_signals import (
 
 
 def open_matplotlib_signal_plot(figure, *, figure_of=None, show=True, pause=0.0):
-    """Draw ``figure`` and keep it open in a window, without blocking, to be updated."""
+    """Draw ``figure`` and keep it open in a window, without blocking, to be updated; inline it is shown once."""
     result = draw(figure, renderer="matplotlib", show=False)
-    if show and not is_headless() and plt.get_backend().lower() != "agg":
-        plt.show(block=False)
+
+    # Where show resolves: a window kept open without blocking, or inline once
+    place = resolve_show(show, "matplotlib")
+    if place == "window":
+        result.figure.show()
         if pause > 0.0:
             plt.pause(pause)
+    elif place == "inline":
+        show_figure(result.figure, "matplotlib", "inline")
 
     return MatplotlibLivePlotHandle(result, figure_of=figure_of)
 

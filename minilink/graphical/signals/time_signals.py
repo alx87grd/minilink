@@ -216,7 +216,7 @@ def open_time_signal_plot(
     signals: tuple[str, ...] = ("x", "u"),
     abscissa_label: str = TIME_ABSCISSA_LABEL,
     renderer="matplotlib",
-    show: bool = True,
+    show=True,
     pause: float = 0.0,
 ) -> LivePlotHandle:
     """Open a live time-signal plot: a handle whose ``update`` redraws it from a new trajectory."""
