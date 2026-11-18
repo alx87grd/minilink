@@ -179,3 +179,14 @@ def test_a_notebook_cell_shows_each_figure_once_in_code_order():
         elif "image/png" in data:
             kinds.append("plot")
     assert kinds == ["diagram", "animation", "plot"]
+
+
+@pytest.mark.parametrize(
+    "backend, expected", [("agg", True), ("pdf", True), ("tkagg", False)]
+)
+def test_the_backend_check_reads_matplotlibs_own_registry(backend, expected):
+    """The real check, unpatched: a file backend cannot open a window, a GUI one can."""
+    from unittest import mock
+
+    with mock.patch("matplotlib.get_backend", return_value=backend):
+        assert environment.mpl_backend_is_non_interactive() is expected

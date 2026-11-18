@@ -217,10 +217,14 @@ def mpl_backend_is_non_interactive() -> bool:
     ``pdf``, ``svg``, …). Interactive backends (``qt*``, ``macosx``, ``tkagg``,
     ``ipympl`` / ``widget``, ``nbagg``) return False.
     """
+    # Lazy import: matplotlib loads when a figure is shown, not with the core
     import matplotlib
-    from matplotlib import rcsetup
+    from matplotlib.backends import BackendFilter, backend_registry
 
     backend = matplotlib.get_backend().lower()
-    file_backends = {name.lower() for name in rcsetup.non_interactive_bk}
+    file_backends = {
+        name.lower()
+        for name in backend_registry.list_builtin(BackendFilter.NON_INTERACTIVE)
+    }
 
     return "inline" in backend or backend in file_backends
