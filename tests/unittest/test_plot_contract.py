@@ -7,8 +7,8 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2] / "minilink"
 
-# The plot_ names that draw nothing: a choice and a converter
-NOT_FIGURES = {"plot_space_of", "plot_result_of"}
+# The plot_ name that draws nothing: a choice of plot space
+NOT_FIGURES = {"plot_space_of"}
 
 # The plots that do not take every keyword yet, and the keywords they lack. The
 # list only shrinks: a name that takes them all must leave it.

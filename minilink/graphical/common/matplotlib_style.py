@@ -72,9 +72,3 @@ def style_animation_axes(ax, *, is_3d: bool) -> None:
     ax.yaxis.label.set_fontsize(FONT_SIZE)
     if is_3d:
         ax.zaxis.label.set_fontsize(FONT_SIZE)
-
-
-def style_trajectory_subplot(ax) -> None:
-    """Grid and ticks for stacked trajectory / signal plots."""
-    ax.grid(True, linestyle="--", alpha=0.6)
-    ax.tick_params(labelsize=FONT_SIZE)

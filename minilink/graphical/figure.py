@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any
 
-import numpy as np
-
 ###############################################################################
 # Public API
 ###############################################################################
@@ -294,8 +292,3 @@ def distinct_colours(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
 def has_colorbar(panel) -> bool:
     """Whether a panel holds a layer with a colour bar."""
     return any(getattr(layer, "colorbar", None) is not None for layer in panel.layers)
-
-
-def as_array(values) -> np.ndarray:
-    """A layer's values as a float array."""
-    return np.asarray(values, dtype=float)

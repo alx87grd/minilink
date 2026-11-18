@@ -59,25 +59,6 @@ class PlotResult:
         """
 
 
-def plot_result_of(figures):
-    """A matplotlib ``(fig, axes)`` as a :class:`PlotResult`; a record passes as it is, a list item by item."""
-    if isinstance(figures, list):
-        return [plot_result_of(item) for item in figures]
-    if isinstance(figures, PlotResult):
-        return figures
-    fig, axes = figures
-
-    return PlotResult(renderer="matplotlib", figure=fig, axes=axes)
-
-
-def require_matplotlib(renderer):
-    """Refuse a drawing library a plot does not draw with: Matplotlib only."""
-    if renderer != "matplotlib":
-        raise ValueError(
-            f"this plot draws with renderer='matplotlib' only, got {renderer!r}"
-        )
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
