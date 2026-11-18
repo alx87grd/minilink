@@ -15,9 +15,9 @@ __all__ = [
 
 EnvName = str
 
-# One cached detection, so every environment-sensitive site (the animation HTML
-# default, figure blocking, the meshcat prompt, the stacked plot height) reads the
-# same answer through the policy predicates below.
+# One cached detection, so every environment-sensitive site (the show resolver,
+# figure blocking, the meshcat prompt, the stacked plot height) reads the same
+# answer through the policy predicates below.
 _CACHE = None
 
 
@@ -203,6 +203,7 @@ def has_display() -> bool:
 
 def mpl_backend_is_inline() -> bool:
     """True when matplotlib draws into the notebook's output (the ``inline`` backend)."""
+    # Lazy import: matplotlib loads where its figure is shown, not with the resolver
     import matplotlib
 
     return "inline" in matplotlib.get_backend().lower()

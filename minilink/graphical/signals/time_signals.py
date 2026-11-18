@@ -33,12 +33,12 @@ class LivePlotHandle:
 
     supports_live = True
 
-    def update(self, traj_or_spec, *, title: str | None = None) -> None:
+    def update(self, traj_or_figure, *, title: str | None = None) -> None:
         """Update an existing plot from a new trajectory or its description."""
         raise NotImplementedError
 
     def close(self) -> None:
-        """Release backend resources held by the live plot."""
+        """Release what the live plot holds: its window, or its server."""
         raise NotImplementedError
 
 
@@ -492,9 +492,9 @@ def system_channel_samples(sys, traj, name: str) -> np.ndarray | None:
     return out
 
 
-def require_traces(traces):
+def require_traces(panels):
     """Refuse a plot without a single signal component."""
-    if not traces:
+    if not panels:
         raise ValueError("No signal components were selected for plotting.")
 
 

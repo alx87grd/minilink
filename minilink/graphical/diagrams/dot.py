@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import getpass
+import hashlib
+import re
 import tempfile
 import warnings
 from dataclasses import replace
+from pathlib import Path
 
+from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.common.show import show_figure
 from minilink.graphical.diagrams.export import (
     TopologyExporter,
     export_diagram_topology,
@@ -71,10 +77,6 @@ def plot_diagram(sys_or_diagram, *, show=True, expand=True):
     names the place. ``.save("loop.svg")`` writes it in the format of the
     extension. Without Graphviz the figure is skipped with a warning.
     """
-    # Lazy import: the record loads with the first diagram
-    from minilink.graphical.common.plot_result import PlotResult
-    from minilink.graphical.common.show import show_figure
-
     graph = get_diagram(sys_or_diagram, expand=expand)
     show_figure(graph, "graphviz", show)
 
@@ -287,6 +289,7 @@ def present_diagram(graph, place):
     """Show ``graph``: its SVG under the notebook cell, or its vector PDF in the system's viewer."""
     try:
         if place == "inline":
+            # Lazy import: IPython is optional, needed only in a notebook
             from IPython.display import SVG, display
 
             display(SVG(graph.pipe(format="svg")))
@@ -308,11 +311,6 @@ def present_diagram(graph, place):
 
 def viewer_path_of(graph):
     """A per-user temporary PDF for ``graph``: its name made portable, and a hash of its source."""
-    import getpass
-    import hashlib
-    import re
-    from pathlib import Path
-
     folder = Path(tempfile.gettempdir()) / f"minilink-{getpass.getuser()}"
     folder.mkdir(parents=True, exist_ok=True)
     name = re.sub(r"[^A-Za-z0-9_.-]+", "_", graph.name or "diagram").strip("_")[:60]
@@ -323,6 +321,5 @@ def viewer_path_of(graph):
 
 def open_in_viewer(path):
     """Open ``path`` in the system's viewer for its type."""
-    import graphviz
-
+    graphviz = require_graphviz()
     graphviz.view(str(path))

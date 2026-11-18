@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from minilink.graphical.common.show import show_figure
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -27,9 +29,6 @@ class PlotResult:
 
     def show(self):
         """Show the figure where the environment puts it, as ``show=True`` does."""
-        # Lazy import: the show step loads with the first shown figure
-        from minilink.graphical.common.show import show_figure
-
         require_drawn(self)
         show_figure(self.figure, self.renderer, True)
 

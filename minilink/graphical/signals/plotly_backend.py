@@ -31,6 +31,7 @@ def open_plotly_signal_plot(figure, *, figure_of=None, show: bool = True):
     # In a notebook: a FigureWidget under the cell, updated in place
     env = detect_env()
     if env in ("jupyter", "colab"):
+        # Lazy import: Plotly is optional, loaded with the first live figure
         import plotly.graph_objects as go
 
         try:

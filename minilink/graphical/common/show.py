@@ -29,6 +29,7 @@ def show_figure(figure, renderer, show) -> None:
 
 def present_matplotlib(fig, place):
     """A matplotlib figure inline (displayed, then closed) or in its window."""
+    # Lazy import: pyplot loads with the first matplotlib figure, not with Plotly's
     import matplotlib.pyplot as plt
 
     if place == "inline":
@@ -58,6 +59,7 @@ def present_graphviz(graph, place):
 
 def display_now(obj):
     """Display ``obj`` in the notebook's output, now."""
+    # Lazy import: IPython is optional, needed only in a notebook
     from IPython.display import display
 
     display(obj)

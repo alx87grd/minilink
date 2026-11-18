@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+from minilink.graphical.common.plot_result import PlotResult
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -176,9 +178,6 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
     ``show=None`` shows the figure unless it is drawn into ``ax``.
     ``renderer=None`` draws nothing: the record holds the description alone.
     """
-    # Lazy import: the record and the renderers load on first use
-    from minilink.graphical.common.plot_result import PlotResult
-
     if show is None:
         show = ax is None
 

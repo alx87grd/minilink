@@ -1,4 +1,4 @@
-"""Control-analysis figure style: the titles, labels, colors and axes both backends share."""
+"""Control-analysis figure style: the titles, labels, colours and axes every control figure shares."""
 
 from __future__ import annotations
 

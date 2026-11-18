@@ -552,9 +552,7 @@ class MatplotlibRenderer(AnimationRenderer):
         return save_matplotlib_clip(clip.built()[1], path, clip.schedule.target_fps)
 
 
-###############################################################################
-# Clips
-###############################################################################
+# Playing and saving a clip
 
 # The animations playing in a window: a FuncAnimation stops when nothing holds it,
 # so each is kept here until its window closes
@@ -564,6 +562,7 @@ PLAYING = set()
 def show_matplotlib_clip(fig, ani, place):
     """Play ``ani`` inline, as an HTML player displayed now, or in its window."""
     if place == "inline":
+        # Lazy import: IPython is optional, needed only in a notebook
         from IPython.display import HTML, display
 
         display(HTML(ani.to_jshtml()))

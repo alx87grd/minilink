@@ -20,6 +20,7 @@ from minilink.graphical.animation.primitives import (
     Sphere,
     TorqueArrow,
 )
+from minilink.graphical.animation.renderers.plotly_renderer import require_html_path
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 from minilink.graphical.common.environment import detect_env, is_blocking_needed
 from minilink.graphical.meshes import merge_meshes
@@ -1083,10 +1084,6 @@ class MeshcatRenderer(AnimationRenderer):
 
     def save_clip(self, clip, path):
         """A self-contained ``.html`` page of the keyframed animation."""
-        from minilink.graphical.animation.renderers.plotly_renderer import (
-            require_html_path,
-        )
-
         require_html_path(path)
         path = path if path.suffix else path.with_suffix(".html")
         path.write_text(clip.built()[0].static_html(), encoding="utf-8")

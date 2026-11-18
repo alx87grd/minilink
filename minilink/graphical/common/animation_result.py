@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from minilink.graphical.common.environment import resolve_show
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -36,9 +38,6 @@ class AnimationResult:
 
     def show(self):
         """Play the animation where the environment puts it, as ``show=True`` does."""
-        # Lazy import: the show resolver loads with the first shown figure
-        from minilink.graphical.common.environment import resolve_show
-
         place = resolve_show(True, self.renderer)
         if place is not None:
             self.clip.show(place)
@@ -129,9 +128,6 @@ class BuiltClip:
 
 def animation_result_of(figure, animation, *, fps, show):
     """A matplotlib ``FuncAnimation`` a plot function built, as a record, shown where ``show`` resolves."""
-    # Lazy import: the show resolver loads with the first shown figure
-    from minilink.graphical.common.environment import resolve_show
-
     result = AnimationResult(
         renderer="matplotlib", clip=BuiltClip(figure, animation, fps)
     )

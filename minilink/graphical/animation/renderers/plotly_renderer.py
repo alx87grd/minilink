@@ -350,6 +350,7 @@ class PlotlyRenderer(AnimationRenderer):
         """Play the figure inline, displayed now, or in a browser tab."""
         fig = clip.built()[0]
         if place == "inline":
+            # Lazy import: IPython is optional, needed only in a notebook
             from IPython.display import display
 
             display(fig)
