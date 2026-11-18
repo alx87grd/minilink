@@ -42,9 +42,6 @@ NOT_YET = {
     ("planning/spatial/plotting.py", "plot_cost_field"): {"renderer"},
     ("planning/spatial/plotting.py", "plot_cost_field_3d"): {"renderer"},
     ("planning/spatial/plotting.py", "plot_cost_field_exports"): {"renderer", "ax"},
-    ("planning/trajectory_optimization/mpc/viz.py", "plot_sampled_futures"): {
-        "renderer"
-    },
 }
 
 
