@@ -23,6 +23,7 @@ from minilink.graphical import (  # noqa: E402
 )
 
 pytest.importorskip("plotly")
+from plotly.colors import sample_colorscale  # noqa: E402
 
 RENDERERS = ("matplotlib", "plotly")
 
@@ -329,3 +330,75 @@ def test_a_figure_without_a_panel_is_refused_by_name():
 
 def test_the_renderers_name_is_read_in_any_case():
     assert draw(LAYERS["trace"], renderer="Plotly", show=False).renderer == "plotly"
+
+
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_an_overlay_widens_the_hosts_limits_and_ticks_to_hold_both(renderer):
+    host_panel = one_panel(Trace(X, X), x_lim=(-1.0, 1.0), y_ticks=(-1.0, 0.0))
+    host = draw(host_panel, renderer=renderer, show=False)
+    wide = one_panel(Trace(5 * X, X), x_lim=(-5.0, 0.5), y_ticks=(0.0, 1.0))
+    both = draw(wide, ax=host, show=False)
+    panel = both.spec.panels[0]
+    assert panel.x_lim == (-5.0, 1.0) and panel.y_ticks == (-1.0, 0.0, 1.0)
+    if renderer == "matplotlib":
+        assert both.axes.get_xlim() == (-5.0, 1.0)
+        assert list(both.axes.get_yticks()) == [-1.0, 0.0, 1.0]
+    else:
+        assert tuple(both.figure.layout.xaxis.range) == (-5.0, 1.0)
+        assert tuple(both.figure.layout.yaxis.tickvals) == (-1.0, 0.0, 1.0)
+    plt.close("all")
+
+
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_an_overlay_labels_the_axes_its_host_left_bare(renderer):
+    host = draw(one_panel(Trace(X, X), y_label="mine"), renderer=renderer, show=False)
+    both = draw(one_panel(Trace(X, -X), x_label="t", y_label="other"), ax=host)
+    panel = both.spec.panels[0]
+    assert (panel.x_label, panel.y_label) == ("t", "mine")
+    if renderer == "matplotlib":
+        assert both.axes.get_xlabel() == "t" and both.axes.get_ylabel() == "mine"
+    else:
+        layout = both.figure.layout
+        assert layout.xaxis.title.text == "t" and layout.yaxis.title.text == "mine"
+    plt.close("all")
+
+
+def test_an_overlay_keeps_a_labelled_markers_colour_and_moves_a_bare_one():
+    """A labelled marker's colour is its legend's code; an unlabelled one tells two systems apart."""
+    host = draw(one_panel(Trace(X, X, color="black")), show=False)
+    marks = one_panel(
+        Trace(X[:1], X[:1], color="black", mode="markers", label="start"),
+        Trace(X[1:], X[1:], color="black", mode="markers"),
+        Trace([0, 1, 1], [0, 0, 1], color="black", fill=True),
+    )
+    start, bare, filled = draw(marks, ax=host, show=False).spec.panels[0].layers[1:]
+    assert start.color == "black" and filled.color == "black"
+    assert bare.color != "black"
+    plt.close("all")
+
+
+def test_an_overlays_note_moves_clear_of_the_hosts_at_the_same_anchor():
+    host = draw(one_panel(Trace(X, X), Note("one\ntwo")), show=False)
+    both = draw(one_panel(Trace(X, -X), Note("three")), ax=host, show=False)
+    below, above = [n for n in both.spec.panels[0].layers if isinstance(n, Note)]
+    assert above.x == below.x and above.y > below.y + 0.1
+    plt.close("all")
+
+
+def test_plotly_draws_a_heatmaps_gamma_on_its_colour_scale():
+    plain = draw(one_panel(Heatmap(X, Y, Z)), renderer="plotly", show=False)
+    warped = draw(one_panel(Heatmap(X, Y, Z, gamma=0.5)), renderer="plotly", show=False)
+    scale = warped.figure.data[0].colorscale
+
+    # The colour at a quarter of the range is the map's at 0.25^0.5 = 0.5
+    stops = [stop for stop, _ in scale]
+    quarter = scale[stops.index(0.25)][1]
+    assert quarter == sample_colorscale("viridis", [0.5])[0]
+    assert scale != plain.figure.data[0].colorscale
+
+
+def test_a_plot_in_a_grid_of_user_axes_leaves_the_figures_title_alone():
+    fig, (left, right) = plt.subplots(1, 2)
+    draw(FigureSpec(panels=(Panel(layers=(Trace(X, X),)),), title="plot"), ax=left)
+    assert fig.get_suptitle() == ""
+    plt.close(fig)

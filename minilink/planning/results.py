@@ -15,8 +15,8 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import EPISODE_LENGTH
 from minilink.planning.plotting import (
-    draw_cost_to_go,
     plot_control_law,
+    plot_cost_to_go,
     plot_solution_trajectory,
 )
 from minilink.planning.problems import PlanningProblem, require_cost
@@ -248,7 +248,7 @@ class PlanningSolution:
         field = require_cost_to_go(self)
         grid = getattr(self.controller, "grid", None)
 
-        return draw_cost_to_go(
+        return plot_cost_to_go(
             self.problem,
             field,
             grid=grid,

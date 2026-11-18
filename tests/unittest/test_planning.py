@@ -1914,7 +1914,7 @@ def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
     matplotlib.use("Agg", force=True)
     import matplotlib.pyplot as plt
 
-    from minilink.planning.spatial.plotting import plot_cost_field, plot_cost_field_3d
+    from minilink.planning.spatial.plotting import plot_cost_field
 
     scene = Scene(obstacles=(Sphere([1.0, 0.0], 0.4),))
     body = _holonomic_point()
@@ -1927,8 +1927,14 @@ def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
         costs, bounds=bounds, grid=(16, 14), log_scale=True, title="2D", show=False
     )
     both = scene.plot(ax=flat, bounds=bounds, show_density=False, title="")
-    surface = plot_cost_field_3d(
-        costs, bounds=bounds, grid=(16, 14), log_scale=True, title="3D", show=False
+    surface = plot_cost_field(
+        costs,
+        bounds=bounds,
+        grid=(16, 14),
+        log_scale=True,
+        is_3d=True,
+        title="3D",
+        show=False,
     )
     assert flat.axes.get_title() == "2D" and surface.axes.get_title() == "3D"
     assert len(flat.figure.axes) == 2 and len(surface.figure.axes) == 2
@@ -1942,7 +1948,6 @@ def test_the_spatial_plots_draw_on_plotly():
     pytest.importorskip("plotly")
     from minilink.planning.spatial.plotting import (
         plot_cost_field,
-        plot_cost_field_3d,
         plot_track,
     )
 
@@ -1970,8 +1975,8 @@ def test_the_spatial_plots_draw_on_plotly():
         show=False,
     )
     assert [trace.type for trace in drawn.figure.data] == ["heatmap"]
-    drawn = plot_cost_field_3d(
-        [cost], bounds=bounds, grid=(12, 8), renderer="plotly", show=False
+    drawn = plot_cost_field(
+        [cost], bounds=bounds, grid=(12, 8), is_3d=True, renderer="plotly", show=False
     )
     assert [trace.type for trace in drawn.figure.data] == ["surface"]
 

@@ -1,7 +1,5 @@
 """The live trajectory-optimization plot: each iterate's trajectory drawn as the solver runs."""
 
-from minilink.graphical.live_plots import pause_figures
-
 ###############################################################################
 # Public API
 ###############################################################################
@@ -50,7 +48,7 @@ class LiveTrajectoryPlotCallback:
     def draw(self, trajectory, title: str) -> None:
         """Open the plot on the first drawn iterate, then update its lines and title."""
         if self.handle is None:
-            # Lazy import: the graphics load on first use, not with the core
+            # Lazy import: the graphics load on first use, not with the planners
             from minilink.graphical.signals import open_time_signal_plot
 
             self.handle = open_time_signal_plot(
@@ -66,6 +64,9 @@ class LiveTrajectoryPlotCallback:
 
         # A short pause lets the matplotlib window redraw while the solver runs
         if self.renderer == "matplotlib":
+            # Lazy import: matplotlib loads with its own live figure, not with Plotly's
+            from minilink.graphical.live_plots import pause_figures
+
             pause_figures(self.pause)
 
     ###########################################################################

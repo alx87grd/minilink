@@ -16,7 +16,7 @@ from minilink.core.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
-from minilink.planning.spatial.plotting import plot_cost_field_3d
+from minilink.planning.spatial.plotting import plot_cost_field
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
@@ -168,13 +168,14 @@ if SHOW_COST_FIELD:
         weight=OBSTACLE_REPULSION_WEIGHT,
         shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
     )
-    plot_cost_field_3d(
+    plot_cost_field(
         [path_viz, corridor_viz, obstacle_viz],
         bounds=bounds,
         state_dim=sys_mpc.n,
         grid=(80, 80),
         title="Combined cost field",
         log_scale=True,
+        is_3d=True,
     )
 
 planner = TrajectoryOptimizationPlanner(

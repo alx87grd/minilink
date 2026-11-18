@@ -1182,3 +1182,11 @@ def test_the_grid_and_its_planner_read_one_owner_of_the_sets():
     other = problem.replace(U=BoxSet([-0.5], [0.5]))
     with pytest.raises(ValueError, match="another problem's X or U"):
         DynamicProgrammingPlanner(other, grid=grid)
+
+
+def test_a_two_state_slice_follows_the_axes_asked_for():
+    """``slice_2d`` is indexed ``[x_axis, y_axis]``: the swapped pair is the transposed table."""
+    grid = StateSpaceGrid(make_problem(), x_grid=(5, 4), u_grid=(3,), dt=0.1)
+    table = np.arange(20.0).reshape(5, 4)
+    np.testing.assert_array_equal(grid.slice_2d(table), table)
+    np.testing.assert_array_equal(grid.slice_2d(table, x_axis=1, y_axis=0), table.T)

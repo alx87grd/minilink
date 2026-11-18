@@ -15,7 +15,7 @@ from minilink.planning.dynamic_programming import plotting as grid_plotting
 ###############################################################################
 
 
-def draw_cost_to_go(
+def plot_cost_to_go(
     problem,
     field,
     *,
@@ -226,7 +226,7 @@ def sample_field(problem, field, *, x_axis, y_axis, anchor, bounds, grid_shape, 
 
 def plot_solution_trajectory(solution, traj, *, signals, renderer, show, ax=None):
     """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
-    # Lazy import: the graphics load on first use, not with the core
+    # Lazy import: the signal plots load on first use, not with the planners
     from minilink.graphical.signals.time_signals import plot_time_signals
 
     # The title says which: the plan the planner computed, or the controller's run

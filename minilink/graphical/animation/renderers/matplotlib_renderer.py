@@ -534,6 +534,10 @@ class MatplotlibRenderer(AnimationRenderer):
             interval=schedule.interval_ms,
             blit=False,
         )
+
+        # The first frame is on the figure before the animation plays
+        update(0)
+
         return fig, ani
 
     def build_clip(
@@ -549,10 +553,21 @@ class MatplotlibRenderer(AnimationRenderer):
         show_matplotlib_clip(*clip.built(), place)
 
     def save_clip(self, clip, path):
-        """A ``.gif`` (the default) or a video through ffmpeg (``.mp4``)."""
-        require_clip_suffix(path)
+        """A ``.gif`` (the default) or a video through ffmpeg (``.mp4``); a clip of one frame also as an image (``.png``, ``.pdf``, ``.svg``, …)."""
+        path = Path(path)
+        is_still = len(clip.frames) == 1 and path.suffix.lower() not in CLIP_SUFFIXES
+        if not is_still:
+            require_clip_suffix(path)
         fig, ani = clip.built()
-        written = save_matplotlib_clip(ani, path, clip.schedule.target_fps)
+        if is_still:
+            fig.savefig(path, bbox_inches="tight")
+            written = path
+
+            # The still is the clip's output: matplotlib then holds no warning
+            # for an animation never played
+            ani._draw_was_started = True
+        else:
+            written = save_matplotlib_clip(ani, path, clip.schedule.target_fps)
 
         # A figure built for the file alone is not left for the notebook to show
         hold_back(fig, "matplotlib")
@@ -561,6 +576,9 @@ class MatplotlibRenderer(AnimationRenderer):
 
 
 # Playing and saving a clip
+
+# The files a matplotlib animation saves as: a GIF (also without a suffix), a video
+CLIP_SUFFIXES = ("", ".gif", ".mp4")
 
 # The animations playing in a window: a FuncAnimation stops when nothing holds it,
 # so each is kept here until its window closes
@@ -597,7 +615,7 @@ def save_matplotlib_clip(ani, path, fps):
 
 def require_clip_suffix(path):
     """Refuse a file a matplotlib animation cannot be: only ``.gif`` and ``.mp4`` (a GIF without a suffix)."""
-    if path.suffix.lower() not in ("", ".gif", ".mp4"):
+    if path.suffix.lower() not in CLIP_SUFFIXES:
         raise ValueError(
             "a matplotlib animation saves as a .gif or an .mp4 video, "
             f"got {path.name!r}; pass a file name ending in .gif or .mp4"

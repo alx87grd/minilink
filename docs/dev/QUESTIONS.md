@@ -201,9 +201,7 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
 - **Siblings whose surfaces differ:**
   14. the step `compute_trajectory` has no `port`, `n_samples` or `solver_warnings`, and
       another keyword order;
-  15. `Planner.plot_trajectory`, `animate` and `plot_cost` take `**kwargs` where
-      `plot_control_law` and `plot_cost_to_go` spell every keyword; `Comparison`'s plots have
-      no `renderer`, `ax` or `title`;
+  15. `Planner.animate` takes `**kwargs` where the planner's plots spell every keyword;
   16. `StepPlanningProblem` has no `compile`, `nominal`, `goal_point`, `discount_factor` or
       `drawn_paths`, and a `disturbances` property that always returns `{}`;
   17. three draw verbs on the problem with three defaults: `realize(key=None, n=1)`,

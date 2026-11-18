@@ -31,7 +31,6 @@ from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import pad_bounds
 from minilink.planning.spatial.plotting import (
     plot_cost_field,
-    plot_cost_field_3d,
 )
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack
@@ -247,12 +246,13 @@ if SHOW_PLOTS:
         drawn.axes.set_xlim(plot_bounds[0])
         drawn.axes.set_ylim(plot_bounds[1])
         drawn.show()
-        plot_cost_field_3d(
+        plot_cost_field(
             costs,
             bounds=cost_bounds,
             state_dim=sys_mpc.n,
             grid=(120, 120),
             log_scale=True,
+            is_3d=True,
             title=f"{name} cost (3D)",
             figsize=(9.0, 7.0),
         )

@@ -18,9 +18,9 @@ from minilink.graphical.figure import (
     RefLine,
     Surface,
     Trace,
+    composed,
     direction_arrow_spans,
     grid_of,
-    overlay,
 )
 
 # The description's marker and dash names in matplotlib's spelling
@@ -44,11 +44,14 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
         fig = axes[0].figure
         fill_only = True
 
-    # The panels, then the title above them: on a new figure, or on the caller's
-    # figure when it has none
+    # The title belongs above a figure these panels fill: a new one, or the
+    # caller's when it holds no other axes and no title of its own
+    fills_figure = ax is None or (len(fig.axes) == len(axes) and not fig.get_suptitle())
+
+    # The panels, then the title above them
     for target, panel in zip(axes, spec.panels):
         draw_panel(target, panel, fill_only=fill_only)
-    if spec.title and (ax is None or not fig.get_suptitle()):
+    if spec.title and fills_figure:
         fig.suptitle(spec.title, fontsize=FONT_SIZE + 1)
     if ax is None:
         fig.tight_layout()
@@ -68,14 +71,17 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
 def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
     """Add the layers of ``spec`` to the panels of the drawn figure ``host``."""
     axes = axes_list(host.axes, spec)
-    for target, panel in zip(axes, spec.panels):
-        draw_panel(target, panel, fill_only=True)
+    combined = composed(host.spec, spec)
+
+    # The layers, then what the overlay changes of the host's frame
+    for k, target in enumerate(axes):
+        draw_layers(target, spec.panels[k])
+        draw_changes(target, host.spec.panels[k], combined.panels[k])
+        draw_legend(target, spec.panels[k])
 
     # The host is shown, or held back, by the call that drew it
     if show is not False:
         show_figure(host.figure, "matplotlib", show)
-
-    combined = overlay(host.spec, [panel.layers for panel in spec.panels])
 
     return PlotResult(
         renderer="matplotlib", figure=host.figure, axes=host.axes, spec=combined
@@ -131,10 +137,7 @@ def draw_panel(ax, panel, *, fill_only):
     ``fill_only`` keeps what the axes already shows: a title, a label or a
     limit is set only where the axes has none.
     """
-    if panel.is_3d and getattr(ax, "name", "") != "3d":
-        raise ValueError("a 3-D plot draws on 3-D axes; pass axes with projection='3d'")
-    for layer in panel.layers:
-        DRAW[type(layer)](ax, layer)
+    draw_layers(ax, panel)
 
     # The scales, the grid and the aspect
     if panel.x_log:
@@ -161,10 +164,41 @@ def draw_panel(ax, panel, *, fill_only):
     if panel.is_3d:
         set_text(ax.set_zlabel, ax.get_zlabel(), panel.z_label, fill_only)
 
-    # A legend when a layer carries a label, each label once
+    draw_legend(ax, panel)
+
+
+def draw_layers(ax, panel):
+    """Draw one panel's layers on ``ax``, in order."""
+    if panel.is_3d and getattr(ax, "name", "") != "3d":
+        raise ValueError("a 3-D plot draws on 3-D axes; pass axes with projection='3d'")
+    for layer in panel.layers:
+        DRAW[type(layer)](ax, layer)
+
+
+def draw_changes(ax, before, after):
+    """Set on ``ax`` the texts, limits and ticks of the panel ``after`` that differ from ``before``'s."""
+    if after.title != before.title:
+        ax.set_title(after.title)
+    if after.x_label != before.x_label:
+        ax.set_xlabel(after.x_label)
+    if after.y_label != before.y_label:
+        ax.set_ylabel(after.y_label)
+    if after.is_3d and after.z_label != before.z_label:
+        ax.set_zlabel(after.z_label)
+    if after.x_lim != before.x_lim:
+        ax.set_xlim(after.x_lim)
+    if after.y_lim != before.y_lim:
+        ax.set_ylim(after.y_lim)
+    if after.y_ticks != before.y_ticks:
+        ax.set_yticks(after.y_ticks)
+
+
+def draw_legend(ax, panel):
+    """A legend when a layer of ``panel`` carries a label: each label once, with the first handle drawn for it."""
     if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
-        handles, labels = ax.get_legend_handles_labels()
-        unique = dict(zip(labels, handles))
+        unique = {}
+        for handle, label in zip(*ax.get_legend_handles_labels()):
+            unique.setdefault(label, handle)
         ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
 
 

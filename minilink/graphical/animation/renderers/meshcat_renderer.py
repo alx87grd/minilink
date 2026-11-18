@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -24,18 +23,6 @@ from minilink.graphical.animation.renderers.plotly_renderer import require_html_
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 from minilink.graphical.common.environment import detect_env, is_blocking_needed
 from minilink.graphical.meshes import merge_meshes
-
-
-def html_export_path(file_name) -> Path:
-    """Destination of ``animate(save=True, renderer="meshcat")``.
-
-    ``Animation`` becomes ``Animation.html``. A name that already ends in
-    ``.html`` is left as written, so a project can pass a full page path.
-    """
-    path = Path(file_name)
-    if path.suffix.lower() != ".html":
-        path = Path(str(file_name) + ".html")
-    return path
 
 
 def _import_meshcat():

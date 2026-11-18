@@ -72,7 +72,7 @@ the projects. The algorithms do not need them.
 | Value iteration: `animate_cost_to_go`, `animate_control_law`, the sweep history | No caller. Also two plot "forms" nobody uses and a batch-slice path never fed. | 150 | public methods | M |
 | Trajectory optimization: `callback=`, `live_plot=`, `record_history=`, the iteration record, `live_plot.py`; the evaluator's `live_plot` | Called by three old demos only. `callback=` could stay as a plain pass-through. | 230 | public keywords | M |
 | Soft cost fields in a `Scene` (`workspace_fields`, `cost_density`, `GaussianField` drawing) | One old demo. The kept surface uses a scene for obstacles and clearance only. | 200 | a `Scene` argument | M |
-| The 3-D cost-field figure (`plot_cost_field_3d`) | Called by the projects and old demos only; they move with the projects. | 190 | none | H |
+| The 3-D cost-field figure (`plot_cost_field(is_3d=True)`) | Called by the projects and old demos only; they move with the projects. | 190 | none | H |
 | MPC: the sampled-futures plot, four overlay keywords | One old demo, the projects. | 100 | none | M |
 | Racecar skin: `palette`, `equipment`, `scene`, `heading_arrow`, `wheel_radius`; a debug look | A skin is only ever called as `skin(plant)`; the keywords are never passed. | 55 | public keywords | H |
 

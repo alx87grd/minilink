@@ -528,7 +528,6 @@ from minilink.graphical.animation.renderers.meshcat_renderer import (
     camera_world_shift,
     flipbook_pages,
     fold_growing_prefix,
-    html_export_path,
     page_visibility,
     polyline_strip_mesh,
 )
@@ -968,10 +967,6 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
             # a ribbon mesh with a real width, never a one-pixel WebGL line
             self.assertIsInstance(drawn, g.Mesh)
             self.assertNotIsInstance(drawn, g.Line)
-
-    def test_html_export_path_keeps_or_appends_suffix(self):
-        self.assertEqual(html_export_path("lap").name, "lap.html")
-        self.assertEqual(html_export_path("lap.html").name, "lap.html")
 
     @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
     def test_export_animation_writes_standalone_html(self):
@@ -1589,7 +1584,7 @@ class TestPlotlySignalPlot(unittest.TestCase):
             sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
         self.assertEqual(len(result.figure.data), 2)
-        self.assertEqual(result.figure.layout.width, 100 * result.spec.figsize[0])
+        self.assertEqual(result.figure.layout.width, 150 * result.spec.figsize[0])
         handle = open_time_signal_plot(
             sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
@@ -2161,3 +2156,13 @@ def test_the_poses_place_a_unit_primitive_between_two_points():
     S = segment_pose_2d([1.0, 1.0], [4.0, 5.0])
     np.testing.assert_allclose(S @ [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 0.0, 1.0])
     np.testing.assert_allclose(S @ [1.0, 0.0, 0.0, 1.0], [4.0, 5.0, 0.0, 1.0])
+
+
+def test_a_rendered_frame_is_on_its_figure_and_saves_as_an_image(tmp_path):
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    still = Pendulum().render(np.array([1.0, 0.0]), np.array([0.0]), 0.5, show=False)
+    ax = still.figure.axes[0]
+    assert ax.lines or ax.patches or ax.collections
+    assert still.save(tmp_path / "still.png").stat().st_size > 0
+    plt.close("all")

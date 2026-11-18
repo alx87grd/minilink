@@ -142,7 +142,7 @@ class Comparison:
         bounds=None,
         grid_shape=(101, 101),
         t=0.0,
-        title="",
+        title=None,
         renderer="matplotlib",
         show=None,
         ax=None,
@@ -176,7 +176,7 @@ class Comparison:
         grid_shape=(51, 51),
         t=0.0,
         jmax=None,
-        title="",
+        title=None,
         renderer="matplotlib",
         show=None,
         ax=None,
@@ -436,7 +436,7 @@ def side_by_side(panels, title):
     n = len(panels)
 
     return FigureSpec(
-        panels=tuple(panels), title=title, n_cols=n, figsize=(4.5 * n, 4.0)
+        panels=tuple(panels), title=title or "", n_cols=n, figsize=(4.5 * n, 4.0)
     )
 
 

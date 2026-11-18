@@ -208,8 +208,7 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     u_grid_shape=)` → `x_grid=`, `u_grid=`; `KinodynamicExtender(n_substeps=)` → `n_steps=`;
     `Sys2Gym(tf=)` and `env.tf` → `episode_length`; the channel count of the sources, white
     noise and the PID family, `p=` / `dof=` → `dim=`; `show_3d=` → `is_3d=`; the grid plots'
-    `axes=(i, j)` and `slice_2d(axis_x, axis_y)` → `x_axis=i, y_axis=j`; `plot_diagram(filename=)`
-    → `file_name=`; `LyapunovCertificate.plot(limits=)` → `bounds=`;
+    `axes=(i, j)` and `slice_2d(axis_x, axis_y)` → `x_axis=i, y_axis=j`; `LyapunovCertificate.plot(limits=)` → `bounds=`;
     `animate(time_factor_video=)` → `speed=`; `region_of_attraction(samples=)` → `n_samples=`;
     `step_info(time, y)` → `step_info(t, y)`; `discretize(system=)` → `sys=`;
     `RRTPlanner.show_live_search()` is gone for `solve(callback=LiveSearchPlot())`. The RL
@@ -262,9 +261,7 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *The plots' keywords.* `plot_sampled_futures(axes=("t", 0))` →
     `plot_sampled_futures(x_axis="t", y_axis=0)`; value iteration's
     `plot_control_law(axis=)` → `u_axis=`, as every other control-law plot, and its title
-    reads "Control law u[0]"; the animations write a file with `file_name=` (RRT's
-    `animate_search` and `animate_convergence` took `save=`, value iteration's
-    `animate_cost_to_go` and `animate_control_law` took `save_path=`);
+    reads "Control law u[0]";
     `StateSpaceGrid.plot_value` → `plot_cost_to_go`.
   - *`tf` is an absolute end time.* `DynamicProgrammingPlanner.final_time` → `planner.tf` (the
     problem's `t0 + horizon`); where a length was called `tf`, it is `horizon` or
@@ -332,8 +329,22 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `sys.plot_control_law(…)` and a sampled loop's `animate(…)` take the named keywords of the
     function they draw with, so an editor shows them (a misspelt keyword is refused at the call);
     `plot_diagram(show_inline=True)` → `plot_diagram(show="inline")`, `show_pdf=True` →
-    `show="pdf"`, `show="window"` the Matplotlib window; `show=True` still picks the place
+    `show="window"`, the vector PDF in the system's viewer; `show=True` still picks the place
     (inline in a notebook, a window in a script) and `show=False` builds the graph only.
+  - *One plotting contract.* Every `plot_*` takes `renderer=`, `show=` and `ax=` and returns a
+    `PlotResult`: `fig, ax = plot(...)` → `result.figure`, `result.axes` (the scene, track,
+    tree, cost-field, cost-to-go and MPC-futures plots returned a pair); `show=None`, the
+    default, shows unless `ax=` is given. A file is written by the record:
+    `plot_diagram(filename=)`, `animate(html=, save=, file_name=)`, RRT's
+    `animate_search(save=)` and value iteration's `animate_cost_to_go(save_path=)` →
+    `.save(file_name)` on what the call returns; `animate(native=)` is gone (Meshcat draws
+    changing geometry itself) and `sys.render` and `animate_modal` return records.
+    `plot_diagram(show="pdf")` → `show="window"`. Removed: `PlotResult.payload`, `FieldGrid`,
+    `sample_field_costs`, `plot_cost_field_exports` (loop over the layers and `.save` each),
+    `ControlFigure`, `SignalPlotSpec`, `PhasePlaneSpec` (one `FigureSpec`);
+    `plot_cost_field_3d(...)` → `plot_cost_field(..., is_3d=True)`; `plot_track(waypoint_color="none")`
+    → `show_waypoints=False`. `is_3d=True` on a cost-to-go draws the surface alone. A Plotly
+    figure has the size of its matplotlib twin (150 px per inch).
   - *The impedance laws take the PID family's signature* (the maintainer's ruling 9):
     `Impedance(dof=1, *, Kp=10.0, Kd=1.0, …)` → `Impedance(Kp=10.0, Kd=1.0, *, dim=1,
     tracking_ref=False, …)` and `IntegralImpedance(Kp, Ki, Kd, *, dim=1, …)`, so

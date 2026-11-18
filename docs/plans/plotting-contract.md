@@ -525,7 +525,9 @@ in a session:
   `renderer=`.
 - A time-signal figure carries no title unless one is given: the matplotlib figure had none
   (its title went to the window); Plotly loses its generic "Time signals for …" heading.
-- Plotly's figure size is the description's (100 px per inch), one size for both renderers.
+- Plotly's figure size is the description's at matplotlib's own resolution (150 px per
+  inch), one size for both renderers (100 px per inch during the run; the review after the
+  merge found those figures too small to read).
 - The DP and search animations build their `FuncAnimation` themselves and are wrapped in
   an `AnimationResult` (`animation_result_of`); they move under `graphical/` in step 5.
 - `Panel.legend` is a bool: on or off, its place chosen by the renderer.
@@ -534,3 +536,29 @@ in a session:
   its record still displays it. In a window, a script blocks on that one figure.
 - The graphics import nothing from `planning`: the search animations build their frames as
   data and play them through `graphical/animation/line_animations.py`.
+
+### Decisions taken in the review after the merge
+
+Four independent reviewers read the merged contract; the maintainer left these calls to the
+agent (2026-11-18):
+
+- An overlay moves the colour of a line and of an unlabelled marker set; a labelled marker
+  and a fill keep theirs. A start or a goal keeps its colour code, and two pole-zero maps
+  are still told apart.
+- Into a `PlotResult`, limits and ticks given by both plots widen to hold both, a note moves
+  clear of the host's, and the record's description is the figure as drawn. On the caller's
+  own axes the rule stays "only where the axes has none".
+- A plot drawn into one axes of a larger figure leaves the figure's title alone.
+- `gamma` is drawn by Plotly too, on its colour scale.
+- `plot_cost_field_3d` folds into `plot_cost_field(is_3d=True)`; its `grid=` keeps its name
+  until the spatial module moves (geometry-module.md).
+- The planning module's `draw_cost_to_go` is `plot_cost_to_go`, beside `plot_control_law`;
+  `Comparison`'s plots default to `title=None`.
+- A rendered frame is on its figure at once and saves as an image.
+- `graphical/control/` stays a package of one module, and an explicit
+  `renderer="matplotlib"` on a Plotly host reads as the default: neither is worth a public
+  change.
+- The bands import the figure description at module top (DESIGN §3): it loads no drawing
+  library.
+- RULES 6.14 stays, on readability; a figure composed with `ax=` shares one cell.
+

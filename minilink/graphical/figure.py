@@ -186,8 +186,8 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
 
     ``ax`` is where to draw: a matplotlib ``Axes`` (a list of them for several
     panels), or a :class:`PlotResult`, whose panels receive these layers; a
-    line in a colour its host panel already draws takes the next free one.
-    ``show=None`` shows the figure unless it is drawn into ``ax``.
+    line in a colour its host panel already draws takes the next free one, and
+    the host's limits and ticks widen to hold both. ``show=None`` shows the figure unless it is drawn into ``ax``.
     ``renderer=None`` draws nothing: the record holds the description alone.
     """
     require_panels(spec)
@@ -206,7 +206,8 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
         require_same_renderer(renderer, ax.renderer)
         require_composable(ax.spec, spec)
         module = renderer_module(ax.renderer)
-        return module.draw_into(ax, distinct_colors(ax.spec, spec), show=show)
+        apart = stacked_notes(ax.spec, distinct_colors(ax.spec, spec))
+        return module.draw_into(ax, apart, show=show)
 
     module = renderer_module(renderer)
     return module.draw_figure(spec, show=show, ax=ax)
@@ -217,6 +218,31 @@ def overlay(host: FigureSpec, layers_by_panel) -> FigureSpec:
     panels = tuple(
         replace(panel, layers=panel.layers + tuple(layers))
         for panel, layers in zip(host.panels, layers_by_panel)
+    )
+
+    return replace(host, panels=panels)
+
+
+def composed(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
+    """``host`` with ``spec`` drawn into it, a new description.
+
+    Each host panel takes the overlay panel's layers, the title and labels it
+    has none of, and limits and ticks that hold both panels'.
+    """
+    panels = tuple(
+        replace(
+            host_panel,
+            layers=host_panel.layers + panel.layers,
+            title=host_panel.title or panel.title,
+            x_label=host_panel.x_label or panel.x_label,
+            y_label=host_panel.y_label or panel.y_label,
+            z_label=host_panel.z_label or panel.z_label,
+            x_lim=both_limits(host_panel.x_lim, panel.x_lim),
+            y_lim=both_limits(host_panel.y_lim, panel.y_lim),
+            y_ticks=both_ticks(host_panel.y_ticks, panel.y_ticks),
+            legend=host_panel.legend or panel.legend,
+        )
+        for host_panel, panel in zip(host.panels, spec.panels)
     )
 
     return replace(host, panels=panels)
@@ -296,13 +322,65 @@ def require_composable(host: FigureSpec, spec: FigureSpec):
             )
 
 
+def both_limits(host_lim, lim):
+    """The limits that hold both: the one given when the other is ``None``."""
+    if host_lim is None or lim is None:
+        return lim if host_lim is None else host_lim
+
+    return (min(host_lim[0], lim[0]), max(host_lim[1], lim[1]))
+
+
+def both_ticks(host_ticks, ticks):
+    """The ticks of both, in order: the ones given when the other is ``None``."""
+    if host_ticks is None or ticks is None:
+        return ticks if host_ticks is None else host_ticks
+
+    return tuple(sorted(set(host_ticks) | set(ticks)))
+
+
+# The height of a note's line and of its box's padding, as fractions of the panel
+NOTE_LINE = 0.085
+NOTE_PAD = 0.06
+
+
+def stacked_notes(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
+    """``spec`` with each note anchored where its host panel already has one moved clear of it, away from the panel's edge."""
+    panels = []
+    for host_panel, panel in zip(host.panels, spec.panels):
+        placed = [layer for layer in host_panel.layers if isinstance(layer, Note)]
+        layers = []
+        for layer in panel.layers:
+            if isinstance(layer, Note):
+                layer = clear_of(layer, placed)
+                placed.append(layer)
+            layers.append(layer)
+        panels.append(replace(panel, layers=tuple(layers)))
+
+    return replace(spec, panels=tuple(panels))
+
+
+def clear_of(note: Note, placed) -> Note:
+    """``note`` moved past each placed note that sits at its anchor: up from the bottom half, down from the top."""
+    direction = 1.0 if note.y < 0.5 else -1.0
+    for other in placed:
+        if (other.x, other.y) == (note.x, note.y):
+            height = NOTE_LINE * (other.text.count("\n") + 1) + NOTE_PAD
+            note = replace(note, y=note.y + direction * height)
+
+    return note
+
+
 # The colours an overlay's line takes when its own is already the host panel's:
 # the palette after its blue, the first line's colour
 OVERLAY_COLORS = TAB10[1:]
 
 
 def distinct_colors(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
-    """``spec`` with each line colour its host panel already draws moved to a colour neither panel uses, one per clashing colour."""
+    """``spec`` with each line colour its host panel already draws moved to a colour neither panel uses, one per clashing colour.
+
+    Lines and unlabelled markers move. A labelled marker and a fill keep
+    their colour: it is their meaning (a start, a goal, an obstacle).
+    """
     panels = []
     for host_panel, panel in zip(host.panels, spec.panels):
         used = colors_of(host_panel) | colors_of(panel)
@@ -312,18 +390,26 @@ def distinct_colors(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
         # colour, and keeps its own when none is left
         moved = {}
         for layer in panel.layers:
-            clashes = isinstance(layer, Trace) and layer.color in colors_of(host_panel)
+            clashes = is_recolored(layer) and layer.color in colors_of(host_panel)
             if clashes and layer.color not in moved:
                 moved[layer.color] = next(free, layer.color)
         layers = tuple(
             replace(layer, color=moved[layer.color])
-            if isinstance(layer, Trace) and layer.color in moved
+            if is_recolored(layer) and layer.color in moved
             else layer
             for layer in panel.layers
         )
         panels.append(replace(panel, layers=layers))
 
     return replace(spec, panels=tuple(panels))
+
+
+def is_recolored(layer) -> bool:
+    """Whether an overlay may move ``layer``'s colour: a line, or a marker set without a label."""
+    if not isinstance(layer, Trace) or layer.fill:
+        return False
+
+    return layer.mode == "lines" or not layer.label
 
 
 def colors_of(panel) -> set:

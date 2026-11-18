@@ -28,7 +28,7 @@ from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
-from minilink.planning.spatial.plotting import plot_cost_field_3d
+from minilink.planning.spatial.plotting import plot_cost_field
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -146,13 +146,14 @@ if SHOW_COST_FIELD:
     corridor_viz = track.corridor_field(probe).as_cost(
         weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
     )
-    plot_cost_field_3d(
+    plot_cost_field(
         [path_viz, corridor_viz],
         bounds=bounds,
         state_dim=sys_mpc.n,
         grid=(80, 80),
         title="Path + corridor cost field",
         log_scale=True,
+        is_3d=True,
     )
 
 # Offline: plant twin + demo clock (ROS2 uses the real vehicle / estimator).

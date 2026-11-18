@@ -627,10 +627,10 @@ concrete formatting, ordered by the cost of being wrong:
   draws (`plot_*`, `animate`, `plot_diagram`, `plot_tree`, `scene.plot`, ...) is the only
   statement in that cell. Setup, `solve`, and `compute_trajectory` stay in the cell
   above; the figure cell is one library verb. Two slices
-  (`plot_control_law(..., u_axis=0)` then `u_axis=1`) are two cells. Jupyter displays
-  one figure per cell: a later `plot_*` in the same cell hides, races, or drops an
-  overlay (`show=False` then `plt.show()`, stacked `animate`). A script may still plot
-  after the API in one file. Apply this when writing or editing a notebook; do not
+  (`plot_control_law(..., u_axis=0)` then `u_axis=1`) are two cells. A cell is read as
+  one idea: the student sees which call drew which figure, and can rerun or change that
+  one figure alone. A figure composed of several calls (`ax=`) is one figure, and its
+  calls share a cell. A script may still plot after the API in one file. Apply this when writing or editing a notebook; do not
   restyle an existing dense notebook unless asked.
 - **6.15 Show the mechanism once, then the tool.** Where a library verb hides a mechanism a
   student should understand (a gradient-descent loop behind `Optimizer`, a Riccati iteration behind

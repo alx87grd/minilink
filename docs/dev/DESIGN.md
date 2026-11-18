@@ -159,7 +159,10 @@ state-feedback block):
   an adapter on its linearization (RULES 4.3), and the Riccati equations are
   analysis-tier math shared with the planners.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
-- `graphical/` is imported lazily from anywhere; rendering stays optional.
+- `graphical/` is imported lazily from anywhere; rendering stays optional. The one module
+  imported at the top is the figure description, `graphical/figure.py`, by the modules that
+  build one (a band's `plotting.py`, the analysis plots): it is plain data and loads no
+  drawing library.
 - The `experimental/` tier is imported by nothing.
 
 ### Placement algorithm
@@ -1896,8 +1899,8 @@ switch held on the path, not in its `params`; `path.at(s)` is the point at arc l
 clearance (subtract body radius). Compose with obstacles:
 `X = bounds & scene.clearance_field(body).as_set() & track.corridor_field(body).as_set()`.
 
-**Workspace cost raster** (`plotting.plot_cost_field` / `plot_cost_field_3d`, each
-sampling its own costs on a `grid=` of workspace points): rasterize shaped ``FieldCost`` terms
+**Workspace cost raster** (`plotting.plot_cost_field`, a heatmap or with `is_3d=True` a surface,
+sampling its costs on a `grid=` of workspace points): rasterize shaped ``FieldCost`` terms
 at workspace points ``p = (x, y)`` with a **point probe** body (heading-independent).
 Build viz costs with ``mount(point_probe(), on=sys)``; MPC may still use ``car_outline``.
 
@@ -1944,7 +1947,8 @@ breaking a line, `fill=True` closing and filling it), `RefLine`, `Note`, `Heatma
 `Contour`, `Surface`, `Arrows` (quiver or stream). The objects are frozen; a colour is a
 CSS name or a hex code, and a `Trace` with `color=None` takes the renderer's colour cycle.
 A field enters a layer only when a plot of the library needs it and both renderers honour
-it; no renderer keyword passes through, and a finish one library alone offers is the
+it, or ignore it without changing what the figure says (a point's hover text, a surface's
+mesh stride); no renderer keyword passes through, and a finish one library alone offers is the
 caller's own call on `result.figure` or `result.axes`.
 
 `draw(spec, *, renderer="matplotlib", show=None, ax=None)` draws with
@@ -1967,15 +1971,21 @@ and returns a `PlotResult`; `plot_diagram` is the one exception (below).
 - **`renderer=None`** draws nothing: the record holds `spec` alone, for tests and for grids
   assembled from descriptions.
 - **Composition, `ax=`:** a matplotlib `Axes` (a list of them for a multi-panel plot) or a
-  `PlotResult`. The plot adds its layers to the host's panels, panel by panel, and sets a
-  panel's title, labels, limits and scales only where the host has none, and a figure
-  title only where the figure has none. Refused by name: another panel count, a 3-D layer
+  `PlotResult`. The plot adds its layers to the host's panels, panel by panel. On axes it
+  sets a panel's title, labels, limits and scales only where the axes has none, and a
+  figure title only on a figure these panels fill and that has none. Into a `PlotResult`
+  the host keeps its title, labels and scales and takes the ones it lacks; limits and
+  ticks given by both widen to hold both, and a note anchored where the host has one moves
+  clear of it. Refused by name: another panel count, a 3-D layer
   into a 2-D panel or a 2-D one into a 3-D panel, a second colour bar in one panel, a host
   with no description, a host that holds a description only (`renderer=None`: draw it
-  first). The default `renderer=` follows the host's. A line in a colour its host panel
-  draws takes a free colour, one per clashing colour; a legend entry that repeats a host
-  label is not added again. The returned record holds the host's
-  description with the overlay's layers.
+  first). The default `renderer=` follows the host's, and `renderer="matplotlib"`, the
+  default's own value, reads as the default there. A line in a colour its host panel
+  draws takes a free colour, one per clashing colour, and so does a marker set without a
+  label; a labelled marker and a fill keep theirs, which is their meaning (a start, a goal,
+  an obstacle). A legend entry that repeats a host label is not added again. The returned
+  record holds the description of the figure as drawn: the host's, with the overlay's
+  layers and what it changed.
 - **`show=None`** shows unless `ax=` is given: a plot drawn into a host leaves the showing
   to the host.
 

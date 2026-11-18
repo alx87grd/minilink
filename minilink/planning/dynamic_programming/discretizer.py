@@ -409,7 +409,7 @@ class StateSpaceGrid:
         """
         grid_nd = np.asarray(grid_nd)
         if self.n == 2:
-            return grid_nd
+            return grid_nd if x_axis < y_axis else grid_nd.T
 
         # The other axes pinned at the node nearest the anchor
         anchor = self.default_anchor() if anchor is None else np.asarray(anchor)

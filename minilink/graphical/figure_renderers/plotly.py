@@ -5,9 +5,11 @@ from __future__ import annotations
 import numpy as np
 import plotly.figure_factory as ff
 import plotly.graph_objects as go
+from plotly.colors import sample_colorscale
 from plotly.subplots import make_subplots
 from scipy.interpolate import RegularGridInterpolator
 
+from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.common.plotly_style import PLOTLY_TEMPLATE
 from minilink.graphical.common.show import show_figure
@@ -21,9 +23,9 @@ from minilink.graphical.figure import (
     RefLine,
     Surface,
     Trace,
+    composed,
     direction_arrow_spans,
     grid_of,
-    overlay,
 )
 
 # The description's marker names in Plotly's spelling
@@ -80,7 +82,8 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
         },
     )
     if spec.figsize is not None:
-        fig.update_layout(width=100 * spec.figsize[0], height=100 * spec.figsize[1])
+        width, height = spec.figsize
+        fig.update_layout(width=DPI_FIGURE * width, height=DPI_FIGURE * height)
 
     # One legend per figure: none when no panel asks for one
     if not any(panel.legend for panel in spec.panels):
@@ -96,10 +99,13 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
     _, n_cols = grid_of(host.spec)
     shown = legend_names(host.figure)
     n_before = len(host.figure.data)
+    combined = composed(host.spec, spec)
     for k, panel in enumerate(spec.panels):
         row, col = cell_of(k, n_cols)
         for layer in panel.layers:
             DRAW[type(layer)](host.figure, layer, row, col)
+        if not panel.is_3d:
+            draw_changes(host.figure, host.spec.panels[k], combined.panels[k], row, col)
 
         # A labelled overlay shows the legend, whatever the host's panels asked
         if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
@@ -111,8 +117,6 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
             trace.showlegend = False
 
     show_figure(host.figure, "plotly", show)
-
-    combined = overlay(host.spec, [panel.layers for panel in spec.panels])
 
     return PlotResult(renderer="plotly", figure=host.figure, axes=None, spec=combined)
 
@@ -175,6 +179,24 @@ def draw_panel(fig, panel, row, col):
     if panel.equal_aspect:
         x_ref = fig.get_subplot(row, col).xaxis.plotly_name.replace("axis", "")
         fig.update_yaxes(scaleanchor=x_ref, row=row, col=col)
+
+
+def draw_changes(fig, before, after, row, col):
+    """Set on a 2-D panel the labels, limits and ticks of ``after`` that differ from ``before``'s."""
+    if after.x_label != before.x_label:
+        fig.update_xaxes(
+            title_text=after.x_label.replace("\n", "<br>"), row=row, col=col
+        )
+    if after.y_label != before.y_label:
+        fig.update_yaxes(
+            title_text=after.y_label.replace("\n", "<br>"), row=row, col=col
+        )
+    if after.x_lim != before.x_lim:
+        fig.update_xaxes(range=log_range(after.x_lim, after.x_log), row=row, col=col)
+    if after.y_lim != before.y_lim:
+        fig.update_yaxes(range=after.y_lim, row=row, col=col)
+    if after.y_ticks != before.y_ticks:
+        fig.update_yaxes(tickvals=list(after.y_ticks), row=row, col=col)
 
 
 def log_range(limits, is_log):
@@ -292,7 +314,7 @@ def draw_heatmap(fig, heatmap: Heatmap, row, col):
             x=np.asarray(heatmap.x, dtype=float),
             y=np.asarray(heatmap.y, dtype=float),
             z=np.asarray(heatmap.z, dtype=float),
-            colorscale=COLOR_MAPS.get(heatmap.cmap, heatmap.cmap),
+            colorscale=color_scale(heatmap),
             zmin=heatmap.vmin,
             zmax=heatmap.vmax,
             zsmooth="best" if heatmap.shading == "smooth" else False,
@@ -367,7 +389,7 @@ def draw_surface(fig, surface: Surface, row, col):
             x=np.asarray(surface.x, dtype=float),
             y=np.asarray(surface.y, dtype=float),
             z=np.asarray(surface.z, dtype=float),
-            colorscale=COLOR_MAPS.get(surface.cmap, surface.cmap),
+            colorscale=color_scale(surface),
             cmin=surface.vmin,
             cmax=surface.vmax,
             opacity=surface.alpha,
@@ -377,6 +399,18 @@ def draw_surface(fig, surface: Surface, row, col):
         row=row,
         col=col,
     )
+
+
+def color_scale(layer):
+    """A layer's colour scale: its map, drawn at ``s^γ`` of each fraction ``s`` of the range when ``gamma`` is not 1."""
+    name = COLOR_MAPS.get(layer.cmap, layer.cmap)
+    if layer.gamma == 1.0:
+        return name
+
+    s = np.linspace(0.0, 1.0, 33)
+    colors = sample_colorscale(name, s**layer.gamma)
+
+    return [[float(stop), color] for stop, color in zip(s, colors)]
 
 
 def colorbar_of(layer):

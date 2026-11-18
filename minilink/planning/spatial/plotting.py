@@ -117,14 +117,15 @@ def plot_cost_field(
     log_scale: bool = False,
     vmax: float | None = None,
     gamma: float = 0.55,
+    is_3d: bool = False,
     title: str | None = "Spatial cost",
-    figsize=(6.0, 6.0),
+    figsize=None,
     renderer="matplotlib",
     show=None,
     ax=None,
 ):
     """
-    Plot the summed cost of ``FieldCost`` terms over a workspace grid, as a heatmap.
+    Plot the summed cost of ``FieldCost`` terms over a workspace grid, as a heatmap, or with ``is_3d`` as the surface ``z = cost(x, y)``.
 
     Each cell is the cost of a workspace point ``p = (x, y)`` seen by a point
     probe: build the costs with ``mount(point_probe(), on=sys)``, so the field
@@ -135,56 +136,13 @@ def plot_cost_field(
     xs, ys, Z = sampled_costs(
         costs, bounds=bounds, grid=grid, state_dim=state_dim, u=u, t=t, params=params
     )
-    spec = cost_field_figure(
-        xs,
-        ys,
-        Z,
-        cmap=cmap,
-        log_scale=log_scale,
-        vmax=vmax,
-        gamma=gamma,
-        title=title,
-        figsize=figsize,
-    )
-
-    return draw(spec, renderer=renderer, show=show, ax=ax)
-
-
-def plot_cost_field_3d(
-    costs,
-    *,
-    bounds,
-    grid=(200, 200),
-    state_dim: int = 2,
-    u=None,
-    t: float = 0.0,
-    params=None,
-    cmap=COST_FIELD_CMAP,
-    log_scale: bool = False,
-    vmax: float | None = None,
-    gamma: float = 0.55,
-    title: str | None = "Spatial cost",
-    figsize=(8.0, 6.0),
-    renderer="matplotlib",
-    show=None,
-    ax=None,
-):
-    """Plot the summed cost of ``FieldCost`` terms as a 3-D surface ``z = cost(x, y)`` (see :func:`plot_cost_field`)."""
-    xs, ys, Z = sampled_costs(
-        costs, bounds=bounds, grid=grid, state_dim=state_dim, u=u, t=t, params=params
-    )
-    spec = cost_surface_figure(
-        xs,
-        ys,
-        Z,
-        cmap=cmap,
-        log_scale=log_scale,
-        vmax=vmax,
-        gamma=gamma,
-        title=title,
-        figsize=figsize,
-        stride=1,
-    )
+    look = dict(cmap=cmap, log_scale=log_scale, vmax=vmax, gamma=gamma, title=title)
+    if is_3d:
+        spec = cost_surface_figure(
+            xs, ys, Z, figsize=figsize or (8.0, 6.0), stride=1, **look
+        )
+    else:
+        spec = cost_field_figure(xs, ys, Z, figsize=figsize or (6.0, 6.0), **look)
 
     return draw(spec, renderer=renderer, show=show, ax=ax)
 
