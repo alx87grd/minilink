@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-11-10.
+lands. Last checked against the code: 2026-11-18 (NumPy 2.5, JAX 0.12, a cloud machine).
 
 ## Composition and control
 
@@ -30,20 +30,20 @@ lands. Last checked against the code: 2026-11-10.
 
 ## The README's examples
 
-Found by running the README's snippets as written (2026-11-09, a 4-core cloud machine, JAX
-0.12, NumPy backend unless the snippet says otherwise).
+Found by running the README's snippets as written (2026-11-09; run again 2026-11-18, a cloud
+machine, JAX 0.12, NumPy backend unless the snippet says otherwise).
 
 ### The "One problem, every planner" example shows two planners missing the goal
 - **Symptom:** README §7 as written: value iteration ends with `success = no`
   ("max_iterations=1000 reached before tol=0.1 (delta=5.48)") after a warning that an infinite
   undiscounted horizon has no cost bound (a failure costs 1e6), and `compare` scores it
-  `J = 88.25 (goal missed)`; RRT is scored `J = 133.3 (goal missed)`; only trajectory
-  optimization succeeds (`J = 89.82`). Times: value iteration 10.1 s, RRT 0.4 s, trajectory
-  optimization 10.8 s.
+  `J = 88.25 (goal missed)`; RRT, whose record says "goal reached", is scored
+  `J = 133.6 (goal missed)`; only trajectory optimization succeeds (`J = 89.82`). Times:
+  value iteration 7.4 s, RRT 0.4 s, trajectory optimization 9.2 s.
 - **Workaround:** none in the snippet; a discount on the problem (`discount_rate=`) or a
   `failure_cost` gives value iteration a cost bound.
 - **Fix:** **[ask]** the README is the maintainer's: the example's numbers chosen so each
-  planner reaches the goal (TODO, "Rows waiting for the maintainer's go").
+  planner reaches the goal, decided with the kept demo set (TODO §1.12).
 
 ### The co-design example returns a negative gain and a 3.5 cm pendulum
 - **Symptom:** README §5: `Optimizer(pe.program(wrt=["controller.Kp", "plant.l"])).solve()`
@@ -56,11 +56,13 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
 
 ### A tree search that never leaves its root cannot be scored
 - **Symptom:** `RRTStarPlanner(problem, seed=0, max_iterations=300).solve(evaluate=True)` on
-  the pendulum swing-up (`Xf = BallSet([π, 0], 0.3)`, horizon 10 s) raises "Port dimension
-  mismatch: controller:y has dim 0, plant:u has dim 1": no extension improved on the root, so
-  the best-effort path is the root alone, and `Tree.extract_trajectory` builds its input with
-  no channel (`u` of shape `(0, 1)`), which the controller's `TrajectorySource` carries (found
-  2026-11-11).
+  the pendulum swing-up (`Xf = BallSet([π, 0], 0.3)`, horizon 10 s) raises "dt must be
+  positive, got nan" after NumPy's "Mean of empty slice" warning: no extension improved on the
+  root, so the best-effort path is the root alone, a plan of one sample with no step to read,
+  and `Tree.extract_trajectory` builds its input with no channel (`u` of shape `(0, 1)`),
+  which the controller's `TrajectorySource` carries; `evaluate(problem, solution.controller)`
+  then raises "u_seq must have shape (N, 1), got (222, 0)" (found 2026-11-11; the messages as
+  of 2026-11-18).
 - **Workaround:** more iterations (`max_iterations=`), or `solve()` without `evaluate` and a
   check of `solution.record.success` first.
 - **Fix:** TODO, D3's hardening rows: the root-only path holds the plant's nominal input.
@@ -102,9 +104,21 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
 
 ## Tooling
 
-### Two racecar demos hang when run headless
-- **Symptom:** `examples/demos/udes_racecar/pure_pursuit_racecar.py` and `los_racecar.py`
-  compute their lap, print the meshcat viewer's URL and then wait: with no browser open on the
-  viewer, the script never ends (both still running after 110 s on a cloud machine, 2026-11-08).
-- **Workaround:** run them interactively, with a browser open on the URL they print.
-- **Fix:** the maintainer's end-of-v0.4 demo rebuild (TODO §1.12, the demo set).
+### Three NumPy-against-JAX tests fail in the last digit on NumPy 2.5 with JAX 0.12
+- **Symptom:** a normal draw is the same on both backends in its bits, not in its last
+  digit: `standard_normal` runs Box–Muller, `√(−2 ln u₁) cos(2π u₂)`, through each
+  library's own `log` and `cos`, which round differently on this pair of versions (one unit
+  in the last place: a fifth of the `log` values, one `cos` in a thousand, about one draw in
+  fifteen). Three tests compare with exact
+  equality and fail: `test_random.py::test_bits_and_normals_agree_on_numpy_and_jax`,
+  `test_stochastic_policy.py::test_a_policy_vmaps_over_seeds_on_both_backends` and
+  `test_blocks.py::TestWhiteNoiseSource::test_the_same_signal_on_numpy_and_jax_and_a_traced_params_family`.
+  The cipher's bits are identical; a seeded noise signal or a stochastic policy's draw
+  differs between `backend="numpy"` and `backend="jax"` by that last digit, where the
+  docstrings say "identical". No version is pinned (`numpy` and `jax>=0.4.28` in
+  `pyproject.toml`), so a fresh install or a CI run on these versions meets it. Reproduced
+  2026-11-18 (NumPy 2.5.3, JAX 0.12.1, Python 3.13).
+- **Workaround:** compare the two backends' draws to a tolerance (`rtol=1e-14`); deselect
+  the three tests on such an install.
+- **Fix:** none planned yet: the three tests compare the normals to a tolerance, the bits
+  staying exact, and the docstrings say so.

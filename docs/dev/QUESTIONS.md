@@ -25,9 +25,11 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
   2. `TrajectoryOptimizationPlanner.transcription_options()`, the verbose print's line: it
      names the option records the settlement deleted (the transcription now takes
      `n_steps=` itself) and returns `{"n_steps": N}`; its only caller is the print.
-  3. `animate_control_law(axis=0, ...)` (value iteration's planner and
-     `planning/dynamic_programming/plotting.py`): the input channel drawn, the idea
-     `plot_control_law` now names `u_axis=`.
+  3. `animate_control_law(grid, record, *, axis=0, ...)`
+     (`planning/dynamic_programming/plotting.py`; value iteration's planner forwards its
+     keywords to it): the input channel drawn, the idea `plot_control_law` names `u_axis=`.
+     The animation itself stays, with `animate_cost_to_go` (ruled: used in class); only the
+     keyword is asked.
   4. The planners' `compile(backend=None)` (trajectory optimization, MPPI): `backend` stays
      positional (the MPC calls `planner.compile(backend)`), where `System.compile(*, backend=)`
      is keyword-only.
@@ -144,8 +146,9 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
 ## The architecture
 
 ### Does the planning framework get a package of its own?
-- **Context:** `minilink.planning` is the largest package (19 093 lines, the core is 17 005).
-  A third of it is not a planner: the 13 files at its top level (6 585 lines) are the
+- **Context:** `minilink.planning` is the largest package (18 661 lines, the core is 16 985;
+  measured 2026-11-18). A third of it is not a planner: the 13 files at its top level (6 554
+  lines) are the
   framework every planner shares: the problem (`problems.py`, `step_problems.py`,
   `step_model.py`), the evaluation (`evaluator.py`, `evaluation.py`, `comparison.py`), the
   solution record (`results.py`), the planner base class and its helpers. The algorithms sit
