@@ -12,9 +12,7 @@ from minilink.graphical.common import PlotResult
 from minilink.graphical.common.labels import label_with_unit
 from minilink.graphical.common.matplotlib_style import FIGSIZE_BASE
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
-from minilink.graphical.phase_plane.phase_plane import (
-    require_grid_shape,
-)
+from minilink.graphical.phase_plane.phase_plane import require_grid_shape
 
 # The sweep range of a coordinate whose bounds are not finite
 _DEFAULT_BOUNDS = (-10.0, 10.0)
