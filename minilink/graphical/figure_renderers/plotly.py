@@ -140,14 +140,14 @@ def draw_panel(fig, panel, row, col, names):
 
     # 2-D: titles, limits, a log axis, an equal aspect
     fig.update_xaxes(
-        title_text=panel.x_label,
+        title_text=panel.x_label.replace("\n", "<br>"),
         range=log_range(panel.x_lim, panel.x_log),
         type="log" if panel.x_log else None,
         row=row,
         col=col,
     )
     fig.update_yaxes(
-        title_text=panel.y_label,
+        title_text=panel.y_label.replace("\n", "<br>"),
         range=panel.y_lim,
         tickvals=None if panel.y_ticks is None else list(panel.y_ticks),
         row=row,

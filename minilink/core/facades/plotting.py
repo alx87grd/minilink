@@ -19,7 +19,8 @@ class SystemPlotting:
         *,
         signals=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """
         Convenience shortcut to plot sampled time signals.
@@ -64,9 +65,12 @@ class SystemPlotting:
             signals=signals,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
-    def plot_cost(self, cost, *, of=None, traj=None, renderer="matplotlib", show=True):
+    def plot_cost(
+        self, cost, *, of=None, traj=None, renderer="matplotlib", show=None, ax=None
+    ):
         """
         Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
 
@@ -85,7 +89,7 @@ class SystemPlotting:
         scored = scored_trajectory(self, of, traj).with_cost(cost)
 
         return scored_system.plot_trajectory(
-            scored, signals=("dJ", "J"), renderer=renderer, show=show
+            scored, signals=("dJ", "J"), renderer=renderer, show=show, ax=ax
         )
 
     def plot_input_output_map(
@@ -538,7 +542,8 @@ class StepPlotting(LinearPlotting):
         *,
         signals=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """
         Convenience shortcut to plot sampled step signals.
@@ -573,6 +578,7 @@ class StepPlotting(LinearPlotting):
             ),
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
 

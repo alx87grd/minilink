@@ -5,6 +5,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import (
@@ -91,7 +92,7 @@ def new_axes(spec: FigureSpec):
     n = len(spec.panels)
     n_cols = min(spec.n_cols, n)
     n_rows = -(-n // n_cols)
-    fig = plt.figure(figsize=spec.figsize)
+    fig = plt.figure(figsize=spec.figsize, dpi=DPI_FIGURE)
     axes = []
     for k, panel in enumerate(spec.panels):
         share = axes[0] if spec.share_x and axes else None
@@ -104,6 +105,12 @@ def new_axes(spec: FigureSpec):
                 sharex=share,
             )
         )
+
+    # A shared x axis is labelled under the bottom panel of each column only
+    if spec.share_x:
+        for k, ax in enumerate(axes):
+            if k + n_cols < n:
+                ax.tick_params(labelbottom=False)
 
     return fig, axes
 

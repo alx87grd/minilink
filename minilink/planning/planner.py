@@ -137,20 +137,22 @@ class Planner(ABC):
 
     # Views of the latest solution
 
-    def plot_trajectory(self, *, signals=("x", "u"), renderer="matplotlib", show=True):
+    def plot_trajectory(
+        self, *, signals=("x", "u"), renderer="matplotlib", show=None, ax=None
+    ):
         """The latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_trajectory`)."""
         return require_solution(self).plot_trajectory(
-            dt=self.dt, signals=signals, renderer=renderer, show=show
+            dt=self.dt, signals=signals, renderer=renderer, show=show, ax=ax
         )
 
     def animate(self, **kwargs):
         """The latest solution's plan, else its controller's run on the planner's ``dt``, animated (:meth:`PlanningSolution.animate`)."""
         return require_solution(self).animate(**{"dt": self.dt, **kwargs})
 
-    def plot_cost(self, *, dt=None, renderer="matplotlib", show=True):
+    def plot_cost(self, *, dt=None, renderer="matplotlib", show=None, ax=None):
         """The running cost along the latest solution's plan, else its controller's run on ``dt``, by default the planner's (:meth:`PlanningSolution.plot_cost`)."""
         return require_solution(self).plot_cost(
-            dt=self.dt if dt is None else dt, renderer=renderer, show=show
+            dt=self.dt if dt is None else dt, renderer=renderer, show=show, ax=ax
         )
 
     def plot_control_law(

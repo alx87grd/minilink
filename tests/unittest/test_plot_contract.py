@@ -13,17 +13,8 @@ NOT_FIGURES = {"plot_space_of", "plot_result_of"}
 # The plots that do not take every keyword yet, and the keywords they lack. The
 # list only shrinks: a name that takes them all must leave it.
 NOT_YET = {
-    ("core/facades/plotting.py", "plot_trajectory"): {"ax"},
-    ("core/facades/plotting.py", "plot_cost"): {"ax"},
     ("core/facades/plotting.py", "plot_diagram"): {"renderer", "ax"},
-    ("core/facades/plotting.py", "plot_rollout"): {"ax"},
     ("graphical/diagrams/dot.py", "plot_diagram"): {"renderer", "ax"},
-    ("graphical/signals/time_signals.py", "plot_time_signals"): {"ax"},
-    ("planning/planner.py", "plot_trajectory"): {"ax"},
-    ("planning/planner.py", "plot_cost"): {"ax"},
-    ("planning/plotting.py", "plot_solution_trajectory"): {"ax"},
-    ("planning/results.py", "plot_trajectory"): {"ax"},
-    ("planning/results.py", "plot_cost"): {"ax"},
 }
 
 

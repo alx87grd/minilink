@@ -6,7 +6,6 @@ import numpy as np
 
 from minilink.core.fields import GridField
 from minilink.core.sets import is_finite_box
-from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, draw, overlay
 from minilink.planning.dynamic_programming import plotting as grid_plotting
 
@@ -227,27 +226,23 @@ def sample_field(problem, field, *, x_axis, y_axis, anchor, bounds, grid_shape, 
     return x_level, y_level, J
 
 
-def plot_solution_trajectory(solution, traj, *, signals, renderer, show):
+def plot_solution_trajectory(solution, traj, *, signals, renderer, show, ax=None):
     """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.signals.time_signals import plot_time_signals
 
-    # The trajectory on the solution's system, shown once it is titled
-    result = plot_time_signals(
+    # The title says which: the plan the planner computed, or the controller's run
+    kind = "plan" if solution.trajectory is not None else "run"
+
+    return plot_time_signals(
         solution.problem.sys,
         traj,
         signals=signals,
+        title=f"{kind} ({solution.family})",
         renderer=renderer,
-        show=False,
+        show=show,
+        ax=ax,
     )
-
-    # The title says which: the plan the planner computed, or the controller's run
-    kind = "plan" if solution.trajectory is not None else "run"
-    if renderer == "matplotlib":
-        result.figure.suptitle(f"{kind} ({solution.family})")
-        show_figure(result.figure, renderer, show)
-
-    return result
 
 
 def control_law_kwargs(solution, kwargs) -> dict:

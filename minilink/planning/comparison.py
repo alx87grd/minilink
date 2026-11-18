@@ -239,29 +239,27 @@ class Comparison:
     ):
         """The plans and the controllers' runs overlaid, one row per signal component, legend by name: a :class:`PlotResult`, ``title`` over the first row."""
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.signals.time_signals import build_signal_plot_spec
+        from minilink.graphical.signals.time_signals import signal_figure
 
-        # One plot spec per solution, on the first solution's system
+        # One description per solution, on the first solution's system
         first = next(iter(self.solutions.values()))
         sys = first.problem.sys
         specs = {
-            name: build_signal_plot_spec(
-                sys, drawn_trajectory_of(solution), signals=signals
-            )
+            name: signal_figure(sys, drawn_trajectory_of(solution), signals=signals)
             for name, solution in self.items()
         }
 
         # One row per signal component, each solution in its colour on every row; the
         # rows labelled from the first spec, the names, the legend and the title on
         # the first
-        rows = next(iter(specs.values())).traces
+        rows = next(iter(specs.values())).panels
         n_rows = len(rows)
         panels = [
             Panel(
                 layers=tuple(
                     Trace(
-                        spec.t,
-                        spec.traces[k].values,
+                        spec.panels[k].layers[0].x,
+                        spec.panels[k].layers[0].y,
                         color=SOLUTION_COLORS[m % len(SOLUTION_COLORS)],
                         label=name if k == 0 else "",
                     )
@@ -269,7 +267,7 @@ class Comparison:
                 ),
                 title=title if k == 0 else "",
                 x_label="Time [s]" if k == n_rows - 1 else "",
-                y_label=row.label + (f" [{row.unit}]" if row.unit else ""),
+                y_label=row.y_label.replace("\n", " "),
                 legend="upper right",
             )
             for k, row in enumerate(rows)

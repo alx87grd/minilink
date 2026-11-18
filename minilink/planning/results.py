@@ -121,7 +121,13 @@ class PlanningSolution:
     # Views, run on demand: the plan, else the controller run from the problem's start
 
     def plot_trajectory(
-        self, *, dt=None, signals=("x", "u"), renderer="matplotlib", show=True
+        self,
+        *,
+        dt=None,
+        signals=("x", "u"),
+        renderer="matplotlib",
+        show=None,
+        ax=None,
     ):
         """
         Draw the plan, else the controller's run from the problem's start, on the problem's system.
@@ -140,19 +146,21 @@ class PlanningSolution:
             signals=signals,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def animate(self, *, dt=None, **kwargs):
         """Animate the plan, else the controller's run from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system."""
         return self.problem.sys.animate(drawn_trajectory_of(self, dt), **kwargs)
 
-    def plot_cost(self, *, dt=None, renderer="matplotlib", show=True):
+    def plot_cost(self, *, dt=None, renderer="matplotlib", show=None, ax=None):
         """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`), with the drawing library ``renderer``."""
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
             traj=drawn_trajectory_of(self, dt),
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_control_law(
