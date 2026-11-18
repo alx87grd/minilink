@@ -28,7 +28,7 @@ from minilink.core.shaping import (
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
-from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
+from minilink.planning.spatial.grid import pad_bounds
 from minilink.planning.spatial.plotting import plot_cost_field_exports
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack
@@ -216,12 +216,11 @@ if SHOW_PLOTS:
         shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
     )
     cost_bounds = pad_bounds(plot_bounds, 3.0)
-    kw = dict(bounds=cost_bounds, state_dim=sys_mpc.n, grid=(120, 120))
     layers = {
-        "path": sample_field_costs([path_viz], **kw),
-        "corridor": sample_field_costs([corridor_viz], **kw),
-        "obstacle": sample_field_costs([obstacle_viz], **kw),
-        "combined": sample_field_costs([path_viz, corridor_viz, obstacle_viz], **kw),
+        "path": [path_viz],
+        "corridor": [corridor_viz],
+        "obstacle": [obstacle_viz],
+        "combined": [path_viz, corridor_viz, obstacle_viz],
     }
     ax = scene.plot(show=False, bounds=plot_bounds, title="", show_density=False).axes
     track.plot(show=False, ax=ax, bounds=plot_bounds, title="")
@@ -230,6 +229,9 @@ if SHOW_PLOTS:
     plt.show()
     plot_cost_field_exports(
         layers,
+        bounds=cost_bounds,
+        state_dim=sys_mpc.n,
+        grid=(120, 120),
         track=track,
         scene=scene,
         overlay_bounds=plot_bounds,

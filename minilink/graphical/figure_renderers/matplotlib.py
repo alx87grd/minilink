@@ -244,7 +244,8 @@ def draw_heatmap(ax, heatmap: Heatmap):
     if norm is None:
         mesh.set_clim(vmin=heatmap.vmin, vmax=heatmap.vmax)
     if heatmap.colorbar is not None:
-        ax.figure.colorbar(mesh, ax=ax, label=heatmap.colorbar or None)
+        bar = ax.figure.colorbar(mesh, ax=ax, label=heatmap.colorbar or None)
+        offset_ticks(bar, heatmap.tick_offset)
 
 
 def draw_contour(ax, contour: Contour):
@@ -277,20 +278,37 @@ def draw_contour(ax, contour: Contour):
 
 def draw_surface(ax, surface: Surface):
     """A 3-D surface over the mesh, coloured by value, and its colour bar."""
+    from matplotlib.colors import PowerNorm
+
     mesh_x, mesh_y = np.meshgrid(surface.x, surface.y)
+    scale = {"vmin": surface.vmin, "vmax": surface.vmax}
+    if surface.gamma != 1.0:
+        scale = {"norm": PowerNorm(gamma=surface.gamma, **scale)}
+    if surface.stride is not None:
+        scale.update(rstride=surface.stride, cstride=surface.stride)
     drawn = ax.plot_surface(
         mesh_x,
         mesh_y,
         np.asarray(surface.z, dtype=float),
         cmap=surface.cmap,
-        vmin=surface.vmin,
-        vmax=surface.vmax,
         alpha=surface.alpha,
         linewidth=0,
         antialiased=False,
+        **scale,
     )
     if surface.colorbar is not None:
-        ax.figure.colorbar(drawn, ax=ax, shrink=0.6, label=surface.colorbar or None)
+        bar = ax.figure.colorbar(
+            drawn, ax=ax, shrink=0.6, label=surface.colorbar or None
+        )
+        offset_ticks(bar, surface.tick_offset)
+
+
+def offset_ticks(bar, offset):
+    """Label each colour-bar tick ``t`` as ``t + offset``, to one decimal; nothing for 0."""
+    if offset:
+        ticks = bar.get_ticks()
+        bar.set_ticks(ticks)
+        bar.set_ticklabels([f"{t + offset:.1f}" for t in ticks])
 
 
 def draw_vector_field(ax, arrows: Arrows):

@@ -91,6 +91,8 @@ class Heatmap:
     ``shading="smooth"`` blends between the mesh nodes, ``"cells"`` paints a
     cell around each value. ``colorbar`` is the colour bar's label, ``None``
     for none. ``gamma`` < 1 stretches the low values of the colour scale.
+    ``tick_offset`` labels each colour-bar tick ``t`` as ``t + tick_offset``,
+    for values drawn shifted.
     """
 
     x: Any
@@ -103,6 +105,7 @@ class Heatmap:
     colorbar: str | None = ""
     alpha: float = 1.0
     gamma: float = 1.0
+    tick_offset: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -128,7 +131,12 @@ class Contour:
 
 @dataclass(frozen=True)
 class Surface:
-    """Values ``z[j, i]`` at ``(x[i], y[j])`` as a 3-D surface, coloured by value."""
+    """Values ``z[j, i]`` at ``(x[i], y[j])`` as a 3-D surface, coloured by value.
+
+    ``gamma`` and ``tick_offset`` scale and label the colours as a
+    :class:`Heatmap`'s do; ``stride`` draws every ``stride``-th mesh line,
+    ``None`` lets the renderer choose.
+    """
 
     x: Any
     y: Any
@@ -138,6 +146,9 @@ class Surface:
     vmax: float | None = None
     colorbar: str | None = ""
     alpha: float = 1.0
+    gamma: float = 1.0
+    tick_offset: float = 0.0
+    stride: int | None = None
 
 
 @dataclass(frozen=True)

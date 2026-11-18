@@ -236,7 +236,7 @@ def draw_heatmap(fig, heatmap: Heatmap, row, col):
             zsmooth="best" if heatmap.shading == "smooth" else False,
             opacity=heatmap.alpha,
             showscale=heatmap.colorbar is not None,
-            colorbar={"title": heatmap.colorbar or None},
+            colorbar=colorbar_of(heatmap),
         ),
         row=row,
         col=col,
@@ -322,11 +322,26 @@ def draw_surface(fig, surface: Surface, row, col):
             cmax=surface.vmax,
             opacity=surface.alpha,
             showscale=surface.colorbar is not None,
-            colorbar={"title": surface.colorbar or None},
+            colorbar=colorbar_of(surface),
         ),
         row=row,
         col=col,
     )
+
+
+def colorbar_of(layer):
+    """A layer's colour bar: its title, and its ticks labelled ``t + tick_offset`` when offset."""
+    bar = {"title": layer.colorbar or None}
+    if layer.tick_offset:
+        z = np.asarray(layer.z, dtype=float)
+        finite = z[np.isfinite(z)]
+        lo = layer.vmin if layer.vmin is not None else float(finite.min())
+        hi = layer.vmax if layer.vmax is not None else float(finite.max())
+        ticks = np.linspace(lo, hi, 6)
+        bar["tickvals"] = ticks
+        bar["ticktext"] = [f"{t + layer.tick_offset:.1f}" for t in ticks]
+
+    return bar
 
 
 def draw_vector_field(fig, arrows: Arrows, row, col):

@@ -1427,64 +1427,102 @@
   "artists": [
    [
     [
-     "AxesImage",
-     "Circle",
-     "Circle",
      "Line2D",
-     "QuadContourSet"
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "QuadContourSet",
+     "QuadMesh"
     ]
    ],
    [
     [
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
      "Line2D",
      "Line2D",
      "Line2D",
      "Line2D",
      "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
      "QuadContourSet"
     ],
     [
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
      "Line2D",
      "Line2D",
      "Line2D",
      "Line2D",
      "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
      "QuadContourSet"
     ]
    ]
@@ -1494,10 +1532,13 @@
     "axes": [
      {
       "data": [
-       "1b8beb9a0102",
+       "17bfd136c843",
+       "269c5dbdb489",
+       "297ae446d16e",
        "3262a14f4a2a",
-       "4d126160e952",
+       "3262a14f4a2a",
        "4d9b902ac63c",
+       "5a0b50df703e",
        "c4cdd735d17a",
        "e921f7f02fab"
       ],
@@ -1524,31 +1565,49 @@
     "axes": [
      {
       "data": [
-       "00e7ba56d785",
        "030418894d6b",
        "0527fc17691b",
-       "0b51a9ecc69f",
-       "17b1c0b6c546",
+       "18799a75232e",
        "1a120e4c65e2",
-       "1b785039a159",
+       "1f2f2c881aff",
+       "25ae93281edf",
+       "27ff11fb6f43",
+       "2d2f5249b55d",
+       "2d2f5249b55d",
+       "2e03885790de",
+       "2e5a4bfbd939",
+       "2e5a4bfbd939",
+       "304bb64b2fa8",
+       "304bb64b2fa8",
        "3262a14f4a2a",
-       "3817fc894715",
-       "4ae8c40068d8",
-       "4caf8991aa18",
+       "43e8485805e5",
+       "4a010fe9ffb8",
        "4d9b902ac63c",
-       "54534a8ed08e",
-       "605c36d982d6",
-       "63443c5e42e9",
-       "64b247138495",
-       "7081d931ede5",
+       "6419e10d7bdf",
+       "64689bdd3c5b",
+       "687761b9cc2c",
+       "754731d816f4",
+       "754731d816f4",
+       "80b9626ad385",
        "8b88ab6da398",
-       "978e4ca75fc3",
-       "9f57901fa37a",
-       "b42dcb7edc75",
-       "cbd3a7d62950",
+       "8e9c7052a573",
+       "8f7b533ee53a",
+       "935a16821c4f",
+       "a4f3f95f2d01",
+       "a66f0e5aa556",
+       "b69a6e75b948",
+       "b7071d58d7bb",
+       "bac7cd487c6d",
+       "bac7cd487c6d",
+       "c34ae484745c",
+       "c82f8a8038bc",
        "d0eff42dd951",
-       "e890bd8b203a",
-       "f0c7f5aae526"
+       "d8ea1fd00133",
+       "e5ff4213bcf1",
+       "e5ff4213bcf1",
+       "effbef61a547",
+       "effbef61a547",
+       "fbc344582d48"
       ],
       "legend": [
        "goal",
@@ -1572,31 +1631,49 @@
      },
      {
       "data": [
-       "00e7ba56d785",
        "030418894d6b",
-       "0b51a9ecc69f",
-       "17b1c0b6c546",
+       "18799a75232e",
        "1a120e4c65e2",
-       "1b785039a159",
+       "1f2f2c881aff",
+       "25ae93281edf",
+       "27ff11fb6f43",
+       "2d2f5249b55d",
+       "2d2f5249b55d",
+       "2e03885790de",
+       "2e5a4bfbd939",
+       "2e5a4bfbd939",
+       "304bb64b2fa8",
+       "304bb64b2fa8",
        "3262a14f4a2a",
-       "3817fc894715",
        "4192230df90e",
-       "4ae8c40068d8",
-       "4caf8991aa18",
+       "43e8485805e5",
+       "4a010fe9ffb8",
        "4d9b902ac63c",
-       "54534a8ed08e",
-       "605c36d982d6",
-       "63443c5e42e9",
-       "64b247138495",
-       "7081d931ede5",
-       "978e4ca75fc3",
-       "9f57901fa37a",
-       "b42dcb7edc75",
+       "6419e10d7bdf",
+       "64689bdd3c5b",
+       "687761b9cc2c",
+       "754731d816f4",
+       "754731d816f4",
+       "80b9626ad385",
+       "8e9c7052a573",
+       "8f7b533ee53a",
+       "935a16821c4f",
+       "a4f3f95f2d01",
+       "a66f0e5aa556",
+       "b69a6e75b948",
+       "b7071d58d7bb",
+       "bac7cd487c6d",
+       "bac7cd487c6d",
+       "c34ae484745c",
        "c60d99cc2341",
-       "cbd3a7d62950",
+       "c82f8a8038bc",
        "d0eff42dd951",
-       "e890bd8b203a",
-       "f0c7f5aae526"
+       "d8ea1fd00133",
+       "e5ff4213bcf1",
+       "e5ff4213bcf1",
+       "effbef61a547",
+       "effbef61a547",
+       "fbc344582d48"
       ],
       "legend": [
        "goal",
@@ -1882,107 +1959,79 @@
   "artists": [
    [
     [
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
      "Line2D",
      "Line2D",
      "Line2D",
-     "PathCollection"
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon"
     ]
    ],
    [
     [
-     "AxesImage",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
      "Line2D",
      "Line2D",
      "Line2D",
-     "PathCollection"
-    ]
-   ],
-   [
-    [
-     "Poly3DCollection"
-    ]
-   ],
-   [
-    [
-     "AxesImage",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
      "Line2D",
      "Line2D",
      "Line2D",
-     "PathCollection"
-    ]
-   ],
-   [
-    [
-     "Poly3DCollection"
-    ]
-   ],
-   [
-    [
-     "AxesImage",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
      "Line2D",
      "Line2D",
      "Line2D",
-     "PathCollection"
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "QuadMesh"
     ]
    ],
    [
@@ -1992,26 +2041,129 @@
    ],
    [
     [
-     "AxesImage",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
-     "Circle",
      "Line2D",
      "Line2D",
      "Line2D",
-     "PathCollection"
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "QuadMesh"
+    ]
+   ],
+   [
+    [
+     "Poly3DCollection"
+    ]
+   ],
+   [
+    [
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "QuadMesh"
+    ]
+   ],
+   [
+    [
+     "Poly3DCollection"
+    ]
+   ],
+   [
+    [
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "Polygon",
+     "QuadMesh"
     ]
    ],
    [
@@ -2025,25 +2177,40 @@
     "axes": [
      {
       "data": [
-       "04aae6ffc1c6",
        "14792c94ed54",
-       "1a077ac43906",
-       "1d850617f33a",
-       "26a25ee277cd",
+       "2edfaf8a7822",
+       "2edfaf8a7822",
        "38c31cfa0d54",
-       "3a97695a7285",
-       "3dc378bf1fb4",
-       "3f25a310984f",
-       "440d44af3543",
-       "809e1468b088",
-       "8471f26e389a",
-       "8681184a36e1",
+       "425c828b3ef6",
+       "425c828b3ef6",
+       "60c1c8920a6e",
+       "60c1c8920a6e",
+       "679ce70e2b31",
+       "679ce70e2b31",
+       "67a97c15221f",
+       "67a97c15221f",
+       "7d994bd5fefa",
+       "7d994bd5fefa",
        "8ff046e6db9f",
-       "94323dd747ef",
-       "a0af6ee38c0a",
+       "90f8283d8d26",
+       "90f8283d8d26",
        "a54202459d53",
-       "abc165a832fb",
-       "c3a1782ee390"
+       "ad9515a5e72f",
+       "affb90ef17d0",
+       "affb90ef17d0",
+       "bbaaa072a59b",
+       "c178ce78ead1",
+       "c178ce78ead1",
+       "dc69f538c4be",
+       "dc69f538c4be",
+       "eba44a8f6fc1",
+       "eba44a8f6fc1",
+       "ec9f6a0271de",
+       "ec9f6a0271de",
+       "f3e6bc4f1fad",
+       "f3e6bc4f1fad",
+       "fc5dec46348a",
+       "fc5dec46348a"
       ],
       "legend": [
        "corridor",
@@ -2072,26 +2239,42 @@
     "axes": [
      {
       "data": [
-       "04aae6ffc1c6",
        "14792c94ed54",
-       "1a077ac43906",
-       "1d850617f33a",
-       "26a25ee277cd",
+       "2edfaf8a7822",
+       "2edfaf8a7822",
+       "3262a14f4a2a",
        "32e4df1c6efe",
        "38c31cfa0d54",
-       "3a97695a7285",
-       "3dc378bf1fb4",
-       "3f25a310984f",
-       "440d44af3543",
-       "809e1468b088",
-       "8471f26e389a",
-       "8681184a36e1",
+       "425c828b3ef6",
+       "425c828b3ef6",
+       "60c1c8920a6e",
+       "60c1c8920a6e",
+       "679ce70e2b31",
+       "679ce70e2b31",
+       "67a97c15221f",
+       "67a97c15221f",
+       "7d994bd5fefa",
+       "7d994bd5fefa",
        "8ff046e6db9f",
-       "94323dd747ef",
-       "a0af6ee38c0a",
+       "90f8283d8d26",
+       "90f8283d8d26",
        "a54202459d53",
-       "abc165a832fb",
-       "c3a1782ee390"
+       "ad9515a5e72f",
+       "affb90ef17d0",
+       "affb90ef17d0",
+       "bbaaa072a59b",
+       "c178ce78ead1",
+       "c178ce78ead1",
+       "dc69f538c4be",
+       "dc69f538c4be",
+       "eba44a8f6fc1",
+       "eba44a8f6fc1",
+       "ec9f6a0271de",
+       "ec9f6a0271de",
+       "f3e6bc4f1fad",
+       "f3e6bc4f1fad",
+       "fc5dec46348a",
+       "fc5dec46348a"
       ],
       "legend": [
        "corridor",
@@ -2147,26 +2330,42 @@
     "axes": [
      {
       "data": [
-       "04aae6ffc1c6",
        "129dc514c5da",
        "14792c94ed54",
-       "1a077ac43906",
-       "1d850617f33a",
-       "26a25ee277cd",
+       "2edfaf8a7822",
+       "2edfaf8a7822",
+       "3262a14f4a2a",
        "38c31cfa0d54",
-       "3a97695a7285",
-       "3dc378bf1fb4",
-       "3f25a310984f",
-       "440d44af3543",
-       "809e1468b088",
-       "8471f26e389a",
-       "8681184a36e1",
+       "425c828b3ef6",
+       "425c828b3ef6",
+       "60c1c8920a6e",
+       "60c1c8920a6e",
+       "679ce70e2b31",
+       "679ce70e2b31",
+       "67a97c15221f",
+       "67a97c15221f",
+       "7d994bd5fefa",
+       "7d994bd5fefa",
        "8ff046e6db9f",
-       "94323dd747ef",
-       "a0af6ee38c0a",
+       "90f8283d8d26",
+       "90f8283d8d26",
        "a54202459d53",
-       "abc165a832fb",
-       "c3a1782ee390"
+       "ad9515a5e72f",
+       "affb90ef17d0",
+       "affb90ef17d0",
+       "bbaaa072a59b",
+       "c178ce78ead1",
+       "c178ce78ead1",
+       "dc69f538c4be",
+       "dc69f538c4be",
+       "eba44a8f6fc1",
+       "eba44a8f6fc1",
+       "ec9f6a0271de",
+       "ec9f6a0271de",
+       "f3e6bc4f1fad",
+       "f3e6bc4f1fad",
+       "fc5dec46348a",
+       "fc5dec46348a"
       ],
       "legend": [
        "corridor",
@@ -2222,26 +2421,42 @@
     "axes": [
      {
       "data": [
-       "04aae6ffc1c6",
        "14792c94ed54",
-       "1a077ac43906",
-       "1d850617f33a",
-       "26a25ee277cd",
+       "2edfaf8a7822",
+       "2edfaf8a7822",
+       "3262a14f4a2a",
        "38c31cfa0d54",
-       "3a97695a7285",
-       "3dc378bf1fb4",
-       "3f25a310984f",
-       "440d44af3543",
-       "809e1468b088",
-       "8471f26e389a",
-       "8681184a36e1",
+       "425c828b3ef6",
+       "425c828b3ef6",
+       "60c1c8920a6e",
+       "60c1c8920a6e",
+       "679ce70e2b31",
+       "679ce70e2b31",
+       "67a97c15221f",
+       "67a97c15221f",
+       "7d994bd5fefa",
+       "7d994bd5fefa",
        "8ff046e6db9f",
-       "94323dd747ef",
-       "a0af6ee38c0a",
+       "90f8283d8d26",
+       "90f8283d8d26",
        "a54202459d53",
-       "abc165a832fb",
-       "c3a1782ee390",
-       "e8e5276f7107"
+       "ad9515a5e72f",
+       "affb90ef17d0",
+       "affb90ef17d0",
+       "bbaaa072a59b",
+       "c178ce78ead1",
+       "c178ce78ead1",
+       "dc69f538c4be",
+       "dc69f538c4be",
+       "e8e5276f7107",
+       "eba44a8f6fc1",
+       "eba44a8f6fc1",
+       "ec9f6a0271de",
+       "ec9f6a0271de",
+       "f3e6bc4f1fad",
+       "f3e6bc4f1fad",
+       "fc5dec46348a",
+       "fc5dec46348a"
       ],
       "legend": [
        "corridor",
@@ -2297,26 +2512,42 @@
     "axes": [
      {
       "data": [
-       "04aae6ffc1c6",
        "14792c94ed54",
-       "1a077ac43906",
-       "1d850617f33a",
-       "26a25ee277cd",
+       "2edfaf8a7822",
+       "2edfaf8a7822",
+       "3262a14f4a2a",
        "38c31cfa0d54",
-       "3a97695a7285",
-       "3dc378bf1fb4",
-       "3f25a310984f",
-       "440d44af3543",
-       "809e1468b088",
-       "8471f26e389a",
-       "8681184a36e1",
+       "425c828b3ef6",
+       "425c828b3ef6",
+       "60c1c8920a6e",
+       "60c1c8920a6e",
+       "679ce70e2b31",
+       "679ce70e2b31",
+       "67a97c15221f",
+       "67a97c15221f",
+       "7d994bd5fefa",
+       "7d994bd5fefa",
        "8ff046e6db9f",
-       "94323dd747ef",
-       "a0af6ee38c0a",
+       "90f8283d8d26",
+       "90f8283d8d26",
        "a54202459d53",
-       "abc165a832fb",
+       "ad9515a5e72f",
+       "affb90ef17d0",
+       "affb90ef17d0",
+       "bbaaa072a59b",
        "be16645dd818",
-       "c3a1782ee390"
+       "c178ce78ead1",
+       "c178ce78ead1",
+       "dc69f538c4be",
+       "dc69f538c4be",
+       "eba44a8f6fc1",
+       "eba44a8f6fc1",
+       "ec9f6a0271de",
+       "ec9f6a0271de",
+       "f3e6bc4f1fad",
+       "f3e6bc4f1fad",
+       "fc5dec46348a",
+       "fc5dec46348a"
       ],
       "legend": [
        "corridor",
@@ -5834,164 +6065,6 @@
    }
   ]
  },
- "tests/unittest/test_planning.py::test_drawn_shapes_span_their_bounds": {
-  "artists": [
-   [
-    [
-     "Circle"
-    ]
-   ],
-   [
-    [
-     "Rectangle"
-    ]
-   ],
-   [
-    [
-     "FancyBboxPatch"
-    ]
-   ],
-   [
-    [
-     "Circle"
-    ]
-   ],
-   [
-    [
-     "Circle",
-     "FancyBboxPatch"
-    ]
-   ]
-  ],
-  "data": [
-   {
-    "axes": [
-     {
-      "data": [
-       "33089090a879"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "",
-      "xlabel": "",
-      "xlim": [
-       0.0,
-       1.0
-      ],
-      "xscale": "linear",
-      "ylabel": "",
-      "ylim": [
-       0.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "e738df5f0f67"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "",
-      "xlabel": "",
-      "xlim": [
-       0.0,
-       1.0
-      ],
-      "xscale": "linear",
-      "ylabel": "",
-      "ylim": [
-       0.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "14264f7a1b62"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "",
-      "xlabel": "",
-      "xlim": [
-       0.0,
-       1.0
-      ],
-      "xscale": "linear",
-      "ylabel": "",
-      "ylim": [
-       0.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "907772d621c1"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "",
-      "xlabel": "",
-      "xlim": [
-       0.0,
-       1.0
-      ],
-      "xscale": "linear",
-      "ylabel": "",
-      "ylim": [
-       0.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "4d126160e952",
-       "d15db0fdd14c"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "",
-      "xlabel": "",
-      "xlim": [
-       0.0,
-       1.0
-      ],
-      "xscale": "linear",
-      "ylabel": "",
-      "ylim": [
-       0.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   }
-  ]
- },
  "tests/unittest/test_planning.py::test_live_plot_runs_beside_the_callback": {
   "artists": [
    [
@@ -6056,8 +6129,9 @@
   "artists": [
    [
     [
-     "AxesImage",
-     "Circle"
+     "Line2D",
+     "Polygon",
+     "QuadMesh"
     ]
    ],
    [
@@ -6067,8 +6141,9 @@
    ],
    [
     [
-     "AxesImage",
-     "Circle"
+     "Line2D",
+     "Polygon",
+     "QuadMesh"
     ]
    ],
    [
@@ -6078,8 +6153,9 @@
    ],
    [
     [
-     "AxesImage",
-     "Circle"
+     "Line2D",
+     "Polygon",
+     "QuadMesh"
     ]
    ],
    [
@@ -6089,8 +6165,9 @@
    ],
    [
     [
-     "AxesImage",
-     "Circle"
+     "Line2D",
+     "Polygon",
+     "QuadMesh"
     ]
    ],
    [
@@ -6104,7 +6181,9 @@
     "axes": [
      {
       "data": [
-       "a9641a701c00",
+       "3262a14f4a2a",
+       "7fd92b432446",
+       "8104f35a5a14",
        "f7d6b165cf45"
       ],
       "legend": [],
@@ -6157,8 +6236,10 @@
     "axes": [
      {
       "data": [
+       "3262a14f4a2a",
        "43282b91be0d",
-       "a9641a701c00"
+       "7fd92b432446",
+       "8104f35a5a14"
       ],
       "legend": [],
       "texts": [],
@@ -6211,7 +6292,9 @@
      {
       "data": [
        "15bf99084998",
-       "a9641a701c00"
+       "3262a14f4a2a",
+       "7fd92b432446",
+       "8104f35a5a14"
       ],
       "legend": [],
       "texts": [],
@@ -6263,8 +6346,10 @@
     "axes": [
      {
       "data": [
+       "3262a14f4a2a",
        "3a6a9ee8148e",
-       "a9641a701c00"
+       "7fd92b432446",
+       "8104f35a5a14"
       ],
       "legend": [],
       "texts": [],
@@ -6446,25 +6531,29 @@
   "artists": [
    [
     [
-     "AxesImage",
-     "Circle",
-     "Line2D"
-    ]
-   ],
-   [
-    [
-     "AxesImage",
-     "Circle",
-     "Circle",
-     "Line2D"
-    ]
-   ],
-   [
-    [
-     "AxesImage",
-     "Circle",
      "Line2D",
-     "Line2D"
+     "Line2D",
+     "Polygon",
+     "QuadMesh"
+    ]
+   ],
+   [
+    [
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "Polygon",
+     "QuadMesh"
+    ]
+   ],
+   [
+    [
+     "Line2D",
+     "Line2D",
+     "Line2D",
+     "Polygon",
+     "QuadMesh"
     ]
    ]
   ],
@@ -6473,7 +6562,9 @@
     "axes": [
      {
       "data": [
-       "4d126160e952",
+       "17bfd136c843",
+       "297ae446d16e",
+       "3262a14f4a2a",
        "9f95bdac68a6",
        "e921f7f02fab"
       ],
@@ -6500,8 +6591,11 @@
     "axes": [
      {
       "data": [
-       "064a1ca140a3",
-       "4d126160e952",
+       "0c36611ce024",
+       "17bfd136c843",
+       "297ae446d16e",
+       "3262a14f4a2a",
+       "615ab48bf929",
        "9f95bdac68a6",
        "e921f7f02fab"
       ],
@@ -6528,7 +6622,9 @@
     "axes": [
      {
       "data": [
-       "4d126160e952",
+       "17bfd136c843",
+       "297ae446d16e",
+       "3262a14f4a2a",
        "537cdd823440",
        "9f95bdac68a6",
        "e921f7f02fab"

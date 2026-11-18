@@ -1,20 +1,36 @@
-"""Spatial plots: a scene, a reference track and a workspace cost field in Matplotlib."""
+"""Spatial plots: a scene, a reference track and a workspace cost field."""
 
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import replace
 
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
-from minilink.graphical.common.plot_result import plot_result_of
-from minilink.planning.plotting import maybe_show
+from minilink.graphical.figure import (
+    Contour,
+    FigureSpec,
+    Heatmap,
+    Panel,
+    Surface,
+    Trace,
+    draw,
+    overlay,
+)
 from minilink.planning.spatial.collision import iter_probes
-from minilink.planning.spatial.grid import FieldGrid, sample_grid
+from minilink.planning.spatial.grid import sample_grid
 from minilink.planning.spatial.workspace_fields import GaussianField
 
-# Matplotlib is imported inside each view, so the planning layer stays usable
-# without a display backend until a plot is requested.
+# The colours of the scene and the track
+OBSTACLE_COLOR = "#c44e52"
+BODY_COLOR = "#4c72b0"
+FIELD_MARKER_COLOR = "#ff7f0e"
+CENTERLINE_COLOR = "#5c6570"
+CORRIDOR_EDGE_COLOR = "#9aa3af"
+WAYPOINT_COLOR = "#1f77b4"
+
+# Low cost (blue) to high cost (red)
+COST_FIELD_CMAP = "turbo"
 
 
 ###############################################################################
@@ -33,115 +49,37 @@ def plot_scene(
     body=None,
     x=None,
     states=None,
-    show: bool = True,
-    ax=None,
-    figsize=(6.0, 6.0),
     t: float = 0.0,
     params=None,
-    obstacle_color: str = "#c44e52",
-    obstacle_alpha: float = 0.45,
-    density_cmap: str = "Oranges",
-    density_alpha: float = 0.55,
-    body_color: str = "#4c72b0",
-    body_alpha: float = 0.35,
-    point_marker_size: float = 9.0,
     title: str | None = None,
-    equal_aspect: bool = True,
+    figsize=(6.0, 6.0),
+    renderer="matplotlib",
+    show=None,
+    ax=None,
 ):
     """
     Plot hard obstacles and soft workspace fields for a 2-D scene.
 
     Pass ``body`` with ``x`` (one state) or ``states`` (several) to overlay
     collision discs at the placed body poses.
-
-    Returns ``(fig, ax)``. Matplotlib is imported on first call.
     """
-    import matplotlib.pyplot as plt
+    spec = scene_figure(
+        scene,
+        bounds=bounds,
+        grid=grid,
+        show_obstacles=show_obstacles,
+        show_density=show_density,
+        show_clearance_contour=show_clearance_contour,
+        body=body,
+        x=x,
+        states=states,
+        t=t,
+        params=params,
+        title=title,
+        figsize=figsize,
+    )
 
-    require_planar_scene(scene)
-
-    # The window, and a new figure or the one that holds the given axes
-    plot_bounds = bounds if bounds is not None else default_bounds(scene)
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize, frameon=True)
-    else:
-        fig = ax.figure
-
-    # The soft fields: their summed cost density as a heatmap
-    if show_density and scene.workspace_fields:
-        density = sample_grid(
-            scene.cost_density,
-            plot_bounds,
-            grid=grid,
-            t=t,
-            params=params,
-        )
-        ax.imshow(
-            density.Z,
-            extent=density.extent,
-            origin="lower",
-            cmap=density_cmap,
-            alpha=density_alpha,
-            aspect="auto",
-            zorder=1,
-        )
-
-    # The obstacles' boundary: the zero level set of their union's signed distance
-    if show_clearance_contour and scene.obstacles:
-        clearance = sample_grid(
-            Union(scene.obstacles).sdf,
-            plot_bounds,
-            grid=grid,
-            t=t,
-            params=params,
-        )
-        ax.contour(
-            clearance.xs,
-            clearance.ys,
-            clearance.Z,
-            levels=[0.0],
-            colors="k",
-            linewidths=1.0,
-            zorder=3,
-        )
-
-    # The hard obstacles, and a marker at each soft field's source
-    if show_obstacles:
-        for obstacle in scene.obstacles:
-            draw_shape(ax, obstacle, obstacle_color, obstacle_alpha)
-
-    for field in scene.workspace_fields:
-        draw_field_marker(ax, field)
-
-    # The body's collision discs, placed at each given state
-    body_states = coerce_body_states(x, states)
-    if body is not None:
-        for state in body_states:
-            draw_body(
-                ax,
-                body,
-                state,
-                t,
-                params,
-                body_color,
-                body_alpha,
-                point_marker_size,
-            )
-
-    # The limits, aspect and labels
-    (x_lo, x_hi), (y_lo, y_hi) = plot_bounds
-    ax.set_xlim(x_lo, x_hi)
-    ax.set_ylim(y_lo, y_hi)
-    if equal_aspect:
-        ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title(title if title is not None else "Scene")
-    ax.grid(True, alpha=0.25, zorder=0)
-
-    maybe_show(fig, show)
-
-    return plot_result_of((fig, ax))
+    return draw(spec, renderer=renderer, show=show, ax=ax)
 
 
 def plot_track(
@@ -149,31 +87,268 @@ def plot_track(
     *,
     bounds=None,
     n_samples: int = 200,
-    show: bool = True,
-    ax=None,
-    figsize=(6.0, 6.0),
-    centerline_color: str = "#5c6570",
-    corridor_edge_color: str = "#9aa3af",
-    waypoint_color: str = "#1f77b4",
+    show_waypoints: bool = True,
     title: str | None = None,
-    equal_aspect: bool = True,
+    figsize=(6.0, 6.0),
+    renderer="matplotlib",
+    show=None,
+    ax=None,
+):
+    """Plot a :class:`~minilink.planning.spatial.track.ReferenceTrack` in 2-D: its corridor, centerline and waypoints."""
+    spec = track_figure(
+        track,
+        bounds=bounds,
+        n_samples=n_samples,
+        show_waypoints=show_waypoints,
+        title=title,
+        figsize=figsize,
+    )
+
+    return draw(spec, renderer=renderer, show=show, ax=ax)
+
+
+def plot_cost_field(
+    costs,
+    *,
+    bounds,
+    grid=(200, 200),
+    state_dim: int = 2,
+    u=None,
+    t: float = 0.0,
+    params=None,
+    cmap=COST_FIELD_CMAP,
+    log_scale: bool = False,
+    vmax: float | None = None,
+    gamma: float = 0.55,
+    title: str | None = "Spatial cost",
+    figsize=(6.0, 6.0),
+    renderer="matplotlib",
+    show=None,
+    ax=None,
 ):
     """
-    Plot a :class:`~minilink.planning.spatial.track.ReferenceTrack` in 2-D.
+    Plot the summed cost of ``FieldCost`` terms over a workspace grid, as a heatmap.
 
-    Returns ``(fig, ax)``. Matplotlib is imported on first call.
+    Each cell is the cost of a workspace point ``p = (x, y)`` seen by a point
+    probe: build the costs with ``mount(point_probe(), on=sys)``, so the field
+    does not depend on heading or body extent, and pass the plant's
+    ``state_dim`` (``sys.n``). ``log_scale`` draws ``log(1 + cost)``; the
+    colours scale as ``(z / vmax)^γ``.
     """
-    import matplotlib.pyplot as plt
+    xs, ys, Z = sampled_costs(
+        costs, bounds=bounds, grid=grid, state_dim=state_dim, u=u, t=t, params=params
+    )
+    spec = cost_field_figure(
+        xs,
+        ys,
+        Z,
+        cmap=cmap,
+        log_scale=log_scale,
+        vmax=vmax,
+        gamma=gamma,
+        title=title,
+        figsize=figsize,
+    )
 
+    return draw(spec, renderer=renderer, show=show, ax=ax)
+
+
+def plot_cost_field_3d(
+    costs,
+    *,
+    bounds,
+    grid=(200, 200),
+    state_dim: int = 2,
+    u=None,
+    t: float = 0.0,
+    params=None,
+    cmap=COST_FIELD_CMAP,
+    log_scale: bool = False,
+    vmax: float | None = None,
+    gamma: float = 0.55,
+    title: str | None = "Spatial cost",
+    figsize=(8.0, 6.0),
+    renderer="matplotlib",
+    show=None,
+    ax=None,
+):
+    """Plot the summed cost of ``FieldCost`` terms as a 3-D surface ``z = cost(x, y)`` (see :func:`plot_cost_field`)."""
+    xs, ys, Z = sampled_costs(
+        costs, bounds=bounds, grid=grid, state_dim=state_dim, u=u, t=t, params=params
+    )
+    spec = cost_surface_figure(
+        xs,
+        ys,
+        Z,
+        cmap=cmap,
+        log_scale=log_scale,
+        vmax=vmax,
+        gamma=gamma,
+        title=title,
+        figsize=figsize,
+        stride=1,
+    )
+
+    return draw(spec, renderer=renderer, show=show, ax=ax)
+
+
+def plot_cost_field_exports(
+    layers,
+    *,
+    bounds,
+    grid=(200, 200),
+    state_dim: int = 2,
+    u=None,
+    t: float = 0.0,
+    params=None,
+    track=None,
+    scene=None,
+    overlay_bounds=None,
+    traj=None,
+    log_scale: bool = True,
+    cmap=COST_FIELD_CMAP,
+    renderer="matplotlib",
+    show=None,
+    ax=None,
+):
+    """
+    Plot each named cost layer in 2-D and 3-D with the same colour map.
+
+    Parameters
+    ----------
+    layers : dict[str, list]
+        The cost terms of each layer, e.g. ``{"path": [path_cost],
+        "combined": [path_cost, corridor_cost]}``, sampled on ``bounds`` and
+        ``grid`` as :func:`plot_cost_field` does.
+    track, scene
+        Optional overlays drawn on the 2-D figures (``overlay_bounds`` for limits).
+    traj
+        Optional executed path ``(x, y)`` polyline on 2-D figures.
+    ax
+        ``None``: each layer draws two figures of its own.
+
+    Returns
+    -------
+    dict
+        ``{name: {"2d": PlotResult, "3d": PlotResult}}``; ``.save`` writes each.
+    """
+    require_own_figures(ax)
+
+    out = {}
+    for name, costs in layers.items():
+        xs, ys, Z = sampled_costs(
+            costs,
+            bounds=bounds,
+            grid=grid,
+            state_dim=state_dim,
+            u=u,
+            t=t,
+            params=params,
+        )
+        title = name.replace("_", " ").title()
+        shared = {"cmap": cmap, "log_scale": log_scale, "vmax": None, "gamma": 0.55}
+
+        # The heatmap, under the track, the scene and the executed path when given
+        heatmap = cost_field_figure(
+            xs, ys, Z, title=f"{title} cost (2D)", figsize=(9.0, 7.0), **shared
+        )
+        spec_2d = export_overlay(heatmap, track, scene, overlay_bounds, traj)
+
+        # The surface, every second mesh line
+        spec_3d = cost_surface_figure(
+            xs,
+            ys,
+            Z,
+            title=f"{title} cost (3D)",
+            figsize=(9.0, 7.0),
+            stride=2,
+            **shared,
+        )
+
+        out[name] = {
+            "2d": draw(spec_2d, renderer=renderer, show=show),
+            "3d": draw(spec_3d, renderer=renderer, show=show),
+        }
+
+    return out
+
+
+def scene_figure(
+    scene,
+    *,
+    bounds,
+    grid,
+    show_obstacles,
+    show_density,
+    show_clearance_contour,
+    body,
+    x,
+    states,
+    t,
+    params,
+    title,
+    figsize,
+):
+    """The scene's density, clearance contour, obstacles, field markers and body, as a description."""
+    require_planar_scene(scene)
+    plot_bounds = bounds if bounds is not None else default_bounds(scene)
+    layers = []
+
+    # The soft fields: their summed cost density as a heatmap
+    if show_density and scene.workspace_fields:
+        xs, ys, density = sample_grid(
+            scene.cost_density, plot_bounds, grid=grid, t=t, params=params
+        )
+        layers.append(
+            Heatmap(
+                xs,
+                ys,
+                density,
+                cmap="Oranges",
+                alpha=0.55,
+                shading="cells",
+                colorbar=None,
+            )
+        )
+
+    # The obstacles' boundary: the zero level set of their union's signed distance
+    if show_clearance_contour and scene.obstacles:
+        xs, ys, clearance = sample_grid(
+            Union(scene.obstacles).sdf, plot_bounds, grid=grid, t=t, params=params
+        )
+        layers.append(Contour(xs, ys, clearance, levels=(0.0,), color="black"))
+
+    # The hard obstacles, and a marker at each soft field's source
+    if show_obstacles:
+        for obstacle in scene.obstacles:
+            layers += disc_layers(shape_outlines(obstacle), OBSTACLE_COLOR, 0.45)
+    for field in scene.workspace_fields:
+        layers.append(field_marker(field))
+
+    # The body's collision discs, placed at each given state
+    if body is not None:
+        for state in coerce_body_states(x, states):
+            layers += body_layers(body, state, t, params)
+
+    (x_lo, x_hi), (y_lo, y_hi) = plot_bounds
+    panel = Panel(
+        layers=tuple(layers),
+        title="Scene" if title is None else title,
+        x_label="x",
+        y_label="y",
+        x_lim=(x_lo, x_hi),
+        y_lim=(y_lo, y_hi),
+        equal_aspect=True,
+        legend=None,
+    )
+
+    return FigureSpec(panels=(panel,), figsize=figsize)
+
+
+def track_figure(track, *, bounds, n_samples, show_waypoints, title, figsize):
+    """The track's corridor edges, dashed centerline and waypoints, as a description."""
     path = track.path
     require_planar_path(path)
-
-    # A new figure, or the one that holds the given axes
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize, frameon=True)
-    else:
-        fig = ax.figure
-
     total = path.total_length
     require_positive_length(total)
 
@@ -184,341 +359,114 @@ def plot_track(
     normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
 
     # The corridor edges c(s) ± w n(s)
-    half = float(track.half_width)
-    upper = center + half * normals
-    lower = center - half * normals
+    w = float(track.half_width)
+    upper = center + w * normals
+    lower = center - w * normals
 
     # The corridor edges, then the dashed centerline
-    ax.plot(
-        upper[:, 0],
-        upper[:, 1],
-        color=corridor_edge_color,
-        linewidth=1.0,
-        zorder=2,
-        label="corridor",
-    )
-    ax.plot(
-        lower[:, 0],
-        lower[:, 1],
-        color=corridor_edge_color,
-        linewidth=1.0,
-        zorder=2,
-    )
-    ax.plot(
-        center[:, 0],
-        center[:, 1],
-        color=centerline_color,
-        linewidth=1.2,
-        linestyle=(0, (5, 4)),
-        zorder=3,
-        label="path",
-    )
+    edge = {"color": CORRIDOR_EDGE_COLOR, "width": 1.0}
+    layers = [
+        Trace(upper[:, 0], upper[:, 1], label="corridor", **edge),
+        Trace(lower[:, 0], lower[:, 1], **edge),
+        Trace(
+            center[:, 0],
+            center[:, 1],
+            color=CENTERLINE_COLOR,
+            width=1.2,
+            dash="dash",
+            label="path",
+        ),
+    ]
 
     # The waypoints, when the path keeps them
-    if hasattr(path, "waypoints"):
+    if show_waypoints and hasattr(path, "waypoints"):
         wp = np.asarray(path.waypoints)
-        ax.scatter(
-            wp[:, 0],
-            wp[:, 1],
-            color=waypoint_color,
-            s=36,
-            zorder=4,
-            label="waypoints",
+        layers.append(
+            Trace(
+                wp[:, 0],
+                wp[:, 1],
+                color=WAYPOINT_COLOR,
+                mode="markers",
+                label="waypoints",
+            )
         )
 
     # The limits: the given bounds, else the centerline padded by w + 0.5
-    if bounds is not None:
-        (xlo, xhi), (ylo, yhi) = bounds
-        ax.set_xlim(xlo, xhi)
-        ax.set_ylim(ylo, yhi)
-    else:
-        pad = half + 0.5
-        ax.set_xlim(center[:, 0].min() - pad, center[:, 0].max() + pad)
-        ax.set_ylim(center[:, 1].min() - pad, center[:, 1].max() + pad)
-
-    # The aspect, labels and legend
-    if equal_aspect:
-        ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title(title if title is not None else "Reference track")
-    ax.legend(loc="best", fontsize=8)
-
-    maybe_show(fig, show)
-
-    return plot_result_of((fig, ax))
-
-
-def plot_cost_field(
-    grid: FieldGrid,
-    *,
-    ax=None,
-    cmap=None,
-    log_scale: bool = False,
-    vmax: float | None = None,
-    vmax_percentile: float = 99.0,
-    gamma: float = 0.55,
-    normalize_range: bool = True,
-    facecolor: str = "white",
-    colorbar: bool = True,
-    colorbar_label: str | None = None,
-    show: bool = True,
-    figsize=(6.0, 6.0),
-    title: str | None = "Spatial cost",
-    equal_aspect: bool = True,
-):
-    """Plot a workspace cost heatmap. Returns ``(fig, ax)``."""
-    import matplotlib.pyplot as plt
-
-    # A new figure, or the one that holds the given axes
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize, frameon=True, facecolor=facecolor)
-    else:
-        fig = ax.figure
-
-    # The displayed values, their colour map and their power-law scale
-    z, vmin, vmax, default_label = cost_field_array(
-        grid,
-        log_scale=log_scale,
-        vmax=vmax,
-        vmax_percentile=vmax_percentile,
-        normalize_range=normalize_range,
+    if bounds is None:
+        pad = w + 0.5
+        bounds = (
+            (center[:, 0].min() - pad, center[:, 0].max() + pad),
+            (center[:, 1].min() - pad, center[:, 1].max() + pad),
+        )
+    panel = Panel(
+        layers=tuple(layers),
+        title="Reference track" if title is None else title,
+        x_label="x",
+        y_label="y",
+        x_lim=tuple(bounds[0]),
+        y_lim=tuple(bounds[1]),
+        equal_aspect=True,
     )
-    cmap_resolved = cost_cmap_of(cmap)
-    norm = cost_field_norm(vmax, gamma=gamma)
 
-    # The heatmap, and its colour bar
-    ax.set_facecolor(facecolor)
-    image = ax.imshow(
+    return FigureSpec(panels=(panel,), figsize=figsize)
+
+
+def cost_field_figure(xs, ys, Z, *, cmap, log_scale, vmax, gamma, title, figsize):
+    """The cost field as a heatmap on a power-law colour scale, as a description."""
+    z, vmin, vmax, label = cost_field_array(Z, log_scale=log_scale, vmax=vmax)
+    heatmap = Heatmap(
+        xs,
+        ys,
         z,
-        extent=grid.extent,
-        origin="lower",
-        cmap=cmap_resolved,
-        norm=norm,
-        aspect="auto",
-        zorder=1,
-    )
-    if colorbar:
-        label = colorbar_label if colorbar_label is not None else default_label
-        cbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label=label)
-        label_cost_colorbar(
-            cbar, vmin, normalize_range=normalize_range, log_scale=log_scale
-        )
-
-    # The limits, aspect and labels
-    ax.set_xlim(grid.extent[0], grid.extent[1])
-    ax.set_ylim(grid.extent[2], grid.extent[3])
-    if equal_aspect:
-        ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title(title)
-    ax.grid(True, alpha=0.25, zorder=0)
-
-    maybe_show(fig, show)
-
-    return plot_result_of((fig, ax))
-
-
-def plot_cost_field_3d(
-    grid: FieldGrid,
-    *,
-    ax=None,
-    cmap=None,
-    log_scale: bool = False,
-    vmax: float | None = None,
-    vmax_percentile: float = 99.0,
-    gamma: float = 0.55,
-    normalize_range: bool = True,
-    facecolor: str = "white",
-    colorbar: bool = True,
-    colorbar_label: str | None = None,
-    show: bool = True,
-    figsize=(8.0, 6.0),
-    title: str | None = "Spatial cost",
-    elev: float = 35.0,
-    azim: float = -60.0,
-    alpha: float = 0.92,
-    rstride: int = 1,
-    cstride: int = 1,
-):
-    """Plot workspace cost as a 3-D surface ``z = cost(x, y)``. Returns ``(fig, ax)``."""
-    import matplotlib.pyplot as plt
-
-    # The displayed values, their colour map and scale, over the (x, y) mesh
-    z, vmin, vmax, default_label = cost_field_array(
-        grid,
-        log_scale=log_scale,
+        cmap=cmap,
+        vmin=0.0,
         vmax=vmax,
-        vmax_percentile=vmax_percentile,
-        normalize_range=normalize_range,
+        shading="cells",
+        colorbar=label,
+        gamma=gamma,
+        tick_offset=vmin if log_scale else 0.0,
     )
-    cmap_resolved = cost_cmap_of(cmap)
-    norm = cost_field_norm(vmax, gamma=gamma)
-    x_grid, y_grid = np.meshgrid(grid.xs, grid.ys)
-
-    # A new 3-D figure, or the one that holds the given axes
-    if ax is None:
-        fig = plt.figure(figsize=figsize, frameon=True, facecolor=facecolor)
-        ax = fig.add_subplot(111, projection="3d")
-    else:
-        fig = ax.figure
-
-    # The surface, and its colour bar
-    ax.set_facecolor(facecolor)
-    surface = ax.plot_surface(
-        x_grid,
-        y_grid,
-        z,
-        cmap=cmap_resolved,
-        norm=norm,
-        linewidth=0.0,
-        antialiased=True,
-        alpha=alpha,
-        rstride=rstride,
-        cstride=cstride,
+    panel = Panel(
+        layers=(heatmap,),
+        title=title or "",
+        x_label="x",
+        y_label="y",
+        x_lim=(float(xs[0]), float(xs[-1])),
+        y_lim=(float(ys[0]), float(ys[-1])),
+        equal_aspect=True,
     )
-    if colorbar:
-        label = colorbar_label if colorbar_label is not None else default_label
-        cbar = fig.colorbar(surface, ax=ax, shrink=0.62, pad=0.08, label=label)
-        label_cost_colorbar(
-            cbar, vmin, normalize_range=normalize_range, log_scale=log_scale
-        )
 
-    # The labels and the view
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel(default_label)
-    ax.set_title(title)
-    ax.view_init(elev=elev, azim=azim)
-
-    maybe_show(fig, show)
-
-    return plot_result_of((fig, ax))
+    return FigureSpec(panels=(panel,), figsize=figsize)
 
 
-def plot_cost_field_exports(
-    layers,
-    *,
-    track=None,
-    scene=None,
-    overlay_bounds=None,
-    traj=None,
-    log_scale: bool = True,
-    cmap=None,
-    save_dir=None,
-    show: bool = True,
-    figsize_2d=(9.0, 7.0),
-    figsize_3d=(9.0, 7.0),
-    surface_stride: int = 2,
-    **plot_kwargs,
+def cost_surface_figure(
+    xs, ys, Z, *, cmap, log_scale, vmax, gamma, title, figsize, stride
 ):
-    """
-    Plot each named cost layer in 2-D and 3-D with the same colormap.
+    """The cost field as a 3-D surface on a power-law colour scale, as a description."""
+    z, vmin, vmax, label = cost_field_array(Z, log_scale=log_scale, vmax=vmax)
+    surface = Surface(
+        xs,
+        ys,
+        z,
+        cmap=cmap,
+        vmin=0.0,
+        vmax=vmax,
+        colorbar=label,
+        alpha=0.92,
+        gamma=gamma,
+        tick_offset=vmin if log_scale else 0.0,
+        stride=stride,
+    )
+    panel = Panel(
+        layers=(surface,),
+        title=title or "",
+        x_label="x",
+        y_label="y",
+        z_label=label,
+        is_3d=True,
+    )
 
-    Parameters
-    ----------
-    layers : dict[str, FieldGrid]
-        e.g. ``{"path": g, "corridor": g, "obstacle": g, "combined": g}``.
-    track, scene
-        Optional overlays drawn on the 2-D figures (``overlay_bounds`` for limits).
-    traj
-        Optional executed path ``(x, y)`` polyline on 2-D figures.
-    save_dir
-        If set, write ``{name}_2d.png`` and ``{name}_3d.png`` for each layer.
-    **plot_kwargs
-        Forwarded to :func:`plot_cost_field` / :func:`plot_cost_field_3d`
-        (``vmax_percentile``, ``gamma``, etc.).
-
-    Returns
-    -------
-    dict
-        ``{name: {"2d": (fig, ax), "3d": (fig, ax)}}``.
-    """
-
-    import matplotlib.pyplot as plt
-
-    # The options every layer shares, and the output folder
-    cmap_resolved = cost_cmap_of(cmap)
-    shared = {"cmap": cmap_resolved, "log_scale": log_scale, **plot_kwargs}
-    out = {}
-    save_path = Path(save_dir) if save_dir is not None else None
-    if save_path is not None:
-        save_path.mkdir(parents=True, exist_ok=True)
-
-    for name, grid in layers.items():
-        # The layer's titles
-        title_2d = name.replace("_", " ").title()
-        title_2d_full = f"{title_2d} cost (2D)"
-        title_3d_full = f"{title_2d} cost (3D)"
-
-        # The heatmap, under the track, the scene and the executed path when given
-        drawn2d = plot_cost_field(
-            grid,
-            ax=None,
-            title=title_2d_full,
-            show=False,
-            figsize=figsize_2d,
-            **shared,
-        )
-        fig2d, ax2d = drawn2d.figure, drawn2d.axes
-        if track is not None:
-            track.plot(show=False, ax=ax2d, bounds=overlay_bounds, title="")
-        if scene is not None:
-            scene.plot(
-                show=False,
-                ax=ax2d,
-                bounds=overlay_bounds,
-                show_density=False,
-                title="",
-            )
-        if traj is not None:
-            ax2d.plot(
-                traj[0, :],
-                traj[1, :],
-                color="k",
-                linewidth=1.0,
-                alpha=0.85,
-                zorder=7,
-            )
-        ax2d.set_title(title_2d_full)
-        fig2d.tight_layout()
-
-        # The surface
-        drawn3d = plot_cost_field_3d(
-            grid,
-            ax=None,
-            title=title_3d_full,
-            show=False,
-            figsize=figsize_3d,
-            rstride=surface_stride,
-            cstride=surface_stride,
-            **shared,
-        )
-        fig3d = drawn3d.figure
-        fig3d.tight_layout()
-
-        # Saved when asked, kept in the result, closed when not shown
-        if save_path is not None:
-            fig2d.savefig(save_path / f"{name}_2d.png", dpi=160, bbox_inches="tight")
-            fig3d.savefig(save_path / f"{name}_3d.png", dpi=160, bbox_inches="tight")
-
-        out[name] = {"2d": drawn2d, "3d": drawn3d}
-
-        if not show:
-            plt.close(fig2d)
-            plt.close(fig3d)
-
-    maybe_show(None, show)
-
-    return out
-
-
-def cost_field_cmap():
-    """Low cost (blue) to high cost (red) — matplotlib ``turbo``."""
-    import matplotlib.pyplot as plt
-
-    return plt.get_cmap("turbo")
+    return FigureSpec(panels=(panel,), figsize=figsize)
 
 
 ###############################################################################
@@ -608,81 +556,79 @@ def field_bounds(field):
     raise TypeError(f"unsupported field type for plotting: {type(field).__name__}")
 
 
-def draw_shape(ax, shape, color, alpha, pad=0.0):
-    """Draw a sphere, box, inflated shape or union as filled patches, grown by ``pad``."""
-    import matplotlib.patches as mpatches
-
+def shape_outlines(shape, pad=0.0, n=100):
+    """The closed outlines ``(x, y)`` of a sphere, box, inflated shape or union, grown by ``pad``."""
     if isinstance(shape, Sphere):
         center = np.asarray(shape.center, dtype=float)
-        ax.add_patch(
-            mpatches.Circle(
-                (float(center[0]), float(center[1])),
-                float(shape.radius) + pad,
-                facecolor=color,
-                edgecolor="k",
-                linewidth=0.8,
-                alpha=alpha,
-                zorder=4,
-            )
-        )
-        return
+        return [circle(center[0], center[1], float(shape.radius) + pad, n)]
     if isinstance(shape, Box):
         lower = np.asarray(shape.lower, dtype=float)
         upper = np.asarray(shape.upper, dtype=float)
-        corner = (float(lower[0]), float(lower[1]))
-        width = float(upper[0] - lower[0])
-        height = float(upper[1] - lower[1])
-        # A box grown by pad: the same box with its corners rounded at radius pad
-        if pad > 0.0:
-            patch = mpatches.FancyBboxPatch(
-                corner,
-                width,
-                height,
-                boxstyle=f"round,pad={pad}",
-                facecolor=color,
-                edgecolor="k",
-                linewidth=0.8,
-                alpha=alpha,
-                zorder=4,
-            )
-        else:
-            patch = mpatches.Rectangle(
-                corner,
-                width,
-                height,
-                facecolor=color,
-                edgecolor="k",
-                linewidth=0.8,
-                alpha=alpha,
-                zorder=4,
-            )
-        ax.add_patch(patch)
-        return
+        return [rounded_box(lower, upper, pad, n)]
     if isinstance(shape, Inflated):
         # An inflated shape is its base grown by the inflation radius
-        draw_shape(ax, shape.base, color, alpha, pad + float(shape.radius))
-        return
+        return shape_outlines(shape.base, pad + float(shape.radius), n)
     if isinstance(shape, Union):
-        for member in shape.shapes:
-            draw_shape(ax, member, color, alpha, pad)
-        return
+        return [
+            outline
+            for member in shape.shapes
+            for outline in shape_outlines(member, pad, n)
+        ]
     raise TypeError(f"unsupported shape type for plotting: {type(shape).__name__}")
 
 
-def draw_field_marker(ax, field):
-    """Mark a Gaussian field's center with a cross."""
+def circle(cx, cy, r, n):
+    """The ``n + 1`` points of the circle ``c + r (cos φ, sin φ)``, closed."""
+    phi = np.linspace(0.0, 2.0 * np.pi, n + 1)
+    x = cx + r * np.cos(phi)
+    y = cy + r * np.sin(phi)
+
+    return x, y
+
+
+def rounded_box(lower, upper, pad, n):
+    """A box grown by ``pad``: its sides pushed out by ``pad``, its corners quarter circles of radius ``pad``."""
+    if pad <= 0.0:
+        x = np.array([lower[0], upper[0], upper[0], lower[0], lower[0]])
+        y = np.array([lower[1], lower[1], upper[1], upper[1], lower[1]])
+        return x, y
+
+    # One quarter circle per corner, counter-clockwise from the lower right
+    quarter = np.linspace(0.0, 0.5 * np.pi, max(2, n // 4))
+    corners = (
+        (upper[0], lower[1], -0.5 * np.pi),
+        (upper[0], upper[1], 0.0),
+        (lower[0], upper[1], 0.5 * np.pi),
+        (lower[0], lower[1], np.pi),
+    )
+    x = np.concatenate([cx + pad * np.cos(a + quarter) for cx, _, a in corners])
+    y = np.concatenate([cy + pad * np.sin(a + quarter) for _, cy, a in corners])
+
+    return np.r_[x, x[:1]], np.r_[y, y[:1]]
+
+
+def disc_layers(outlines, color, alpha):
+    """Each outline filled in ``color``, edged in black."""
+    layers = []
+    for x, y in outlines:
+        layers.append(Trace(x, y, color=color, alpha=alpha, fill=True))
+        layers.append(Trace(x, y, color="black", width=0.8, alpha=alpha))
+
+    return layers
+
+
+def field_marker(field):
+    """A cross at a Gaussian field's center."""
     if isinstance(field, GaussianField):
         center = np.asarray(field.center, dtype=float)
-        ax.plot(
-            float(center[0]),
-            float(center[1]),
+        return Trace(
+            [float(center[0])],
+            [float(center[1])],
+            color=FIELD_MARKER_COLOR,
+            mode="markers",
             marker="x",
-            color="C1",
-            markersize=8,
-            markeredgewidth=1.5,
-            zorder=5,
+            size=8.0,
         )
-        return
     raise TypeError(f"unsupported field type for plotting: {type(field).__name__}")
 
 
@@ -695,36 +641,20 @@ def coerce_body_states(x, states):
     return []
 
 
-def draw_body(ax, body, x, t, params, color, alpha, point_marker_size):
-    """Draw the body's collision probes at state ``x``: a disc each, a dot for a point probe."""
-    import matplotlib.patches as mpatches
-
+def body_layers(body, x, t, params):
+    """The body's collision probes at state ``x``: a disc each, a dot for a point probe."""
+    layers = []
     for world, radius in iter_probes(body, x, None, t, params):
         wx, wy = float(world[0]), float(world[1])
         # A radius ≤ 10⁻¹² is a point probe
         if float(radius) > 1e-12:
-            ax.add_patch(
-                mpatches.Circle(
-                    (wx, wy),
-                    float(radius),
-                    facecolor=color,
-                    edgecolor="k",
-                    linewidth=0.8,
-                    alpha=alpha,
-                    zorder=6,
-                )
+            layers += disc_layers(
+                [circle(wx, wy, float(radius), 100)], BODY_COLOR, 0.35
             )
         else:
-            ax.plot(
-                wx,
-                wy,
-                marker="o",
-                color=color,
-                markersize=point_marker_size,
-                markeredgecolor="k",
-                markeredgewidth=1.0,
-                zorder=6,
-            )
+            layers.append(Trace([wx], [wy], color=BODY_COLOR, mode="markers", size=9.0))
+
+    return layers
 
 
 # The track's refusals
@@ -742,19 +672,43 @@ def require_positive_length(total):
         raise ValueError("path has zero length")
 
 
-# The cost field's display scale
+# The cost field's samples and display scale
 
 
-def cost_field_array(
-    grid: FieldGrid,
-    *,
-    log_scale: bool = False,
-    vmax: float | None = None,
-    vmax_percentile: float = 99.0,
-    normalize_range: bool = True,
-) -> tuple[np.ndarray, float, float, str]:
-    """Return display values, vmin, vmax, and colorbar label."""
-    z = np.asarray(grid.Z, dtype=float)
+def sampled_costs(costs, *, bounds, grid, state_dim, u, t, params):
+    """
+    The summed cost of ``costs`` at each workspace point of the grid: ``(xs, ys, Z)``.
+
+    Each point ``p = (x, y)`` fills the first two entries of a zero state of
+    dimension ``state_dim``; the input is ``u`` (zero when ``None``).
+    """
+    require_costs(costs)
+
+    # The held input, and the state whose first two entries carry the point
+    u_use = np.zeros(1) if u is None else u
+    x = np.zeros(int(state_dim))
+
+    def fn(p, t_query=0.0, params_query=None):
+        x[0] = p[0]
+        x[1] = p[1]
+
+        # g(p) = Σ_c g_c(x(p), u, t), summed in the terms' order
+        g = sum(float(c.g(x, u_use, t=t_query, params=params_query)) for c in costs)
+
+        return g
+
+    return sample_grid(fn, bounds, grid=grid, t=t, params=params)
+
+
+def require_costs(costs):
+    """Refuse a cost field with no cost term."""
+    if not costs:
+        raise ValueError("a cost field needs at least one cost term")
+
+
+def cost_field_array(Z, *, log_scale=False, vmax=None, vmax_percentile=99.0):
+    """The displayed values, starting at 0, their shift ``vmin``, the top of the scale and the colour bar's label."""
+    z = np.asarray(Z, dtype=float)
     label = "log(1 + cost)" if log_scale else "cost"
 
     # z ← log(1 + max(z, 0)) on a log scale
@@ -763,11 +717,10 @@ def cost_field_array(
 
     # z ← z − min z over the finite values, so the scale starts at 0
     vmin = 0.0
-    if normalize_range:
-        finite = z[np.isfinite(z)]
-        if finite.size:
-            vmin = float(np.min(finite))
-            z = z - vmin
+    finite = z[np.isfinite(z)]
+    if finite.size:
+        vmin = float(np.min(finite))
+        z = z - vmin
 
     # The top of the scale: vmax, else a percentile of the finite values, and 1 when ≤ 0
     if vmax is None:
@@ -782,21 +735,60 @@ def cost_field_array(
     return z, vmin, vmax, label
 
 
-def cost_cmap_of(cmap):
-    """The given colour map, else :func:`cost_field_cmap`."""
-    return cost_field_cmap() if cmap is None else cmap
+# The exports' overlays
 
 
-def cost_field_norm(vmax: float, *, gamma: float = 0.55):
-    """The power-law colour scale ``(z / vmax)^γ`` on ``[0, vmax]``."""
-    from matplotlib.colors import PowerNorm
+def require_own_figures(ax):
+    """Refuse axes for the exports: each layer draws two figures of its own."""
+    if ax is not None:
+        raise ValueError(
+            "plot_cost_field_exports draws two figures per layer; pass ax=None "
+            "and compose with each record it returns"
+        )
 
-    return PowerNorm(gamma=gamma, vmin=0.0, vmax=vmax)
 
+def export_overlay(heatmap, track, scene, overlay_bounds, traj):
+    """The cost heatmap with the track, the scene and the executed path over it, framed on ``overlay_bounds``."""
+    layers = []
+    frame = None
+    if track is not None:
+        drawn = track_figure(
+            track,
+            bounds=overlay_bounds,
+            n_samples=200,
+            show_waypoints=True,
+            title="",
+            figsize=None,
+        ).panels[0]
+        layers += drawn.layers
+        frame = (drawn.x_lim, drawn.y_lim)
+    if scene is not None:
+        drawn = scene_figure(
+            scene,
+            bounds=overlay_bounds,
+            grid=(120, 120),
+            show_obstacles=True,
+            show_density=False,
+            show_clearance_contour=False,
+            body=None,
+            x=None,
+            states=None,
+            t=0.0,
+            params=None,
+            title="",
+            figsize=None,
+        ).panels[0]
+        layers += drawn.layers
+        frame = (drawn.x_lim, drawn.y_lim)
+    if traj is not None:
+        layers.append(
+            Trace(traj[0, :], traj[1, :], color="black", width=1.0, alpha=0.85)
+        )
 
-def label_cost_colorbar(cbar, vmin, *, normalize_range, log_scale):
-    """Label the ticks of a shifted log scale by their unshifted values ``tick + vmin``."""
-    if normalize_range and log_scale:
-        ticks = cbar.get_ticks()
-        cbar.set_ticks(ticks)
-        cbar.set_ticklabels([f"{t + vmin:.1f}" for t in ticks])
+    # The overlays' frame, else the heatmap's own
+    spec = overlay(heatmap, [layers])
+    if frame is not None:
+        panel = replace(spec.panels[0], x_lim=frame[0], y_lim=frame[1])
+        spec = replace(spec, panels=(panel,))
+
+    return spec

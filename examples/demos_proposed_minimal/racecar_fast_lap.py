@@ -107,7 +107,7 @@ traj = closed_loop.compute_trajectory(tf=TF, dt=0.002)
 
 lap = traj.of("plant")
 
-drawn = track.plot(bounds=((-4.5, 4.5), (-3.5, 3.5)), waypoint_color="none", show=False)
+drawn = track.plot(bounds=((-4.5, 4.5), (-3.5, 3.5)), show_waypoints=False, show=False)
 fig, ax = drawn.figure, drawn.axes
 speed = ax.scatter(
     lap.x[0, ::20], lap.x[1, ::20], c=lap.x[3, ::20], s=6, cmap="viridis"

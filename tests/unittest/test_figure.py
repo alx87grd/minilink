@@ -67,6 +67,18 @@ def test_every_layer_draws_on_both_renderers(name, renderer):
     plt.close("all")
 
 
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_a_tick_offset_labels_the_colour_bar_by_the_shifted_values(renderer):
+    spec = one_panel(Heatmap(X, Y, Z, vmin=0.0, vmax=4.0, tick_offset=10.0))
+    result = draw(spec, renderer=renderer, show=False)
+    if renderer == "plotly":
+        labels = list(result.figure.data[0].colorbar.ticktext)
+    else:
+        labels = [t.get_text() for t in result.figure.axes[1].get_yticklabels()]
+    assert labels[0] == "10.0"
+    plt.close("all")
+
+
 def test_renderer_none_keeps_the_description_alone():
     spec = LAYERS["heatmap"]
     result = draw(spec, renderer=None)
