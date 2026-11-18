@@ -105,9 +105,8 @@ concrete formatting, ordered by the cost of being wrong:
   derivative, the optimizer's algorithm, the interpolation, the certificate family); `solver=`
   is the time integration on every tool that integrates (`Simulator`, `compute_trajectory`,
   `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade;
-  `renderer=` is the drawing library, the keyword on every drawing verb (`plot_renderer=` on
-  `game` and the realtime simulator). The drawn-directly plots do not take it yet; the split
-  is the plotting contract ([plotting-contract.md](../plans/plotting-contract.md)).
+  `renderer=` is the drawing library, on every drawing verb (`plot_renderer=` on `game` and the
+  realtime simulator).
   `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule.
   Four words, one meaning each (the maintainer's ruling 17b): `cost` is the cost object
   (`problem.cost`, `cost=`, the parameter tree's `"cost"` key); `J` is a scalar, one run's cost

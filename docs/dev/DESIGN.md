@@ -550,9 +550,7 @@ at `"terrain"`.
   optimizer's algorithm on `Optimizer` and on every planner that optimizes, value
   iteration's `method="loop"`, RRT's `nearest_method=`); the optimizer's solver adapter,
   which a method binds, is `Optimizer.adapter`; `renderer=` is the drawing library on every
-  drawing verb (`plot_renderer=` on `game` and the realtime simulator). The drawn-directly
-  plots do not take it yet; the split is the plotting contract
-  ([plotting-contract.md](../plans/plotting-contract.md)).
+  drawing verb (`plot_renderer=` on `game` and the realtime simulator).
 - **One word for a run's origin:** `t0`, on every runner (`compute_trajectory`,
   `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
   run, the gym bridge). A trajectory's first sample is its `t0` property.
