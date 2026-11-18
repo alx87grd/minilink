@@ -86,6 +86,9 @@ Search
 .. automodule:: minilink.planning.search.live_plot
    :members:
 
+.. automodule:: minilink.planning.search.plotting
+   :members: animate_search, animate_convergence
+
 Dynamic programming
 -------------------
 

@@ -55,8 +55,8 @@ Animation
 .. automodule:: minilink.graphical.animation.grid_animations
    :members:
 
-.. automodule:: minilink.graphical.animation.search_animations
-   :members: animate_search, animate_convergence
+.. automodule:: minilink.graphical.animation.line_animations
+   :members:
 
 Graphical catalog
 -----------------
