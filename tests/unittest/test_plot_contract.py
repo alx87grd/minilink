@@ -10,11 +10,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[2] / "minilink"
 # The plot_ name that draws nothing: a choice of plot space
 NOT_FIGURES = {"plot_space_of"}
 
-# The plots that do not take every keyword yet, and the keywords they lack. The
-# list only shrinks: a name that takes them all must leave it.
-NOT_YET = {
-    ("core/facades/plotting.py", "plot_diagram"): {"renderer", "ax"},
-    ("graphical/diagrams/dot.py", "plot_diagram"): {"renderer", "ax"},
+# The block diagram is outside the contract: Graphviz lays out and draws the
+# whole graph itself, so it takes no axes to draw into and no other renderer
+DIAGRAM_EXEMPTION = {"renderer", "ax"}
+EXEMPT = {
+    ("core/facades/plotting.py", "plot_diagram"): DIAGRAM_EXEMPTION,
+    ("graphical/diagrams/dot.py", "plot_diagram"): DIAGRAM_EXEMPTION,
 }
 
 
@@ -41,9 +42,8 @@ def plot_functions():
 )
 def test_a_plot_takes_renderer_show_and_ax(path, name, keywords):
     missing = {"renderer", "show", "ax"} - set(keywords)
-    assert missing == NOT_YET.get((path, name), set()), (
-        f"{path}::{name} lacks {sorted(missing)}; a plot takes renderer=, show= "
-        "and ax= (a name that now takes them all leaves NOT_YET)"
+    assert missing == EXEMPT.get((path, name), set()), (
+        f"{path}::{name} lacks {sorted(missing)}; a plot takes renderer=, show= and ax="
     )
 
 
