@@ -474,7 +474,8 @@ in a session:
 | --- | --- | --- | --- | --- |
 | 0 | Plan and environment | a7e0c1f3 | done | baseline tooling |
 | 0 | Baseline: 80 tests and demos, about 190 figures, two runs byte-identical (`--dist loadfile`, realtime tests left out), 3.5 min a check | e284a250 | done | step 1, the spike |
-| 1 | Spike: `graphical/figure.py` (`FigureSpec`, `Panel`, `Trace`, `RefLine`, `Note`, `Heatmap`, `draw`), `figure_renderers/matplotlib.py` and `plotly.py`; the DP heatmaps and their trajectory overlay drawn through it. **Gate passed:** data record unchanged (80 tests); 158 vs 161 ms and 158 vs 159 ms (plot plus `canvas.draw`, median of 7, alternated, this container); `Heatmap` 10 fields; `draw_heatmap` 20 lines (matplotlib), 18 (plotly); overlay through `ax=result` on both renderers | this commit | done | step 2, the record and the show |
+| 1 | Spike: `graphical/figure.py` (`FigureSpec`, `Panel`, `Trace`, `RefLine`, `Note`, `Heatmap`, `draw`), `figure_renderers/matplotlib.py` and `plotly.py`; the DP heatmaps and their trajectory overlay drawn through it. **Gate passed:** data record unchanged (80 tests); 158 vs 161 ms and 158 vs 159 ms (plot plus `canvas.draw`, median of 7, alternated, this container); `Heatmap` 10 fields; `draw_heatmap` 20 lines (matplotlib), 18 (plotly); overlay through `ax=result` on both renderers | 2a20a599 | done | step 2, the record and the show |
+| 2a | `resolve_show` (the table of §4.1, headless, refusals by name) and `show_figure`, the one show step (inline displayed at the call and closed for matplotlib; a window blocks in a script); the 30 show sites go through it (live figures keep their open window); `MINILINK_HEADLESS=1` in the test conftest, the demo and notebook runners and the CI workflows; `tests/unittest/test_show.py`, the table test (57 cases). Baseline unchanged; 1 300 plotting tests pass | eabb011e | done | 2b: `PlotResult` with `show`/`save`, `payload` out |
 
 ### Decisions taken during the run
 
@@ -483,3 +484,13 @@ in a session:
 - When `ax=` is a `PlotResult`, the renderer follows the host; a `renderer=` that names
   another library than the host's (other than the default) is refused.
 - The spike's code stays: it is step 4's base (no scratch branch).
+- `MINILINK_HEADLESS=1` silences every `show`, explicit `"inline"` and `"window"` included:
+  it is the switch for automated runs. Without it, an explicit place that cannot be shown
+  is refused by name.
+- Pygame refuses `show=True` where it has no window (Colab, a server), rather than staying
+  silent: it only draws in a window of its own; its off-screen driver
+  (`SDL_VIDEODRIVER=dummy`) counts as a window.
+- The `show=None` default ("show unless `ax=` is given") enters each function with its
+  family's move onto the description (step 5).
+- The live figures (`block=False` in the signal, port-map and phase-plane backends) keep
+  their open, non-blocking window: they are updated after they are shown.
