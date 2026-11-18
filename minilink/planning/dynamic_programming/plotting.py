@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Trace, draw
 from minilink.planning.plotting import maybe_show
 
 # The value-iteration result is a node-indexed field over the state grid: these
@@ -63,10 +64,9 @@ def plot_cost_to_go(
 
     require_flat_overlay(is_3d, trajectory)
 
-    defer_show = trajectory is not None
-
-    # The heatmap, shown now unless the surface or the overlay comes after it
-    fig, ax = plot_value(
+    # The heatmap with the closed-loop trajectory over it, shown now unless the
+    # surface comes after it
+    fig, ax = plot_field(
         grid,
         J,
         x_axis=x_axis,
@@ -77,7 +77,8 @@ def plot_cost_to_go(
         cmap=cmap,
         ax=ax,
         title=title,
-        show=show and not is_3d and not defer_show,
+        show=show and not is_3d,
+        overlay=trajectory_layers(trajectory, x_axis, y_axis, overlay_labels),
     )
 
     # The 3-D surface of J, clipped to 0 ≤ J (≤ jmax when given)
@@ -93,14 +94,6 @@ def plot_cost_to_go(
             title=title,
             show=show,
         )
-
-    # The closed-loop trajectory over the heatmap, then the deferred show
-    if trajectory is not None:
-        overlay_trajectory(ax, trajectory, x_axis, y_axis, overlay_labels)
-        if show and not is_3d:
-            import matplotlib.pyplot as plt
-
-            maybe_show(plt, show)
 
     return fig, ax
 
@@ -148,8 +141,8 @@ def plot_control_law(
             for (x_k, y_k), u_k in zip(slices, u_axes)
         ]
 
-    # The heatmap, shown now unless the overlay comes after it
-    fig, ax = plot_control_law_field(
+    # The heatmap with the closed-loop trajectory over it
+    return plot_control_law_field(
         grid,
         pi,
         u_axis=u_axis,
@@ -158,18 +151,9 @@ def plot_control_law(
         anchor=anchor,
         cmap=cmap,
         ax=ax,
-        show=show and trajectory is None,
+        show=show,
+        overlay=trajectory_layers(trajectory, x_axis, y_axis, overlay_labels),
     )
-
-    # The closed-loop trajectory over the heatmap, then the deferred show
-    if trajectory is not None:
-        overlay_trajectory(ax, trajectory, x_axis, y_axis, overlay_labels)
-        if show:
-            import matplotlib.pyplot as plt
-
-            maybe_show(plt, show)
-
-    return fig, ax
 
 
 def animate_cost_to_go(
@@ -432,7 +416,9 @@ def overlay_trajectory(ax, trajectory, x_axis, y_axis, labels):
     ax.legend(loc="upper right", fontsize=8)
 
 
-def plot_control_law_field(grid, pi, *, u_axis, x_axis, y_axis, anchor, cmap, ax, show):
+def plot_control_law_field(
+    grid, pi, *, u_axis, x_axis, y_axis, anchor, cmap, ax, show, overlay=()
+):
     """Heatmap of input ``u_axis`` of a control-law table, scaled to that input's bounds."""
     u = grid.input_from_policy(pi)[:, u_axis]
 
@@ -448,6 +434,7 @@ def plot_control_law_field(grid, pi, *, u_axis, x_axis, y_axis, anchor, cmap, ax
         ax=ax,
         title=f"Control law u[{u_axis}]",
         show=show,
+        overlay=overlay,
     )
 
 
@@ -483,32 +470,94 @@ def require_history(record):
 
 
 def plot_field(
-    grid, values, *, x_axis, y_axis, anchor, vmin, vmax, cmap, ax, title, show
+    grid,
+    values,
+    *,
+    x_axis,
+    y_axis,
+    anchor,
+    vmin,
+    vmax,
+    cmap,
+    ax,
+    title,
+    show,
+    overlay=(),
 ):
-    """Heatmap of a node-indexed field on a 2-D slice of the grid."""
-    import matplotlib.pyplot as plt
+    """Heatmap of a node-indexed field on a 2-D slice of the grid, ``overlay`` layers over it."""
+    spec = field_figure(
+        grid,
+        values,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        anchor=anchor,
+        vmin=vmin,
+        vmax=vmax,
+        cmap=cmap,
+        title=title,
+        overlay=overlay,
+    )
+    result = draw(spec, show=show, ax=ax)
 
+    return result.figure, result.axes
+
+
+def field_figure(
+    grid, values, *, x_axis, y_axis, anchor, vmin, vmax, cmap, title, overlay=()
+):
+    """The heatmap of a node-indexed field on a 2-D slice of the grid, as a description."""
     # The 2-D slice of the field, over its two state levels
     Z = grid.slice_2d(grid.grid_from_array(values), x_axis, y_axis, anchor=anchor)
-    x_level = grid.x_levels[x_axis]
-    y_level = grid.x_levels[y_axis]
+    heatmap = Heatmap(
+        x=grid.x_levels[x_axis],
+        y=grid.x_levels[y_axis],
+        z=Z.T,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+    )
+    panel = Panel(
+        layers=(heatmap, *overlay),
+        title=title,
+        x_label=axis_name(grid, x_axis),
+        y_label=axis_name(grid, y_axis),
+        legend="upper right",
+    )
 
-    # A new figure, or the one that holds the given axes
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = ax.figure
+    return FigureSpec(panels=(panel,))
 
-    mesh = ax.pcolormesh(x_level, y_level, Z.T, shading="gouraud", cmap=cmap)
-    mesh.set_clim(vmin=vmin, vmax=vmax)
-    fig.colorbar(mesh, ax=ax)
-    label_axes(ax, grid, x_axis, y_axis)
-    ax.set_title(title)
-    ax.grid(True, alpha=0.3)
 
-    maybe_show(plt, show)
+def trajectory_layers(trajectory, x_axis, y_axis, labels):
+    """A trajectory's path, start and end on the ``(x_axis, y_axis)`` slice, as layers."""
+    if trajectory is None:
+        return ()
+    x = trajectory.x
 
-    return fig, ax
+    return (
+        Trace(x[x_axis], x[y_axis], color="black", width=2.0, label=labels[0]),
+        Trace(
+            x[x_axis, :1], x[y_axis, :1], color="green", mode="markers", label=labels[1]
+        ),
+        Trace(
+            x[x_axis, -1:],
+            x[y_axis, -1:],
+            color="red",
+            mode="markers",
+            marker="*",
+            size=12.0,
+            label=labels[2],
+        ),
+    )
+
+
+def axis_name(grid, i):
+    """A state axis's label and unit, ``x[i]`` without labels."""
+    labels = getattr(grid.sys.state, "labels", None)
+    units = getattr(grid.sys.state, "units", None)
+    base = labels[i] if labels else f"x[{i}]"
+    unit = f" [{units[i]}]" if units and units[i] else ""
+
+    return base + unit
 
 
 def label_axes(ax, grid, x_axis, y_axis):

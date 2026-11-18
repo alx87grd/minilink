@@ -12,10 +12,11 @@ from typing import Any
 class PlotResult:
     """Result returned by a renderer."""
 
-    renderer: str
-    payload: Any
+    renderer: str | None
+    payload: Any = None
     figure: Any = None
     axes: Any = None
+    spec: Any = None
 
     # Display
 

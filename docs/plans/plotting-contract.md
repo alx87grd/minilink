@@ -473,8 +473,13 @@ in a session:
 | Step | Item | Commit | State | Next action |
 | --- | --- | --- | --- | --- |
 | 0 | Plan and environment | a7e0c1f3 | done | baseline tooling |
-| 0 | Baseline: 80 tests and demos, about 190 figures, two runs byte-identical (`--dist loadfile`, realtime tests left out), 3.5 min a check | this commit | done | step 1, the spike |
+| 0 | Baseline: 80 tests and demos, about 190 figures, two runs byte-identical (`--dist loadfile`, realtime tests left out), 3.5 min a check | e284a250 | done | step 1, the spike |
+| 1 | Spike: `graphical/figure.py` (`FigureSpec`, `Panel`, `Trace`, `RefLine`, `Note`, `Heatmap`, `draw`), `figure_renderers/matplotlib.py` and `plotly.py`; the DP heatmaps and their trajectory overlay drawn through it. **Gate passed:** data record unchanged (80 tests); 158 vs 161 ms and 158 vs 159 ms (plot plus `canvas.draw`, median of 7, alternated, this container); `Heatmap` 10 fields; `draw_heatmap` 20 lines (matplotlib), 18 (plotly); overlay through `ax=result` on both renderers | this commit | done | step 2, the record and the show |
 
 ### Decisions taken during the run
 
-(none yet)
+- Colours in a description are CSS names or hex codes, which both renderers read; the
+  matplotlib shorthand (`"k"`, `"g"`) is not used in builders.
+- When `ax=` is a `PlotResult`, the renderer follows the host; a `renderer=` that names
+  another library than the host's (other than the default) is refused.
+- The spike's code stays: it is step 4's base (no scratch branch).
