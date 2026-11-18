@@ -7,7 +7,17 @@ import numpy as np
 
 from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.common.show import show_figure
-from minilink.graphical.figure import FigureSpec, Heatmap, Note, RefLine, Trace, overlay
+from minilink.graphical.figure import (
+    Arrows,
+    Contour,
+    FigureSpec,
+    Heatmap,
+    Note,
+    RefLine,
+    Surface,
+    Trace,
+    overlay,
+)
 
 # The description's marker names in matplotlib's spelling
 MARKERS = {"o": "o", "o-open": "o", "x": "x", "+": "+", "*": "*"}
@@ -109,6 +119,8 @@ def draw_panel(ax, panel, *, fill_only):
     ``fill_only`` keeps what the axes already shows: a title, a label or a
     limit is set only where the axes has none.
     """
+    if panel.is_3d and getattr(ax, "name", "") != "3d":
+        raise ValueError("a 3-D plot draws on 3-D axes; pass axes with projection='3d'")
     for layer in panel.layers:
         DRAW[type(layer)](ax, layer)
 
@@ -135,9 +147,11 @@ def draw_panel(ax, panel, *, fill_only):
     if panel.is_3d:
         set_text(ax.set_zlabel, ax.get_zlabel(), panel.z_label, fill_only)
 
-    # A legend when a layer carries a label
+    # A legend when a layer carries a label, each label once
     if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
-        ax.legend(loc=panel.legend, fontsize=8)
+        handles, labels = ax.get_legend_handles_labels()
+        unique = dict(zip(labels, handles))
+        ax.legend(unique.values(), unique.keys(), loc=panel.legend, fontsize=8)
 
 
 def set_text(setter, current, text, fill_only):
@@ -181,7 +195,7 @@ def draw_trace(ax, trace: Trace):
         label=label,
     )
     if trace.arrows:
-        draw_arrows(ax, x, y, ax.lines[-1].get_color())
+        draw_direction_arrows(ax, x, y, ax.lines[-1].get_color())
 
 
 def draw_ref_line(ax, line: RefLine):
@@ -233,7 +247,63 @@ def draw_heatmap(ax, heatmap: Heatmap):
         ax.figure.colorbar(mesh, ax=ax, label=heatmap.colorbar or None)
 
 
-def draw_arrows(ax, x, y, color, count: int = 3):
+def draw_contour(ax, contour: Contour):
+    """Level lines, or filled bands between levels, and a legend entry when labelled."""
+    style = {"levels": None if contour.levels is None else list(contour.levels)}
+    if contour.color is not None:
+        style["colors"] = [contour.color]
+    elif contour.cmap is not None:
+        style["cmap"] = contour.cmap
+    if contour.filled:
+        ax.contourf(contour.x, contour.y, contour.z, alpha=contour.alpha, **style)
+        if contour.label:
+            ax.fill([], [], color=contour.color, label=contour.label)
+        return
+
+    ax.contour(
+        contour.x,
+        contour.y,
+        contour.z,
+        linewidths=contour.width,
+        linestyles=DASHES.get(contour.dash, "-"),
+        alpha=contour.alpha,
+        **style,
+    )
+    if contour.label:
+        ax.plot(
+            [], [], color=contour.color, linewidth=contour.width, label=contour.label
+        )
+
+
+def draw_surface(ax, surface: Surface):
+    """A 3-D surface over the mesh, coloured by value, and its colour bar."""
+    mesh_x, mesh_y = np.meshgrid(surface.x, surface.y)
+    drawn = ax.plot_surface(
+        mesh_x,
+        mesh_y,
+        np.asarray(surface.z, dtype=float),
+        cmap=surface.cmap,
+        vmin=surface.vmin,
+        vmax=surface.vmax,
+        alpha=surface.alpha,
+        linewidth=0,
+        antialiased=False,
+    )
+    if surface.colorbar is not None:
+        ax.figure.colorbar(drawn, ax=ax, shrink=0.6, label=surface.colorbar or None)
+
+
+def draw_vector_field(ax, arrows: Arrows):
+    """One arrow per grid node, or streamlines through the field."""
+    if arrows.style == "stream":
+        ax.streamplot(arrows.x, arrows.y, arrows.u, arrows.v, color=arrows.color)
+    else:
+        ax.quiver(arrows.x, arrows.y, arrows.u, arrows.v, color=arrows.color)
+    if arrows.label:
+        ax.plot([], [], color=arrows.color, label=arrows.label)
+
+
+def draw_direction_arrows(ax, x, y, color, count: int = 3):
     """Direction arrows spread over the middle of a line."""
     if x.size < 3:
         return
@@ -257,4 +327,7 @@ DRAW = {
     RefLine: draw_ref_line,
     Note: draw_note,
     Heatmap: draw_heatmap,
+    Contour: draw_contour,
+    Surface: draw_surface,
+    Arrows: draw_vector_field,
 }

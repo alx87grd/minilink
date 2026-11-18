@@ -105,6 +105,54 @@ class Heatmap:
     gamma: float = 1.0
 
 
+@dataclass(frozen=True)
+class Contour:
+    """Level sets of ``z[j, i]`` at ``(x[i], y[j])``: lines, or bands between levels when ``filled``.
+
+    ``levels`` are the values drawn (``None`` lets the renderer choose);
+    ``color`` draws every level in one colour, ``cmap`` colours them by value.
+    """
+
+    x: Any
+    y: Any
+    z: Any
+    levels: tuple[float, ...] | None = None
+    filled: bool = False
+    color: str | None = None
+    cmap: str | None = None
+    width: float = 1.0
+    dash: str = "solid"
+    alpha: float = 1.0
+    label: str = ""
+
+
+@dataclass(frozen=True)
+class Surface:
+    """Values ``z[j, i]`` at ``(x[i], y[j])`` as a 3-D surface, coloured by value."""
+
+    x: Any
+    y: Any
+    z: Any
+    cmap: str = "viridis"
+    vmin: float | None = None
+    vmax: float | None = None
+    colorbar: str | None = ""
+    alpha: float = 1.0
+
+
+@dataclass(frozen=True)
+class Arrows:
+    """A vector field ``(u, v)`` on the grid ``(x, y)``: one arrow per node, or streamlines."""
+
+    x: Any
+    y: Any
+    u: Any
+    v: Any
+    style: str = "quiver"  # "quiver" | "stream"
+    color: str | None = None
+    label: str = ""
+
+
 def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
     """
     Draw ``spec`` with ``renderer`` and return its :class:`PlotResult`.
@@ -127,6 +175,7 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
     # Into a drawn figure: its panels take the layers, on its renderer
     if isinstance(ax, PlotResult):
         require_same_renderer(renderer, ax.renderer)
+        require_composable(ax.spec, spec)
         module = renderer_module(ax.renderer)
         return module.draw_into(ax, spec, show=show)
 
@@ -178,6 +227,32 @@ def require_same_renderer(renderer, host_renderer):
             f"the host figure is drawn with {host_renderer!r}; "
             f"drop renderer= or pass renderer={host_renderer!r}"
         )
+
+
+def require_composable(host: FigureSpec, spec: FigureSpec):
+    """Refuse an overlay its host cannot take: another panel count, 3-D into 2-D, a second colour bar."""
+    if host is None:
+        raise ValueError(
+            "the host figure has no description to draw into; draw it with a minilink "
+            "plot, or pass matplotlib axes as ax="
+        )
+    if len(host.panels) != len(spec.panels):
+        raise ValueError(
+            f"the host has {len(host.panels)} panel(s), this plot {len(spec.panels)}; "
+            "draw into a host with as many panels"
+        )
+    for host_panel, panel in zip(host.panels, spec.panels):
+        if panel.is_3d and not host_panel.is_3d:
+            raise ValueError("a 3-D plot does not draw into a 2-D panel")
+        if has_colorbar(host_panel) and has_colorbar(panel):
+            raise ValueError(
+                "the host panel already has a colour bar; draw the overlay without one"
+            )
+
+
+def has_colorbar(panel) -> bool:
+    """Whether a panel holds a layer with a colour bar."""
+    return any(getattr(layer, "colorbar", None) is not None for layer in panel.layers)
 
 
 def as_array(values) -> np.ndarray:

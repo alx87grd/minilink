@@ -8,7 +8,17 @@ from plotly.subplots import make_subplots
 
 from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.common.show import show_figure
-from minilink.graphical.figure import FigureSpec, Heatmap, Note, RefLine, Trace, overlay
+from minilink.graphical.figure import (
+    Arrows,
+    Contour,
+    FigureSpec,
+    Heatmap,
+    Note,
+    RefLine,
+    Surface,
+    Trace,
+    overlay,
+)
 
 # The description's marker names in Plotly's spelling
 MARKERS = {"o": "circle", "o-open": "circle-open", "x": "x", "+": "cross", "*": "star"}
@@ -64,7 +74,6 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
 
 def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
     """Add the layers of ``spec`` to the panels of the drawn Plotly figure ``host``."""
-    require_matching_panels(host.spec, spec)
     n_cols = min(host.spec.n_cols, len(host.spec.panels))
     for k, panel in enumerate(spec.panels):
         row, col = cell_of(k, n_cols)
@@ -89,19 +98,6 @@ def require_no_axes(ax):
         raise ValueError(
             "renderer='plotly' draws into a PlotResult of a Plotly figure, not into "
             "matplotlib axes; pass ax=<PlotResult> or renderer='matplotlib'"
-        )
-
-
-def require_matching_panels(host, spec):
-    """Refuse an overlay whose panel count differs from its host's, or a host with no description."""
-    if host is None:
-        raise ValueError(
-            "this Plotly figure has no description to draw into; draw the host with a "
-            "minilink plot"
-        )
-    if len(host.panels) != len(spec.panels):
-        raise ValueError(
-            f"the host has {len(host.panels)} panel(s), this plot {len(spec.panels)}"
         )
 
 
@@ -240,10 +236,137 @@ def draw_heatmap(fig, heatmap: Heatmap, row, col):
     )
 
 
+def draw_contour(fig, contour: Contour, row, col):
+    """Level lines, one trace per level, or a filled band as a mask between the outer levels."""
+    x, y = np.asarray(contour.x, dtype=float), np.asarray(contour.y, dtype=float)
+    z = np.asarray(contour.z, dtype=float)
+    color = contour.color or "#1f77b4"
+
+    # A filled band: the mesh points between the lowest and highest level
+    if contour.filled:
+        lower, upper = (
+            (np.nanmin(z), np.nanmax(z))
+            if contour.levels is None
+            else (
+                min(contour.levels),
+                max(contour.levels),
+            )
+        )
+        inside = np.where((z >= lower) & (z <= upper), 1.0, np.nan)
+        fig.add_trace(
+            go.Heatmap(
+                x=x,
+                y=y,
+                z=inside,
+                colorscale=[[0.0, color], [1.0, color]],
+                showscale=False,
+                opacity=contour.alpha,
+                name=contour.label or None,
+                showlegend=bool(contour.label),
+                hoverinfo="skip",
+            ),
+            row=row,
+            col=col,
+        )
+        return
+
+    # Level lines: the levels given, each its own trace, else Plotly's own
+    levels = [None] if contour.levels is None else list(contour.levels)
+    for k, level in enumerate(levels):
+        contours = {
+            "coloring": "lines" if contour.cmap else "none",
+            "showlabels": False,
+        }
+        if level is not None:
+            contours.update(start=level, end=level, size=1.0)
+        fig.add_trace(
+            go.Contour(
+                x=x,
+                y=y,
+                z=z,
+                contours=contours,
+                line={
+                    "color": None if contour.cmap else color,
+                    "width": contour.width,
+                    "dash": contour.dash,
+                },
+                colorscale=COLOR_MAPS.get(contour.cmap, contour.cmap)
+                if contour.cmap
+                else None,
+                showscale=False,
+                opacity=contour.alpha,
+                name=contour.label or None,
+                showlegend=bool(contour.label) and k == 0,
+            ),
+            row=row,
+            col=col,
+        )
+
+
+def draw_surface(fig, surface: Surface, row, col):
+    """A 3-D surface over the mesh, coloured by value."""
+    fig.add_trace(
+        go.Surface(
+            x=np.asarray(surface.x, dtype=float),
+            y=np.asarray(surface.y, dtype=float),
+            z=np.asarray(surface.z, dtype=float),
+            colorscale=COLOR_MAPS.get(surface.cmap, surface.cmap),
+            cmin=surface.vmin,
+            cmax=surface.vmax,
+            opacity=surface.alpha,
+            showscale=surface.colorbar is not None,
+            colorbar={"title": surface.colorbar or None},
+        ),
+        row=row,
+        col=col,
+    )
+
+
+def draw_vector_field(fig, arrows: Arrows, row, col):
+    """Arrows scaled so the longest spans 0.9 of a grid cell, or streamlines."""
+    import plotly.figure_factory as ff
+
+    X, Y = np.asarray(arrows.x, dtype=float), np.asarray(arrows.y, dtype=float)
+    U, V = np.asarray(arrows.u, dtype=float), np.asarray(arrows.v, dtype=float)
+    x_values, y_values = X[0, :], Y[:, 0]
+    line = {"color": arrows.color or "#1f77b4", "width": 1}
+    if arrows.style == "stream":
+        x_values, y_values, U, V = square_grid(x_values, y_values, U, V)
+        field = ff.create_streamline(x_values, y_values, U, V, density=1.2, line=line)
+    else:
+        cell = min(np.diff(x_values).min(), np.diff(y_values).min())
+        longest = max(float(np.hypot(U, V).max()), 1e-12)
+        field = ff.create_quiver(
+            X, Y, U, V, scale=0.9 * cell / longest, arrow_scale=0.3, line=line
+        )
+    for k, trace in enumerate(field.data):
+        trace.name = arrows.label or None
+        trace.showlegend = bool(arrows.label) and k == 0
+        fig.add_trace(trace, row=row, col=col)
+
+
+def square_grid(x_values, y_values, U, V):
+    """The field on an ``n × n`` grid over the same window: Plotly's streamlines need one."""
+    if x_values.size == y_values.size:
+        return x_values, y_values, U, V
+    from scipy.interpolate import RegularGridInterpolator
+
+    n = max(x_values.size, y_values.size)
+    xs = np.linspace(x_values[0], x_values[-1], n)
+    ys = np.linspace(y_values[0], y_values[-1], n)
+    points = np.stack(np.meshgrid(ys, xs, indexing="ij"), axis=-1)
+    on_grid = [RegularGridInterpolator((y_values, x_values), F)(points) for F in (U, V)]
+
+    return xs, ys, *on_grid
+
+
 # One draw function per layer kind
 DRAW = {
     Trace: draw_trace,
     RefLine: draw_ref_line,
     Note: draw_note,
     Heatmap: draw_heatmap,
+    Contour: draw_contour,
+    Surface: draw_surface,
+    Arrows: draw_vector_field,
 }
