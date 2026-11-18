@@ -17,7 +17,6 @@ NOT_YET = {
     ("analysis/frequency.py", "plot_pzmap"): {"ax"},
     ("analysis/frequency.py", "plot_root_locus"): {"ax"},
     ("analysis/frequency.py", "plot_nyquist"): {"ax"},
-    ("analysis/lyapunov.py", "plot_region_of_attraction"): {"renderer"},
     ("analysis/time_response.py", "plot_step_response"): {"ax"},
     ("core/facades/plotting.py", "plot_trajectory"): {"ax"},
     ("core/facades/plotting.py", "plot_cost"): {"ax"},
