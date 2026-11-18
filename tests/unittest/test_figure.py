@@ -136,6 +136,7 @@ def test_a_two_panel_plot_draws_into_a_list_of_axes():
     [
         (LAYERS["trace"], FigureSpec(panels=(Panel(), Panel())), "panel"),
         (LAYERS["trace"], LAYERS["surface"], "3-D"),
+        (LAYERS["surface"], LAYERS["trace"], "2-D plot does not draw into a 3-D"),
         (LAYERS["heatmap"], LAYERS["heatmap"], "colour bar"),
     ],
 )
@@ -177,3 +178,67 @@ def test_an_overlay_line_in_the_hosts_colour_takes_a_free_one(renderer):
     first, second = both.spec.panels[0].layers
     assert first.color == "#1f77b4" and second.color not in ("#1f77b4", None)
     plt.close("all")
+
+
+def test_each_clashing_colour_takes_its_own_free_colour():
+    """Two host colours repeated by the overlay move to two distinct free colours; a colourless layer clashes with none."""
+    host = draw(
+        one_panel(
+            Trace(X, X, color="#1f77b4"),
+            Trace(X, 2 * X, color="#d62728"),
+            Heatmap(X, Y, Z, colorbar=None),
+            Trace(X, 3 * X),
+        ),
+        show=False,
+    )
+    both = draw(
+        one_panel(
+            Trace(X, -X, color="#1f77b4"),
+            Trace(X, -2 * X, color="#d62728"),
+            Trace(X, -3 * X, color="#1f77b4"),
+            Trace(X, -4 * X),
+        ),
+        ax=host,
+        show=False,
+    )
+    _, _, _, _, blue, red, blue_again, plain = both.spec.panels[0].layers
+    used = {"#1f77b4", "#d62728"}
+    assert blue.color not in used and red.color not in used
+    assert blue.color != red.color and blue_again.color == blue.color
+    assert plain.color is None
+    plt.close("all")
+
+
+def test_a_description_only_host_is_refused_by_name():
+    host = draw(LAYERS["trace"], renderer=None)
+    with pytest.raises(ValueError, match="draw the host first"):
+        draw(LAYERS["trace"], ax=host, show=False)
+
+
+def test_plotly_adds_no_legend_entry_the_host_shows():
+    host = draw(one_panel(Trace(X, X, label="run")), renderer="plotly", show=False)
+    both = draw(one_panel(Trace(X, -X, label="run")), ax=host, show=False)
+    assert [trace.showlegend for trace in both.figure.data] == [True, False]
+
+
+def test_plotly_direction_arrows_sit_on_their_own_panel():
+    spec = FigureSpec(
+        panels=(
+            Panel(layers=(Trace(X, X),)),
+            Panel(layers=(Trace(X, -X, arrows=True),)),
+        ),
+        n_cols=2,
+    )
+    result = draw(spec, renderer="plotly", show=False)
+    arrows = result.figure.layout.annotations
+    assert arrows and all(
+        (a.xref, a.yref, a.axref, a.ayref) == ("x2", "y2", "x2", "y2") for a in arrows
+    )
+
+
+def test_drawing_into_user_axes_keeps_the_users_figure_title():
+    fig, ax = plt.subplots()
+    fig.suptitle("mine")
+    draw(FigureSpec(panels=(Panel(layers=(Trace(X, X),)),), title="plot"), ax=ax)
+    assert fig.get_suptitle() == "mine"
+    plt.close(fig)

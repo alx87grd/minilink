@@ -86,10 +86,17 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
 def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
     """Add the layers of ``spec`` to the panels of the drawn Plotly figure ``host``."""
     _, n_cols = grid_of(host.spec)
+    shown = legend_names(host.figure)
+    n_before = len(host.figure.data)
     for k, panel in enumerate(spec.panels):
         row, col = cell_of(k, n_cols)
         for layer in panel.layers:
             DRAW[type(layer)](host.figure, layer, row, col)
+
+    # A legend entry the host already shows is not added again
+    for trace in host.figure.data[n_before:]:
+        if trace.name in shown:
+            trace.showlegend = False
 
     show_figure(host.figure, "plotly", show)
 
@@ -110,6 +117,11 @@ def require_no_axes(ax):
             "renderer='plotly' draws into a PlotResult of a Plotly figure, not into "
             "matplotlib axes; pass ax=<PlotResult> or renderer='matplotlib'"
         )
+
+
+def legend_names(fig) -> set:
+    """The names a figure's legend shows."""
+    return {trace.name for trace in fig.data if trace.name and trace.showlegend}
 
 
 def cell_of(k, n_cols):
@@ -210,17 +222,20 @@ def draw_trace(fig, trace: Trace, row, col):
 
 
 def draw_direction_arrows(fig, x, y, color, row, col):
-    """Direction arrows spread over the middle of a line, as annotations."""
+    """Direction arrows spread over the middle of a line, as annotations on the panel's own axes."""
+    subplot = fig.get_subplot(row, col)
+    x_ref = subplot.xaxis.plotly_name.replace("axis", "")
+    y_ref = subplot.yaxis.plotly_name.replace("axis", "")
     for start, end in direction_arrow_spans(x.size):
         fig.add_annotation(
             x=x[end],
             y=y[end],
             ax=x[start],
             ay=y[start],
-            xref="x",
-            yref="y",
-            axref="x",
-            ayref="y",
+            xref=x_ref,
+            yref=y_ref,
+            axref=x_ref,
+            ayref=y_ref,
             showarrow=True,
             arrowhead=2,
             arrowcolor=color,

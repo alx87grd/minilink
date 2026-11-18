@@ -48,10 +48,11 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
         fig = axes[0].figure
         fill_only = True
 
-    # The panels, then the title above them
+    # The panels, then the title above them: on a new figure, or on the caller's
+    # figure when it has none
     for target, panel in zip(axes, spec.panels):
         draw_panel(target, panel, fill_only=fill_only)
-    if spec.title:
+    if spec.title and (ax is None or not fig.get_suptitle()):
         fig.suptitle(spec.title, fontsize=FONT_SIZE + 1)
     if ax is None:
         fig.tight_layout()

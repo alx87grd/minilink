@@ -187,10 +187,11 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
 
     # Into a drawn figure: its panels take the layers, on its renderer
     if isinstance(ax, PlotResult):
+        require_drawn_host(ax)
         require_same_renderer(renderer, ax.renderer)
         require_composable(ax.spec, spec)
         module = renderer_module(ax.renderer)
-        return module.draw_into(ax, distinct_colours(ax.spec, spec), show=show)
+        return module.draw_into(ax, distinct_colors(ax.spec, spec), show=show)
 
     module = renderer_module(renderer)
     return module.draw_figure(spec, show=show, ax=ax)
@@ -231,8 +232,17 @@ def require_renderer(renderer):
         raise ValueError(f"renderer must be one of {names} or None, got {renderer!r}")
 
 
+def require_drawn_host(host):
+    """Refuse a host that holds a description only: it has no figure to draw into."""
+    if host.renderer is None:
+        raise ValueError(
+            "the host record holds a description only (renderer=None) and no figure "
+            "to draw into; draw the host first, with draw(host.spec, renderer=...)"
+        )
+
+
 def require_same_renderer(renderer, host_renderer):
-    """Refuse drawing into a figure with another renderer than its own."""
+    """Refuse drawing into a figure with another renderer than its own; the default renderer follows the host's."""
     if renderer != host_renderer and renderer != "matplotlib":
         raise ValueError(
             f"the host figure is drawn with {host_renderer!r}; "
@@ -241,7 +251,7 @@ def require_same_renderer(renderer, host_renderer):
 
 
 def require_composable(host: FigureSpec, spec: FigureSpec):
-    """Refuse an overlay its host cannot take: another panel count, 3-D into 2-D, a second colour bar."""
+    """Refuse an overlay its host cannot take: another panel count, 3-D into 2-D, 2-D into 3-D, a second colour bar."""
     if host is None:
         raise ValueError(
             "the host figure has no description to draw into; draw it with a minilink "
@@ -255,6 +265,10 @@ def require_composable(host: FigureSpec, spec: FigureSpec):
     for host_panel, panel in zip(host.panels, spec.panels):
         if panel.is_3d and not host_panel.is_3d:
             raise ValueError("a 3-D plot does not draw into a 2-D panel")
+        if host_panel.is_3d and not panel.is_3d:
+            raise ValueError(
+                "a 2-D plot does not draw into a 3-D panel; draw it into a 2-D host"
+            )
         if has_colorbar(host_panel) and has_colorbar(panel):
             raise ValueError(
                 "the host panel already has a colour bar; draw the overlay without one"
@@ -262,7 +276,7 @@ def require_composable(host: FigureSpec, spec: FigureSpec):
 
 
 # The colours an overlay's line takes when its own is already the host panel's
-OVERLAY_COLOURS = (
+OVERLAY_COLORS = (
     "#ff7f0e",
     "#2ca02c",
     "#9467bd",
@@ -273,20 +287,38 @@ OVERLAY_COLOURS = (
 )
 
 
-def distinct_colours(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
-    """``spec`` with each line whose colour its host panel already draws in the next colour that panel does not use."""
+def distinct_colors(host: FigureSpec, spec: FigureSpec) -> FigureSpec:
+    """``spec`` with each line colour its host panel already draws moved to a colour neither panel uses, one per clashing colour."""
     panels = []
     for host_panel, panel in zip(host.panels, spec.panels):
-        used = {getattr(layer, "color", None) for layer in host_panel.layers}
-        free = [colour for colour in OVERLAY_COLOURS if colour not in used]
-        layers = []
+        used = colors_of(host_panel) | colors_of(panel)
+        free = iter(color for color in OVERLAY_COLORS if color not in used)
+
+        # Each clashing colour, in the order the lines draw it, takes its own free
+        # colour, and keeps its own when none is left
+        moved = {}
         for layer in panel.layers:
-            if isinstance(layer, Trace) and layer.color in used and free:
-                layer = replace(layer, color=free[0])
-            layers.append(layer)
-        panels.append(replace(panel, layers=tuple(layers)))
+            clashes = isinstance(layer, Trace) and layer.color in colors_of(host_panel)
+            if clashes and layer.color not in moved:
+                moved[layer.color] = next(free, layer.color)
+        layers = tuple(
+            replace(layer, color=moved[layer.color])
+            if isinstance(layer, Trace) and layer.color in moved
+            else layer
+            for layer in panel.layers
+        )
+        panels.append(replace(panel, layers=layers))
 
     return replace(spec, panels=tuple(panels))
+
+
+def colors_of(panel) -> set:
+    """The colours a panel's layers name; a layer without one names none."""
+    return {
+        layer.color
+        for layer in panel.layers
+        if getattr(layer, "color", None) is not None
+    }
 
 
 def has_colorbar(panel) -> bool:
