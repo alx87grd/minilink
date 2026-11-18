@@ -129,7 +129,8 @@ Because a composite diagram is itself a `DynamicSystem`, **every analysis verb w
 
 - **Real-Time Wall-Clock Play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame).
 - **Decoupled Geometry:** Body poses $T = \mathrm{tf}(x, u, t; p)$ describe kinematics without cluttering the differential equations with rendering code.
-- **Hardware-Accelerated 3D WebGL:** `plant.animate(traj, renderer="meshcat")` opens an interactive 3D browser viewer with orbit, pan, and playback controls.
+- **Hardware-Accelerated 3D WebGL:** `plant.animate(traj, renderer="meshcat")` plays the trajectory in an interactive 3D viewer with orbit, pan, and playback controls: inline in a notebook, in the browser from a script.
+- **One Way to Plot, Animate and Save:** the plots (`plot_trajectory`, `plot_bode`, `plot_cost_to_go`, …) take `renderer="matplotlib"` or `"plotly"`, `show=`, and `ax=` (to draw into another plot) and return a `PlotResult`; the animations return an `AnimationResult`; each saves itself: `result.save("bode.pdf")`, `anim.save("lap.html")`.
 - **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), drones (`Drone2D`), and aerospace vehicles (`Rocket`).
 
 ```python
@@ -137,7 +138,8 @@ from minilink import UR5Manipulator
 
 robot = UR5Manipulator()
 traj = robot.compute_trajectory(tf=5.0)
-robot.animate(traj, renderer="meshcat")  # interactive 3D WebGL in browser
+anim = robot.animate(traj, renderer="meshcat")  # interactive 3D WebGL
+anim.save("ur5.html")  # a self-contained page
 ```
 
 *Live interactive 3D demos:* [UR-5 Impedance Control](https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html) • [Racecar MPC](https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html).
