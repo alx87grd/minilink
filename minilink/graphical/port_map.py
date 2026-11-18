@@ -9,10 +9,10 @@ import numpy as np
 
 from minilink.core.roles import plot_space_of, require_command, subsystem_roles
 from minilink.graphical.common import PlotResult
+from minilink.graphical.common.labels import label_with_unit
 from minilink.graphical.common.matplotlib_style import FIGSIZE_BASE
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
 from minilink.graphical.phase_plane.phase_plane import (
-    format_axis_label,
     require_grid_shape,
 )
 
@@ -376,8 +376,8 @@ def port_map_figure(
     if vmax is None and np.isfinite(output.upper[out_axis]):
         vmax = float(output.upper[out_axis])
 
-    x_label = format_axis_label(axes[0].label, axes[0].unit)
-    out_label = format_axis_label(output.labels[out_axis], output.units[out_axis])
+    x_label = label_with_unit(axes[0].label, axes[0].unit)
+    out_label = label_with_unit(output.labels[out_axis], output.units[out_axis])
 
     # One swept axis: a line, within the output's limits when both are known
     if y_values is None:
@@ -393,7 +393,7 @@ def port_map_figure(
         return FigureSpec(panels=(panel,), figsize=FIGSIZE_BASE)
 
     # Two swept axes: a surface, or a heatmap with its colour bar
-    y_label = format_axis_label(axes[1].label, axes[1].unit)
+    y_label = label_with_unit(axes[1].label, axes[1].unit)
     if is_3d:
         layer = Surface(
             x=x_values, y=y_values, z=U, cmap=cmap, vmin=vmin, vmax=vmax, colorbar=None

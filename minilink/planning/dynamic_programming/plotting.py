@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
 
@@ -333,8 +334,8 @@ def animate(
         cmap="YlOrRd" if is_value else "bwr",
         vmin=0.0 if is_value else None,
         vmax=top,
-        x_label=axis_name(grid, x_axis),
-        y_label=axis_name(grid, y_axis),
+        x_label=state_axis_label(grid.sys, x_axis),
+        y_label=state_axis_label(grid.sys, y_axis),
         interval=interval,
         show=show,
     )
@@ -502,8 +503,8 @@ def field_figure(
     panel = Panel(
         layers=(heatmap, *overlay),
         title=title,
-        x_label=axis_name(grid, x_axis),
-        y_label=axis_name(grid, y_axis),
+        x_label=state_axis_label(grid.sys, x_axis),
+        y_label=state_axis_label(grid.sys, y_axis),
         legend="upper right",
     )
 
@@ -520,8 +521,8 @@ def value_surface_figure(grid, J, *, x_axis, y_axis, anchor, cmap, title):
     panel = Panel(
         layers=(surface,),
         title=title,
-        x_label=axis_name(grid, x_axis),
-        y_label=axis_name(grid, y_axis),
+        x_label=state_axis_label(grid.sys, x_axis),
+        y_label=state_axis_label(grid.sys, y_axis),
         z_label="J",
         is_3d=True,
     )
@@ -550,16 +551,6 @@ def trajectory_layers(trajectory, x_axis, y_axis, labels):
             label=labels[2],
         ),
     )
-
-
-def axis_name(grid, i):
-    """A state axis's label and unit, ``x[i]`` without labels."""
-    labels = getattr(grid.sys.state, "labels", None)
-    units = getattr(grid.sys.state, "units", None)
-    base = labels[i] if labels else f"x[{i}]"
-    unit = f" [{units[i]}]" if units and units[i] else ""
-
-    return base + unit
 
 
 def show_each(results, show):

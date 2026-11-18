@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.core.fields import GridField
 from minilink.core.sets import is_finite_box
+from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, draw, overlay
 from minilink.planning.dynamic_programming import plotting as grid_plotting
 
@@ -323,13 +324,12 @@ def cost_to_go_panel(
 ):
     """The heatmap of a sampled field on the colour scale ``0 ≤ J ≤ jmax``, ``layers`` over it, as a panel."""
     heatmap = Heatmap(x=x_level, y=y_level, z=J.T, cmap="YlOrRd", vmin=0.0, vmax=jmax)
-    labels = state_labels(problem.sys)
 
     return Panel(
         layers=(heatmap, *layers),
         title=title,
-        x_label=labels[x_axis],
-        y_label=labels[y_axis],
+        x_label=state_axis_label(problem.sys, x_axis),
+        y_label=state_axis_label(problem.sys, y_axis),
         legend="upper right",
     )
 
@@ -338,29 +338,16 @@ def cost_to_go_surface(problem, x_level, y_level, J, x_axis, y_axis, jmax, title
     """The surface of a sampled field, clipped to ``0 ≤ J ≤ jmax``, as a description."""
     J_plot = np.clip(J, 0.0, np.inf if jmax is None else jmax)
     surface = Surface(x=x_level, y=y_level, z=J_plot.T, cmap="YlOrRd")
-    labels = state_labels(problem.sys)
     panel = Panel(
         layers=(surface,),
         title=title,
-        x_label=labels[x_axis],
-        y_label=labels[y_axis],
+        x_label=state_axis_label(problem.sys, x_axis),
+        y_label=state_axis_label(problem.sys, y_axis),
         z_label="J",
         is_3d=True,
     )
 
     return FigureSpec(panels=(panel,))
-
-
-def state_labels(sys) -> list:
-    """The state's axis labels with their units, ``x[i]`` where the state names none."""
-    labels = getattr(sys.state, "labels", None)
-    units = getattr(sys.state, "units", None)
-    n = int(sys.n)
-    return [
-        (labels[i] if labels else f"x[{i}]")
-        + (f" [{units[i]}]" if units and units[i] else "")
-        for i in range(n)
-    ]
 
 
 def state_box(problem):

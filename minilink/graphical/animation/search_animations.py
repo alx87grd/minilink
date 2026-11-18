@@ -1,10 +1,10 @@
 """Search animations in matplotlib: the RRT family's tree growing, and RRT*'s recorded convergence."""
 
 from minilink.graphical.common.animation_result import animation_result_of
+from minilink.graphical.common.labels import state_axis_label
 from minilink.planning.search.plotting import (
     PATH_COLOR,
     TREE_COLOR,
-    axis_label,
     endpoint_layers,
     goal_region_layers,
     require_history,
@@ -177,8 +177,8 @@ def frame_search_axes(ax, planner, x_axis, y_axis):
     x_lim, y_lim = tree_limits(planner, x_axis, y_axis)
     ax.set_xlim(*x_lim)
     ax.set_ylim(*y_lim)
-    ax.set_xlabel(axis_label(planner.problem.sys, x_axis))
-    ax.set_ylabel(axis_label(planner.problem.sys, y_axis))
+    ax.set_xlabel(state_axis_label(planner.problem.sys, x_axis))
+    ax.set_ylabel(state_axis_label(planner.problem.sys, y_axis))
     for layer in goal_region_layers(planner, x_axis, y_axis):
         draw_trace(ax, layer)
     for layer in endpoint_layers(planner, x_axis, y_axis):

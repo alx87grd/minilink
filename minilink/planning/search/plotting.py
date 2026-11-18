@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
 
 # The tree's edges and the solution path
@@ -76,8 +77,8 @@ def tree_figure(planner, solution, *, x_axis, y_axis, title, path_style, figsize
     panel = Panel(
         layers=tuple(layers),
         title=f"RRT tree ({len(tree.nodes)} nodes)" if title is None else title,
-        x_label=axis_label(planner.problem.sys, x_axis),
-        y_label=axis_label(planner.problem.sys, y_axis),
+        x_label=state_axis_label(planner.problem.sys, x_axis),
+        y_label=state_axis_label(planner.problem.sys, y_axis),
     )
 
     return FigureSpec(panels=(panel,), figsize=figsize)
@@ -155,16 +156,6 @@ def tree_limits(planner, x_axis, y_axis):
         limits.append((lo - pad, hi + pad))
 
     return tuple(limits)
-
-
-def axis_label(sys, i):
-    """The label and unit of state ``i``, ``x[i]`` without labels."""
-    labels = getattr(sys.state, "labels", None)
-    units = getattr(sys.state, "units", None)
-    name = labels[i] if labels and i < len(labels) else f"x[{i}]"
-    unit = f" [{units[i]}]" if units and i < len(units) and units[i] else ""
-
-    return name + unit
 
 
 def search_title(step):

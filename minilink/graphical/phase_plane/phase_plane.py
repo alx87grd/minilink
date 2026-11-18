@@ -7,6 +7,7 @@ import operator
 import numpy as np
 
 from minilink.graphical.common import PlotResult
+from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.common.matplotlib_style import FIGSIZE_BASE
 from minilink.graphical.figure import Arrows, FigureSpec, Panel, Trace, draw
 
@@ -150,12 +151,8 @@ def phase_plane_figure(
     panel = Panel(
         layers=layers,
         title=title or f"Phase plane for {sys.name}",
-        x_label=format_axis_label(
-            label_for_axis(sys, x_axis), unit_for_axis(sys, x_axis)
-        ),
-        y_label=format_axis_label(
-            label_for_axis(sys, y_axis), unit_for_axis(sys, y_axis)
-        ),
+        x_label=state_axis_label(sys, x_axis),
+        y_label=state_axis_label(sys, y_axis),
         x_lim=x_bounds,
         y_lim=y_bounds,
     )
@@ -350,28 +347,3 @@ def require_field_shape(dx, n):
     """Refuse a vector field ``f`` that does not return ``n`` state rates."""
     if dx.shape != (n,):
         raise ValueError(f"sys.f must return shape ({n},), got {dx.shape}")
-
-
-def label_for_axis(sys, axis: int) -> str:
-    """The state's label of ``axis``, else ``x[axis]``."""
-    labels = list(sys.state.labels)
-    if len(labels) > axis:
-        return str(labels[axis])
-    return f"x[{axis}]"
-
-
-def unit_for_axis(sys, axis: int) -> str:
-    """The state's unit of ``axis``, else none."""
-    units = list(sys.state.units)
-    if len(units) > axis:
-        return str(units[axis])
-    return ""
-
-
-def format_axis_label(label: str, unit: str) -> str:
-    """The label with its unit in brackets: ``[m]`` stays ``[m]``."""
-    if unit:
-        if unit.startswith("[") and unit.endswith("]"):
-            return f"{label} {unit}"
-        return f"{label} [{unit}]"
-    return label

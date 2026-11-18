@@ -8,6 +8,7 @@ from minilink.core.diagram import DiagramSystem, subsystem_run
 from minilink.core.system import System
 from minilink.graphical.common import PlotResult
 from minilink.graphical.common.environment import allow_tall_stacked_figures
+from minilink.graphical.common.labels import label_with_unit
 from minilink.graphical.common.matplotlib_style import trajectory_stack_figsize
 from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
 from minilink.graphical.signals.signal_colors import (
@@ -164,7 +165,7 @@ def signal_figure(
                 width=style.linewidth,
                 label=labels[i],
             )
-            y_label = ylabel_with_unit(labels[i], units[i])
+            y_label = label_with_unit(labels[i], units[i], separator="\n")
             panels.append(Panel(layers=(trace,), y_label=y_label, legend=None))
 
     require_traces(panels)
@@ -525,13 +526,3 @@ def require_same_trace_count(figure, n_lines):
         raise ValueError(
             "Live plot update changed the number of traces; open a new plot."
         )
-
-
-def ylabel_with_unit(label: str, unit: str) -> str:
-    """The label over its unit in brackets: ``[m]`` stays ``[m]``."""
-    if not unit:
-        return label
-    unit = str(unit).strip()
-    if unit.startswith("[") and unit.endswith("]"):
-        return f"{label}\n{unit}"
-    return f"{label}\n[{unit}]"
