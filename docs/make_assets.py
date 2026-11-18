@@ -48,9 +48,9 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
     """Write the interactive 3-D page, then the GIF screenshot of that page."""
     SHOWCASE.mkdir(parents=True, exist_ok=True)
     html = SHOWCASE / page
-    sys_or_diagram.animate(
-        traj, renderer="meshcat", show=False, **animate_kwargs
-    ).save(html)
+    sys_or_diagram.animate(traj, renderer="meshcat", show=False, **animate_kwargs).save(
+        html
+    )
     print(f"{html}: {html.stat().st_size / 1e6:.2f} MB")
     html_to_gif(html, STATIC / gif)
 

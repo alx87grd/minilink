@@ -408,8 +408,12 @@ RETIRED_KEYWORDS = {
     "minilink.planning.dynamic_programming.plotting.animate_control_law": {
         "save_path": "file_name"
     },
-    "minilink.graphical.animation.search_animations.animate_search": {"save": "file_name"},
-    "minilink.graphical.animation.search_animations.animate_convergence": {"save": "file_name"},
+    "minilink.graphical.animation.search_animations.animate_search": {
+        "save": "file_name"
+    },
+    "minilink.graphical.animation.search_animations.animate_convergence": {
+        "save": "file_name"
+    },
     "minilink.planning.evaluation.score_run": {"tf": "horizon"},
     "minilink.planning.planner.planner_evidence": {"tf": "episode_length"},
     "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
