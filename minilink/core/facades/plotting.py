@@ -105,8 +105,9 @@ class SystemPlotting:
         cmap="bwr",
         vmin=None,
         vmax=None,
+        renderer="matplotlib",
+        show=None,
         ax=None,
-        show=True,
     ):
         """
         Convenience shortcut plotting one output component over swept inputs.
@@ -135,8 +136,9 @@ class SystemPlotting:
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
-            ax=ax,
+            renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_control_law(
@@ -156,8 +158,9 @@ class SystemPlotting:
         cmap="bwr",
         vmin=None,
         vmax=None,
+        renderer="matplotlib",
+        show=None,
         ax=None,
-        show=True,
     ):
         """
         Convenience shortcut plotting the textbook slice of this block's control law.
@@ -190,8 +193,9 @@ class SystemPlotting:
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
-            ax=ax,
+            renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def get_diagram(self, *, expand=True):

@@ -1749,6 +1749,22 @@ class TestPlotInputOutputMap(unittest.TestCase):
         self.assertIsNotNone(res.figure)
         plt.close(res.figure)
 
+    def test_plotly_draws_the_line_the_heatmap_and_the_surface(self):
+        sat = Saturation(-1.0, 1.0)
+        line = sat.plot_input_output_map(renderer="plotly", show=False)
+        self.assertEqual([type(t).__name__ for t in line.figure.data], ["Scatter"])
+        law = StateFeedback(np.array([[3.0, 1.0]]))
+        for is_3d, kind in ((False, "Heatmap"), (True, "Surface")):
+            res = law.plot_input_output_map(
+                x_axis=0,
+                y_axis=1,
+                grid_shape=(5, 5),
+                is_3d=is_3d,
+                renderer="plotly",
+                show=False,
+            )
+            self.assertEqual([type(t).__name__ for t in res.figure.data], [kind])
+
 
 class TestPlotControlLaw(unittest.TestCase):
     def test_error_space_line_values(self):

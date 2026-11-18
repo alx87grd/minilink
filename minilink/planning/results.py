@@ -168,9 +168,9 @@ class PlanningSolution:
         is_3d=False,
         trajectory=None,
         title=None,
-        ax=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """
         Draw the feedback law, input ``u_axis`` over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
@@ -184,8 +184,9 @@ class PlanningSolution:
         scale (``bounds``, ``grid_shape``, ``t`` or ``is_3d`` given, a grid
         law is swept the same way); ``anchor`` pins a grid law's other axes
         (a controller's are at their nominal values). ``trajectory`` overlays a run, ``title``
-        replaces the title, ``ax`` draws into existing axes, ``show=False``
-        builds only; ``renderer`` is ``"matplotlib"``.
+        replaces the title; ``renderer`` is ``"matplotlib"`` or ``"plotly"``,
+        ``ax`` draws into matplotlib axes or a drawn ``PlotResult``, and
+        ``show=None`` shows the figure unless it is drawn into ``ax``.
         """
         return plot_control_law(
             self,
@@ -199,9 +200,9 @@ class PlanningSolution:
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
-            ax=ax,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_cost_to_go(
@@ -217,9 +218,9 @@ class PlanningSolution:
         is_3d=False,
         trajectory=None,
         title=None,
-        ax=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """
         Draw the method's cost-to-go over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
@@ -229,10 +230,12 @@ class PlanningSolution:
         problem's state box) at the time ``t``, the other axes pinned at
         ``anchor`` (the goal, else the start). ``jmax`` tops the colour scale,
         by default the field's value past its grid (the failure cost) when it
-        has one, ``np.inf`` for Matplotlib's own scale; ``is_3d`` adds the
-        surface, ``trajectory`` overlays a run, ``title`` replaces the title,
-        ``ax`` draws into existing axes, ``show=False`` builds only;
-        ``renderer`` is ``"matplotlib"``.
+        has one, ``np.inf`` for the renderer's own scale; ``is_3d`` adds the
+        surface on a figure of its own, ``trajectory`` overlays a run,
+        ``title`` replaces the title; ``renderer`` is ``"matplotlib"`` or
+        ``"plotly"``, ``ax`` draws into matplotlib axes or a drawn
+        ``PlotResult``, and ``show=None`` shows the figure unless it is drawn
+        into ``ax``.
         """
         field = require_cost_to_go(self)
         grid = getattr(self.controller, "grid", None)
@@ -252,9 +255,9 @@ class PlanningSolution:
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
-            ax=ax,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     # Display

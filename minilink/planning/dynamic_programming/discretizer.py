@@ -431,29 +431,55 @@ class StateSpaceGrid:
 
     # Plotting
 
-    def plot_cost_to_go(self, values, *, is_3d=False, **kwargs):
+    def plot_cost_to_go(
+        self,
+        values,
+        *,
+        is_3d=False,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        vmin=None,
+        vmax=None,
+        cmap="YlOrRd",
+        title="Cost-to-go",
+        renderer="matplotlib",
+        show=None,
+        ax=None,
+    ):
         """
         Draw a node-indexed field on this grid: a heatmap, or a surface with ``is_3d``.
 
         ``values`` has shape ``(n_nodes,)`` — a cost-to-go, a policy's value, a
-        fitted approximation. Options (``x_axis``, ``y_axis``, ``anchor``, ``vmin``, ``vmax``,
-        ``title``, ``show``) are those of
+        fitted approximation. The heatmap's colours span ``[vmin, vmax]``,
+        ``vmin`` 0 by default; the surface is the field clipped to the limits
+        given. ``x_axis``, ``y_axis`` and ``anchor`` pick the slice, as in
         :func:`~minilink.planning.dynamic_programming.plotting.plot_value`.
         """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.dynamic_programming import plotting
 
         values = np.asarray(values, dtype=float)
+        drawn = dict(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            cmap=cmap,
+            title=title,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
 
         # A surface takes no colour limits: the field itself is clipped to [vmin, vmax]
         if is_3d:
-            vmin = kwargs.pop("vmin", None)
-            vmax = kwargs.pop("vmax", None)
             if vmin is not None or vmax is not None:
                 values = np.clip(values, vmin, vmax)
-            return plotting.plot_value_3d(self, values, **kwargs)
+            return plotting.plot_value_3d(self, values, **drawn)
 
-        return plotting.plot_value(self, values, **kwargs)
+        return plotting.plot_value(
+            self, values, vmin=0.0 if vmin is None else vmin, vmax=vmax, **drawn
+        )
 
     # Persistence
 

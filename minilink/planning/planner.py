@@ -137,17 +137,21 @@ class Planner(ABC):
 
     # Views of the latest solution
 
-    def plot_trajectory(self, **kwargs):
+    def plot_trajectory(self, *, signals=("x", "u"), renderer="matplotlib", show=True):
         """The latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_trajectory`)."""
-        return require_solution(self).plot_trajectory(**{"dt": self.dt, **kwargs})
+        return require_solution(self).plot_trajectory(
+            dt=self.dt, signals=signals, renderer=renderer, show=show
+        )
 
     def animate(self, **kwargs):
         """The latest solution's plan, else its controller's run on the planner's ``dt``, animated (:meth:`PlanningSolution.animate`)."""
         return require_solution(self).animate(**{"dt": self.dt, **kwargs})
 
-    def plot_cost(self, **kwargs):
-        """The running cost along the latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_cost`)."""
-        return require_solution(self).plot_cost(**{"dt": self.dt, **kwargs})
+    def plot_cost(self, *, dt=None, renderer="matplotlib", show=True):
+        """The running cost along the latest solution's plan, else its controller's run on ``dt``, by default the planner's (:meth:`PlanningSolution.plot_cost`)."""
+        return require_solution(self).plot_cost(
+            dt=self.dt if dt is None else dt, renderer=renderer, show=show
+        )
 
     def plot_control_law(
         self,
@@ -162,9 +166,9 @@ class Planner(ABC):
         is_3d=False,
         trajectory=None,
         title=None,
-        ax=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """The latest solution's law (:meth:`PlanningSolution.plot_control_law`, the same keywords): a ``PlotResult``."""
         return require_solution(self).plot_control_law(
@@ -178,9 +182,9 @@ class Planner(ABC):
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
-            ax=ax,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     def plot_cost_to_go(
@@ -196,9 +200,9 @@ class Planner(ABC):
         is_3d=False,
         trajectory=None,
         title=None,
-        ax=None,
         renderer="matplotlib",
-        show=True,
+        show=None,
+        ax=None,
     ):
         """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`, the same keywords): a ``PlotResult``."""
         return require_solution(self).plot_cost_to_go(
@@ -212,9 +216,9 @@ class Planner(ABC):
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
-            ax=ax,
             renderer=renderer,
             show=show,
+            ax=ax,
         )
 
     ###########################################################################
