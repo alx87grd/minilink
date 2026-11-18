@@ -72,7 +72,7 @@ the projects. The algorithms do not need them.
 | Value iteration: `animate_cost_to_go`, `animate_control_law`, the sweep history | No caller. Also two plot "forms" nobody uses and a batch-slice path never fed. | 150 | public methods | M |
 | Trajectory optimization: `callback=`, `live_plot=`, `record_history=`, the iteration record, `live_plot.py`; the evaluator's `live_plot` | Called by three old demos only. `callback=` could stay as a plain pass-through. | 230 | public keywords | M |
 | Soft cost fields in a `Scene` (`workspace_fields`, `cost_density`, `GaussianField` drawing) | One old demo. The kept surface uses a scene for obstacles and clearance only. | 200 | a `Scene` argument | M |
-| Two cost-field figures (`plot_cost_field_3d`, `plot_cost_field_exports`) | Called by the projects and old demos only; they move with the projects. | 190 | none | H |
+| The 3-D cost-field figure (`plot_cost_field_3d`) | Called by the projects and old demos only; they move with the projects. | 190 | none | H |
 | MPC: the sampled-futures plot, four overlay keywords | One old demo, the projects. | 100 | none | M |
 | Racecar skin: `palette`, `equipment`, `scene`, `heading_arrow`, `wheel_radius`; a debug look | A skin is only ever called as `skin(plant)`; the keywords are never passed. | 55 | public keywords | H |
 
@@ -108,7 +108,7 @@ comment. Risk: behaviour for those callers. Confidence: M, your call on Colab.
 | `Tree(nearest_method="kd_tree")` | Tests only. | 35 | none | M |
 | The reward-rebuild branch of the learning planner (`reward="stage"`) | A keyword no caller passes; the environment's own option stays. | 15 | none | M |
 | Custom gravity hook on the arm impedance laws (`gravity=`, signature probing) | Tests only; two of its guards can never fire. | 35 | public keyword | M |
-| Law keywords: label and unit overrides on `Impedance`, `y_filt0`, integrator clamps, `autowire(strict=)`, `animate(native=)` | Passed by nobody. | 50 | public keywords | M |
+| Law keywords: label and unit overrides on `Impedance`, `y_filt0`, integrator clamps, `autowire(strict=)` | Passed by nobody. | 50 | public keywords | M |
 | A pluggable diagram-exporter layer with one backend (`graphical/diagrams/export.py`) | Graphviz is the only exporter; the layer exists for a test. | 90 | exported names | H |
 | Mesh tools: the Collada loader (two functions), `split_by_radius`, `refine` | No caller, tests included. | 200 | none | H |
 | JAX setup: `configure_jax`, two backend tuples | Called by the projects and tests, always with the default. | 35 | a public name | M |
@@ -125,7 +125,7 @@ Small, safe, and each one a line a reader stops on.
 | `core/inspect.py` | The LaTeX path goes out and comes back to one class; its generic branch would recurse forever if reached. | 18 |
 | `optimization/optimizer.py` | The method table is an identity copy of the presets; a method is validated three times. | 25 |
 | `planning/evaluator.py` | `numbers_key` builds a cache key, and is only tested for `None`. | 10 |
-| Records | Fields written and never read: four on the trajectory-optimization record, `frozen_at`, `last_program`, `last_optimizer`, `last_traj`, `PlotResult.payload`, `ControlFigure.extra`. | 60 |
+| Records | Fields written and never read: four on the trajectory-optimization record, `frozen_at`, `last_program`, `last_optimizer`, `last_traj`. | 60 |
 | Fallbacks that cannot fire | About twenty `getattr(x, name, default)` on attributes every object has; six spellings of "is this a diagram"; `if problem.X is not None` (always true). | 60 |
 | Forwarders | Functions that only pass their arguments on; variadic helpers every caller gives one argument; a dataclass around one dict. | 130 |
 | `SampledSystem` | Three different fixes for one problem (defaults written through the view). | 8 |

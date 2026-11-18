@@ -462,8 +462,8 @@ in a session:
   never left uncommitted at a break: it is finished, or reverted.
 - **The progress log below** is updated in the same commit as the work it records: the step,
   the item, its commit, and the next action. A restart reads it first.
-- **The baseline tooling and records live on the branch**, in `docs/plans/plotting-run/`
-  (`baseline.py`, `baseline.json`), and leave before the pull request is merged.
+- **The baseline tooling and records lived on the branch**, in `docs/plans/plotting-run/`
+  (`baseline.py`, `baseline.json`); they left after the merge and are in the git history.
 - **A restart:** `git fetch && git checkout plotting-contract && git pull --ff-only`; install
   the environment (below); read the progress log; re-run `baseline.py --check`; continue at
   the next action.

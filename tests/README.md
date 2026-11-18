@@ -206,6 +206,9 @@ SDL_VIDEODRIVER=dummy pytest
 `SDL_VIDEODRIVER=dummy` lets pygame tests initialize in headless CI or
 cloud agent sessions.
 
+`MINILINK_HEADLESS=1` (set by `tests/unittest/conftest.py`, the demo and notebook
+runners and CI) shows no figure, whatever `show=` asks.
+
 ## Marker policy
 
 - `optional`: any test that needs a dependency outside the base package

@@ -167,7 +167,7 @@ concrete formatting, ordered by the cost of being wrong:
   | An episode's length (`Sys2Gym`) | `episode_length` | `tf` as a length |
   | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native method's numbers (`max_iterations=`, `tol=`, `learning_rate=` are keywords) |
   | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
-  | Print text / draw a figure (and where: `plot_diagram(show="inline" \| "window" \| "pdf")`) | `verbose` (default `False`) / `show` | `show_inline`, `show_pdf` |
+  | Print text / draw a figure (and where: `plot_diagram(show="inline" \| "window")`) | `verbose` (default `False`) / `show` | `show_inline`, `show_pdf` |
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
   | Cost-to-go and control-law plots, and their sweeps animated | `plot_cost_to_go`, `plot_control_law`; `animate_cost_to_go`, `animate_control_law` | `plot_cost2go`, `plot_policy`, `animate_policy` |
 | A plant's signals: the state's order (a style guideline, not a rule enforced on a user's plant), a rate's label, a unit, a default label | positions, then their rates (`[q; dq]`, all the positions first on a plant of several bodies); `d<position>` (`dtheta`, `dy`) unless the textbook names the rate (`omega`, `yaw_rate`, `vx`); a bare unit (`"Nm"`, `"rad/s"`: the plot adds the brackets); counted from 1 (`q1…`, `dq1…`, `u1…`, `p1…`) | rates first; `"[Nm]"`, `"rad/sec"`; `"Torque 0"`, `"Angle 0"` |
