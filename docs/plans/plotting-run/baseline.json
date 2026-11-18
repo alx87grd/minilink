@@ -2304,7 +2304,7 @@
      {
       "data": [
        "3262a14f4a2a",
-       "a13cd6b6a039"
+       "ec8eb97cb421"
       ],
       "legend": [],
       "texts": [],
@@ -2395,7 +2395,7 @@
      {
       "data": [
        "3262a14f4a2a",
-       "8ed35760b39f"
+       "a687db871f7e"
       ],
       "legend": [],
       "texts": [],
@@ -2485,8 +2485,8 @@
     "axes": [
      {
       "data": [
-       "3262a14f4a2a",
-       "4c0bc270bd13"
+       "0002d2fca4f8",
+       "3262a14f4a2a"
       ],
       "legend": [],
       "texts": [],
@@ -2577,7 +2577,7 @@
      {
       "data": [
        "3262a14f4a2a",
-       "550bf03bf55f"
+       "84ce796079e9"
       ],
       "legend": [],
       "texts": [],
@@ -4098,17 +4098,7 @@
   "artists": [
    [
     [
-     "QuadMesh"
-    ]
-   ],
-   [
-    [
      "Poly3DCollection"
-    ]
-   ],
-   [
-    [
-     "QuadMesh"
     ]
    ],
    [
@@ -4118,32 +4108,6 @@
    ]
   ],
   "data": [
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "403e2ea44c25"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Cost-to-go",
-      "xlabel": "x[0]",
-      "xlim": [
-       -3.0,
-       3.0
-      ],
-      "xscale": "linear",
-      "ylabel": "x[1]",
-      "ylim": [
-       -3.0,
-       3.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
    {
     "axes": [
      {
@@ -4167,32 +4131,6 @@
       ],
       "yscale": "linear",
       "zlabel": "J"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "403e2ea44c25"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Cost-to-go",
-      "xlabel": "x[1]",
-      "xlim": [
-       -3.0,
-       3.0
-      ],
-      "xscale": "linear",
-      "ylabel": "x[0]",
-      "ylim": [
-       -3.0,
-       3.0
-      ],
-      "yscale": "linear"
      }
     ],
     "suptitle": ""
@@ -4502,6 +4440,74 @@
       ],
       "texts": [],
       "title": "Control law u[0]",
+      "xlabel": "x[0]",
+      "xlim": [
+       -3.0,
+       3.0
+      ],
+      "xscale": "linear",
+      "ylabel": "x[1]",
+      "ylim": [
+       -3.0,
+       3.0
+      ],
+      "yscale": "linear"
+     }
+    ],
+    "suptitle": ""
+   }
+  ]
+ },
+ "tests/unittest/test_dynamic_programming.py::TestDynamicProgrammingPlotting::test_the_sweep_animations_draw_into_axes_and_refuse_another_renderer": {
+  "artists": [
+   [
+    [
+     "QuadMesh"
+    ]
+   ],
+   [
+    [
+     "QuadMesh"
+    ]
+   ]
+  ],
+  "data": [
+   {
+    "axes": [
+     {
+      "data": [
+       "3262a14f4a2a",
+       "c7b6bd8a2b37"
+      ],
+      "legend": [],
+      "texts": [],
+      "title": "",
+      "xlabel": "x[0]",
+      "xlim": [
+       -3.0,
+       3.0
+      ],
+      "xscale": "linear",
+      "ylabel": "x[1]",
+      "ylim": [
+       -3.0,
+       3.0
+      ],
+      "yscale": "linear"
+     }
+    ],
+    "suptitle": ""
+   },
+   {
+    "axes": [
+     {
+      "data": [
+       "09cfb35912c0",
+       "3262a14f4a2a"
+      ],
+      "legend": [],
+      "texts": [],
+      "title": "",
       "xlabel": "x[0]",
       "xlim": [
        -3.0,
@@ -6067,6 +6073,79 @@
    }
   ]
  },
+ "tests/unittest/test_planning.py::test_a_cost_field_takes_the_scene_and_draws_its_surface": {
+  "artists": [
+   [
+    [
+     "Line2D",
+     "Polygon",
+     "QuadMesh"
+    ]
+   ],
+   [
+    [
+     "Poly3DCollection"
+    ]
+   ]
+  ],
+  "data": [
+   {
+    "axes": [
+     {
+      "data": [
+       "3262a14f4a2a",
+       "3a6a9ee8148e",
+       "7fd92b432446",
+       "8104f35a5a14"
+      ],
+      "legend": [],
+      "texts": [],
+      "title": "2D",
+      "xlabel": "x",
+      "xlim": [
+       -1.0,
+       3.0
+      ],
+      "xscale": "linear",
+      "ylabel": "y",
+      "ylim": [
+       -1.0,
+       1.0
+      ],
+      "yscale": "linear"
+     }
+    ],
+    "suptitle": ""
+   },
+   {
+    "axes": [
+     {
+      "data": [
+       "3262a14f4a2a",
+       "eb182311661d"
+      ],
+      "legend": [],
+      "texts": [],
+      "title": "3D",
+      "xlabel": "x",
+      "xlim": [
+       -1.291667,
+       3.291667
+      ],
+      "xscale": "linear",
+      "ylabel": "y",
+      "ylim": [
+       -1.145833,
+       1.145833
+      ],
+      "yscale": "linear",
+      "zlabel": "log(1 + cost)"
+     }
+    ],
+    "suptitle": ""
+   }
+  ]
+ },
  "tests/unittest/test_planning.py::test_a_track_draws_and_overlays_its_corridor_at_half_width_from_the_centerline": {
   "artists": [
    [
@@ -6167,280 +6246,6 @@
        4.423193
       ],
       "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   }
-  ]
- },
- "tests/unittest/test_planning.py::test_plot_cost_field_exports_smoke": {
-  "artists": [
-   [
-    [
-     "Line2D",
-     "Polygon",
-     "QuadMesh"
-    ]
-   ],
-   [
-    [
-     "Poly3DCollection"
-    ]
-   ],
-   [
-    [
-     "Line2D",
-     "Polygon",
-     "QuadMesh"
-    ]
-   ],
-   [
-    [
-     "Poly3DCollection"
-    ]
-   ],
-   [
-    [
-     "Line2D",
-     "Polygon",
-     "QuadMesh"
-    ]
-   ],
-   [
-    [
-     "Poly3DCollection"
-    ]
-   ],
-   [
-    [
-     "Line2D",
-     "Polygon",
-     "QuadMesh"
-    ]
-   ],
-   [
-    [
-     "Poly3DCollection"
-    ]
-   ]
-  ],
-  "data": [
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "7fd92b432446",
-       "8104f35a5a14",
-       "f7d6b165cf45"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Path cost (2D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.0,
-       3.0
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "a6e523eff177"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Path cost (3D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.291667,
-       3.291667
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.145833,
-       1.145833
-      ],
-      "yscale": "linear",
-      "zlabel": "log(1 + cost)"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "43282b91be0d",
-       "7fd92b432446",
-       "8104f35a5a14"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Corridor cost (2D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.0,
-       3.0
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "ad1a7e8da40e"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Corridor cost (3D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.291667,
-       3.291667
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.145833,
-       1.145833
-      ],
-      "yscale": "linear",
-      "zlabel": "log(1 + cost)"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "15bf99084998",
-       "3262a14f4a2a",
-       "7fd92b432446",
-       "8104f35a5a14"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Obstacle cost (2D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.0,
-       3.0
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "101a5fad2a6e",
-       "3262a14f4a2a"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Obstacle cost (3D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.291667,
-       3.291667
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.145833,
-       1.145833
-      ],
-      "yscale": "linear",
-      "zlabel": "log(1 + cost)"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "3a6a9ee8148e",
-       "7fd92b432446",
-       "8104f35a5a14"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Combined cost (2D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.0,
-       3.0
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.0,
-       1.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "92932b2a1066"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Combined cost (3D)",
-      "xlabel": "x",
-      "xlim": [
-       -1.291667,
-       3.291667
-      ],
-      "xscale": "linear",
-      "ylabel": "y",
-      "ylim": [
-       -1.145833,
-       1.145833
-      ],
-      "yscale": "linear",
-      "zlabel": "log(1 + cost)"
      }
     ],
     "suptitle": ""
@@ -8478,17 +8283,7 @@
    ],
    [
     [
-     "QuadMesh"
-    ]
-   ],
-   [
-    [
      "Poly3DCollection"
-    ]
-   ],
-   [
-    [
-     "QuadMesh"
     ]
    ],
    [
@@ -8513,32 +8308,6 @@
    ]
   ],
   "data": [
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "bbce208a6fe7"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "Cost-to-go",
-      "xlabel": "theta [rad]",
-      "xlim": [
-       -6.283185,
-       6.283185
-      ],
-      "xscale": "linear",
-      "ylabel": "dtheta [rad/s]",
-      "ylim": [
-       -8.0,
-       8.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
    {
     "axes": [
      {
@@ -8602,32 +8371,6 @@
       "legend": [],
       "texts": [],
       "title": "Control law u[0]",
-      "xlabel": "theta [rad]",
-      "xlim": [
-       -6.283185,
-       6.283185
-      ],
-      "xscale": "linear",
-      "ylabel": "dtheta [rad/s]",
-      "ylim": [
-       -8.0,
-       8.0
-      ],
-      "yscale": "linear"
-     }
-    ],
-    "suptitle": ""
-   },
-   {
-    "axes": [
-     {
-      "data": [
-       "3262a14f4a2a",
-       "b25cb7e6ec22"
-      ],
-      "legend": [],
-      "texts": [],
-      "title": "cost-to-go (riccati)",
       "xlabel": "theta [rad]",
       "xlim": [
        -6.283185,

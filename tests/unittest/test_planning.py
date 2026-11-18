@@ -1912,6 +1912,8 @@ def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
     import matplotlib
 
     matplotlib.use("Agg", force=True)
+    import matplotlib.pyplot as plt
+
     from minilink.planning.spatial.plotting import plot_cost_field, plot_cost_field_3d
 
     scene = Scene(obstacles=(Sphere([1.0, 0.0], 0.4),))
@@ -1933,6 +1935,7 @@ def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
     assert both.figure is flat.figure and len(both.spec.panels[0].layers) > 1
     assert flat.save(tmp_path / "flat.png").exists()
     assert surface.save(tmp_path / "surface.png").exists()
+    plt.close("all")
 
 
 def test_the_spatial_plots_draw_on_plotly():
