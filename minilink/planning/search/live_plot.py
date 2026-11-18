@@ -2,6 +2,14 @@
 
 from dataclasses import dataclass
 
+from minilink.planning.search.plotting import (
+    best_path_states,
+    edge_traces,
+    path_trace,
+    search_frame,
+    search_title,
+)
+
 __all__ = ["LiveSearchPlot", "TreeSearchIteration"]
 
 ###############################################################################
@@ -56,17 +64,18 @@ class LiveSearchPlot:
         self.x_axis = int(x_axis)
         self.y_axis = int(y_axis)
 
-        # Memory: the figure, and the artists of the latest redraw
+        # Memory: the figure, and the artists of the latest redraw (the tree under
+        # the endpoints, the best path over them)
         self.fig = None
-        self.tree_lines: list = []
-        self.path_line = None
+        self.under_lines: list = []
+        self.over_lines: list = []
         self.title = None
         self.framed = False
 
     @property
     def lines(self):
         """Tree edge line artists from the latest redraw."""
-        return list(self.tree_lines)
+        return list(self.under_lines)
 
     def __call__(self, step) -> None:
         # One redraw every few extensions, and none before the goal when asked
@@ -76,9 +85,21 @@ class LiveSearchPlot:
             return
 
         # Lazy import: the graphics load with the first redraw
-        from minilink.graphical.live_plots import redraw_search
+        from minilink.graphical.live_plots import redraw_lines
 
-        redraw_search(self, step)
+        # The frame on the first redraw; the tree as it stands, and the best path
+        planner = step.planner
+        i = self.x_axis
+        j = self.y_axis
+        frame = None if self.framed else search_frame(planner, i, j)
+        edges = [
+            node.edge.states for node in planner.tree.nodes if node.parent is not None
+        ]
+        under = edge_traces(edges, i, j, width=0.35)
+        path = best_path_states(planner, step.reached_goal)
+        over = () if path is None else (path_trace(path, i, j),)
+
+        redraw_lines(self, frame, under, over, search_title(step))
 
 
 @dataclass

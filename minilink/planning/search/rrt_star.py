@@ -259,9 +259,7 @@ class RRTStarPlanner(RRTPlanner):
     def animate_convergence(self, **kwargs):
         """Animate the latest solution's recorded history (a ``solve(record_history=True)``)."""
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.animation.search_animations import (
-            animate_convergence,
-        )
+        from minilink.planning.search.plotting import animate_convergence
 
         return animate_convergence(self, **kwargs)
 

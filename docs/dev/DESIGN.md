@@ -138,9 +138,6 @@ state-feedback block):
   (its plots draw the track).
 - **Exception:** `graphical/animation` imports `planning.spatial.Scene`, to
   draw a scene as an overlay.
-- **Exception:** `graphical/live_plots.py` and `graphical/animation/search_animations.py`
-  import `planning.search.plotting` (its colours, labels, limits and layers): the live
-  search figure and the search animations draw the tree the search plot describes.
 - **Exception:** the LQR planner (`planning/dynamic_programming/lqr.py`) imports
   `control.design` and `control.state`: it solves with the design verb and returns its
   state-feedback law.

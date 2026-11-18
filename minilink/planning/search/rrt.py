@@ -277,7 +277,7 @@ class RRTPlanner(Planner):
     def animate_search(self, **kwargs):
         """Animate the tree growth in a state projection, in matplotlib."""
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.animation.search_animations import animate_search
+        from minilink.planning.search.plotting import animate_search
 
         return animate_search(self, **kwargs)
 

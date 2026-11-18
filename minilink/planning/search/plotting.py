@@ -49,6 +49,105 @@ def plot_tree(
     return draw(spec, renderer=renderer, show=show, ax=ax)
 
 
+def animate_search(
+    planner,
+    *,
+    x_axis: int = 0,
+    y_axis: int = 1,
+    ax=None,
+    step: int = 5,
+    interval: int = 30,
+    show=True,
+    figsize=(6.0, 5.0),
+):
+    """
+    Replay the tree growth as an animation in the ``(x_axis, y_axis)`` projection.
+
+    ``step`` edges are revealed per frame, in node insertion order; the solution
+    path is drawn at the end. Returns the
+    :class:`AnimationResult`; ``.save("tree.gif")`` writes it.
+    """
+    # Lazy import: the graphics load on first use, not with the planners
+    from minilink.graphical.animation.line_animations import animate_lines
+
+    tree = require_tree(planner)
+    solution = planner.last_solution
+
+    # The edges in insertion order, and the solution path once every edge is shown
+    edges = [node.edge.states for node in tree.nodes if node.parent is not None]
+    path = None if solution is None else np.asarray(solution.trajectory.x).T
+
+    def frame_of(frame):
+        shown = min(len(edges), (frame + 1) * step)
+        under = (edge_trace(edges[:shown], x_axis, y_axis, width=0.4),)
+        done = shown >= len(edges) and path is not None
+        over = (path_trace(path, x_axis, y_axis),) if done else ()
+        return under, over, "RRT search"
+
+    # One frame per batch of step edges, and a last one for the path
+    n_frames = (len(edges) + step - 1) // step + 1
+
+    return animate_lines(
+        search_frame(planner, x_axis, y_axis, title="RRT search"),
+        frame_of,
+        n_frames,
+        interval=interval,
+        repeat=False,
+        show=show,
+        ax=ax,
+        figsize=figsize,
+    )
+
+
+def animate_convergence(
+    planner,
+    *,
+    x_axis: int = 0,
+    y_axis: int = 1,
+    ax=None,
+    interval: int = 50,
+    show=True,
+    figsize=(7.0, 6.0),
+    title_prefix: str = "RRT* convergence",
+):
+    """
+    Animate recorded RRT* history showing tree growth and best-path refinement.
+
+    Requires the latest solution's ``record.history``, from a solve with
+    ``record_history=True``.
+    Each frame redraws the full tree (including rewiring) and highlights the
+    current best goal path. Returns the :class:`AnimationResult`.
+    """
+    # Lazy import: the graphics load on first use, not with the planners
+    from minilink.graphical.animation.line_animations import animate_lines
+
+    history = require_history(planner)
+
+    # Each snapshot: its tree as recorded (rewired edges included), its best path,
+    # and the iteration with the best cost once the goal is reached
+    def frame_of(frame):
+        snapshot = history[frame]
+        under = (edge_trace(snapshot.tree_edges, x_axis, y_axis, width=0.35),)
+        over = ()
+        if snapshot.path_states is not None:
+            over = (path_trace(snapshot.path_states, x_axis, y_axis),)
+        progress = "searching..."
+        if snapshot.reached_goal and snapshot.best_cost_to_come is not None:
+            progress = f"best cost={snapshot.best_cost_to_come:.2f}"
+        return under, over, f"{title_prefix}  iter={snapshot.iteration}  {progress}"
+
+    return animate_lines(
+        search_frame(planner, x_axis, y_axis, title=title_prefix),
+        frame_of,
+        len(history),
+        interval=interval,
+        repeat=True,
+        show=show,
+        ax=ax,
+        figsize=figsize,
+    )
+
+
 def tree_figure(planner, solution, *, x_axis, y_axis, title, path_style, figsize):
     """The search tree, the solution path and the endpoints, as a description."""
     tree = require_tree(planner)
@@ -93,6 +192,35 @@ def edge_trace(edges, x_axis, y_axis, *, width, color=TREE_COLOR):
     y = np.concatenate([np.r_[np.asarray(s, float)[:, y_axis], gap] for s in edges])
 
     return Trace(x[:-1], y[:-1], color=color, width=width)
+
+
+def edge_traces(edges, x_axis, y_axis, *, width, color=TREE_COLOR):
+    """Each edge's states in the ``(x_axis, y_axis)`` projection, one line per edge."""
+    return tuple(
+        Trace(states[:, x_axis], states[:, y_axis], color=color, width=width)
+        for states in edges
+    )
+
+
+def path_trace(states, x_axis, y_axis):
+    """A path's states in the ``(x_axis, y_axis)`` projection, as one wide line."""
+    return Trace(states[:, x_axis], states[:, y_axis], color=PATH_COLOR, width=2.5)
+
+
+def search_frame(planner, x_axis, y_axis, *, title=""):
+    """The fixed frame of a search drawing, as a panel: the title, the limits, the labels, the goal region and the endpoints."""
+    x_lim, y_lim = tree_limits(planner, x_axis, y_axis)
+    layers = goal_region_layers(planner, x_axis, y_axis)
+    layers += endpoint_layers(planner, x_axis, y_axis)
+
+    return Panel(
+        layers=tuple(layers),
+        title=title,
+        x_label=state_axis_label(planner.problem.sys, x_axis),
+        y_label=state_axis_label(planner.problem.sys, y_axis),
+        x_lim=x_lim,
+        y_lim=y_lim,
+    )
 
 
 def endpoint_layers(planner, x_axis, y_axis):
