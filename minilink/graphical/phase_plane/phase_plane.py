@@ -37,6 +37,8 @@ def plot_phase_plane(
 ) -> PlotResult:
     """Plot a phase-plane vector field with an optional trajectory overlay.
 
+    The keywords not listed here are those of :func:`phase_plane_figure`.
+
     Parameters
     ----------
     sys : DynamicSystem
@@ -49,8 +51,6 @@ def plot_phase_plane(
     renderer, show, ax : optional
         ``"matplotlib"`` or ``"plotly"``; show the figure, by default unless it
         is drawn into ``ax`` (matplotlib axes or a drawn ``PlotResult``).
-
-    The other keywords are those of :func:`phase_plane_figure`.
     """
     spec = phase_plane_figure(
         sys,
