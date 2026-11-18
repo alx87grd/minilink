@@ -256,8 +256,8 @@ class RRTPlanner(Planner):
         """Plot the final tree and solution path in the ``(x_axis, y_axis)`` state projection.
 
         ``path_style="waypoints"`` draws the path through the tree's nodes;
-        pass ``ax`` (a ``scene.plot`` record or matplotlib axes) to overlay the
-        tree on a scene. See :func:`~minilink.planning.search.plotting.plot_tree`.
+        pass ``ax`` (matplotlib axes, a ``scene.plot`` record's ``axes``) to
+        overlay the tree on a scene. See :func:`~minilink.planning.search.plotting.plot_tree`.
         """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import plot_tree

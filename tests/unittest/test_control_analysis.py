@@ -1320,7 +1320,11 @@ class TestPhasePlane(unittest.TestCase):
             u=np.zeros((1, 2)),
         )
         plot_phase_plane(
-            sys, traj, bounds=((-1.0, 1.0), (-1.5, 1.5)), grid_shape=(3, 3), ax=first
+            sys,
+            traj,
+            bounds=((-1.0, 1.0), (-1.5, 1.5)),
+            grid_shape=(3, 3),
+            ax=first.axes,
         )
         self.assertEqual(len(first.axes.lines), 3)
 

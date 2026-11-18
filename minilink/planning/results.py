@@ -193,8 +193,8 @@ class PlanningSolution:
         law is swept the same way); ``anchor`` pins a grid law's other axes
         (a controller's are at their nominal values). ``trajectory`` overlays a run, ``title``
         replaces the title; ``renderer`` is ``"matplotlib"`` or ``"plotly"``,
-        ``ax`` draws into matplotlib axes or a drawn ``PlotResult``, and
-        ``show=None`` shows the figure unless it is drawn into ``ax``.
+        ``ax`` draws on matplotlib axes (a drawn plot's ``result.axes``), and
+        ``show=None`` shows the figure unless it is drawn on ``ax``.
         """
         return plot_control_law(
             self,
@@ -241,9 +241,9 @@ class PlanningSolution:
         has one, ``np.inf`` for the renderer's own scale; ``is_3d`` draws the
         surface instead of the heatmap, ``trajectory`` overlays a run,
         ``title`` replaces the title; ``renderer`` is ``"matplotlib"`` or
-        ``"plotly"``, ``ax`` draws into matplotlib axes or a drawn
-        ``PlotResult``, and ``show=None`` shows the figure unless it is drawn
-        into ``ax``.
+        ``"plotly"``, ``ax`` draws on matplotlib axes (a drawn plot's
+        ``result.axes``), and ``show=None`` shows the figure unless it is
+        drawn on ``ax``.
         """
         field = require_cost_to_go(self)
         grid = getattr(self.controller, "grid", None)

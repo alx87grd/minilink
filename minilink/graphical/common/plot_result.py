@@ -16,8 +16,8 @@ class PlotResult:
     """
     A drawn figure: ``figure`` (matplotlib's or Plotly's figure, Graphviz's
     graph), ``axes`` (matplotlib's ``Axes`` of a one-panel figure, a list in
-    panel order for several; ``None`` on the other renderers) and ``spec``,
-    the description it was drawn from.
+    panel order for several; a :class:`NoAxes` on a figure matplotlib did not
+    draw) and ``spec``, the description this plot was drawn from.
 
     ``renderer=None`` holds the description alone, drawn by no renderer.
     """
@@ -57,6 +57,32 @@ class PlotResult:
         figure alone, without this record's text under it. The figure stays on
         ``result.figure``.
         """
+
+
+class NoAxes:
+    """
+    The ``axes`` of a record matplotlib did not draw: a Plotly figure, or a
+    description alone. It holds nothing, and says so by name when it is read
+    or passed as ``ax=``: overlays and axis adjustments are matplotlib's.
+    """
+
+    def __init__(self, renderer):
+        self.renderer = renderer
+
+    def __str__(self):
+        if self.renderer is None:
+            return (
+                "this record holds a description only and no axes; draw it with "
+                "renderer='matplotlib' to overlay a plot or adjust its axes"
+            )
+
+        return (
+            f"a {self.renderer} figure has no matplotlib axes; draw the plot with "
+            "renderer='matplotlib' to overlay another or adjust its axes"
+        )
+
+    def __getattr__(self, name):
+        raise AttributeError(str(self))
 
 
 ###############################################################################

@@ -10,7 +10,7 @@ from plotly.subplots import make_subplots
 from scipy.interpolate import RegularGridInterpolator
 
 from minilink.graphical.common.matplotlib_style import DPI_FIGURE
-from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.common.plot_result import NoAxes, PlotResult
 from minilink.graphical.common.plotly_style import PLOTLY_TEMPLATE
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import (
@@ -23,7 +23,6 @@ from minilink.graphical.figure import (
     RefLine,
     Surface,
     Trace,
-    composed,
     direction_arrow_spans,
     grid_of,
 )
@@ -91,34 +90,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
 
     show_figure(fig, "plotly", show)
 
-    return PlotResult(renderer="plotly", figure=fig, axes=None, spec=spec)
-
-
-def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
-    """Add the layers of ``spec`` to the panels of the drawn Plotly figure ``host``."""
-    _, n_cols = grid_of(host.spec)
-    shown = legend_names(host.figure)
-    n_before = len(host.figure.data)
-    combined = composed(host.spec, spec)
-    for k, panel in enumerate(spec.panels):
-        row, col = cell_of(k, n_cols)
-        for layer in panel.layers:
-            DRAW[type(layer)](host.figure, layer, row, col)
-        if not panel.is_3d:
-            draw_changes(host.figure, host.spec.panels[k], combined.panels[k], row, col)
-
-        # A labelled overlay shows the legend, whatever the host's panels asked
-        if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
-            host.figure.update_layout(showlegend=True)
-
-    # A legend entry the host already shows is not added again
-    for trace in host.figure.data[n_before:]:
-        if trace.name in shown:
-            trace.showlegend = False
-
-    show_figure(host.figure, "plotly", show)
-
-    return PlotResult(renderer="plotly", figure=host.figure, axes=None, spec=combined)
+    return PlotResult(renderer="plotly", figure=fig, axes=NoAxes("plotly"), spec=spec)
 
 
 ###############################################################################
@@ -127,17 +99,12 @@ def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
 
 
 def require_no_axes(ax):
-    """Refuse matplotlib axes as a Plotly figure's host."""
+    """Refuse axes as the place of a Plotly figure: Plotly draws a figure of its own."""
     if ax is not None:
         raise ValueError(
-            "renderer='plotly' draws into a PlotResult of a Plotly figure, not into "
-            "matplotlib axes; pass ax=<PlotResult> or renderer='matplotlib'"
+            "renderer='plotly' draws a figure of its own and takes no ax=; "
+            "overlays are drawn with renderer='matplotlib'"
         )
-
-
-def legend_names(fig) -> set:
-    """The names a figure's legend shows."""
-    return {trace.name for trace in fig.data if trace.name and trace.showlegend}
 
 
 def cell_of(k, n_cols):
@@ -179,24 +146,6 @@ def draw_panel(fig, panel, row, col):
     if panel.equal_aspect:
         x_ref = fig.get_subplot(row, col).xaxis.plotly_name.replace("axis", "")
         fig.update_yaxes(scaleanchor=x_ref, row=row, col=col)
-
-
-def draw_changes(fig, before, after, row, col):
-    """Set on a 2-D panel the labels, limits and ticks of ``after`` that differ from ``before``'s."""
-    if after.x_label != before.x_label:
-        fig.update_xaxes(
-            title_text=after.x_label.replace("\n", "<br>"), row=row, col=col
-        )
-    if after.y_label != before.y_label:
-        fig.update_yaxes(
-            title_text=after.y_label.replace("\n", "<br>"), row=row, col=col
-        )
-    if after.x_lim != before.x_lim:
-        fig.update_xaxes(range=log_range(after.x_lim, after.x_log), row=row, col=col)
-    if after.y_lim != before.y_lim:
-        fig.update_yaxes(range=after.y_lim, row=row, col=col)
-    if after.y_ticks != before.y_ticks:
-        fig.update_yaxes(tickvals=list(after.y_ticks), row=row, col=col)
 
 
 def log_range(limits, is_log):

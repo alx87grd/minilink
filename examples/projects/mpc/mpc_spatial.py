@@ -241,8 +241,8 @@ if SHOW_PLOTS:
             figsize=(9.0, 7.0),
             show=False,
         )
-        track.plot(ax=drawn, show=False, bounds=plot_bounds, title="")
-        scene.plot(ax=drawn, bounds=plot_bounds, show_density=False, title="")
+        track.plot(ax=drawn.axes, bounds=plot_bounds, title="")
+        scene.plot(ax=drawn.axes, bounds=plot_bounds, show_density=False, title="")
         drawn.axes.set_xlim(plot_bounds[0])
         drawn.axes.set_ylim(plot_bounds[1])
         drawn.show()

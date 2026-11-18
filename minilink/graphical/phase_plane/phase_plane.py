@@ -50,7 +50,7 @@ def plot_phase_plane(
         The figure's size in inches.
     renderer, show, ax : optional
         ``"matplotlib"`` or ``"plotly"``; show the figure, by default unless it
-        is drawn into ``ax`` (matplotlib axes or a drawn ``PlotResult``).
+        is drawn on ``ax`` (matplotlib axes, a drawn plot's ``result.axes``).
     """
     spec = phase_plane_figure(
         sys,

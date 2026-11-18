@@ -72,8 +72,9 @@ def plot_input_output_map(
         ``"matplotlib"``, ``"plotly"``, or ``None`` for the description alone.
     show : bool, optional
         Show the figure; by default unless it is drawn into ``ax``.
-    ax : matplotlib axes or PlotResult, optional
-        Draw into an existing subplot (side-by-side comparisons).
+    ax : matplotlib axes, optional
+        Draw on existing axes: a subplot (side-by-side comparisons), or a drawn
+        plot's ``result.axes``.
 
     Returns
     -------

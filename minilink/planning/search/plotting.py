@@ -34,8 +34,8 @@ def plot_tree(
     Tree edges are grey, the solution path is highlighted, and the start, goal,
     and goal region are marked. ``path_style="waypoints"`` draws the path
     through the tree's nodes, ``"dense"`` along its trajectory. Reached through
-    ``RRTPlanner.plot_tree``; pass ``ax`` (e.g. ``scene.plot(...)``'s record)
-    to overlay the tree on a scene.
+    ``RRTPlanner.plot_tree``; pass ``ax`` (e.g. the ``axes`` of
+    ``scene.plot(...)``'s record) to overlay the tree on a scene.
     """
     spec = tree_figure(
         planner,

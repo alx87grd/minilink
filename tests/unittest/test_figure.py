@@ -93,27 +93,6 @@ def test_an_unknown_renderer_is_refused_by_name():
         draw(LAYERS["trace"], renderer="bokeh")
 
 
-@pytest.mark.parametrize("renderer", RENDERERS)
-def test_an_overlay_adds_its_layers_panel_by_panel(renderer):
-    host = draw(LAYERS["heatmap"], renderer=renderer, show=False)
-    run = one_panel(Trace(X, X, color="black", label="run"))
-    both = draw(run, ax=host, show=False)
-    assert both.figure is host.figure
-    assert [type(layer).__name__ for layer in both.spec.panels[0].layers] == [
-        "Heatmap",
-        "Trace",
-    ]
-    plt.close("all")
-
-
-def test_an_overlay_keeps_the_hosts_title_and_labels():
-    host = draw(one_panel(Heatmap(X, Y, Z), title="J", x_label="x"), show=False)
-    draw(one_panel(Trace(X, X), title="run", x_label="other"), ax=host, show=False)
-    assert host.axes.get_title() == "J"
-    assert host.axes.get_xlabel() == "x"
-    plt.close("all")
-
-
 def test_fresh_axes_take_the_plots_title_and_labels():
     fig, ax = plt.subplots()
     draw(one_panel(Trace(X, X), title="run", x_label="x"), ax=ax, show=False)
@@ -130,22 +109,6 @@ def test_a_two_panel_plot_draws_into_a_list_of_axes():
     assert result.axes == list(axes)
     assert len(axes[0].lines) == 1 and len(axes[1].lines) == 1
     plt.close(fig)
-
-
-@pytest.mark.parametrize(
-    "host, overlay, message",
-    [
-        (LAYERS["trace"], FigureSpec(panels=(Panel(), Panel())), "panel"),
-        (LAYERS["trace"], LAYERS["surface"], "3-D"),
-        (LAYERS["surface"], LAYERS["trace"], "2-D plot does not draw into a 3-D"),
-        (LAYERS["heatmap"], LAYERS["heatmap"], "colour bar"),
-    ],
-)
-def test_an_overlay_its_host_cannot_take_is_refused_by_name(host, overlay, message):
-    drawn = draw(host, show=False)
-    with pytest.raises(ValueError, match=message):
-        draw(overlay, ax=drawn, show=False)
-    plt.close("all")
 
 
 def test_a_repeated_legend_label_shows_once():
@@ -204,56 +167,6 @@ def test_saving_leaves_the_global_font_settings_alone(tmp_path):
     plt.close("all")
 
 
-@pytest.mark.parametrize("renderer", RENDERERS)
-def test_an_overlay_line_in_the_hosts_colour_takes_a_free_one(renderer):
-    host = draw(one_panel(Trace(X, X, color="#1f77b4")), renderer=renderer, show=False)
-    both = draw(one_panel(Trace(X, -X, color="#1f77b4")), ax=host, show=False)
-    first, second = both.spec.panels[0].layers
-    assert first.color == "#1f77b4" and second.color not in ("#1f77b4", None)
-    plt.close("all")
-
-
-def test_each_clashing_colour_takes_its_own_free_colour():
-    """Two host colours repeated by the overlay move to two distinct free colours; a colourless layer clashes with none."""
-    host = draw(
-        one_panel(
-            Trace(X, X, color="#1f77b4"),
-            Trace(X, 2 * X, color="#d62728"),
-            Heatmap(X, Y, Z, colorbar=None),
-            Trace(X, 3 * X),
-        ),
-        show=False,
-    )
-    both = draw(
-        one_panel(
-            Trace(X, -X, color="#1f77b4"),
-            Trace(X, -2 * X, color="#d62728"),
-            Trace(X, -3 * X, color="#1f77b4"),
-            Trace(X, -4 * X),
-        ),
-        ax=host,
-        show=False,
-    )
-    _, _, _, _, blue, red, blue_again, plain = both.spec.panels[0].layers
-    used = {"#1f77b4", "#d62728"}
-    assert blue.color not in used and red.color not in used
-    assert blue.color != red.color and blue_again.color == blue.color
-    assert plain.color is None
-    plt.close("all")
-
-
-def test_a_description_only_host_is_refused_by_name():
-    host = draw(LAYERS["trace"], renderer=None)
-    with pytest.raises(ValueError, match="draw the host first"):
-        draw(LAYERS["trace"], ax=host, show=False)
-
-
-def test_plotly_adds_no_legend_entry_the_host_shows():
-    host = draw(one_panel(Trace(X, X, label="run")), renderer="plotly", show=False)
-    both = draw(one_panel(Trace(X, -X, label="run")), ax=host, show=False)
-    assert [trace.showlegend for trace in both.figure.data] == [True, False]
-
-
 def test_plotly_direction_arrows_sit_on_their_own_panel():
     spec = FigureSpec(
         panels=(
@@ -308,12 +221,6 @@ def test_plotly_keeps_an_equal_aspect_after_a_3d_panel():
     assert layout.yaxis.scaleanchor == "x"
 
 
-def test_a_labelled_plotly_overlay_shows_the_legend_its_host_hid():
-    host = draw(one_panel(Trace(X, X), legend=False), renderer="plotly", show=False)
-    both = draw(one_panel(Trace(X, -X, label="run")), ax=host, show=False)
-    assert both.figure.layout.showlegend is True
-
-
 def test_a_colour_bars_offset_ticks_stay_inside_its_range():
     spec = one_panel(Heatmap(X, Y, Z, colorbar="J", tick_offset=10.0))
     result = draw(spec, show=False)
@@ -332,59 +239,6 @@ def test_the_renderers_name_is_read_in_any_case():
     assert draw(LAYERS["trace"], renderer="Plotly", show=False).renderer == "plotly"
 
 
-@pytest.mark.parametrize("renderer", RENDERERS)
-def test_an_overlay_widens_the_hosts_limits_and_ticks_to_hold_both(renderer):
-    host_panel = one_panel(Trace(X, X), x_lim=(-1.0, 1.0), y_ticks=(-1.0, 0.0))
-    host = draw(host_panel, renderer=renderer, show=False)
-    wide = one_panel(Trace(5 * X, X), x_lim=(-5.0, 0.5), y_ticks=(0.0, 1.0))
-    both = draw(wide, ax=host, show=False)
-    panel = both.spec.panels[0]
-    assert panel.x_lim == (-5.0, 1.0) and panel.y_ticks == (-1.0, 0.0, 1.0)
-    if renderer == "matplotlib":
-        assert both.axes.get_xlim() == (-5.0, 1.0)
-        assert list(both.axes.get_yticks()) == [-1.0, 0.0, 1.0]
-    else:
-        assert tuple(both.figure.layout.xaxis.range) == (-5.0, 1.0)
-        assert tuple(both.figure.layout.yaxis.tickvals) == (-1.0, 0.0, 1.0)
-    plt.close("all")
-
-
-@pytest.mark.parametrize("renderer", RENDERERS)
-def test_an_overlay_labels_the_axes_its_host_left_bare(renderer):
-    host = draw(one_panel(Trace(X, X), y_label="mine"), renderer=renderer, show=False)
-    both = draw(one_panel(Trace(X, -X), x_label="t", y_label="other"), ax=host)
-    panel = both.spec.panels[0]
-    assert (panel.x_label, panel.y_label) == ("t", "mine")
-    if renderer == "matplotlib":
-        assert both.axes.get_xlabel() == "t" and both.axes.get_ylabel() == "mine"
-    else:
-        layout = both.figure.layout
-        assert layout.xaxis.title.text == "t" and layout.yaxis.title.text == "mine"
-    plt.close("all")
-
-
-def test_an_overlay_keeps_a_labelled_markers_colour_and_moves_a_bare_one():
-    """A labelled marker's colour is its legend's code; an unlabelled one tells two systems apart."""
-    host = draw(one_panel(Trace(X, X, color="black")), show=False)
-    marks = one_panel(
-        Trace(X[:1], X[:1], color="black", mode="markers", label="start"),
-        Trace(X[1:], X[1:], color="black", mode="markers"),
-        Trace([0, 1, 1], [0, 0, 1], color="black", fill=True),
-    )
-    start, bare, filled = draw(marks, ax=host, show=False).spec.panels[0].layers[1:]
-    assert start.color == "black" and filled.color == "black"
-    assert bare.color != "black"
-    plt.close("all")
-
-
-def test_an_overlays_note_moves_clear_of_the_hosts_at_the_same_anchor():
-    host = draw(one_panel(Trace(X, X), Note("one\ntwo")), show=False)
-    both = draw(one_panel(Trace(X, -X), Note("three")), ax=host, show=False)
-    below, above = [n for n in both.spec.panels[0].layers if isinstance(n, Note)]
-    assert above.x == below.x and above.y > below.y + 0.1
-    plt.close("all")
-
-
 def test_plotly_draws_a_heatmaps_gamma_on_its_colour_scale():
     plain = draw(one_panel(Heatmap(X, Y, Z)), renderer="plotly", show=False)
     warped = draw(one_panel(Heatmap(X, Y, Z, gamma=0.5)), renderer="plotly", show=False)
@@ -401,4 +255,80 @@ def test_a_plot_in_a_grid_of_user_axes_leaves_the_figures_title_alone():
     fig, (left, right) = plt.subplots(1, 2)
     draw(FigureSpec(panels=(Panel(layers=(Trace(X, X),)),), title="plot"), ax=left)
     assert fig.get_suptitle() == ""
+    plt.close(fig)
+
+
+def test_a_plot_draws_on_a_drawn_plots_axes_and_keeps_its_title_and_labels():
+    host = draw(one_panel(Heatmap(X, Y, Z), title="J", x_label="x"), show=False)
+    run = one_panel(Trace(X, X, color="black"), title="run", x_label="other")
+    both = draw(run, ax=host.axes)
+    assert both.figure is host.figure and len(host.axes.lines) == 1
+    assert host.axes.get_title() == "J" and host.axes.get_xlabel() == "x"
+    plt.close("all")
+
+
+def test_a_plot_widens_the_view_of_axes_that_show_something_and_never_shrinks_it():
+    host = draw(
+        one_panel(Trace(X, X), x_lim=(-1.0, 1.0), y_lim=(-1.0, 1.0)), show=False
+    )
+    draw(one_panel(Trace(5 * X, X), x_lim=(-5.0, 0.5)), ax=host.axes)
+    assert host.axes.get_xlim() == (-5.0, 1.0) and host.axes.get_ylim() == (-1.0, 1.0)
+
+    # The caller's own data stays in view
+    fig, ax = plt.subplots()
+    ax.plot([0.0, 100.0], [0.0, 1.0])
+    draw(one_panel(Trace(X, X), x_lim=(-1.0, 0.5)), ax=ax)
+    low, high = ax.get_xlim()
+    assert low <= -1.0 and high >= 100.0
+    plt.close("all")
+
+
+def test_empty_axes_keep_the_limits_the_caller_set():
+    fig, ax = plt.subplots()
+    ax.set_xlim(-9.0, 9.0)
+    draw(one_panel(Trace(X, X), x_lim=(-1.0, 1.0)), ax=ax)
+    assert ax.get_xlim() == (-9.0, 9.0)
+    plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "host, plot, message",
+    [
+        (LAYERS["trace"], FigureSpec(panels=(Panel(), Panel())), "panel"),
+        (LAYERS["trace"], LAYERS["surface"], "3-D plot draws on 3-D axes"),
+        (LAYERS["surface"], LAYERS["trace"], "2-D plot does not draw on 3-D axes"),
+        (LAYERS["heatmap"], LAYERS["heatmap"], "colour bar"),
+    ],
+)
+def test_axes_refuse_a_plot_they_cannot_take_by_name(host, plot, message):
+    drawn = draw(host, show=False)
+    with pytest.raises(ValueError, match=message):
+        draw(plot, ax=drawn.axes)
+    plt.close("all")
+
+
+def test_a_record_is_refused_as_the_place_to_draw_by_name():
+    host = draw(LAYERS["trace"], show=False)
+    with pytest.raises(ValueError, match="pass ax=result.axes"):
+        draw(LAYERS["trace"], ax=host)
+    plt.close("all")
+
+
+@pytest.mark.parametrize(
+    "renderer, message", [("plotly", "plotly"), (None, "description")]
+)
+def test_a_record_matplotlib_did_not_draw_has_no_axes_and_says_so(renderer, message):
+    """Its ``axes`` name the reason when read, and when passed as ``ax=``."""
+    host = draw(LAYERS["trace"], renderer=renderer, show=False)
+    with pytest.raises(AttributeError, match=message):
+        host.axes.set_xlim(0.0, 1.0)
+    with pytest.raises(ValueError, match=message):
+        draw(LAYERS["trace"], ax=host.axes)
+    plt.close("all")
+
+
+def test_plotly_takes_no_axes():
+    fig, ax = plt.subplots()
+    with pytest.raises(ValueError, match="takes no ax="):
+        draw(LAYERS["trace"], renderer="plotly", ax=ax, show=False)
     plt.close(fig)

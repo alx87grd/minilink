@@ -559,12 +559,12 @@ wait for his pass over the demos and features (§1.12):
   4.6: `animation/renderers/meshcat_renderer.py` still prints in Colab and on a static frame);
   a warning when the phase plane falls back on its ±10 window
   (`phase_plane/phase_plane.py`). Done when both have a test.
-- [ ] **Plotly parity on a hand-built figure** (agent lane, plotting;
-  `graphical/figure_renderers/plotly.py`; from the plotting contract's review): on a
-  `FigureSpec` assembled by hand the colour bars of a multi-panel grid overlap, `share_x` does
-  not hold across columns, a 3-D panel ignores its limits, and a `Note` in a 3-D panel is not
-  drawn. Done when one test figure per gap reads the same on both renderers, or the case is
-  refused by name.
+- [ ] **Plotly on a hand-built figure** (agent lane, plotting;
+  `graphical/figure_renderers/plotly.py`; from the plotting contract's review): matplotlib
+  is the reference and Plotly draws as closely as it can (DESIGN §7), so these wait for the
+  maintainer's pass on whether Plotly stays: on a `FigureSpec` assembled by hand the colour
+  bars of a multi-panel grid overlap, `share_x` does not hold across columns, a 3-D panel
+  ignores its limits, and a `Note` in a 3-D panel is not drawn.
 - [ ] **The Plotly live signal plot and the one show step** (agent lane, plotting;
   `minilink/graphical/signals/plotly_backend.py`): it decides where it shows on its own
   (`open_plotly_signal_plot`, its local page), outside `resolve_show`. Done when it shows

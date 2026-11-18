@@ -18,9 +18,9 @@ from minilink.graphical.figure import (
     RefLine,
     Surface,
     Trace,
-    composed,
     direction_arrow_spans,
     grid_of,
+    has_colorbar,
 )
 
 # The description's marker and dash names in matplotlib's spelling
@@ -65,26 +65,6 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
         figure=fig,
         axes=axes[0] if len(axes) == 1 else axes,
         spec=spec,
-    )
-
-
-def draw_into(host: PlotResult, spec: FigureSpec, *, show) -> PlotResult:
-    """Add the layers of ``spec`` to the panels of the drawn figure ``host``."""
-    axes = axes_list(host.axes, spec)
-    combined = composed(host.spec, spec)
-
-    # The layers, then what the overlay changes of the host's frame
-    for k, target in enumerate(axes):
-        draw_layers(target, spec.panels[k])
-        draw_changes(target, host.spec.panels[k], combined.panels[k])
-        draw_legend(target, spec.panels[k])
-
-    # The host is shown, or held back, by the call that drew it
-    if show is not False:
-        show_figure(host.figure, "matplotlib", show)
-
-    return PlotResult(
-        renderer="matplotlib", figure=host.figure, axes=host.axes, spec=combined
     )
 
 
@@ -134,10 +114,18 @@ def axes_list(ax, spec: FigureSpec) -> list:
 def draw_panel(ax, panel, *, fill_only):
     """Draw one panel's layers on ``ax``, then its labels, limits and legend.
 
-    ``fill_only`` keeps what the axes already shows: a title, a label or a
-    limit is set only where the axes has none.
+    ``fill_only`` keeps what the axes already shows: a title or a label is set
+    only where the axes has none, and a limit only while the axes still
+    autoscales. Axes that already show something keep their view and widen it
+    to hold the panel's limits.
     """
-    draw_layers(ax, panel)
+    require_fitting_axes(ax, panel)
+
+    # What the axes shows before these layers, and its view
+    shown = ax.has_data()
+    x_view, y_view = ax.get_xlim(), ax.get_ylim()
+    for layer in panel.layers:
+        DRAW[type(layer)](ax, layer)
 
     # The scales, the grid and the aspect
     if panel.x_log:
@@ -151,11 +139,18 @@ def draw_panel(ax, panel, *, fill_only):
     if panel.equal_aspect:
         ax.set_aspect("equal", adjustable="box")
 
-    # The limits, unless the axes holds its own
-    if panel.x_lim is not None and (not fill_only or ax.get_autoscalex_on()):
-        ax.set_xlim(panel.x_lim)
-    if panel.y_lim is not None and (not fill_only or ax.get_autoscaley_on()):
-        ax.set_ylim(panel.y_lim)
+    # The limits: the panel's on empty axes, unless the caller set its own; on
+    # axes that already show something the view widens to hold them, never shrinks
+    if panel.x_lim is not None:
+        if shown:
+            ax.set_xlim(wider(x_view, panel.x_lim))
+        elif not fill_only or ax.get_autoscalex_on():
+            ax.set_xlim(panel.x_lim)
+    if panel.y_lim is not None:
+        if shown:
+            ax.set_ylim(wider(y_view, panel.y_lim))
+        elif not fill_only or ax.get_autoscaley_on():
+            ax.set_ylim(panel.y_lim)
 
     # The title and the labels, unless the axes has its own
     set_text(ax.set_title, ax.get_title(), panel.title, fill_only)
@@ -164,42 +159,39 @@ def draw_panel(ax, panel, *, fill_only):
     if panel.is_3d:
         set_text(ax.set_zlabel, ax.get_zlabel(), panel.z_label, fill_only)
 
-    draw_legend(ax, panel)
-
-
-def draw_layers(ax, panel):
-    """Draw one panel's layers on ``ax``, in order."""
-    if panel.is_3d and getattr(ax, "name", "") != "3d":
-        raise ValueError("a 3-D plot draws on 3-D axes; pass axes with projection='3d'")
-    for layer in panel.layers:
-        DRAW[type(layer)](ax, layer)
-
-
-def draw_changes(ax, before, after):
-    """Set on ``ax`` the texts, limits and ticks of the panel ``after`` that differ from ``before``'s."""
-    if after.title != before.title:
-        ax.set_title(after.title)
-    if after.x_label != before.x_label:
-        ax.set_xlabel(after.x_label)
-    if after.y_label != before.y_label:
-        ax.set_ylabel(after.y_label)
-    if after.is_3d and after.z_label != before.z_label:
-        ax.set_zlabel(after.z_label)
-    if after.x_lim != before.x_lim:
-        ax.set_xlim(after.x_lim)
-    if after.y_lim != before.y_lim:
-        ax.set_ylim(after.y_lim)
-    if after.y_ticks != before.y_ticks:
-        ax.set_yticks(after.y_ticks)
-
-
-def draw_legend(ax, panel):
-    """A legend when a layer of ``panel`` carries a label: each label once, with the first handle drawn for it."""
+    # A legend when a layer carries a label: each label once, with the first
+    # handle drawn for it
     if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
         unique = {}
         for handle, label in zip(*ax.get_legend_handles_labels()):
             unique.setdefault(label, handle)
         ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
+
+
+def require_fitting_axes(ax, panel):
+    """Refuse axes a panel cannot be drawn on: 3-D on 2-D, 2-D on 3-D, a second colour bar."""
+    is_3d_axes = getattr(ax, "name", "") == "3d"
+    if panel.is_3d and not is_3d_axes:
+        raise ValueError("a 3-D plot draws on 3-D axes; pass axes with projection='3d'")
+    if is_3d_axes and not panel.is_3d:
+        raise ValueError("a 2-D plot does not draw on 3-D axes; pass 2-D axes")
+
+    # A colour bar hangs on the image or the mesh it reads
+    drawn = list(ax.collections) + list(ax.images)
+    has_bar = any(getattr(artist, "colorbar", None) is not None for artist in drawn)
+    if has_bar and has_colorbar(panel):
+        raise ValueError(
+            "these axes already show a colour bar, and this plot draws its own; "
+            "draw it on axes of its own"
+        )
+
+
+def wider(view, limits):
+    """The view that holds both ``view`` and ``limits``, in ``view``'s direction."""
+    low = min(*view, *limits)
+    high = max(*view, *limits)
+
+    return (low, high) if view[0] <= view[1] else (high, low)
 
 
 def set_text(setter, current, text, fill_only):

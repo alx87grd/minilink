@@ -1,7 +1,9 @@
 # Plotting, simplified: axes only in `ax=`, matplotlib the reference
 
-**Status:** a plan the maintainer agreed to in outline (2026-11-18), waiting for two
-independent reviews before it is built.
+**Status:** ruled and built (2026-11-18). Two independent reviewers read the plan against
+the code (design; correctness and risk); both said to build it with changes, and the
+maintainer ruled the four points they raised, one at a time (§2, rulings 4 to 7). It leaves
+when the maintainer has looked at the result.
 **Where it sits:** infrastructure, the plotting lane (agent-managed; the public keywords below
 are ruled). It follows the plotting contract (DESIGN §7) and narrows it.
 **Why:** the contract is uniform, and heavier than a student needs. Composition through a
@@ -36,69 +38,83 @@ drawn.show()
 ## 2. The rulings
 
 1. **`show=False` is strict.** The figure is not shown, in a script, a console and a notebook
-   alike; `result.show()` shows it. `show=None`, the default, shows unless `ax=` is given.
-   Nothing changes here: this is the contract as it stands.
+   alike; `result.show()` shows it. `show=None`, the default, shows unless `ax=` is given: a
+   plot shows the figure it makes, and a figure it is given is shown when asked. A figure a
+   plot made is shown by its record, so the record is what to keep, not only its axes;
+   `plt.show()` is for a figure the caller made.
 2. **`ax=` takes matplotlib axes only:** one `Axes`, or a list of them for a plot of several
    panels. A `PlotResult` is refused by name, the message saying to pass `result.axes`.
-   On the caller's axes a plot sets a title, a label or a limit only where the axes has none,
-   and leaves the showing to the caller unless asked.
-3. **Matplotlib is the reference renderer.** It draws every plot. Plotly draws a single
-   figure as well as it can, with no promise that every layer field looks the same, and no
-   composition. `renderer="plotly"` stays on every plot; whether Plotly stays at all is
-   decided in the maintainer's pass over the features.
+   On the caller's axes a plot sets a title or a label only where the axes has none; its
+   scale, ticks, aspect and grid are applied as on a figure of its own.
+3. **Matplotlib is the reference renderer.** It draws every plot. Plotly draws a figure of
+   its own as closely as it can, with no promise that every layer field looks the same, and
+   no composition. `renderer="plotly"` stays on every plot; whether Plotly stays at all is
+   decided in the maintainer's pass over the features. `renderer=None` keeps its meaning
+   (the description alone); the environment never picks the renderer.
+4. **Colours are a plot's own.** Two plots of one kind on shared axes share their colours
+   (two trajectories, two Bode plots, two phase-plane runs). No recolouring and no `color=`
+   keyword: no course overlays two plots of one kind (41 `plot_trajectory` calls in the
+   teaching notebooks, none on shared axes). If one does, `label=` on the plots that fix a
+   colour is the remedy: it names the curve in the legend and frees its colour.
+5. **A plot never shrinks the view of axes that already show something.** On empty axes it
+   sets its limits, unless the caller set its own; on axes that show something it widens the
+   view to hold its limits too. The order of two plots does not crop either.
+6. **A record matplotlib did not draw has no axes, and says so.** On a Plotly figure, or a
+   description alone, `result.axes` raises by name when it is read, and is refused by name as
+   `ax=`: it no longer reads as "no axes given", which drew a separate figure in silence.
+7. **Axes refuse what they cannot take, by name:** a 2-D plot on 3-D axes (as a 3-D plot on
+   2-D axes already was) and a second colour bar on axes that show one.
 
-## 3. What leaves
+## 3. What left
 
-The merge of two descriptions and everything built for it, about 225 lines and their tests:
+The merge of two descriptions and everything built for it, 216 lines and 122 lines of tests:
 
 | Where | What |
 | --- | --- |
-| `graphical/figure.py` | `composed`, `both_limits`, `both_ticks`, `stacked_notes`, `clear_of`, `distinct_colors`, `is_recolored`, `colors_of`, `has_colorbar`, `require_drawn_host`, `require_same_renderer`, `require_composable`; the `PlotResult` branch of `draw` |
+| `graphical/figure.py` | `composed`, `both_limits`, `both_ticks`, `stacked_notes`, `clear_of`, `distinct_colors`, `is_recolored`, `colors_of`, `require_drawn_host`, `require_same_renderer`, `require_composable`; the `PlotResult` branch of `draw` |
 | `graphical/figure_renderers/matplotlib.py` | `draw_into`, `draw_changes` |
 | `graphical/figure_renderers/plotly.py` | `draw_into`, `draw_changes`, `legend_names` |
 
-`overlay(host, layers_by_panel)` stays if the planning plots still build one description from
-several (`planning/plotting.py`); it works on plain data before any figure exists.
+`overlay(host, layers_by_panel)` stays: the planning plots build one description from several
+with it (`planning/plotting.py`), as plain data before any figure exists.
 
 ## 4. What it costs
 
-- Two overlaid plots that fix their own colour (two Bode plots, two pole-zero maps) come out
-  in one colour. Two trajectories still differ: their lines take matplotlib's colour cycle.
-- An overlay does not widen the host's limits: a second system's pole outside the first
-  plot's view stays out of view until the caller sets the limits.
+- Two plots of one kind on shared axes come out in the same colours, with the same legend
+  labels (ruling 4).
+- Two notes at one anchor overlap: the margin boxes of two Bode plots on shared axes.
+- A second plot's ticks replace the first's (the phase ticks of a second Bode plot).
+- A record's `spec` describes what its own call drew: a figure drawn on by several plots has
+  no single description, so `draw(result.spec, renderer=...)` redraws one plot, not the
+  composition.
 - No overlay on a Plotly figure.
-
-Open, the maintainer's: a `color=` keyword on the control plots (Bode, pole-zero, root locus,
-Nyquist, step), so an overlay is told apart in one line. Added only if a course overlays them.
 
 ## 5. What stays renderer-neutral
 
 - Every plot builds a `FigureSpec`, which names no drawing library.
 - `draw(spec, renderer=...)` picks a renderer module by name; a new renderer is one module
   with one function that draws a description.
-- The record: `figure`, `spec`, `show()`, `save()`. `draw(result.spec, renderer=...)` redraws
-  a plot elsewhere.
+- The record: `figure`, `spec`, `show()`, `save()`.
+- Composition as data, on any renderer, exists: build the plots with `renderer=None`,
+  `overlay` one's layers on the other's description, and draw once.
 
-Matplotlib-specific: `ax=` and `result.axes`. If composition is wanted on another renderer
-later, two additive routes exist, neither changing what is written on matplotlib: `ax=` also
-accepting that renderer's own target, or descriptions combined as data before one draw.
+Matplotlib-specific: `ax=` and `result.axes`.
 
-## 6. The steps
+## 6. What was touched
 
-1. **Library:** `draw` refuses a `PlotResult` in `ax=`; the functions of §3 leave; the two
-   renderers lose `draw_into`.
-2. **Callers:** the calls in `examples/` and `experimental/` that pass a record pass
-   `result.axes`.
-3. **The tutorial** `examples/tutorial/core/09_plots_and_animations.ipynb`: its section "One
-   plot into another" on axes.
-4. **Tests:** the overlay tests on a record leave or are rewritten on axes; the contract
-   tests (`test_plot_contract.py`) unchanged.
-5. **Docs:** the composition paragraph of DESIGN §7 and its sentence on the two renderers;
-   the breaking-change entry of ROADMAP §2; this plan deleted when it lands.
+1. **Library:** `draw` refuses a record in `ax=`; the functions of §3 left; the matplotlib
+   renderer holds the view rule and the two refusals; a record matplotlib did not draw
+   carries `NoAxes`.
+2. **Callers:** `examples/projects/mpc/mpc_spatial.py` and `mpc_spatial_stack.ipynb` pass
+   `result.axes`. Four notebook cells hid a figure with `show=False` and then called
+   `plt.show()`, which shows nothing in a notebook: the showcase's planner comparison, two
+   cells of `mpc_spatial_stack.ipynb`, one of `car_trajopt.ipynb`. Each now ends on its
+   record's `.show()`.
+3. **The tutorial** `examples/tutorial/core/09_plots_and_animations.ipynb`: its section on
+   `ax=` draws a track on a scene, and its Plotly overlay is gone.
+4. **Tests:** the overlay tests of `test_figure.py` on a record left; the axes rules, the
+   refusals and `NoAxes` have theirs.
+5. **Docs:** DESIGN §7 (the record, composition, the two renderers), README, ROADMAP §2 and
+   the maturity ledger, the Plotly row of TODO §3.
 6. **Teaching** (`alx87grd/teaching`, branch `plotting-contract`): the cells of
-   `optimal_control/racecar_toward_mpc.ipynb` that pass a record.
-7. **Gates:** ruff; the full `pytest -n auto`; the demo-check bridge; the full demo sweep;
-   the notebook check; the docs build; the teaching notebooks.
-
-Done when a record passed to `ax=` is refused by name, every example and tutorial runs, and
-DESIGN §7 states the contract of §2.
+   `optimal_control/racecar_toward_mpc.ipynb` that passed a record.

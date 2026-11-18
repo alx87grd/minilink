@@ -1956,13 +1956,15 @@ draws one per figure, none when no panel asks) and an ordered tuple of layers, o
 breaking a line, `fill=True` closing and filling it), `RefLine`, `Note`, `Heatmap`,
 `Contour`, `Surface`, `Arrows` (quiver or stream). The objects are frozen; a colour is a
 CSS name or a hex code, and a `Trace` with `color=None` takes the renderer's colour cycle.
-A field enters a layer only when a plot of the library needs it and both renderers honour
-it, or ignore it without changing what the figure says (a point's hover text, a surface's
-mesh stride); no renderer keyword passes through, and a finish one library alone offers is the
+A field enters a layer only when a plot of the library needs it; no renderer keyword passes through, and a finish one library alone offers is the
 caller's own call on `result.figure` or `result.axes`.
 
 `draw(spec, *, renderer="matplotlib", show=None, ax=None)` draws with
-`figure_renderers/matplotlib.py` or `figure_renderers/plotly.py`; both draw every layer.
+`figure_renderers/matplotlib.py` or `figure_renderers/plotly.py`. Matplotlib is the
+reference: it draws every plot, and overlays are its own. Plotly draws a figure of its own
+from the same description, every layer kind, as closely as it can; a renderer is one module
+with one function that draws a description, and nothing else in the library names a drawing
+library.
 Those two, the animation renderers, the show and save steps and the matplotlib-only
 figures (the grid and line animations, the live figures, the colour maps) are the only
 modules that import a drawing library; the search plot builds its animation and live frames
@@ -1972,38 +1974,37 @@ and returns a `PlotResult`; `plot_diagram` is the one exception (below).
 
 - **The record:** `PlotResult(renderer, figure, axes, spec)`. `figure` is the drawn figure
   (matplotlib's or Plotly's; Graphviz's graph), `axes` matplotlib's `Axes` for a one-panel
-  figure and a list in panel order for several (`None` on the other renderers), `spec` the
-  description drawn. It does not unpack into a pair. `.show()` shows it as `show=True`
+  figure and a list in panel order for several, `spec` the description this call drew. On a
+  record matplotlib did not draw (a Plotly figure, a description alone) `axes` holds nothing
+  and says so by name when it is read or passed as `ax=`. It does not unpack into a pair. `.show()` shows it as `show=True`
   does; `.save(file_name)` writes it in the format of the extension and returns the path
   written (matplotlib any format it knows, a `.png` without an extension; Plotly an `.html`
   page, the default, or an image through kaleido; Graphviz `.pdf`, the default, `.svg`,
   `.png`). Saving is that one call, on the record.
 - **`renderer=None`** draws nothing: the record holds `spec` alone, for tests and for grids
   assembled from descriptions.
-- **Composition, `ax=`:** a matplotlib `Axes` (a list of them for a multi-panel plot) or a
-  `PlotResult`. The plot adds its layers to the host's panels, panel by panel. On axes it
-  sets a panel's title, labels, limits and scales only where the axes has none, and a
-  figure title only on a figure these panels fill and that has none. Into a `PlotResult`
-  the host keeps its title, labels and scales and takes the ones it lacks; limits and
-  ticks given by both widen to hold both, and a note anchored where the host has one moves
-  clear of it. Refused by name: another panel count, a 3-D layer
-  into a 2-D panel or a 2-D one into a 3-D panel, a second colour bar in one panel, a host
-  with no description, a host that holds a description only (`renderer=None`: draw it
-  first). The default `renderer=` follows the host's, and `renderer="matplotlib"`, the
-  default's own value, reads as the default there. A line in a colour its host panel
-  draws takes a free colour, one per clashing colour, and so does a marker set without a
-  label; a labelled marker and a fill keep theirs, which is their meaning (a start, a goal,
-  an obstacle). A legend entry that repeats a host label is not added again. The returned
-  record holds the description of the figure as drawn: the host's, with the overlay's
-  layers and what it changed.
-- **`show=None`** shows unless `ax=` is given: a plot drawn into a host leaves the showing
-  to the host.
+- **Composition, `ax=`:** matplotlib axes, one `Axes` or a list of them for a multi-panel
+  plot; a drawn plot's are its `result.axes`. The plot draws its layers on them. It sets a
+  title or a label only where the axes has none, and a figure title only on a figure its
+  panels fill and that has none. On empty axes it sets its limits unless the caller set its
+  own; on axes that already show something it widens the view to hold its limits and never
+  shrinks it. Its scale, ticks, aspect and grid are applied as on a figure of its own, and
+  its colours are its own: two plots of one kind on shared axes share their colours.
+  Refused by name: a plot's record in place of its axes, another number of axes than
+  panels, a 3-D plot on 2-D axes or a 2-D one on 3-D axes, a second colour bar on axes that
+  show one, and any `ax=` with `renderer="plotly"`. A record's `spec` describes what its
+  own call drew: a figure drawn on by several plots is not described by one record.
+  Several plots as one description, drawn once on any renderer, is
+  `overlay(spec, layers_by_panel)` on descriptions built with `renderer=None`.
+- **`show=None`** shows unless `ax=` is given: a plot shows the figure it makes, and a
+  figure it is given is shown when asked. `show=False` is strict, in a script, a console
+  and a notebook alike: the figure is shown by its record's `.show()`.
 
 ```python
-first = plant.plot_trajectory(traj_a, show=False)
-plant.plot_trajectory(traj_b, ax=first)    # the second run on the first one's panels
+first = scene.plot(show=False)
+track.plot(ax=first.axes)                  # the track on the scene's axes
 first.show()
-first.save("two_runs.pdf")
+first.save("circuit.pdf")
 ```
 
 **Where a figure is shown.** `show=` takes `None`, `True`, `False`, `"inline"` or

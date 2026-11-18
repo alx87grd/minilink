@@ -1926,7 +1926,7 @@ def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
     flat = plot_cost_field(
         costs, bounds=bounds, grid=(16, 14), log_scale=True, title="2D", show=False
     )
-    both = scene.plot(ax=flat, bounds=bounds, show_density=False, title="")
+    both = scene.plot(ax=flat.axes, bounds=bounds, show_density=False, title="")
     surface = plot_cost_field(
         costs,
         bounds=bounds,
