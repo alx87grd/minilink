@@ -279,7 +279,9 @@ contours and 3-D surfaces enter it. So measure before committing:
    matplotlib figure draws the same data as today's, the render time against today's, and
    whether `Mesh` wants one name or three. The maintainer rules D1 on those numbers.
 1. **The record and the finish.** `PlotResult` as in §3.3; every `plot_*` returns one (the
-   scripts that unpack `fig, ax = …` change, about 16 to 34 call sites); one `finish(show)`.
+   scripts that unpack `fig, ax = …` change to read `result.figure` and `result.axes`, about
+   16 to 34 call sites in `examples/` and the teaching notebooks; `PlotResult` does not unpack
+   as a pair, so a plot's result is read one way); one `finish(show)`.
    Small, and it does not wait for the rest. The smallest slice, and the one to do first:
    move `require_matplotlib` and `plot_result_of` from `planning/plotting.py` into
    `graphical/common/`, apply them to the drawn-directly functions of §2 that take `ax=` and
