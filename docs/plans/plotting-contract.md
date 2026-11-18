@@ -472,7 +472,8 @@ in a session:
 
 | Step | Item | Commit | State | Next action |
 | --- | --- | --- | --- | --- |
-| 0 | Plan and environment | this commit | done | baseline tooling |
+| 0 | Plan and environment | a7e0c1f3 | done | baseline tooling |
+| 0 | Baseline: 80 tests and demos, about 190 figures, two runs byte-identical (`--dist loadfile`, realtime tests left out), 3.5 min a check | this commit | done | step 1, the spike |
 
 ### Decisions taken during the run
 
