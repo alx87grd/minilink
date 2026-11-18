@@ -284,7 +284,7 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
     solve_of(planner)
     # A session with a window: show=False shows nothing, the default shows once
     with (
-        mock.patch("matplotlib.pyplot.show") as shown,
+        mock.patch("minilink.graphical.common.show.show_in_window") as shown,
         mock.patch(
             "minilink.graphical.common.show.resolve_show",
             side_effect=lambda show, renderer: "window" if show else None,
