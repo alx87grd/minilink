@@ -104,3 +104,36 @@ def test_only_the_renderers_import_a_drawing_library():
 def test_every_renderer_module_still_draws():
     importing = {path for path, _ in drawing_imports()}
     assert RENDERER_MODULES <= importing, sorted(RENDERER_MODULES - importing)
+
+
+def keyword_defaults(node):
+    """The keyword-only arguments of a function, in order, each with its default (``...`` when required)."""
+    defaults = []
+    for arg, default in zip(node.args.kwonlyargs, node.args.kw_defaults):
+        value = ... if default is None else ast.literal_eval(default)
+        defaults.append((arg.arg, value))
+
+    return defaults
+
+
+def test_the_three_keywords_come_in_one_order_with_one_default_each():
+    """``renderer="matplotlib"``, then ``show=None``, then ``ax=None``, keyword-only, on every plot that writes them out."""
+    wanted = [("renderer", "matplotlib"), ("show", None), ("ax", None)]
+    odd = []
+    for path in sorted(ROOT.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not isinstance(node, ast.FunctionDef) or not node.name.startswith(
+                "plot_"
+            ):
+                continue
+            try:
+                found = keyword_defaults(node)
+            except ValueError:
+                continue
+            three = [(name, value) for name, value in found if name in dict(wanted)]
+            written_out = len(three) == 3 and all(
+                value is not ... for _, value in three
+            )
+            if written_out and three != wanted:
+                odd.append(f"{path.relative_to(ROOT).as_posix()}::{node.name} {three}")
+    assert odd == []

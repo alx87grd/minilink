@@ -457,7 +457,7 @@ class MatplotlibRenderer(AnimationRenderer):
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         self.canvas.clear()
         # Normal 2D XY views keep geometry in world coordinates and move only the
-        # axis limits, matching Pyro's dynamic-domain behavior. Other 2D axis
+        # axis limits, so the scene scrolls under a fixed drawing. Other 2D axis
         # pairs still project onto the selected camera plane.
         # 3D matplotlib keeps world coordinates; limits and ``view_init`` come from the
         # camera once at ``open_scene``, then the interactive UI owns the viewpoint.

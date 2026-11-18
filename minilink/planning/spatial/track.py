@@ -91,7 +91,7 @@ class ReferenceTrack:
         return CorridorMarginField(self, body)
 
     def plot(self, **kwargs):
-        """Plot the centerline and corridor (lazy matplotlib import)."""
+        """Plot the centerline and the corridor, with the keywords of :func:`~minilink.planning.spatial.plotting.plot_track`: a ``PlotResult``."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.spatial.plotting import plot_track
 

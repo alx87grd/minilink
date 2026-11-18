@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 from minilink.graphical.common.animation_result import show_animation
+from minilink.graphical.figure import require_axes
 from minilink.graphical.figure_renderers.matplotlib import draw_trace
 
 ###############################################################################
@@ -33,6 +34,7 @@ def animate_lines(
     :class:`~minilink.graphical.common.animation_result.AnimationResult`.
     """
     # A new figure, or the one that holds the given axes
+    require_axes(ax)
     if ax is None:
         fig, target = plt.subplots(figsize=figsize, frameon=True)
     else:
@@ -55,6 +57,11 @@ def animate_lines(
     )
 
     return show_animation(fig, anim, fps=max(1, int(1000 / interval)), show=show, ax=ax)
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
 def frame_axes(ax, frame):

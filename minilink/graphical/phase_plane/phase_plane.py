@@ -173,14 +173,14 @@ def require_state(n):
         raise ValueError("Phase-plane plots require a system with at least one state")
 
 
-def require_axis(axis, n: int, name: str) -> int:
-    """Refuse a state index that is not an integer in ``[0, n - 1]``; return it as an int."""
+def require_axis(axis, n: int, name: str, what: str = "state index") -> int:
+    """Refuse an index (``what`` names its kind) that is not an integer in ``[0, n - 1]``; return it as an int."""
     if isinstance(axis, (bool, np.bool_)):
-        raise ValueError(f"{name} must be an integer state index")
+        raise ValueError(f"{name} must be an integer {what}")
     try:
         axis_int = operator.index(axis)
     except TypeError as exc:
-        raise ValueError(f"{name} must be an integer state index") from exc
+        raise ValueError(f"{name} must be an integer {what}") from exc
     if axis_int < 0 or axis_int >= n:
         raise ValueError(f"{name} must be in [0, {n - 1}], got {axis_int}")
     return axis_int

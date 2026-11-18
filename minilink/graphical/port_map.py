@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import operator
 from dataclasses import dataclass
 
 import numpy as np
@@ -12,7 +11,10 @@ from minilink.graphical.common.labels import label_with_unit
 from minilink.graphical.common.matplotlib_style import FIGSIZE_BASE
 from minilink.graphical.common.plot_result import PlotResult
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
-from minilink.graphical.phase_plane.phase_plane import require_grid_shape
+from minilink.graphical.phase_plane.phase_plane import (
+    require_axis,
+    require_grid_shape,
+)
 
 # The sweep range of a coordinate whose bounds are not finite
 _DEFAULT_BOUNDS = (-10.0, 10.0)
@@ -90,7 +92,7 @@ def plot_input_output_map(
 
     # The swept input components, each over its port bounds unless overridden
     def input_axis(component):
-        component = require_axis(component, port.dim, "axis")
+        component = require_axis(component, port.dim, "axis", "component index")
         return SweepAxis(
             "u",
             start + component,
@@ -106,7 +108,7 @@ def plot_input_output_map(
 
     # The output component, swept over the axes with every other input pinned
     output = block.outputs[out_port]
-    out_axis = require_axis(out_axis, output.dim, "out_axis")
+    out_axis = require_axis(out_axis, output.dim, "out_axis", "component index")
     spec = port_map_figure(
         block,
         output,
@@ -204,17 +206,17 @@ def plot_control_law(
 
     # The swept coordinates: the textbook pair unless named
     x_axis, y_axis = default_law_axes(x_axis, y_axis, space, len(meas_axes))
-    x_axis = require_axis(x_axis, len(axes_all), "x_axis")
+    x_axis = require_axis(x_axis, len(axes_all), "x_axis", "component index")
     swept = [axes_all[x_axis]]
     if y_axis is not None:
-        y_axis = require_axis(y_axis, len(axes_all), "y_axis")
+        y_axis = require_axis(y_axis, len(axes_all), "y_axis", "component index")
         require_distinct_axes(x_axis, y_axis)
         swept.append(axes_all[y_axis])
     swept = apply_bounds_override(swept, bounds)
 
     # The command component, with every input at its nominal value and r pinned
     output = block.outputs[roles.control]
-    u_axis = require_axis(u_axis, output.dim, "u_axis")
+    u_axis = require_axis(u_axis, output.dim, "u_axis", "component index")
     u_base = block.u_nominal.astype(float)
     if roles.ref is not None:
         u_base[block.get_input_port_slice(roles.ref)] = rbar
@@ -274,19 +276,6 @@ def require_io_ports(block):
             f"{block.name} needs at least one input and one output port "
             "for plot_input_output_map"
         )
-
-
-def require_axis(axis, dim, name) -> int:
-    """Refuse a component index that is not an integer in ``[0, dim - 1]``; return it as an int."""
-    if isinstance(axis, (bool, np.bool_)):
-        raise ValueError(f"{name} must be an integer component index")
-    try:
-        axis_int = operator.index(axis)
-    except TypeError as exc:
-        raise ValueError(f"{name} must be an integer component index") from exc
-    if axis_int < 0 or axis_int >= dim:
-        raise ValueError(f"{name} must be in [0, {dim - 1}], got {axis_int}")
-    return axis_int
 
 
 def component_bounds(signal, i, fallback=_DEFAULT_BOUNDS) -> tuple[float, float]:
@@ -467,7 +456,7 @@ def evaluate_axes(
 
 
 @dataclass(frozen=True)
-class _LawRoles:
+class LawRoles:
     """The ports a control-law sweep reads: the swept input, the pinned reference, the command."""
 
     measurement: str
@@ -483,7 +472,7 @@ def law_roles_of(block):
     if measurement is None or not outputs:
         return None
     control = require_command(block) or outputs[0]
-    return _LawRoles(measurement, roles.reference, control)
+    return LawRoles(measurement, roles.reference, control)
 
 
 def require_law_roles(block, roles):

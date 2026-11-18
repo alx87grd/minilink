@@ -20,7 +20,6 @@ from minilink.graphical.figure import (
     Trace,
     direction_arrow_spans,
     grid_of,
-    has_colorbar,
 )
 
 # The description's marker and dash names in matplotlib's spelling
@@ -35,29 +34,30 @@ DASHES = {"solid": "-", "dash": "--", "dot": ":"}
 
 def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     """Draw ``spec`` on a new figure, or on the caller's axes ``ax``."""
-    # A new figure, or the caller's axes: one per panel
-    if ax is None:
-        fig, axes = new_axes(spec)
-        fill_only = False
-    else:
+    # A new figure, or the axes given: one per panel, each able to take its panel
+    given = ax is not None
+    if given:
         axes = axes_list(ax, spec)
         fig = axes[0].figure
-        fill_only = True
+        for target, panel in zip(axes, spec.panels):
+            require_fitting_axes(target, panel)
+    else:
+        fig, axes = new_axes(spec)
 
-    # The title belongs above a figure these panels fill: a new one, or the
-    # caller's when it holds no other axes and no title of its own
-    fills_figure = ax is None or (len(fig.axes) == len(axes) and not fig.get_suptitle())
+    # The title belongs above a figure these panels fill: a new one, or a given
+    # one that holds no other axes and no title of its own
+    fills_figure = not given or (len(fig.axes) == len(axes) and not fig.get_suptitle())
 
     # The panels, then the title above them
     for target, panel in zip(axes, spec.panels):
-        draw_panel(target, panel, fill_only=fill_only)
+        draw_panel(target, panel, given=given)
     if spec.title and fills_figure:
         fig.suptitle(spec.title, fontsize=FONT_SIZE + 1)
-    if ax is None:
+    if not given:
         fig.tight_layout()
 
-    # The caller's own figure is left to the caller unless asked to show
-    if ax is None or show is not False:
+    # A given figure is left to its owner unless asked to show
+    if not given or show is not False:
         show_figure(fig, "matplotlib", show)
 
     return PlotResult(
@@ -111,18 +111,17 @@ def axes_list(ax, spec: FigureSpec) -> list:
     return axes
 
 
-def draw_panel(ax, panel, *, fill_only):
+def draw_panel(ax, panel, *, given):
     """Draw one panel's layers on ``ax``, then its labels, limits and legend.
 
-    ``fill_only`` keeps what the axes already shows: a title or a label is set
-    only where the axes has none, and a limit only while the axes still
-    autoscales. Axes that already show something keep their view and widen it
-    to hold the panel's limits.
+    On a new figure the panel sets everything. On ``given`` axes it keeps what
+    they already show: a title or a label is set only where the axes has
+    none; empty axes take the panel's limits unless the caller set its own;
+    axes that already show something widen their view to hold them.
     """
-    require_fitting_axes(ax, panel)
-
     # What the axes shows before these layers, and its view
-    shown = ax.has_data()
+    ax.autoscale_view()
+    x_shown, y_shown = shows_something(ax)
     x_view, y_view = ax.get_xlim(), ax.get_ylim()
     for layer in panel.layers:
         DRAW[type(layer)](ax, layer)
@@ -139,25 +138,24 @@ def draw_panel(ax, panel, *, fill_only):
     if panel.equal_aspect:
         ax.set_aspect("equal", adjustable="box")
 
-    # The limits: the panel's on empty axes, unless the caller set its own; on
-    # axes that already show something the view widens to hold them, never shrinks
+    # The limits: a view that shows something widens to hold them, never shrinks
     if panel.x_lim is not None:
-        if shown:
+        if x_shown:
             ax.set_xlim(wider(x_view, panel.x_lim))
-        elif not fill_only or ax.get_autoscalex_on():
+        elif not given or ax.get_autoscalex_on():
             ax.set_xlim(panel.x_lim)
     if panel.y_lim is not None:
-        if shown:
+        if y_shown:
             ax.set_ylim(wider(y_view, panel.y_lim))
-        elif not fill_only or ax.get_autoscaley_on():
+        elif not given or ax.get_autoscaley_on():
             ax.set_ylim(panel.y_lim)
 
-    # The title and the labels, unless the axes has its own
-    set_text(ax.set_title, ax.get_title(), panel.title, fill_only)
-    set_text(ax.set_xlabel, ax.get_xlabel(), panel.x_label, fill_only)
-    set_text(ax.set_ylabel, ax.get_ylabel(), panel.y_label, fill_only)
+    # The title and the labels, unless the given axes has its own
+    set_text(ax.set_title, ax.get_title(), panel.title, given)
+    set_text(ax.set_xlabel, ax.get_xlabel(), panel.x_label, given)
+    set_text(ax.set_ylabel, ax.get_ylabel(), panel.y_label, given)
     if panel.is_3d:
-        set_text(ax.set_zlabel, ax.get_zlabel(), panel.z_label, fill_only)
+        set_text(ax.set_zlabel, ax.get_zlabel(), panel.z_label, given)
 
     # A legend when a layer carries a label: each label once, with the first
     # handle drawn for it
@@ -166,6 +164,14 @@ def draw_panel(ax, panel, *, fill_only):
         for handle, label in zip(*ax.get_legend_handles_labels()):
             unique.setdefault(label, handle)
         ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
+
+
+def shows_something(ax):
+    """Whether the view along x, and along y, already shows something: on ``ax`` or on axes that share that axis with it."""
+    x_shown = any(peer.has_data() for peer in ax.get_shared_x_axes().get_siblings(ax))
+    y_shown = any(peer.has_data() for peer in ax.get_shared_y_axes().get_siblings(ax))
+
+    return x_shown, y_shown
 
 
 def require_fitting_axes(ax, panel):
@@ -179,7 +185,10 @@ def require_fitting_axes(ax, panel):
     # A colour bar hangs on the image or the mesh it reads
     drawn = list(ax.collections) + list(ax.images)
     has_bar = any(getattr(artist, "colorbar", None) is not None for artist in drawn)
-    if has_bar and has_colorbar(panel):
+    adds_bar = any(
+        getattr(layer, "colorbar", None) is not None for layer in panel.layers
+    )
+    if has_bar and adds_bar:
         raise ValueError(
             "these axes already show a colour bar, and this plot draws its own; "
             "draw it on axes of its own"
@@ -194,9 +203,9 @@ def wider(view, limits):
     return (low, high) if view[0] <= view[1] else (high, low)
 
 
-def set_text(setter, current, text, fill_only):
-    """Set an axes text, unless ``fill_only`` and the axes already has one."""
-    if text and not (fill_only and current):
+def set_text(setter, current, text, given):
+    """Set an axes text, unless the axes is ``given`` and already has one."""
+    if text and not (given and current):
         setter(text)
 
 

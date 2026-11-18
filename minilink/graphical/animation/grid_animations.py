@@ -4,6 +4,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
 from minilink.graphical.common.animation_result import show_animation
+from minilink.graphical.figure import require_axes
 
 ###############################################################################
 # Public API
@@ -37,6 +38,7 @@ def animate_heatmap(
     :class:`~minilink.graphical.common.animation_result.AnimationResult`.
     """
     # A new figure, or the one that holds the given axes
+    require_axes(ax)
     if ax is None:
         fig, target = plt.subplots()
     else:

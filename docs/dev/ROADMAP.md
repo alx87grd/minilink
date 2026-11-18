@@ -427,8 +427,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `minilink.analysis`, the shaping functions on `minilink.core`.
   - *The planning plots take one keyword set and return a `PlotResult`* (the maintainer's
     ruling 16): `sol.plot_cost_to_go(*, x_axis=0, y_axis=1, anchor=None, bounds=None,
-    grid_shape=(51, 51), t=0.0, jmax=None, is_3d=False, trajectory=None, title=None, ax=None,
-    renderer="matplotlib", show=True)` and `sol.plot_control_law` alike (with `u_axis=`, no
+    grid_shape=(51, 51), t=0.0, jmax=None, is_3d=False, trajectory=None, title=None,
+    renderer="matplotlib", show=None, ax=None)` and `sol.plot_control_law` alike (with `u_axis=`, no
     `jmax=`), written out instead of `**kwargs`, on `PlanningSolution` and every planner (a thin
     call to the latest solution; value iteration keeps `field=`), a grid planner's table drawn
     on its own nodes. Value iteration's and the tabular learner's plots returned `(fig, ax)`

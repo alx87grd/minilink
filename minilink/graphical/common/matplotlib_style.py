@@ -1,25 +1,21 @@
-"""Shared matplotlib layout and typography defaults, Pyro-aligned where sensible."""
+"""Shared matplotlib layout and typography defaults."""
 
-# 4:3 animation canvas (1.5× Pyro's (4, 3) inches); smaller than (8, 6) for laptops.
+# 4:3 animation canvas, small enough for a laptop screen
 FIGSIZE_ANIMATION = (6, 4.5)
-# Baseline small figure size (same aspect as Pyro's (4, 3)).
+# The small figure of one panel, 4:3
 FIGSIZE_BASE = (4, 3)
 
 DPI_FIGURE = 150
 DPI_EXPORT = 250
 
-# Larger than Pyro's ``default_fontsize = 5`` for dense print figures, for notebook
-# readability; lower it when print density matters.
+# Readable in a notebook; lower it when print density matters
 FONT_SIZE = 10
 
-# Pyro's ``TrajectoryPlotter`` keeps one small ``figsize`` (e.g. ``(4, 3)`` inches)
-# for the entire stack of subplots, so the canvas does not grow with the signal count
-# and the subplots get cramped. Here the stacked plot height grows with the number of
-# rows so the traces stay readable. In Jupyter and Colab that height is uncapped
-# (scrollable output); in scripts and terminal IPython it is capped by the
-# ``*_MAX_FIG_HEIGHT_POPUP`` constants (see
-# :func:`minilink.graphical.common.environment.allow_tall_stacked_figures`). Tune the
-# widths, row heights and caps as needed.
+# A stack of signal panels grows with its number of rows, so each trace stays
+# readable. In Jupyter and Colab that height is uncapped (scrollable output); in
+# scripts and terminal IPython it is capped by the ``*_MAX_FIG_HEIGHT_POPUP``
+# constants (see
+# :func:`minilink.graphical.common.environment.allow_tall_stacked_figures`).
 
 # Stacked time-signal plots: width × (row height × number of subplots).
 TRAJECTORY_FIG_WIDTH = 6.0

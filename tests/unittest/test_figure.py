@@ -21,6 +21,7 @@ from minilink.graphical import (  # noqa: E402
     Trace,
     draw,
 )
+from minilink.graphical.figure import overlay  # noqa: E402
 
 pytest.importorskip("plotly")
 from plotly.colors import sample_colorscale  # noqa: E402
@@ -55,7 +56,7 @@ LAYERS = {
 
 @pytest.mark.parametrize("renderer", RENDERERS)
 @pytest.mark.parametrize("name", LAYERS)
-def test_every_layer_draws_on_both_renderers(name, renderer):
+def test_every_layer_draws_on_each_renderer(name, renderer):
     result = draw(LAYERS[name], renderer=renderer, show=False)
     assert isinstance(result, PlotResult)
     assert result.renderer == renderer
@@ -64,7 +65,7 @@ def test_every_layer_draws_on_both_renderers(name, renderer):
     if renderer == "plotly":
         assert len(result.figure.data) >= 1 or name == "reference and note"
     else:
-        assert result.axes is not None
+        assert result.axes.figure is result.figure
     plt.close("all")
 
 
@@ -332,3 +333,67 @@ def test_plotly_takes_no_axes():
     with pytest.raises(ValueError, match="takes no ax="):
         draw(LAYERS["trace"], renderer="plotly", ax=ax, show=False)
     plt.close(fig)
+
+
+def test_axes_that_share_an_axis_widen_together():
+    """A plot's limits are not dropped on an empty panel whose shared axis already shows another plot."""
+    fig, (left, right) = plt.subplots(1, 2, sharey=True)
+    draw(one_panel(Trace(X, X), y_lim=(-1.0, 1.0)), ax=left)
+    draw(one_panel(Trace(X, 5 * X), y_lim=(-5.0, 5.0)), ax=right)
+    assert right.get_ylim() == (-5.0, 5.0) and left.get_ylim() == (-5.0, 5.0)
+    plt.close(fig)
+
+
+def test_axes_that_show_only_a_patch_keep_their_own_view():
+    fig, ax = plt.subplots()
+    ax.add_patch(plt.Rectangle((10.0, 10.0), 5.0, 5.0))
+    draw(one_panel(Trace([10.0, 15.0], [10.0, 15.0]), x_lim=(10.0, 15.0)), ax=ax)
+    assert ax.get_xlim()[0] > 5.0
+    plt.close(fig)
+
+
+def test_a_plot_of_several_panels_draws_nothing_when_one_axes_refuses_it():
+    fig, (flat, deep) = plt.subplots(1, 2)
+    spec = FigureSpec(
+        panels=(
+            Panel(layers=(Trace(X, X),)),
+            Panel(layers=(Surface(X, Y, Z),), is_3d=True),
+        )
+    )
+    with pytest.raises(ValueError, match="3-D plot draws on 3-D axes"):
+        draw(spec, ax=[flat, deep])
+    assert not flat.lines
+    plt.close(fig)
+
+
+def test_a_record_in_a_list_of_axes_is_refused_by_name():
+    first = draw(LAYERS["trace"], show=False)
+    with pytest.raises(ValueError, match="pass ax=result.axes"):
+        draw(LAYERS["trace"], ax=[first])
+    plt.close("all")
+
+
+@pytest.mark.parametrize("renderer", ["plotly", None])
+def test_a_record_without_axes_copies_and_names_itself_when_indexed(renderer):
+    import copy
+
+    result = draw(LAYERS["trace"], renderer=renderer, show=False)
+    assert copy.deepcopy(result).renderer == renderer
+    with pytest.raises(TypeError, match="axes"):
+        result.axes[0]
+    with pytest.raises(TypeError, match="axes"):
+        list(result.axes)
+
+
+def test_overlay_adds_layers_to_a_description_drawn_once_on_any_renderer():
+    """Several plots as one description: built as data, drawn by one call."""
+    under = draw(LAYERS["heatmap"], renderer=None).spec
+    over = draw(one_panel(Trace(X, X, color="black")), renderer=None).spec
+    both = overlay(under, [panel.layers for panel in over.panels])
+    assert [type(layer).__name__ for layer in both.panels[0].layers] == [
+        "Heatmap",
+        "Trace",
+    ]
+    assert len(draw(both, show=False).axes.lines) == 1
+    assert len(draw(both, renderer="plotly", show=False).figure.data) == 2
+    plt.close("all")

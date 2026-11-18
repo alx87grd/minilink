@@ -54,13 +54,18 @@ drawn.show()
 4. **Colours are a plot's own.** Two plots of one kind on shared axes share their colours
    (two trajectories, two Bode plots, two phase-plane runs). No recolouring and no `color=`
    keyword: no course overlays two plots of one kind (41 `plot_trajectory` calls in the
-   teaching notebooks, none on shared axes). If one does, `label=` on the plots that fix a
-   colour is the remedy: it names the curve in the legend and frees its colour.
+   teaching notebooks, none on shared axes). Answers are compared with `compare(...)`,
+   which draws each in its own colour, or with the caller's own lines on `result.axes`. If
+   a course overlays two plots of one kind, a `label=` keyword on the plots that fix a
+   colour would be the remedy (it names the curve in the legend and frees its colour); no
+   plot takes it today.
 5. **A plot never shrinks the view of axes that already show something.** On empty axes it
-   sets its limits, unless the caller set its own; on axes that show something it widens the
-   view to hold its limits too. The order of two plots does not crop either.
-6. **A record matplotlib did not draw has no axes, and says so.** On a Plotly figure, or a
-   description alone, `result.axes` raises by name when it is read, and is refused by name as
+   sets its limits, unless the caller set its own; on axes that show something, or that
+   share an axis with axes that do, it widens the view to hold its limits too. The order of
+   two plots that set limits crops neither; a plot without limits of its own leaves a fixed
+   view as it is.
+6. **A record matplotlib did not draw has no axes, and says so.** On a Plotly figure, a
+   Graphviz diagram or a description alone, `result.axes` raises by name when it is read, and is refused by name as
    `ax=`: it no longer reads as "no axes given", which drew a separate figure in silence.
 7. **Axes refuse what they cannot take, by name:** a 2-D plot on 3-D axes (as a 3-D plot on
    2-D axes already was) and a second colour bar on axes that show one.

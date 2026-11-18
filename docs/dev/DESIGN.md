@@ -159,10 +159,12 @@ state-feedback block):
   an adapter on its linearization (RULES 4.3), and the Riccati equations are
   analysis-tier math shared with the planners.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
-- `graphical/` is imported lazily from anywhere; rendering stays optional. The one module
-  imported at the top is the figure description, `graphical/figure.py`, by the modules that
-  build one (a band's `plotting.py`, the analysis plots): it is plain data and loads no
-  drawing library.
+- `graphical/` is imported lazily from anywhere; rendering stays optional. The modules
+  imported at the top are its plain-data ones, which load no drawing library, by the
+  modules that build a figure (a band's `plotting.py`, the analysis plots): the figure
+  description (`figure.py`), the records (`common/plot_result.py`,
+  `common/animation_result.py`), the labels and styles (`common/labels.py`,
+  `control/style.py`, `colormaps.py`) and the signal figure (`signals/time_signals.py`).
 - The `experimental/` tier is imported by nothing.
 
 ### Placement algorithm
@@ -1975,8 +1977,8 @@ and returns a `PlotResult`; `plot_diagram` is the one exception (below).
 - **The record:** `PlotResult(renderer, figure, axes, spec)`. `figure` is the drawn figure
   (matplotlib's or Plotly's; Graphviz's graph), `axes` matplotlib's `Axes` for a one-panel
   figure and a list in panel order for several, `spec` the description this call drew. On a
-  record matplotlib did not draw (a Plotly figure, a description alone) `axes` holds nothing
-  and says so by name when it is read or passed as `ax=`. It does not unpack into a pair. `.show()` shows it as `show=True`
+  record matplotlib did not draw (a Plotly figure, a Graphviz diagram, a description alone)
+  `axes` holds nothing and says so by name when it is read, indexed or passed as `ax=`. It does not unpack into a pair. `.show()` shows it as `show=True`
   does; `.save(file_name)` writes it in the format of the extension and returns the path
   written (matplotlib any format it knows, a `.png` without an extension; Plotly an `.html`
   page, the default, or an image through kaleido; Graphviz `.pdf`, the default, `.svg`,
@@ -1987,12 +1989,15 @@ and returns a `PlotResult`; `plot_diagram` is the one exception (below).
   plot; a drawn plot's are its `result.axes`. The plot draws its layers on them. It sets a
   title or a label only where the axes has none, and a figure title only on a figure its
   panels fill and that has none. On empty axes it sets its limits unless the caller set its
-  own; on axes that already show something it widens the view to hold its limits and never
-  shrinks it. Its scale, ticks, aspect and grid are applied as on a figure of its own, and
-  its colours are its own: two plots of one kind on shared axes share their colours.
-  Refused by name: a plot's record in place of its axes, another number of axes than
-  panels, a 3-D plot on 2-D axes or a 2-D one on 3-D axes, a second colour bar on axes that
-  show one, and any `ax=` with `renderer="plotly"`. A record's `spec` describes what its
+  own; on axes that already show something, or that share an axis with axes that do, it
+  widens the view to hold its limits and never shrinks it. A plot without limits of its own
+  leaves a fixed view as it is. Its log scale, ticks, aspect and grid are applied as on a
+  figure of its own, and its colours are its own: two plots of one kind on shared axes
+  share their colours.
+  Refused by name, before anything is drawn: a plot's record in place of its axes, another
+  number of axes than panels, a 3-D plot on 2-D axes or a 2-D one on 3-D axes, a second
+  colour bar on axes whose image or mesh carries one, and any `ax=` with
+  `renderer="plotly"`. The grid and line animations take axes the same way. A record's `spec` describes what its
   own call drew: a figure drawn on by several plots is not described by one record.
   Several plots as one description, drawn once on any renderer, is
   `overlay(spec, layers_by_panel)` on descriptions built with `renderer=None`.

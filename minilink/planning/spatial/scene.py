@@ -113,7 +113,7 @@ class Scene:
         return CostDensityField(self, body)
 
     def plot(self, **kwargs):
-        """Plot obstacles and workspace fields (lazy matplotlib import)."""
+        """Plot the obstacles and the workspace fields, with the keywords of :func:`~minilink.planning.spatial.plotting.plot_scene`: a ``PlotResult``."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.spatial.plotting import plot_scene
 

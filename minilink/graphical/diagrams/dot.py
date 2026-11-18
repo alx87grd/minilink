@@ -10,7 +10,7 @@ import warnings
 from dataclasses import replace
 from pathlib import Path
 
-from minilink.graphical.common.plot_result import PlotResult
+from minilink.graphical.common.plot_result import NoAxes, PlotResult
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.diagrams.export import (
     TopologyExporter,
@@ -80,7 +80,7 @@ def plot_diagram(sys_or_diagram, *, show=True, expand=True):
     graph = get_diagram(sys_or_diagram, expand=expand)
     show_figure(graph, "graphviz", show)
 
-    return PlotResult(renderer="graphviz", figure=graph)
+    return PlotResult(renderer="graphviz", figure=graph, axes=NoAxes("graphviz"))
 
 
 def get_diagram(sys_or_diagram, *, expand=True):

@@ -184,12 +184,20 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
     """
     Draw ``spec`` with ``renderer`` and return its :class:`PlotResult`.
 
-    ``ax`` is where to draw: a matplotlib ``Axes``, or a list of them for
-    several panels (a drawn plot's are its ``result.axes``). The plot sets a
-    title or a label only where the axes has none, and widens the view of axes
-    that already show something, never shrinking it. ``show=None`` shows the
-    figure unless it is drawn on ``ax``. ``renderer=None`` draws nothing: the
-    record holds the description alone.
+    Every plot ends on this call, so its three keywords mean the same on each:
+
+    - ``renderer``: ``"matplotlib"``, the reference, or ``"plotly"``;
+      ``None`` draws nothing and returns the description alone.
+    - ``show``: ``None`` shows the figure unless it is drawn on ``ax``;
+      ``True`` shows it, ``"inline"`` or ``"window"`` in that place; ``False``
+      builds it only, to be shown by the record's ``show()``.
+    - ``ax``: matplotlib axes to draw on, one ``Axes`` or a list of them for
+      several panels (a drawn plot's are its ``result.axes``). The plot sets a
+      title or a label only where the axes has none, and widens the view of
+      axes that already show something, never shrinking it.
+
+    ``result.save(file_name)`` writes the figure in the format of the
+    extension.
     """
     require_panels(spec)
     require_axes(ax)
@@ -202,18 +210,20 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
     if renderer is None:
         return PlotResult(renderer=None, figure=None, axes=NoAxes(None), spec=spec)
 
-    module = renderer_module(renderer)
+    require_renderer(renderer)
+    module = importlib.import_module(RENDERER_MODULES[renderer])
+
     return module.draw_figure(spec, show=show, ax=ax)
 
 
-def overlay(host: FigureSpec, layers_by_panel) -> FigureSpec:
-    """``host`` with ``layers_by_panel[k]`` added to its panel ``k``, a new description."""
+def overlay(spec: FigureSpec, layers_by_panel) -> FigureSpec:
+    """``spec`` with ``layers_by_panel[k]`` added to its panel ``k``, a new description."""
     panels = tuple(
         replace(panel, layers=panel.layers + tuple(layers))
-        for panel, layers in zip(host.panels, layers_by_panel)
+        for panel, layers in zip(spec.panels, layers_by_panel)
     )
 
-    return replace(host, panels=panels)
+    return replace(spec, panels=panels)
 
 
 ###############################################################################
@@ -225,13 +235,6 @@ RENDERER_MODULES = {
     "matplotlib": "minilink.graphical.figure_renderers.matplotlib",
     "plotly": "minilink.graphical.figure_renderers.plotly",
 }
-
-
-def renderer_module(renderer):
-    """The module that draws with ``renderer``."""
-    require_renderer(renderer)
-
-    return importlib.import_module(RENDERER_MODULES[renderer])
 
 
 def require_panels(spec):
@@ -248,18 +251,15 @@ def require_renderer(renderer):
 
 
 def require_axes(ax):
-    """Refuse a plot's record as the place to draw: ``ax=`` takes matplotlib axes."""
-    if isinstance(ax, PlotResult):
-        raise ValueError(
-            "ax= takes matplotlib axes, not a plot's record; pass ax=result.axes"
-        )
-    if isinstance(ax, NoAxes):
-        raise ValueError(str(ax))
-
-
-def has_colorbar(panel) -> bool:
-    """Whether a panel holds a layer with a colour bar."""
-    return any(getattr(layer, "colorbar", None) is not None for layer in panel.layers)
+    """Refuse what is not matplotlib axes as the place to draw: a plot's record, or the axes of a record matplotlib did not draw."""
+    given = ax if isinstance(ax, (list, tuple, np.ndarray)) else [ax]
+    for item in np.ravel(np.asarray(given, dtype=object)):
+        if isinstance(item, PlotResult):
+            raise ValueError(
+                "ax= takes matplotlib axes, not a plot's record; pass ax=result.axes"
+            )
+        if isinstance(item, NoAxes):
+            raise ValueError(str(item))
 
 
 def grid_of(spec: FigureSpec) -> tuple[int, int]:

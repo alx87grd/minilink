@@ -207,7 +207,7 @@ class TestSystemShortcuts(unittest.TestCase):
 
         matplotlib.use("Agg")
         result = Pendulum().plot_nyquist(show=False)
-        self.assertIsNotNone(result.axes)
+        self.assertIs(result.axes.figure, result.figure)
 
     def test_each_docstring_names_its_band_function(self):
         for name, (owner, target, _) in SHORTCUTS.items():

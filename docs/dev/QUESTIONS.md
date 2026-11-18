@@ -45,6 +45,43 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
 - **Blocks:** nothing; each is one commit with its callers, no alias.
 - **Answer:**
 
+### What the plotting review left on the drawing verbs' signatures
+- **Context:** the plotting contract makes `renderer="matplotlib"`, `show=None`, `ax=None`
+  uniform on every `plot_*` (an AST test holds their order and defaults). The review of the
+  finished contract found the drawing verbs differ beyond those three keywords; each point
+  is a public signature or return, so each waits for you:
+  1. **Two plots return a list.** `plot_cost_to_go` and `plot_control_law` given a list of
+     axes pairs (`x_axis=[0, 2], y_axis=[1, 3]`) return `[PlotResult, …]` and ignore `ax=`,
+     so `.save(...)` on the line fails (`planning/dynamic_programming/plotting.py`).
+  2. **The animations' `show`.** `animate`, `render`, `animate_modal` and `plot_diagram`
+     default to `show=True` and refuse `show=None`; the plots and the grid and search
+     animations default to `show=None`.
+  3. **Order and hidden keywords.** `plot_bode` puts `title` after `ax`; `animate_search`
+     and `animate_convergence` put `ax` before `renderer`; `animate_modal` orders `renderer,
+     is_3d, show` where `animate` orders `is_3d, renderer, show`. `Scene.plot`,
+     `ReferenceTrack.plot` and the planners' `animate*` mirrors take `**kwargs`.
+  4. **Secondary keywords.** `grid=` on the scene and cost-field plots against `grid_shape=`
+     on fifteen others; `title=` on `plot_bode` and not on the four other control plots nor
+     on `plot_trajectory`; `figsize=` on seven plots.
+  5. **`Trace.z`,** a 3-D line or point set, is drawn by both renderers and set by no plot
+     of the library.
+  6. **The record's `axes` off matplotlib** is a small marker object that names itself when
+     read; a property on the record that raises would be one mechanism less, at the price of
+     the record no longer being a four-field dataclass.
+  7. **The look.** Axis units read "Time (seconds)" on the control plots and "Time [s]" on
+     the time signals; a run over a field is orange with a black dot on the phase plane,
+     black with a green dot on the cost-to-go.
+- **Options,** per point: 1. one multi-panel figure and one record, or the batch form
+  removed; 2. `show=None` the default on every drawing verb, or only accepted; 3. one order
+  (the plot's own keywords, then `renderer`, `show`, `ax`) and the keywords written out;
+  4. one name per idea, on every plot that has the idea; 5. kept for a 3-D phase plot, or
+  removed until one lands; 6. the marker, or the property; 7. one unit style, one run style.
+- **Recommendation:** 1 one record; 2 `show=None` everywhere; 3 and 4 with your API review,
+  one commit per verb family; 5 removed until a plot needs it; 6 the marker as built; 7 the
+  brackets of RULES 2.7 and the phase plane's colours.
+- **Blocks:** nothing; none changes what a student writes for one plot.
+- **Answer:**
+
 ### The 3-D car's rear axle: locked, or an open differential?
 - **Context:** the 3-D car (`SuspensionCar3D`, the last rung of the car ladder) drives both rear wheels at one rate `w_rear`, a locked axle (ruled
   2026-11-11). Measured on the built car against the drivetrain bicycle with the same numbers,

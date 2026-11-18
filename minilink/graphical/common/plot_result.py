@@ -16,7 +16,7 @@ class PlotResult:
     """
     A drawn figure: ``figure`` (matplotlib's or Plotly's figure, Graphviz's
     graph), ``axes`` (matplotlib's ``Axes`` of a one-panel figure, a list in
-    panel order for several; a :class:`NoAxes` on a figure matplotlib did not
+    panel order for several; a ``NoAxes`` on a figure matplotlib did not
     draw) and ``spec``, the description this plot was drawn from.
 
     ``renderer=None`` holds the description alone, drawn by no renderer.
@@ -61,10 +61,13 @@ class PlotResult:
 
 class NoAxes:
     """
-    The ``axes`` of a record matplotlib did not draw: a Plotly figure, or a
-    description alone. It holds nothing, and says so by name when it is read
-    or passed as ``ax=``: overlays and axis adjustments are matplotlib's.
+    The ``axes`` of a record matplotlib did not draw: a Plotly figure, a
+    Graphviz diagram, or a description alone. It holds nothing, and says so by
+    name when it is read, indexed, iterated or passed as ``ax=``: overlays and
+    axis adjustments are matplotlib's.
     """
+
+    renderer = None
 
     def __init__(self, renderer):
         self.renderer = renderer
@@ -82,7 +85,19 @@ class NoAxes:
         )
 
     def __getattr__(self, name):
+        # The protocols Python probes for (copying, pickling) get its plain answer
+        if name.startswith("__"):
+            raise AttributeError(name)
         raise AttributeError(str(self))
+
+    def __getitem__(self, index):
+        raise TypeError(str(self))
+
+    def __iter__(self):
+        raise TypeError(str(self))
+
+    def __len__(self):
+        raise TypeError(str(self))
 
 
 ###############################################################################

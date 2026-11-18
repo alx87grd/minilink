@@ -1142,7 +1142,6 @@ def test_plot_pzmap_facade_returns_plot_result():
         show=False,
     )
     assert isinstance(result, PlotResult)
-    assert result.axes is not None
     assert "From: right_force  To: speed" in result.axes.get_title()
     plt.close(result.figure)
 
