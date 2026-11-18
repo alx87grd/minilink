@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from minilink.graphical.common.plot_result import PlotResult
 from minilink.planning.dynamic_programming.dp import (
     grid_failure_cost,
     grid_of,
@@ -388,7 +389,7 @@ class TabularLearningPlanner(Planner):
         ax.grid(True, alpha=0.3)
         maybe_show(ax.figure, created and show)
 
-        return ax
+        return PlotResult(renderer="matplotlib", figure=ax.figure, axes=ax)
 
     ###########################################################################
     # Internal machinery

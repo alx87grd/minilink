@@ -12,6 +12,7 @@ from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
 )
+from minilink.graphical.common.plot_result import plot_result_of
 from minilink.planning.evaluation import require_recorded_input
 from minilink.planning.trajectory_optimization.compiled import require_state_knots
 
@@ -256,7 +257,7 @@ def plot_sampled_futures(
 
     show_figure(fig, "matplotlib", show)
 
-    return fig, ax
+    return plot_result_of((fig, ax))
 
 
 class SampledFutures(Overlay):

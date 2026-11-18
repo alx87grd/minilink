@@ -223,7 +223,7 @@ if SHOW_PLOTS:
         "obstacle": sample_field_costs([obstacle_viz], **kw),
         "combined": sample_field_costs([path_viz, corridor_viz, obstacle_viz], **kw),
     }
-    _, ax = scene.plot(show=False, bounds=plot_bounds, title="", show_density=False)
+    ax = scene.plot(show=False, bounds=plot_bounds, title="", show_density=False).axes
     track.plot(show=False, ax=ax, bounds=plot_bounds, title="")
     ax.set_title("Wide circuit + keepouts")
     plt.tight_layout()

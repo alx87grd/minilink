@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.plot_result import plot_result_of
 from minilink.planning.plotting import maybe_show
 
 # Matplotlib is imported inside each view, so the planners stay usable without a
@@ -89,7 +90,7 @@ def plot_tree(
 
     maybe_show(fig, show)
 
-    return fig, ax
+    return plot_result_of((fig, ax))
 
 
 def animate_search(

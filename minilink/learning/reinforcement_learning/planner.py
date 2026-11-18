@@ -13,6 +13,7 @@ from minilink.control.neural import NeuralPolicy
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.roles import command_port
 from minilink.core.sets import BoxSet
+from minilink.graphical.common.plot_result import PlotResult
 from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
     REINFORCE,
@@ -447,7 +448,7 @@ class ReinforcementLearningPlanner(Planner):
         ax.grid(True, alpha=0.3)
         maybe_show(ax.figure, created and show)
 
-        return ax
+        return PlotResult(renderer="matplotlib", figure=ax.figure, axes=ax)
 
     ###########################################################################
     # Internal machinery

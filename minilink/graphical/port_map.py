@@ -360,7 +360,6 @@ def render_port_map_matplotlib(
 
     return PlotResult(
         renderer="matplotlib",
-        payload=(fig, ax),
         figure=fig,
         axes=ax,
     )

@@ -290,7 +290,7 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
             side_effect=lambda show, renderer: "window" if show else None,
         ),
     ):
-        ax = planner.plot_learning_curve(show=False)
+        ax = planner.plot_learning_curve(show=False).axes
         source = Step()
         source.compute_trajectory(tf=2.0)
         source.plot_trajectory(show=False)

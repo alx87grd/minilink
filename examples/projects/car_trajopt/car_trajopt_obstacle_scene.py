@@ -111,7 +111,7 @@ cost_grid = sample_field_costs(
     grid=(120, 120),
     u=np.zeros(sys.m),
 )
-_, ax = plot_cost_field(
+ax = plot_cost_field(
     cost_grid,
     show=False,
     log_scale=True,
@@ -119,7 +119,7 @@ _, ax = plot_cost_field(
         f"Obstacle cost map (w={OBSTACLE_REPULSION_WEIGHT}, "
         f"eps={OBSTACLE_REPULSION_EPS})"
     ),
-)
+).axes
 scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title="")
 ax.plot(traj.x[0, :], traj.x[1, :], color="k", linewidth=1.5, label="planned")
 ax.legend(loc="upper left")

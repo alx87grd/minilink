@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
+from minilink.graphical.common.plot_result import plot_result_of
 from minilink.planning.plotting import maybe_show
 from minilink.planning.spatial.collision import iter_probes
 from minilink.planning.spatial.grid import FieldGrid, sample_grid
@@ -140,7 +141,7 @@ def plot_scene(
 
     maybe_show(fig, show)
 
-    return fig, ax
+    return plot_result_of((fig, ax))
 
 
 def plot_track(
@@ -245,7 +246,7 @@ def plot_track(
 
     maybe_show(fig, show)
 
-    return fig, ax
+    return plot_result_of((fig, ax))
 
 
 def plot_cost_field(
@@ -316,7 +317,7 @@ def plot_cost_field(
 
     maybe_show(fig, show)
 
-    return fig, ax
+    return plot_result_of((fig, ax))
 
 
 def plot_cost_field_3d(
@@ -393,7 +394,7 @@ def plot_cost_field_3d(
 
     maybe_show(fig, show)
 
-    return fig, ax
+    return plot_result_of((fig, ax))
 
 
 def plot_cost_field_exports(
@@ -452,7 +453,7 @@ def plot_cost_field_exports(
         title_3d_full = f"{title_2d} cost (3D)"
 
         # The heatmap, under the track, the scene and the executed path when given
-        fig2d, ax2d = plot_cost_field(
+        drawn2d = plot_cost_field(
             grid,
             ax=None,
             title=title_2d_full,
@@ -460,6 +461,7 @@ def plot_cost_field_exports(
             figsize=figsize_2d,
             **shared,
         )
+        fig2d, ax2d = drawn2d.figure, drawn2d.axes
         if track is not None:
             track.plot(show=False, ax=ax2d, bounds=overlay_bounds, title="")
         if scene is not None:
@@ -483,7 +485,7 @@ def plot_cost_field_exports(
         fig2d.tight_layout()
 
         # The surface
-        fig3d, ax3d = plot_cost_field_3d(
+        drawn3d = plot_cost_field_3d(
             grid,
             ax=None,
             title=title_3d_full,
@@ -493,6 +495,7 @@ def plot_cost_field_exports(
             cstride=surface_stride,
             **shared,
         )
+        fig3d = drawn3d.figure
         fig3d.tight_layout()
 
         # Saved when asked, kept in the result, closed when not shown
@@ -500,7 +503,7 @@ def plot_cost_field_exports(
             fig2d.savefig(save_path / f"{name}_2d.png", dpi=160, bbox_inches="tight")
             fig3d.savefig(save_path / f"{name}_3d.png", dpi=160, bbox_inches="tight")
 
-        out[name] = {"2d": (fig2d, ax2d), "3d": (fig3d, ax3d)}
+        out[name] = {"2d": drawn2d, "3d": drawn3d}
 
         if not show:
             plt.close(fig2d)

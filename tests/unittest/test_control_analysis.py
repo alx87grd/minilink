@@ -524,7 +524,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         ctl = lqr_finite_horizon(
             LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), horizon=1.0
         )
-        ax = ctl.plot_gain_schedule(show=False)
+        ax = ctl.plot_gain_schedule(show=False).axes
         self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
 
     def test_finite_horizon_after_stationary_keeps_regulating(self):

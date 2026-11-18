@@ -195,7 +195,7 @@ report("MPPI", traj_mppi, 1e3 * float(np.median(tick_times[1:])))
 report("MPC", traj_mpc, 1e3 * mpc_wall / n_ticks)
 
 # --- the two laps on the track, the cone, and MPPI's sampled futures at four ticks ---
-fig, ax = track.plot(show=False)
+ax = track.plot(show=False).axes
 scene.plot(ax=ax, show_density=False, show=False)
 for k, (X_fan, w_fan, x_plan) in fans.items():
     for x_path, w_path in zip(X_fan, w_fan / w_fan.max()):

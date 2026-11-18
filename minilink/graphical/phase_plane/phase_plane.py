@@ -307,7 +307,7 @@ def render_phase_plane_matplotlib(
 
         show_figure(fig, "matplotlib", show)
 
-    return PlotResult(renderer="matplotlib", payload=(fig, ax), figure=fig, axes=ax)
+    return PlotResult(renderer="matplotlib", figure=fig, axes=ax)
 
 
 def render_phase_plane_plotly(
@@ -407,7 +407,7 @@ def render_phase_plane_plotly(
 
     show_figure(fig, "plotly", show)
 
-    return PlotResult(renderer="plotly", payload=fig, figure=fig)
+    return PlotResult(renderer="plotly", figure=fig)
 
 
 ###############################################################################

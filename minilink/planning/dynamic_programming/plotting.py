@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.graphical.common.plot_result import plot_result_of
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Trace, draw
 from minilink.planning.plotting import maybe_show
 
@@ -66,7 +67,7 @@ def plot_cost_to_go(
 
     # The heatmap with the closed-loop trajectory over it, shown now unless the
     # surface comes after it
-    fig, ax = plot_field(
+    result = plot_field(
         grid,
         J,
         x_axis=x_axis,
@@ -95,7 +96,7 @@ def plot_cost_to_go(
             show=show,
         )
 
-    return fig, ax
+    return result
 
 
 def plot_control_law(
@@ -281,7 +282,7 @@ def plot_value_3d(
 
     maybe_show(fig, show)
 
-    return fig, ax
+    return plot_result_of((fig, ax))
 
 
 def animate(
@@ -497,9 +498,7 @@ def plot_field(
         title=title,
         overlay=overlay,
     )
-    result = draw(spec, show=show, ax=ax)
-
-    return result.figure, result.axes
+    return draw(spec, show=show, ax=ax)
 
 
 def field_figure(

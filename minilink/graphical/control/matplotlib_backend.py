@@ -69,9 +69,7 @@ def render_matplotlib(spec: ControlFigure, *, show: bool = True) -> PlotResult:
     # One axes for a single panel, the list of them for a stack
     axes_out = axes[0] if n_panels == 1 else axes
 
-    return PlotResult(
-        renderer="matplotlib", payload=(fig, axes_out), figure=fig, axes=axes_out
-    )
+    return PlotResult(renderer="matplotlib", figure=fig, axes=axes_out)
 
 
 ###############################################################################

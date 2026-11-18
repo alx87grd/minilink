@@ -301,9 +301,7 @@ def plot_region_of_attraction(
 
     show_figure(ax.figure, "matplotlib", show)
 
-    plot = PlotResult(
-        renderer="matplotlib", payload=(ax.figure, ax), figure=ax.figure, axes=ax
-    )
+    plot = PlotResult(renderer="matplotlib", figure=ax.figure, axes=ax)
 
     return plot
 

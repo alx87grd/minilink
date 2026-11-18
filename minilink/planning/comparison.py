@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.graphical.common.plot_result import plot_result_of
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import ProblemEvaluator
 from minilink.planning.plotting import (
     controller_law_figure,
     cost_to_go_heatmap,
     maybe_show,
-    plot_result_of,
     sample_field,
 )
 from minilink.planning.problems import PlanningProblem

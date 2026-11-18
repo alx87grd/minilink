@@ -1214,7 +1214,8 @@ def test_plot_tree_and_animate_search_smoke():
         max_iterations=2000,
     )
     planner.solve()
-    fig, ax = planner.plot_tree(x_axis=0, y_axis=1, show=False)
+    drawn = planner.plot_tree(x_axis=0, y_axis=1, show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert fig is not None and ax is not None
     anim = planner.animate_search(x_axis=0, y_axis=1, step=20, show=False)
     assert anim is not None
@@ -1814,12 +1815,14 @@ def test_scene_plot_smoke():
         obstacles=(Sphere([4.0, 0.0], 0.5),),
         workspace_fields=(GaussianField([2.0, 1.5], 2.0, 1.0),),
     )
-    fig, ax = scene.plot(show=False)
+    drawn = scene.plot(show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert fig is not None
     assert ax is not None
-    fig, ax = scene.plot(show=False, body=_holonomic_disc(0.25), x=np.array([2.0, 0.0]))
+    drawn = scene.plot(show=False, body=_holonomic_disc(0.25), x=np.array([2.0, 0.0]))
+    fig, ax = drawn.figure, drawn.axes
     assert len(ax.patches) >= 2
-    _, ax = scene.plot(show=False, body=_holonomic_point(), x=np.array([2.0, 0.0]))
+    ax = scene.plot(show=False, body=_holonomic_point(), x=np.array([2.0, 0.0])).axes
     assert len(ax.lines) >= 1
 
 
@@ -1926,15 +1929,12 @@ def test_plot_cost_field_exports_smoke(tmp_path):
         save_dir=tmp_path,
     )
     assert set(out) == {"path", "corridor", "obstacle", "combined"}
-    assert out["obstacle"]["2d"][1].get_title() == "Obstacle cost (2D)"
-    assert out["combined"]["3d"][1].get_title() == "Combined cost (3D)"
+    assert out["obstacle"]["2d"].axes.get_title() == "Obstacle cost (2D)"
+    assert out["combined"]["3d"].axes.get_title() == "Combined cost (3D)"
     for entry in out.values():
-        fig2d, ax2d = entry["2d"]
-        fig3d, ax3d = entry["3d"]
-        assert fig2d is not None and ax2d is not None
-        assert fig3d is not None and ax3d is not None
-        assert len(fig2d.axes) == 2
-        assert len(fig3d.axes) == 2
+        assert entry["2d"].axes is not None and entry["3d"].axes is not None
+        assert len(entry["2d"].figure.axes) == 2
+        assert len(entry["3d"].figure.axes) == 2
     assert (tmp_path / "combined_2d.png").exists()
     assert (tmp_path / "combined_3d.png").exists()
 
@@ -2087,7 +2087,8 @@ def test_plot_track_smoke():
 
     matplotlib.use("Agg", force=True)
     track = ReferenceTrack(from_waypoints([[0, 0], [5, 1], [10, 0]]), half_width=0.8)
-    fig, ax = track.plot(show=False)
+    drawn = track.plot(show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert fig is not None
     assert len(ax.lines) >= 1
 
@@ -2409,7 +2410,8 @@ def test_a_track_draws_and_overlays_its_corridor_at_half_width_from_the_centerli
     # The plot: the same three polylines on one axes
     import matplotlib.pyplot as plt
 
-    fig, ax = plot_track(track, show=False)
+    drawn = plot_track(track, show=False)
+    fig, ax = drawn.figure, drawn.axes
     assert len(ax.get_lines()) >= 3
     plt.close(fig)
 

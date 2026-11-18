@@ -89,7 +89,7 @@ def capture(nodeid, figs):
         entry["artists"].append(artists)
 
 
-CURRENT = {"nodeid": None}
+CURRENT = {"nodeid": None, "before": set()}
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -111,6 +111,8 @@ def pytest_configure(config):
                 figs = [plt.figure(fig)] if fig in plt.get_fignums() else []
             else:
                 figs = [fig]
+            # Only the figures this test made: an older one belongs to its own test
+            figs = [f for f in figs if f.number not in CURRENT["before"]]
             capture(CURRENT["nodeid"], figs)
         return original_close(fig)
 
@@ -129,6 +131,7 @@ def pytest_runtest_call(item):
 
     CURRENT["nodeid"] = item.nodeid
     before = set(plt.get_fignums())
+    CURRENT["before"] = before
     yield
     figs = [plt.figure(n) for n in plt.get_fignums() if n not in before]
     capture(item.nodeid, figs)

@@ -6,6 +6,7 @@ from minilink.core.backends import array_module
 from minilink.core.system import System
 from minilink.core.trajectory import interpolate_schedule
 from minilink.dynamics.abstraction.state_space import point_component
+from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -270,7 +271,7 @@ def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):
 
     show_figure(ax.figure, "matplotlib", show)
 
-    return ax
+    return PlotResult(renderer="matplotlib", figure=ax.figure, axes=ax)
 
 
 ###############################################################################

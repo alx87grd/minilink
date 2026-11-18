@@ -219,9 +219,9 @@ def test_the_overlays_and_the_figure_draw_mppi():
     overlays = mpc_animation_overlays(run, mpc, loop=loop, samples=8)
     fan = next(o for o in overlays if isinstance(o, SampledFutures))
     assert len(next(iter(fan.get_dynamic_geometry(0.2).values()))) == 8 + 1
-    fig, ax = plot_sampled_futures(
+    ax = plot_sampled_futures(
         run, mpc, loop=loop, ticks=[0, 5], x_axis="t", y_axis=0, show=False
-    )
+    ).axes
     assert len(ax.lines) == 2 * (32 + 1) + 1
 
 

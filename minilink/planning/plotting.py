@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.core.fields import GridField
 from minilink.core.sets import is_finite_box
+from minilink.graphical.common.plot_result import plot_result_of, require_matplotlib
 
 # Matplotlib is imported inside each view, so the planning layer stays importable
 # without a display backend until a plot is requested.
@@ -313,14 +314,6 @@ def require_no_anchor(anchor):
         )
 
 
-def require_matplotlib(renderer):
-    """Refuse a drawing library the planning plots do not draw with: Matplotlib only."""
-    if renderer != "matplotlib":
-        raise ValueError(
-            f"the planning plots draw with renderer='matplotlib' only, got {renderer!r}"
-        )
-
-
 def colour_top(field, jmax):
     """The top of the cost-to-go colour scale: ``jmax``, else the field's value past its grid; an infinite one is no top (``None``)."""
     # Lazy import: the grid's drawing loads on first use, not with the planning layer
@@ -352,18 +345,6 @@ def node_table(field) -> np.ndarray:
         values = values[0]
 
     return values.reshape(-1)
-
-
-def plot_result_of(figures):
-    """``(fig, ax)`` as a :class:`PlotResult`, or a list of them for several slices."""
-    # Lazy import: the graphics load on first use, not with the planning layer
-    from minilink.graphical.common.plot_result import PlotResult
-
-    if isinstance(figures, list):
-        return [plot_result_of(item) for item in figures]
-    fig, axes = figures
-
-    return PlotResult(renderer="matplotlib", payload=(fig, axes), figure=fig, axes=axes)
 
 
 def cost_to_go_heatmap(problem, x_level, y_level, J, x_axis, y_axis, jmax, title, ax):

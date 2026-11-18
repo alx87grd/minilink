@@ -541,7 +541,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         planner, result = solve(make_problem())
-        fig, ax = plotting.plot_cost_to_go(planner.grid, result.J, show=False)
+        drawn = plotting.plot_cost_to_go(planner.grid, result.J, show=False)
+        fig, ax = drawn.figure, drawn.axes
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -550,7 +551,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         planner, result = solve(make_problem())
-        fig, ax = plotting.plot_control_law(planner.grid, result.pi, show=False)
+        drawn = plotting.plot_control_law(planner.grid, result.pi, show=False)
+        fig, ax = drawn.figure, drawn.axes
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -643,9 +645,9 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         plant.x0 = np.array([2.0, 0.0])
         diagram = LookupPolicy(planner.grid, result.pi) @ plant
         trajectory = diagram.compute_trajectory(tf=8.0, verbose=False)
-        _, ax = plotting.plot_control_law(
+        ax = plotting.plot_control_law(
             planner.grid, result.pi, trajectory=trajectory, show=False
-        )
+        ).axes
         self.assertGreaterEqual(len(ax.lines), 1)
 
     def test_lookup_controller_matmul_wires_state_feedback(self):
@@ -750,7 +752,7 @@ class TestPolicyEvaluationField(unittest.TestCase):
         drawn = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
         self.assertIsNotNone(drawn.figure)
         J = J_pi.params["values"].reshape(-1)
-        fig, _ = planner.grid.plot_cost_to_go(J, is_3d=True, show=False)
+        fig = planner.grid.plot_cost_to_go(J, is_3d=True, show=False).figure
         self.assertIsNotNone(fig)
 
 

@@ -56,7 +56,7 @@ def render_plotly(spec: ControlFigure, *, show: bool = True) -> PlotResult:
 
     show_figure(fig, "plotly", show)
 
-    return PlotResult(renderer="plotly", payload=fig, figure=fig)
+    return PlotResult(renderer="plotly", figure=fig)
 
 
 ###############################################################################
