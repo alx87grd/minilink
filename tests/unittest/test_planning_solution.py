@@ -717,7 +717,7 @@ def test_the_planner_mirrors_its_latest_solution(make, monkeypatch):
     assert planner.dt is not None
     assert given == [
         {"dt": planner.dt, "renderer": "matplotlib", "show": False, "ax": None},
-        {"dt": 0.01, "renderer": "matplotlib", "show": None, "ax": None},
+        {"dt": 0.01, "renderer": "matplotlib", "show": True, "ax": None},
     ]
 
 

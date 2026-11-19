@@ -1961,7 +1961,7 @@ CSS name or a hex code, and a `Trace` with `color=None` takes the renderer's col
 A field enters a layer only when a plot of the library needs it; no renderer keyword passes through, and a finish one library alone offers is the
 caller's own call on `result.figure` or `result.axes`.
 
-`draw(spec, *, renderer="matplotlib", show=None, ax=None)` draws with
+`draw(spec, *, renderer="matplotlib", show=True, ax=None)` draws with
 `figure_renderers/matplotlib.py` or `figure_renderers/plotly.py`. Matplotlib is the
 reference: it draws every plot, and overlays are its own. Plotly draws a figure of its own
 from the same description, every layer kind, as closely as it can; a renderer is one module
@@ -1970,9 +1970,11 @@ library.
 Those two, the animation renderers, the show and save steps and the matplotlib-only
 figures (the grid and line animations, the live figures, the colour maps) are the only
 modules that import a drawing library; the search plot builds its animation and live frames
-as data, and graphics import no planning module for them. Every public `plot_*` takes `renderer=`, `show=None` and `ax=`
-and returns a `PlotResult`; `plot_diagram` is the one exception (below).
-`tests/unittest/test_plot_contract.py` checks both rules on the source.
+as data, and graphics import no planning module for them. Every drawing verb (`plot*`, `animate*`, `render`) writes its keywords out, its own first,
+then the standard ones it takes, keyword-only and in one order: `renderer="matplotlib"`,
+`show=True`, `ax=None`. Every `plot_*` takes the three and returns one `PlotResult`,
+annotated; `plot_diagram`, a Graphviz graph, takes `show=` alone.
+`tests/unittest/test_plot_contract.py` checks these rules on the source.
 
 - **The record:** `PlotResult(renderer, figure, axes, spec)`. `figure` is the drawn figure
   (matplotlib's or Plotly's; Graphviz's graph), `axes` matplotlib's `Axes` for a one-panel
@@ -2001,9 +2003,10 @@ and returns a `PlotResult`; `plot_diagram` is the one exception (below).
   own call drew: a figure drawn on by several plots is not described by one record.
   Several plots as one description, drawn once on any renderer, is
   `overlay(spec, layers_by_panel)` on descriptions built with `renderer=None`.
-- **`show=None`** shows unless `ax=` is given: a plot shows the figure it makes, and a
-  figure it is given is shown when asked. `show=False` is strict, in a script, a console
-  and a notebook alike: the figure is shown by its record's `.show()`.
+- **`show=`** is a yes or a no, `True` by default: a plot shows the figure it makes. `False`
+  is strict, in a script, a console and a notebook alike: the figure is shown by its
+  record's `.show()`. On axes it is given a plot only draws, whatever `show` says: that
+  figure is its owner's to show.
 
 ```python
 first = scene.plot(show=False)
@@ -2046,8 +2049,8 @@ first.save("circuit.pdf")
 of records, and `render(x, u, t)` a record of one frame. The DP and search animations
 (`animate_cost_to_go`, `animate_control_law`, `animate_search`, `animate_convergence`, on
 the module and the planner) are drawn with matplotlib alone: they take
-`renderer="matplotlib"` (any other refused by name), `show=None` (played unless drawn into
-`ax=`), `ax=` and `interval=`. The record holds the renderer and its clip; its `figure`
+`interval=`, `renderer="matplotlib"` (any other refused by name), `show=` and `ax=`, as a
+plot does. The record holds the renderer and its clip; its `figure`
 and `animation` are properties of the clip: `figure` is matplotlib's or Plotly's figure or
 Meshcat's viewer (`None` on pygame); `animation` matplotlib's `FuncAnimation` or Meshcat's
 `Animation` (`None` on Plotly, whose frames sit in its figure, and on pygame). The clip is

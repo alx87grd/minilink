@@ -1190,3 +1190,14 @@ def test_a_two_state_slice_follows_the_axes_asked_for():
     table = np.arange(20.0).reshape(5, 4)
     np.testing.assert_array_equal(grid.slice_2d(table), table)
     np.testing.assert_array_equal(grid.slice_2d(table, x_axis=1, y_axis=0), table.T)
+
+
+def test_a_plot_of_several_slices_is_one_record_of_panels_side_by_side():
+    planner, _ = solve(make_problem())
+    both = planner.plot_cost_to_go(x_axis=[0, 1], y_axis=[1, 0], show=False)
+    assert len(both.spec.panels) == 2 and len(both.axes) == 2
+    laws = planner.plot_control_law(x_axis=[0, 1], y_axis=[1, 0], show=False)
+    assert len(laws.spec.panels) == 2
+    import matplotlib.pyplot as plt
+
+    plt.close("all")

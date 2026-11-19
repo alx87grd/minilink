@@ -43,7 +43,7 @@ def plot_input_output_map(
     vmin=None,
     vmax=None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Plot one output component of ``block`` over swept input components.
@@ -70,13 +70,10 @@ def plot_input_output_map(
         ``True`` draws a 3-D surface instead of a heatmap.
     params : dict, optional
         Alternative parameter set passed through to the port compute.
-    renderer : str, optional
-        ``"matplotlib"``, ``"plotly"``, or ``None`` for the description alone.
-    show : bool, optional
-        Show the figure; by default unless it is drawn into ``ax``.
-    ax : matplotlib axes, optional
-        Draw on existing axes: a subplot (side-by-side comparisons), or a drawn
-        plot's ``result.axes``.
+    renderer, show, ax : optional
+        Those of every plot (:func:`~minilink.graphical.figure.draw`): the
+        drawing library, whether the figure is shown, and matplotlib axes to
+        draw on.
 
     Returns
     -------
@@ -145,7 +142,7 @@ def plot_control_law(
     vmin=None,
     vmax=None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Plot the textbook slice of a controller block's control law.

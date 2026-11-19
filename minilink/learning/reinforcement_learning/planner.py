@@ -13,7 +13,7 @@ from minilink.control.neural import NeuralPolicy
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.roles import command_port
 from minilink.core.sets import BoxSet
-from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
+from minilink.graphical.figure import FigureSpec, Panel, PlotResult, Trace, draw
 from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
     REINFORCE,
@@ -426,7 +426,9 @@ class ReinforcementLearningPlanner(Planner):
 
     # Plots
 
-    def plot_learning_curve(self, *, renderer="matplotlib", show=None, ax=None):
+    def plot_learning_curve(
+        self, *, renderer="matplotlib", show=True, ax=None
+    ) -> PlotResult:
         """Mean return of the exploration episodes against training steps."""
         # Mean episode return against plant steps, one point per iteration
         steps = [h["n_timesteps"] for h in self.history]

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from minilink.core.fields import GridField
@@ -9,6 +11,9 @@ from minilink.core.sets import is_finite_box
 from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, draw, overlay
 from minilink.planning.dynamic_programming import plotting as grid_plotting
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -34,7 +39,7 @@ def plot_cost_to_go(
     renderer,
     show,
     ax,
-):
+) -> PlotResult:
     """
     The cost-to-go field ``J`` drawn over two state axes, the others pinned at ``anchor``: a :class:`PlotResult`.
 
@@ -114,9 +119,9 @@ def plot_control_law(
     trajectory=None,
     title=None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     A solution's feedback law over two state axes: :meth:`PlanningSolution.plot_control_law`.
 
@@ -224,7 +229,9 @@ def sample_field(problem, field, *, x_axis, y_axis, anchor, bounds, grid_shape, 
     return x_level, y_level, J
 
 
-def plot_solution_trajectory(solution, traj, *, signals, renderer, show, ax=None):
+def plot_solution_trajectory(
+    solution, traj, *, signals, renderer, show, ax=None
+) -> PlotResult:
     """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
     # Lazy import: the signal plots load on first use, not with the planners
     from minilink.graphical.signals.time_signals import plot_time_signals

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
@@ -17,6 +19,9 @@ from minilink.graphical.figure import (
 from minilink.planning.spatial.collision import iter_probes
 from minilink.planning.spatial.grid import sample_grid
 from minilink.planning.spatial.workspace_fields import GaussianField
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 # The colours of the scene and the track
 OBSTACLE_COLOR = "#c44e52"
@@ -39,7 +44,7 @@ def plot_scene(
     scene,
     *,
     bounds=None,
-    grid=(120, 120),
+    grid_shape=(120, 120),
     show_obstacles: bool = True,
     show_density: bool = True,
     show_clearance_contour: bool = False,
@@ -51,9 +56,9 @@ def plot_scene(
     title: str | None = None,
     figsize=(6.0, 6.0),
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     Plot hard obstacles and soft workspace fields for a 2-D scene.
 
@@ -63,7 +68,7 @@ def plot_scene(
     spec = scene_figure(
         scene,
         bounds=bounds,
-        grid=grid,
+        grid_shape=grid_shape,
         show_obstacles=show_obstacles,
         show_density=show_density,
         show_clearance_contour=show_clearance_contour,
@@ -88,9 +93,9 @@ def plot_track(
     title: str | None = None,
     figsize=(6.0, 6.0),
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """Plot a :class:`~minilink.planning.spatial.track.ReferenceTrack` in 2-D: its corridor, centerline and waypoints."""
     spec = track_figure(
         track,
@@ -108,7 +113,7 @@ def plot_cost_field(
     costs,
     *,
     bounds,
-    grid=(200, 200),
+    grid_shape=(200, 200),
     state_dim: int = 2,
     u=None,
     t: float = 0.0,
@@ -121,9 +126,9 @@ def plot_cost_field(
     title: str | None = "Spatial cost",
     figsize=None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     Plot the summed cost of ``FieldCost`` terms over a workspace grid, as a heatmap, or with ``is_3d`` as the surface ``z = cost(x, y)``.
 
@@ -134,7 +139,13 @@ def plot_cost_field(
     colours scale as ``(z / vmax)^γ``.
     """
     xs, ys, Z = sampled_costs(
-        costs, bounds=bounds, grid=grid, state_dim=state_dim, u=u, t=t, params=params
+        costs,
+        bounds=bounds,
+        grid_shape=grid_shape,
+        state_dim=state_dim,
+        u=u,
+        t=t,
+        params=params,
     )
     look = dict(cmap=cmap, log_scale=log_scale, vmax=vmax, gamma=gamma, title=title)
     if is_3d:
@@ -151,7 +162,7 @@ def scene_figure(
     scene,
     *,
     bounds,
-    grid,
+    grid_shape,
     show_obstacles,
     show_density,
     show_clearance_contour,
@@ -171,7 +182,7 @@ def scene_figure(
     # The soft fields: their summed cost density as a heatmap
     if show_density and scene.workspace_fields:
         xs, ys, density = sample_grid(
-            scene.cost_density, plot_bounds, grid=grid, t=t, params=params
+            scene.cost_density, plot_bounds, grid_shape=grid_shape, t=t, params=params
         )
         layers.append(
             Heatmap(
@@ -188,7 +199,11 @@ def scene_figure(
     # The obstacles' boundary: the zero level set of their union's signed distance
     if show_clearance_contour and scene.obstacles:
         xs, ys, clearance = sample_grid(
-            Union(scene.obstacles).sdf, plot_bounds, grid=grid, t=t, params=params
+            Union(scene.obstacles).sdf,
+            plot_bounds,
+            grid_shape=grid_shape,
+            t=t,
+            params=params,
         )
         layers.append(Contour(xs, ys, clearance, levels=(0.0,), color="black"))
 
@@ -549,7 +564,7 @@ def require_positive_length(total):
 # The cost field's samples and display scale
 
 
-def sampled_costs(costs, *, bounds, grid, state_dim, u, t, params):
+def sampled_costs(costs, *, bounds, grid_shape, state_dim, u, t, params):
     """
     The summed cost of ``costs`` at each workspace point of the grid: ``(xs, ys, Z)``.
 
@@ -571,7 +586,7 @@ def sampled_costs(costs, *, bounds, grid, state_dim, u, t, params):
 
         return g
 
-    return sample_grid(fn, bounds, grid=grid, t=t, params=params)
+    return sample_grid(fn, bounds, grid_shape=grid_shape, t=t, params=params)
 
 
 def require_costs(costs):

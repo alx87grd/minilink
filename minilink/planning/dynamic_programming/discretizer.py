@@ -1,6 +1,9 @@
 """State-space grid for value iteration: states, inputs, Euler successors and interpolation."""
 
+from __future__ import annotations
+
 import time
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -16,6 +19,9 @@ from minilink.planning.dynamic_programming.progress import (
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.step_model import is_continuous, step_model_of
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 #: Node-action pairs evaluated per JAX chunk when building tables on device.
 PAIR_CHUNK_SIZE = 50_000
@@ -143,7 +149,7 @@ class StateSpaceGrid:
             if precompute_backend == BACKEND_JAX:
                 self._jax_transition = True
 
-    def rebuilt_on(self, problem) -> "StateSpaceGrid":
+    def rebuilt_on(self, problem) -> StateSpaceGrid:
         """The same grid on ``problem``: its shapes, its period (none for a step problem, on its own clock), its scheme and its table options."""
         dt = self.dt if is_continuous(problem) else None
 
@@ -444,9 +450,9 @@ class StateSpaceGrid:
         cmap="YlOrRd",
         title="Cost-to-go",
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Draw a node-indexed field on this grid: a heatmap, or a surface with ``is_3d``.
 

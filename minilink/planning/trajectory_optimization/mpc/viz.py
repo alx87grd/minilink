@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from minilink.core.discrete.sampled_diagram import plant_run_of, samples_per_period
@@ -16,6 +18,9 @@ from minilink.graphical.colormaps import colormap_rgb
 from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
 from minilink.planning.evaluation import require_recorded_input
 from minilink.planning.trajectory_optimization.compiled import require_state_knots
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 # The sampled futures' blue
 FUTURE_COLOR = "#1f77b4"
@@ -210,9 +215,9 @@ def plot_sampled_futures(
     y_axis=1,
     n_shown: int = 32,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     The fans of a sampling MPC at the solves of ``ticks``: the heaviest futures shaded by weight, the plan in black, the closed loop.
 

@@ -198,7 +198,7 @@ def plot_time_signals(
     abscissa_label: str = TIME_ABSCISSA_LABEL,
     title: str | None = None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Plot a trajectory's signals, one row per component: a :class:`PlotResult`."""

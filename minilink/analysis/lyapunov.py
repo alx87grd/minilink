@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.linalg import solve_continuous_lyapunov
@@ -12,6 +13,9 @@ from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
 from minilink.core.fields import EllipsoidSet, QuadraticField
 from minilink.graphical.figure import Contour, FigureSpec, Panel, Trace, draw
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 #: The seed of the first pass's samples, one more per pass: the level reads the same twice.
 SAMPLE_SEED = 0
@@ -179,9 +183,9 @@ def plot_region_of_attraction(
     basin: bool = False,
     trajectories=(),
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     Draw regions of attraction of ``sys`` in the plane of two states.
 

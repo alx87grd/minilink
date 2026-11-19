@@ -38,8 +38,8 @@ drawn.show()
 ## 2. The rulings
 
 1. **`show=False` is strict.** The figure is not shown, in a script, a console and a notebook
-   alike; `result.show()` shows it. `show=None`, the default, shows unless `ax=` is given: a
-   plot shows the figure it makes, and a figure it is given is shown when asked. A figure a
+   alike; `result.show()` shows it. `show=` is a yes or a no, `True` by default: a plot
+   shows the figure it makes, and on axes it is given it only draws. A figure a
    plot made is shown by its record, so the record is what to keep, not only its axes;
    `plt.show()` is for a figure the caller made.
 2. **`ax=` takes matplotlib axes only:** one `Axes`, or a list of them for a plot of several
@@ -123,3 +123,21 @@ Matplotlib-specific: `ax=` and `result.axes`.
    the maturity ledger, the Plotly row of TODO §3.
 6. **Teaching** (`alx87grd/teaching`, branch `plotting-contract`): the cells of
    `optimal_control/racecar_toward_mpc.ipynb` that passed a record.
+
+## 7. The drawing verbs made uniform (ruled 2026-11-19)
+
+The maintainer asked for an interface with no inconsistency left. Every drawing verb
+(`plot*`, `animate*`, `render`) now:
+
+- writes its keywords out (eight forwarders took `**kwargs`), its own first, then the
+  standard ones it takes, keyword-only, in one order and with one default each:
+  `renderer="matplotlib"`, `show=True`, `ax=None`;
+- reads `show` as a yes or a no (`None`, "show unless `ax=` is given", is gone: a plot on
+  given axes only draws);
+- returns one record: a `plot_*` is annotated `-> PlotResult`, and a plot of several slices
+  is one figure of panels side by side, where it returned a list;
+- names one idea one way: `grid_shape=` on the scene and cost-field plots, `u_axis=` on the
+  control-law animation, `title=` on every control plot and on `plot_trajectory`.
+
+`tests/unittest/test_plot_contract.py` holds each of these on the source.
+

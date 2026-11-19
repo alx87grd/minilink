@@ -24,7 +24,7 @@ def animate_heatmap(
     x_label="",
     y_label="",
     interval=60,
-    show=None,
+    show=True,
     ax=None,
 ):
     """
@@ -33,8 +33,8 @@ def animate_heatmap(
     The first frame is drawn once, each later frame swaps its values into the
     same mesh and titles the axes ``title_of(i)``; the colours span
     ``[vmin, vmax]`` when given, every frame on one scale. Drawn on a new
-    figure, or into ``ax``; ``show=None`` plays it unless it is drawn into
-    ``ax``. Returns an
+    figure, or on ``ax``, whose figure is then its owner's to show;
+    ``show=False`` builds it without playing it. Returns an
     :class:`~minilink.graphical.common.animation_result.AnimationResult`.
     """
     # A new figure, or the one that holds the given axes

@@ -1,8 +1,11 @@
 """The planner base: a planner solves a declarative problem into a stored solution."""
 
+from __future__ import annotations
+
 import warnings
 from abc import ABC
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -18,6 +21,9 @@ from minilink.planning.results import (
     require_cost_to_go,
 )
 from minilink.planning.step_model import is_continuous, step_model_of
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -100,7 +106,7 @@ class Planner(ABC):
         """The keywords that rebuild this planner on another problem: its structure and the numbers it was given, never a display (the workflow is the verb's)."""
         raise NotImplementedError(f"{type(self).__name__} has no build_kwargs")
 
-    def rebuilt_on(self, problem, kwargs) -> "Planner":
+    def rebuilt_on(self, problem, kwargs) -> Planner:
         """A planner of this kind on ``problem`` from ``kwargs`` (:meth:`build_kwargs`, the changed numbers in): what :func:`planner_at` solves with."""
         return type(self)(problem, **kwargs)
 
@@ -143,9 +149,9 @@ class Planner(ABC):
         dt=None,
         signals=("x", "u"),
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """The latest solution's plan, else its controller's run on ``dt``, by default the planner's (:meth:`PlanningSolution.plot_trajectory`)."""
         return require_solution(self).plot_trajectory(
             dt=self.dt if dt is None else dt,
@@ -155,11 +161,33 @@ class Planner(ABC):
             ax=ax,
         )
 
-    def animate(self, **kwargs):
-        """The latest solution's plan, else its controller's run on the planner's ``dt``, animated (:meth:`PlanningSolution.animate`)."""
-        return require_solution(self).animate(**{"dt": self.dt, **kwargs})
+    def animate(
+        self,
+        *,
+        dt=None,
+        speed=1.0,
+        is_3d=False,
+        scene_title=None,
+        camera=None,
+        overlays=None,
+        renderer="matplotlib",
+        show=True,
+    ):
+        """The latest solution's plan, else its controller's run on ``dt``, by default the planner's, animated (:meth:`PlanningSolution.animate`)."""
+        return require_solution(self).animate(
+            dt=self.dt if dt is None else dt,
+            speed=speed,
+            is_3d=is_3d,
+            scene_title=scene_title,
+            camera=camera,
+            overlays=overlays,
+            renderer=renderer,
+            show=show,
+        )
 
-    def plot_cost(self, *, dt=None, renderer="matplotlib", show=None, ax=None):
+    def plot_cost(
+        self, *, dt=None, renderer="matplotlib", show=True, ax=None
+    ) -> PlotResult:
         """The running cost along the latest solution's plan, else its controller's run on ``dt``, by default the planner's (:meth:`PlanningSolution.plot_cost`)."""
         return require_solution(self).plot_cost(
             dt=self.dt if dt is None else dt, renderer=renderer, show=show, ax=ax
@@ -179,9 +207,9 @@ class Planner(ABC):
         trajectory=None,
         title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """The latest solution's law (:meth:`PlanningSolution.plot_control_law`, the same keywords): a ``PlotResult``."""
         return require_solution(self).plot_control_law(
             x_axis=x_axis,
@@ -213,9 +241,9 @@ class Planner(ABC):
         trajectory=None,
         title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`, the same keywords): a ``PlotResult``."""
         return require_solution(self).plot_cost_to_go(
             x_axis=x_axis,
@@ -412,7 +440,7 @@ def trial_of(draws, drawn, i):
     return params
 
 
-def planner_at(planner, params) -> "Planner":
+def planner_at(planner, params) -> Planner:
     """
     A planner of the same kind at the complete tree ``params`` of ``planner.params``: what ``solve(params=)`` solves with.
 

@@ -106,34 +106,63 @@ def test_every_renderer_module_still_draws():
     assert RENDERER_MODULES <= importing, sorted(RENDERER_MODULES - importing)
 
 
-def keyword_defaults(node):
-    """The keyword-only arguments of a function, in order, each with its default (``...`` when required)."""
-    defaults = []
-    for arg, default in zip(node.args.kwonlyargs, node.args.kw_defaults):
-        value = ... if default is None else ast.literal_eval(default)
-        defaults.append((arg.arg, value))
-
-    return defaults
+STANDARD = ("renderer", "show", "ax")
 
 
-def test_the_three_keywords_come_in_one_order_with_one_default_each():
-    """``renderer="matplotlib"``, then ``show=None``, then ``ax=None``, keyword-only, on every plot that writes them out."""
-    wanted = [("renderer", "matplotlib"), ("show", None), ("ax", None)]
-    odd = []
+def drawing_verbs():
+    """Every function and method of the library that draws: ``plot*``, ``animate*`` and ``render``."""
+    found = []
     for path in sorted(ROOT.rglob("*.py")):
         for node in ast.walk(ast.parse(path.read_text())):
-            if not isinstance(node, ast.FunctionDef) or not node.name.startswith(
-                "plot_"
-            ):
+            if not isinstance(node, ast.FunctionDef) or node.name in NOT_FIGURES:
                 continue
-            try:
-                found = keyword_defaults(node)
-            except ValueError:
-                continue
-            three = [(name, value) for name, value in found if name in dict(wanted)]
-            written_out = len(three) == 3 and all(
-                value is not ... for _, value in three
-            )
-            if written_out and three != wanted:
-                odd.append(f"{path.relative_to(ROOT).as_posix()}::{node.name} {three}")
+            if node.name.startswith(("plot", "animate")) or node.name == "render":
+                found.append((path.relative_to(ROOT).as_posix(), node))
+    return found
+
+
+def test_the_standard_keywords_come_last_in_one_order_and_keyword_only():
+    """A drawing verb's own keywords, then ``renderer``, ``show``, ``ax``: the ones it takes, in that order."""
+    odd = []
+    for path, node in drawing_verbs():
+        positional = [arg.arg for arg in node.args.args]
+        keywords = [arg.arg for arg in node.args.kwonlyargs]
+        taken = [name for name in STANDARD if name in keywords]
+        by_position = [name for name in STANDARD if name in positional]
+        if by_position or (taken and keywords[-len(taken) :] != taken):
+            odd.append(f"{path}::{node.name} {positional} {keywords}")
     assert odd == []
+
+
+def test_the_standard_keywords_have_one_default_each():
+    """``renderer="matplotlib"``, ``show=True``, ``ax=None`` wherever a drawing verb gives one."""
+    wanted = {"renderer": "matplotlib", "show": True, "ax": None}
+    odd = []
+    for path, node in drawing_verbs():
+        for arg, default in zip(node.args.kwonlyargs, node.args.kw_defaults):
+            if arg.arg in wanted and default is not None:
+                value = ast.literal_eval(default)
+                if value != wanted[arg.arg] or type(value) is not type(wanted[arg.arg]):
+                    odd.append(f"{path}::{node.name} {arg.arg}={value!r}")
+    assert odd == []
+
+
+def test_a_drawing_verb_writes_its_keywords_out():
+    """No ``**kwargs`` on a drawing verb: an editor shows its keywords, and a misspelt one is refused at the call."""
+    hidden = [
+        f"{path}::{node.name}"
+        for path, node in drawing_verbs()
+        if node.args.kwarg is not None
+    ]
+    assert hidden == []
+
+
+def test_a_plot_says_it_returns_a_record():
+    """Every ``plot_*`` is annotated ``-> PlotResult``."""
+    bare = [
+        f"{path}::{node.name}"
+        for path, node in drawing_verbs()
+        if node.name.startswith("plot")
+        and (node.returns is None or ast.unparse(node.returns) != "PlotResult")
+    ]
+    assert bare == []

@@ -13,7 +13,7 @@ def sample_grid(
     fn: Callable,
     bounds,
     *,
-    grid: tuple = (120, 120),
+    grid_shape: tuple = (120, 120),
     t: float = 0.0,
     params=None,
 ):
@@ -30,11 +30,11 @@ def sample_grid(
         Scalar query ``fn(p, t, params) -> float`` over a workspace point ``p``.
     bounds : ((x_min, x_max), (y_min, y_max))
         Grid extent along each axis.
-    grid : (nx, ny)
+    grid_shape : (nx, ny)
         Number of samples along each axis.
     """
     (x_lo, x_hi), (y_lo, y_hi) = bounds
-    nx, ny = grid
+    nx, ny = grid_shape
 
     # The nodes along each axis
     xs = np.linspace(x_lo, x_hi, nx)

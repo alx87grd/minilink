@@ -180,7 +180,7 @@ class Arrows:
     color: str | None = None
 
 
-def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
+def draw(spec: FigureSpec, *, renderer="matplotlib", show=True, ax=None):
     """
     Draw ``spec`` with ``renderer`` and return its :class:`PlotResult`.
 
@@ -188,21 +188,20 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=None, ax=None):
 
     - ``renderer``: ``"matplotlib"``, the reference, or ``"plotly"``;
       ``None`` draws nothing and returns the description alone.
-    - ``show``: ``None`` shows the figure unless it is drawn on ``ax``;
-      ``True`` shows it, ``"inline"`` or ``"window"`` in that place; ``False``
-      builds it only, to be shown by the record's ``show()``.
+    - ``show``: ``True`` shows the figure this plot makes (``"inline"`` or
+      ``"window"`` names the place); ``False`` builds it only, to be shown by
+      the record's ``show()``.
     - ``ax``: matplotlib axes to draw on, one ``Axes`` or a list of them for
-      several panels (a drawn plot's are its ``result.axes``). The plot sets a
-      title or a label only where the axes has none, and widens the view of
-      axes that already show something, never shrinking it.
+      several panels (a drawn plot's are its ``result.axes``). The plot only
+      draws: the figure is its owner's to show. It sets a title or a label
+      only where the axes has none, and widens the view of axes that already
+      show something, never shrinking it.
 
     ``result.save(file_name)`` writes the figure in the format of the
     extension.
     """
     require_panels(spec)
     require_axes(ax)
-    if show is None:
-        show = ax is None
     if isinstance(renderer, str):
         renderer = renderer.strip().lower()
 
@@ -224,6 +223,15 @@ def overlay(spec: FigureSpec, layers_by_panel) -> FigureSpec:
     )
 
     return replace(spec, panels=panels)
+
+
+def side_by_side(panels, title: str = "") -> FigureSpec:
+    """One row of ``panels`` side by side, ``title`` above them, a new description."""
+    n = len(panels)
+
+    return FigureSpec(
+        panels=tuple(panels), title=title, n_cols=n, figsize=(4.5 * n, 4.0)
+    )
 
 
 ###############################################################################

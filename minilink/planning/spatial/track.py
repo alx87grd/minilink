@@ -11,6 +11,7 @@ from minilink.planning.spatial.collision import CollisionBody
 
 if TYPE_CHECKING:
     from minilink.core.fields import Field
+    from minilink.graphical.common.plot_result import PlotResult
 
 
 ###############################################################################
@@ -90,12 +91,33 @@ class ReferenceTrack:
 
         return CorridorMarginField(self, body)
 
-    def plot(self, **kwargs):
-        """Plot the centerline and the corridor, with the keywords of :func:`~minilink.planning.spatial.plotting.plot_track`: a ``PlotResult``."""
+    def plot(
+        self,
+        *,
+        bounds=None,
+        n_samples=200,
+        show_waypoints=True,
+        title=None,
+        figsize=(6.0, 6.0),
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ) -> PlotResult:
+        """Plot the centerline and the corridor (:func:`~minilink.planning.spatial.plotting.plot_track`): a ``PlotResult``."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.spatial.plotting import plot_track
 
-        return plot_track(self, **kwargs)
+        return plot_track(
+            self,
+            bounds=bounds,
+            n_samples=n_samples,
+            show_waypoints=show_waypoints,
+            title=title,
+            figsize=figsize,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
 
 
 ###############################################################################

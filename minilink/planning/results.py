@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -21,6 +22,9 @@ from minilink.planning.plotting import (
 )
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.step_model import is_continuous, step_model_of
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -126,9 +130,9 @@ class PlanningSolution:
         dt=None,
         signals=("x", "u"),
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Draw the plan, else the controller's run from the problem's start, on the problem's system.
 
@@ -149,11 +153,35 @@ class PlanningSolution:
             ax=ax,
         )
 
-    def animate(self, *, dt=None, **kwargs):
-        """Animate the plan, else the controller's run from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system."""
-        return self.problem.sys.animate(drawn_trajectory_of(self, dt), **kwargs)
+    def animate(
+        self,
+        *,
+        dt=None,
+        speed=1.0,
+        is_3d=False,
+        scene_title=None,
+        camera=None,
+        overlays=None,
+        renderer="matplotlib",
+        show=True,
+    ):
+        """Animate the plan, else the controller's run from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system, with the keywords of its ``animate``."""
+        traj = drawn_trajectory_of(self, dt)
 
-    def plot_cost(self, *, dt=None, renderer="matplotlib", show=None, ax=None):
+        return self.problem.sys.animate(
+            traj,
+            speed=speed,
+            is_3d=is_3d,
+            scene_title=scene_title,
+            camera=camera,
+            overlays=overlays,
+            renderer=renderer,
+            show=show,
+        )
+
+    def plot_cost(
+        self, *, dt=None, renderer="matplotlib", show=True, ax=None
+    ) -> PlotResult:
         """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`), with the drawing library ``renderer``."""
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
@@ -177,9 +205,9 @@ class PlanningSolution:
         trajectory=None,
         title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Draw the feedback law, input ``u_axis`` over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
 
@@ -192,9 +220,8 @@ class PlanningSolution:
         scale (``bounds``, ``grid_shape``, ``t`` or ``is_3d`` given, a grid
         law is swept the same way); ``anchor`` pins a grid law's other axes
         (a controller's are at their nominal values). ``trajectory`` overlays a run, ``title``
-        replaces the title; ``renderer`` is ``"matplotlib"`` or ``"plotly"``,
-        ``ax`` draws on matplotlib axes (a drawn plot's ``result.axes``), and
-        ``show=None`` shows the figure unless it is drawn on ``ax``.
+        replaces the title. ``renderer``, ``show`` and ``ax`` are those of every plot
+        (:func:`~minilink.graphical.figure.draw`).
         """
         return plot_control_law(
             self,
@@ -227,9 +254,9 @@ class PlanningSolution:
         trajectory=None,
         title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Draw the method's cost-to-go over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
 
@@ -240,10 +267,8 @@ class PlanningSolution:
         by default the field's value past its grid (the failure cost) when it
         has one, ``np.inf`` for the renderer's own scale; ``is_3d`` draws the
         surface instead of the heatmap, ``trajectory`` overlays a run,
-        ``title`` replaces the title; ``renderer`` is ``"matplotlib"`` or
-        ``"plotly"``, ``ax`` draws on matplotlib axes (a drawn plot's
-        ``result.axes``), and ``show=None`` shows the figure unless it is
-        drawn on ``ax``.
+        ``title`` replaces the title. ``renderer``, ``show`` and ``ax`` are
+        those of every plot (:func:`~minilink.graphical.figure.draw`).
         """
         field = require_cost_to_go(self)
         grid = getattr(self.controller, "grid", None)

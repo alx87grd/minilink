@@ -19,9 +19,9 @@ def animate_lines(
     *,
     interval=30,
     repeat=False,
-    show=None,
-    ax=None,
     figsize=None,
+    show=True,
+    ax=None,
 ):
     """
     Animate the lines ``frame_of(i)`` for ``i < n_frames`` over the fixed ``frame``.

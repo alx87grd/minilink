@@ -256,12 +256,33 @@ class RRTStarPlanner(RRTPlanner):
             history=list(history),
         )
 
-    def animate_convergence(self, **kwargs):
-        """Animate the latest solution's recorded history (a ``solve(record_history=True)``)."""
+    def animate_convergence(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        interval=50,
+        figsize=(7.0, 6.0),
+        title_prefix="RRT* convergence",
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ):
+        """Animate the latest solution's recorded history, a ``solve(record_history=True)`` (:func:`~minilink.planning.search.plotting.animate_convergence`): an ``AnimationResult``."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_convergence
 
-        return animate_convergence(self, **kwargs)
+        return animate_convergence(
+            self,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            interval=interval,
+            figsize=figsize,
+            title_prefix=title_prefix,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
 
     ###########################################################################
     # Internal machinery

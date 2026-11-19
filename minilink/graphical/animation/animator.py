@@ -80,11 +80,11 @@ class Animator:
         *,
         speed=1.0,
         is_3d=False,
-        renderer="matplotlib",
-        show=True,
         scene_title: str | None = None,
         camera=None,
         overlays=None,
+        renderer="matplotlib",
+        show=True,
     ):
         """
         Play a trajectory back: an :class:`AnimationResult`, its clip shown where ``show`` resolves.

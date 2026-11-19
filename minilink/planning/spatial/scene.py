@@ -11,6 +11,7 @@ from minilink.planning.spatial.collision import CollisionBody
 
 if TYPE_CHECKING:
     from minilink.core.fields import Field
+    from minilink.graphical.common.plot_result import PlotResult
 
 
 ###############################################################################
@@ -112,12 +113,47 @@ class Scene:
 
         return CostDensityField(self, body)
 
-    def plot(self, **kwargs):
-        """Plot the obstacles and the workspace fields, with the keywords of :func:`~minilink.planning.spatial.plotting.plot_scene`: a ``PlotResult``."""
+    def plot(
+        self,
+        *,
+        bounds=None,
+        grid_shape=(120, 120),
+        show_obstacles=True,
+        show_density=True,
+        show_clearance_contour=False,
+        body=None,
+        x=None,
+        states=None,
+        t=0.0,
+        params=None,
+        title=None,
+        figsize=(6.0, 6.0),
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ) -> PlotResult:
+        """Plot the obstacles and the workspace fields (:func:`~minilink.planning.spatial.plotting.plot_scene`): a ``PlotResult``."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.spatial.plotting import plot_scene
 
-        return plot_scene(self, **kwargs)
+        return plot_scene(
+            self,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            show_obstacles=show_obstacles,
+            show_density=show_density,
+            show_clearance_contour=show_clearance_contour,
+            body=body,
+            x=x,
+            states=states,
+            t=t,
+            params=params,
+            title=title,
+            figsize=figsize,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
 
     def as_visualizer(self, **kwargs):
         """Return a time-only overlay that draws this scene's obstacle skin."""

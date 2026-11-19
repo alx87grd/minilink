@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import os
 import warnings
+from dataclasses import replace
 
 import numpy as np
 
@@ -337,10 +338,10 @@ def plot_bode(
     margins: bool = True,
     method: str = "auto",
     eps: float = 1e-6,
-    renderer="matplotlib",
-    show=None,
-    ax=None,
     title: str | None = None,
+    renderer="matplotlib",
+    show=True,
+    ax=None,
 ) -> PlotResult:
     """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
 
@@ -388,8 +389,9 @@ def plot_pzmap(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
+    title: str | None = None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros.
@@ -413,6 +415,9 @@ def plot_pzmap(
 
     figure = pzmap_figure(z, p, sys, of, wrt, radius, discrete_period(sys))
 
+    if title is not None:
+        figure = replace(figure, title=title)
+
     return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
@@ -430,8 +435,9 @@ def plot_root_locus(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
+    title: str | None = None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Root locus of the selected channel closed with ``u = -K y``.
@@ -455,6 +461,9 @@ def plot_root_locus(
         A, B, C, D, gains, roots, sys, of, wrt, radius, discrete_period(sys)
     )
 
+    if title is not None:
+        figure = replace(figure, title=title)
+
     return draw(figure, renderer=renderer, show=show, ax=ax)
 
 
@@ -471,8 +480,9 @@ def plot_nyquist(
     n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
+    title: str | None = None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Nyquist diagram of the selected channel with the critical point ``-1``."""
@@ -491,6 +501,9 @@ def plot_nyquist(
     )
 
     figure = nyquist_figure(w, G, sys, of, wrt)
+
+    if title is not None:
+        figure = replace(figure, title=title)
 
     return draw(figure, renderer=renderer, show=show, ax=ax)
 

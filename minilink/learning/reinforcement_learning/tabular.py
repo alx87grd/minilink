@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -25,6 +26,9 @@ from minilink.planning.planner import (
 from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.step_model import is_continuous
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -364,8 +368,8 @@ class TabularLearningPlanner(Planner):
     # Plots
 
     def plot_learning_curve(
-        self, window=20, *, renderer="matplotlib", show=None, ax=None
-    ):
+        self, window=20, *, renderer="matplotlib", show=True, ax=None
+    ) -> PlotResult:
         """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""
         # The episodes' costs J, and the averaging kernel over the window
         J = np.array([record["J"] for record in self.history])

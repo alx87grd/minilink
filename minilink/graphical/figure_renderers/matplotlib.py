@@ -56,8 +56,8 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     if not given:
         fig.tight_layout()
 
-    # A given figure is left to its owner unless asked to show
-    if not given or show is not False:
+    # A plot shows the figure it makes; a given figure is its owner's to show
+    if not given:
         show_figure(fig, "matplotlib", show)
 
     return PlotResult(

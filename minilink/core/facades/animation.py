@@ -18,10 +18,10 @@ class SystemAnimation:
         t,
         *,
         is_3d=False,
-        renderer="matplotlib",
-        show=True,
         camera=None,
         overlays=None,
+        renderer="matplotlib",
+        show=True,
     ):
         """
         Draw one frame of the system at ``(x, u, t)``: an :class:`AnimationResult` of one frame.
@@ -49,11 +49,11 @@ class SystemAnimation:
         *,
         speed=1.0,
         is_3d=False,
-        renderer="matplotlib",
-        show=True,
         scene_title: str | None = None,
         camera=None,
         overlays=None,
+        renderer="matplotlib",
+        show=True,
     ):
         """
         Animate a trajectory of this system: an :class:`AnimationResult`.
@@ -108,8 +108,8 @@ class DynamicAnimation:
         tf=None,
         n_samples=2001,
         speed=3.0,
-        renderer="matplotlib",
         is_3d=False,
+        renderer="matplotlib",
         show=True,
     ):
         """Linearize, excite the selected mode(s), and animate them on this system.

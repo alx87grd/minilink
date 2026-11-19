@@ -21,7 +21,7 @@ from minilink.graphical import (  # noqa: E402
     Trace,
     draw,
 )
-from minilink.graphical.figure import overlay  # noqa: E402
+from minilink.graphical.figure import overlay, side_by_side  # noqa: E402
 
 pytest.importorskip("plotly")
 from plotly.colors import sample_colorscale  # noqa: E402
@@ -396,4 +396,25 @@ def test_overlay_adds_layers_to_a_description_drawn_once_on_any_renderer():
     ]
     assert len(draw(both, show=False).axes.lines) == 1
     assert len(draw(both, renderer="plotly", show=False).figure.data) == 2
+    plt.close("all")
+
+
+def test_a_plot_on_given_axes_only_draws_whatever_show_says(monkeypatch):
+    """The figure of given axes is its owner's to show: ``show=True`` shows nothing there."""
+    import minilink.graphical.figure_renderers.matplotlib as renderer
+
+    shown = []
+    monkeypatch.setattr(renderer, "show_figure", lambda *args: shown.append(args))
+    fig, ax = plt.subplots()
+    draw(LAYERS["trace"], ax=ax, show=True)
+    assert shown == []
+    draw(LAYERS["trace"], show=True)
+    assert len(shown) == 1
+    plt.close("all")
+
+
+def test_side_by_side_puts_panels_in_one_row():
+    spec = side_by_side([LAYERS["trace"].panels[0], LAYERS["heatmap"].panels[0]], "two")
+    result = draw(spec, show=False)
+    assert spec.n_cols == 2 and spec.title == "two" and len(result.axes) == 2
     plt.close("all")

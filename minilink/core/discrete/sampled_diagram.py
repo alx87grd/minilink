@@ -141,11 +141,11 @@ class SampledDiagramSystem(StepDiagramSystem):
         *,
         speed=1.0,
         is_3d=False,
-        renderer="matplotlib",
-        show=True,
         scene_title: str | None = None,
         camera=None,
         overlays=None,
+        renderer="matplotlib",
+        show=True,
     ):
         """
         Animate the loop's plant on its own run: its states, and the input the loop held on it each period.

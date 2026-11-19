@@ -109,8 +109,8 @@ def animate_modal(
     tf=None,
     n_samples=2001,
     speed=3.0,
-    renderer="matplotlib",
     is_3d=False,
+    renderer="matplotlib",
     show=True,
 ):
     """

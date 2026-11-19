@@ -1,10 +1,25 @@
 """Views of a dynamic-programming cost-to-go and policy: heatmaps, surfaces and sweep animations."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from minilink.graphical.common.animation_result import require_matplotlib_animation
 from minilink.graphical.common.labels import state_axis_label
-from minilink.graphical.figure import FigureSpec, Heatmap, Panel, Surface, Trace, draw
+from minilink.graphical.figure import (
+    FigureSpec,
+    Heatmap,
+    Panel,
+    Surface,
+    Trace,
+    draw,
+    side_by_side,
+)
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 # The value-iteration result is a node-indexed field over the state grid: these
 # views reshape it, take a 2-D slice when n > 2, and describe it as a heatmap or
@@ -31,22 +46,22 @@ def plot_cost_to_go(
     cmap="YlOrRd",
     title="Cost-to-go",
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     Draw cost-to-go heatmap(s) of a node-indexed table ``J`` on the state grid.
 
     ``J`` is by grid node: value iteration's ``solution.record.J``, or a
     policy's ``J^π``. ``x_axis`` and ``y_axis`` are the two state axes of the
-    slice, integers, or two lists of one length for several slices.
-    ``is_3d`` draws the surface of ``J`` instead of the heatmap.
+    slice, integers, or two lists of one length for several slices, drawn side by side on
+    one figure. ``is_3d`` draws the surface of ``J`` instead of the heatmap.
     """
     require_single_slice(trajectory, x_axis, y_axis)
 
-    # Several slices: one heatmap per pair, without the overlay
+    # Several slices: one panel per pair, side by side, without the overlay
     if is_batch(x_axis, y_axis):
-        return [
+        panels = [
             plot_cost_to_go(
                 grid,
                 J,
@@ -56,14 +71,13 @@ def plot_cost_to_go(
                 anchor=anchor,
                 vmin=vmin,
                 is_3d=is_3d,
-                trajectory=None,
                 cmap=cmap,
                 title=title,
-                renderer=renderer,
-                show=show,
-            )
+                renderer=None,
+            ).spec.panels[0]
             for x_k, y_k in slices_of(x_axis, y_axis)
         ]
+        return draw(side_by_side(panels), renderer=renderer, show=show, ax=ax)
 
     require_flat_overlay(is_3d, trajectory)
 
@@ -111,9 +125,9 @@ def plot_control_law(
     cmap="bwr",
     title=None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     Draw a control-law heatmap of a node-indexed table ``pi`` (action ids) on the state grid.
 
@@ -125,11 +139,10 @@ def plot_control_law(
     """
     require_single_slice(trajectory, x_axis, y_axis)
 
-    # Several slices: one heatmap per pair, each with its own input axis
+    # Several slices: one panel per pair, side by side, each with its own input axis
     if is_batch(x_axis, y_axis):
         slices = slices_of(x_axis, y_axis)
-        u_axes = u_axes_of(u_axis, slices)
-        return [
+        panels = [
             plot_control_law(
                 grid,
                 pi,
@@ -137,14 +150,13 @@ def plot_control_law(
                 x_axis=x_k,
                 y_axis=y_k,
                 anchor=anchor,
-                trajectory=None,
                 cmap=cmap,
                 title=title,
-                renderer=renderer,
-                show=show,
-            )
-            for (x_k, y_k), u_k in zip(slices, u_axes)
+                renderer=None,
+            ).spec.panels[0]
+            for (x_k, y_k), u_k in zip(slices, u_axes_of(u_axis, slices))
         ]
+        return draw(side_by_side(panels), renderer=renderer, show=show, ax=ax)
 
     # The heatmap with the closed-loop trajectory over it
     return plot_control_law_field(
@@ -173,15 +185,15 @@ def animate_cost_to_go(
     anchor=None,
     interval=60,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ):
     """
     Animate the cost-to-go sweeps a solve recorded on ``record.history``, on ``grid``.
 
     The colours span ``[0, jmax]``; without ``jmax``, the range of the last
-    sweep's slice. Drawn with matplotlib, on a new figure or into ``ax``;
-    ``show=None`` plays it unless it is drawn into ``ax``.
+    sweep's slice. Drawn with matplotlib, on a new figure or on ``ax``, whose figure is then
+    its owner's to show; ``show=False`` builds it without playing it.
     """
     require_matplotlib_animation(renderer)
     require_history(record)
@@ -204,20 +216,20 @@ def animate_control_law(
     grid,
     record,
     *,
-    axis=0,
+    u_axis=0,
     x_axis=0,
     y_axis=1,
     anchor=None,
     interval=60,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ):
     """
     Animate the control-law sweeps a solve recorded on ``record.history``, on ``grid``.
 
-    Drawn with matplotlib, on a new figure or into ``ax``; ``show=None`` plays
-    it unless it is drawn into ``ax``.
+    Drawn with matplotlib, on a new figure or on ``ax``, whose figure is then
+    its owner's to show; ``show=False`` builds it without playing it.
     """
     require_matplotlib_animation(renderer)
     require_history(record)
@@ -226,7 +238,7 @@ def animate_control_law(
         grid,
         record.history,
         kind="policy",
-        axis=axis,
+        axis=u_axis,
         x_axis=x_axis,
         y_axis=y_axis,
         anchor=anchor,
@@ -266,7 +278,7 @@ def animate_field(
     anchor=None,
     vmax=None,
     interval=60,
-    show=None,
+    show=True,
     ax=None,
 ):
     """
@@ -352,9 +364,9 @@ def plot_control_law_field(
     title=None,
     overlay=(),
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """Heatmap of input ``u_axis`` of a control-law table, scaled to that input's bounds."""
     u = grid.input_from_policy(pi)[:, u_axis]
 
@@ -419,9 +431,9 @@ def plot_field(
     title,
     overlay=(),
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """Heatmap of a node-indexed field on a 2-D slice of the grid, ``overlay`` layers over it."""
     spec = field_figure(
         grid,

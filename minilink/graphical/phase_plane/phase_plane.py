@@ -32,7 +32,7 @@ def plot_phase_plane(
     streamplot: bool = False,
     figsize=None,
     renderer: str = "matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Plot a phase-plane vector field with an optional trajectory overlay.
@@ -49,8 +49,9 @@ def plot_phase_plane(
     figsize : tuple, optional
         The figure's size in inches.
     renderer, show, ax : optional
-        ``"matplotlib"`` or ``"plotly"``; show the figure, by default unless it
-        is drawn on ``ax`` (matplotlib axes, a drawn plot's ``result.axes``).
+        Those of every plot (:func:`~minilink.graphical.figure.draw`): the
+        drawing library, whether the figure is shown, and matplotlib axes to
+        draw on.
     """
     spec = phase_plane_figure(
         sys,

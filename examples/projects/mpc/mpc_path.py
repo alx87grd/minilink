@@ -150,7 +150,7 @@ if SHOW_COST_FIELD:
         [path_viz, corridor_viz],
         bounds=bounds,
         state_dim=sys_mpc.n,
-        grid=(80, 80),
+        grid_shape=(80, 80),
         title="Path + corridor cost field",
         log_scale=True,
         is_3d=True,

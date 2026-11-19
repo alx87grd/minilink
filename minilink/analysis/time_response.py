@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
 from minilink.analysis import linear
@@ -150,8 +152,9 @@ def plot_step_response(
     n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
+    title: str | None = None,
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
 ) -> PlotResult:
     """Step response of the selected channel with rise time, settling time and overshoot.
@@ -179,6 +182,9 @@ def plot_step_response(
     info = step_info(time, y)
 
     figure = step_figure(time, y, info, sys, of, wrt, discrete_period(sys))
+
+    if title is not None:
+        figure = replace(figure, title=title)
 
     return draw(figure, renderer=renderer, show=show, ax=ax)
 

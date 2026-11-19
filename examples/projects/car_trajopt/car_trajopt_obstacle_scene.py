@@ -107,7 +107,7 @@ ax = plot_cost_field(
     [obstacle_cost],
     bounds=PLOT_BOUNDS,
     state_dim=sys.n,
-    grid=(120, 120),
+    grid_shape=(120, 120),
     u=np.zeros(sys.m),
     show=False,
     log_scale=True,

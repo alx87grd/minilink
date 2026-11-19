@@ -64,21 +64,20 @@ def show_animation(figure, animation, *, fps, show, ax=None):
     """
     A matplotlib ``FuncAnimation`` a plot function built, as a record, played where ``show`` resolves.
 
-    ``show=None`` plays it unless it is drawn into the caller's ``ax``, whose
-    figure is then left to the caller.
+    An animation drawn on the caller's ``ax`` is not played: the figure is its
+    owner's to show.
     """
-    if show is None:
-        show = ax is None
     result = AnimationResult(
         renderer="matplotlib", clip=BuiltClip(figure, animation, fps)
     )
 
-    # Played now, or held back from a notebook's end-of-cell display when the figure is ours
-    place = resolve_show(show, "matplotlib")
-    if place is not None:
-        result.clip.show(place)
-    elif ax is None:
-        hold_back(figure, "matplotlib")
+    # Our own figure is played now, or held back from a notebook's end-of-cell display
+    if ax is None:
+        place = resolve_show(show, "matplotlib")
+        if place is not None:
+            result.clip.show(place)
+        else:
+            hold_back(figure, "matplotlib")
 
     return result
 

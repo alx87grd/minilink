@@ -67,7 +67,7 @@ class GraphvizTopologyExporter(TopologyExporter):
         return graph
 
 
-def plot_diagram(sys_or_diagram, *, show=True, expand=True):
+def plot_diagram(sys_or_diagram, *, expand=True, show=True) -> PlotResult:
     """Draw a system's or an assembled diagram's blocks and wires: a :class:`PlotResult`.
 
     ``expand=True`` draws the blocks of every nested diagram inside a labelled

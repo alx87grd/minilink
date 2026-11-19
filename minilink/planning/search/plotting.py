@@ -1,10 +1,17 @@
 """Search-tree plots: the RRT family's tree and solution path in a state projection."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from minilink.graphical.common.animation_result import require_matplotlib_animation
 from minilink.graphical.common.labels import state_axis_label
 from minilink.graphical.figure import FigureSpec, Panel, Trace, draw
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 # The tree's edges and the solution path
 TREE_COLOR = "#999999"
@@ -25,9 +32,9 @@ def plot_tree(
     path_style: str = "dense",
     figsize=(6.0, 5.0),
     renderer="matplotlib",
-    show=None,
+    show=True,
     ax=None,
-):
+) -> PlotResult:
     """
     Plot the final tree and solution in the ``(x_axis, y_axis)`` state projection.
 
@@ -55,19 +62,19 @@ def animate_search(
     *,
     x_axis: int = 0,
     y_axis: int = 1,
-    ax=None,
     step: int = 5,
     interval: int = 30,
-    renderer="matplotlib",
-    show=None,
     figsize=(6.0, 5.0),
+    renderer="matplotlib",
+    show=True,
+    ax=None,
 ):
     """
     Replay the tree growth as an animation in the ``(x_axis, y_axis)`` projection.
 
     ``step`` edges are revealed per frame, in node insertion order; the solution
-    path is drawn at the end. Drawn with matplotlib, on a new figure or into
-    ``ax``; ``show=None`` plays it unless it is drawn into ``ax``. Returns the
+    path is drawn at the end. Drawn with matplotlib, on a new figure or on ``ax``, whose figure is then
+    its owner's to show; ``show=False`` builds it without playing it. Returns the
     :class:`AnimationResult`; ``.save("tree.gif")`` writes it.
     """
     # Lazy import: the graphics load on first use, not with the planners
@@ -109,12 +116,12 @@ def animate_convergence(
     *,
     x_axis: int = 0,
     y_axis: int = 1,
-    ax=None,
     interval: int = 50,
-    renderer="matplotlib",
-    show=None,
     figsize=(7.0, 6.0),
     title_prefix: str = "RRT* convergence",
+    renderer="matplotlib",
+    show=True,
+    ax=None,
 ):
     """
     Animate recorded RRT* history showing tree growth and best-path refinement.
@@ -122,8 +129,8 @@ def animate_convergence(
     Requires the latest solution's ``record.history``, from a solve with
     ``record_history=True``.
     Each frame redraws the full tree (including rewiring) and highlights the
-    current best goal path. Drawn with matplotlib, on a new figure or into
-    ``ax``; ``show=None`` plays it unless it is drawn into ``ax``. Returns the
+    current best goal path. Drawn with matplotlib, on a new figure or on ``ax``, whose figure is then
+    its owner's to show; ``show=False`` builds it without playing it. Returns the
     :class:`AnimationResult`.
     """
     # Lazy import: the graphics load on first use, not with the planners

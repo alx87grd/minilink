@@ -334,10 +334,16 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     (inline in a notebook, a window in a script) and `show=False` builds the graph only.
   - *One plotting contract.* Every `plot_*` takes `renderer=`, `show=` and `ax=` and returns a
     `PlotResult`: `fig, ax = plot(...)` → `result.figure`, `result.axes` (the scene, track,
-    tree, cost-field, cost-to-go and MPC-futures plots returned a pair); `show=None`, the
-    default, shows unless `ax=` is given, and `show=False` is strict: a figure a plot made is
+    tree, cost-field, cost-to-go and MPC-futures plots returned a pair); `show=True`, the
+    default, shows the figure a plot makes, and `show=False` is strict: that figure is
     shown by `result.show()`, not by `plt.show()` or the end of a notebook cell. `ax=` takes
-    matplotlib axes (`ax=first.axes`). A file is written by the record:
+    matplotlib axes (`ax=first.axes`); a plot drawn on given axes only draws. Every drawing
+    verb writes its keywords out, its own first, then `renderer`, `show`, `ax`
+    (`Scene.plot`, `ReferenceTrack.plot` and the planners' `animate*` took `**kwargs`). A
+    plot of several slices (`x_axis=[0, 2], y_axis=[1, 3]`) returns one record of panels
+    side by side, where it returned a list. `plot_scene` and `plot_cost_field` take
+    `grid_shape=` (was `grid=`), `animate_control_law` `u_axis=` (was `axis=`); the four
+    control plots and `plot_trajectory` take `title=`, as `plot_bode`. A file is written by the record:
     `plot_diagram(filename=)`, `animate(html=, save=, file_name=)`, RRT's
     `animate_search(save=)` and value iteration's `animate_cost_to_go(save_path=)` →
     `.save(file_name)` on what the call returns; `animate(native=)` is gone (Meshcat draws
@@ -428,7 +434,7 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *The planning plots take one keyword set and return a `PlotResult`* (the maintainer's
     ruling 16): `sol.plot_cost_to_go(*, x_axis=0, y_axis=1, anchor=None, bounds=None,
     grid_shape=(51, 51), t=0.0, jmax=None, is_3d=False, trajectory=None, title=None,
-    renderer="matplotlib", show=None, ax=None)` and `sol.plot_control_law` alike (with `u_axis=`, no
+    renderer="matplotlib", show=True, ax=None)` and `sol.plot_control_law` alike (with `u_axis=`, no
     `jmax=`), written out instead of `**kwargs`, on `PlanningSolution` and every planner (a thin
     call to the latest solution; value iteration keeps `field=`), a grid planner's table drawn
     on its own nodes. Value iteration's and the tabular learner's plots returned `(fig, ax)`

@@ -1,11 +1,18 @@
 """Full-state linear feedback, constant or scheduled gain."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.system import System
 from minilink.core.trajectory import interpolate_schedule
 from minilink.dynamics.abstraction.state_space import point_component
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -178,7 +185,9 @@ class TimeVaryingFeedback(System):
 
         return u_cmd
 
-    def plot_gain_schedule(self, *, renderer="matplotlib", show=None, ax=None):
+    def plot_gain_schedule(
+        self, *, renderer="matplotlib", show=True, ax=None
+    ) -> PlotResult:
         """Draw every entry of the gain schedule ``K(t)`` against time."""
         return plot_gain_schedule(
             self.params["t"],
@@ -241,7 +250,9 @@ class TrajectoryFeedback(System):
 
         return u_cmd
 
-    def plot_gain_schedule(self, *, renderer="matplotlib", show=None, ax=None):
+    def plot_gain_schedule(
+        self, *, renderer="matplotlib", show=True, ax=None
+    ) -> PlotResult:
         """Draw every entry of the gain schedule ``K(t)`` against time."""
         return plot_gain_schedule(
             self.params["t"],
@@ -257,8 +268,8 @@ class TrajectoryFeedback(System):
 
 
 def plot_gain_schedule(
-    t, K, *, title="Gain schedule", renderer="matplotlib", show=None, ax=None
-):
+    t, K, *, title="Gain schedule", renderer="matplotlib", show=True, ax=None
+) -> PlotResult:
     """Draw every entry of a gain schedule ``K(t)``, shape ``(N, m, n)``, against time."""
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.figure import draw

@@ -1880,7 +1880,13 @@ def test_the_cost_field_samples_the_point_probe_cost():
     )
     bounds = ((-1.0, 4.0), (-2.0, 2.0))
     xs, ys, Z = sampled_costs(
-        [cost], bounds=bounds, grid=(5, 4), state_dim=2, u=None, t=0.0, params=None
+        [cost],
+        bounds=bounds,
+        grid_shape=(5, 4),
+        state_dim=2,
+        u=None,
+        t=0.0,
+        params=None,
     )
     p = np.array([xs[2], ys[1]])
     assert Z[1, 2] == pytest.approx(cost.g(p, np.zeros(1)))
@@ -1893,7 +1899,7 @@ def test_the_cost_field_of_an_obstacle_is_radially_symmetric():
     cost = scene.clearance_field(_holonomic_point()).as_cost(weight=1.0)
     bounds = ((0.0, 4.0), (-2.0, 2.0))
     heatmap = (
-        plot_cost_field([cost], bounds=bounds, grid=(41, 21), renderer=None)
+        plot_cost_field([cost], bounds=bounds, grid_shape=(41, 21), renderer=None)
         .spec.panels[0]
         .layers[0]
     )
@@ -1924,13 +1930,18 @@ def test_a_cost_field_takes_the_scene_and_draws_its_surface(tmp_path):
     obstacle = scene.clearance_field(body).as_cost(weight=3.0)
     costs = [path, corridor, obstacle]
     flat = plot_cost_field(
-        costs, bounds=bounds, grid=(16, 14), log_scale=True, title="2D", show=False
+        costs,
+        bounds=bounds,
+        grid_shape=(16, 14),
+        log_scale=True,
+        title="2D",
+        show=False,
     )
     both = scene.plot(ax=flat.axes, bounds=bounds, show_density=False, title="")
     surface = plot_cost_field(
         costs,
         bounds=bounds,
-        grid=(16, 14),
+        grid_shape=(16, 14),
         log_scale=True,
         is_3d=True,
         title="3D",
@@ -1969,14 +1980,19 @@ def test_the_spatial_plots_draw_on_plotly():
     drawn = plot_cost_field(
         [cost],
         bounds=bounds,
-        grid=(12, 8),
+        grid_shape=(12, 8),
         log_scale=True,
         renderer="plotly",
         show=False,
     )
     assert [trace.type for trace in drawn.figure.data] == ["heatmap"]
     drawn = plot_cost_field(
-        [cost], bounds=bounds, grid=(12, 8), is_3d=True, renderer="plotly", show=False
+        [cost],
+        bounds=bounds,
+        grid_shape=(12, 8),
+        is_3d=True,
+        renderer="plotly",
+        show=False,
     )
     assert [trace.type for trace in drawn.figure.data] == ["surface"]
 

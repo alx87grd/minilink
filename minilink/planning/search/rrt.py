@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 
@@ -27,6 +27,9 @@ from minilink.planning.search.tree import (
     Node,
     Tree,
 )
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -250,9 +253,9 @@ class RRTPlanner(Planner):
         path_style: str = "dense",
         figsize=(6.0, 5.0),
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """Plot the final tree and solution path in the ``(x_axis, y_axis)`` state projection.
 
         ``path_style="waypoints"`` draws the path through the tree's nodes;
@@ -274,12 +277,33 @@ class RRTPlanner(Planner):
             ax=ax,
         )
 
-    def animate_search(self, **kwargs):
-        """Animate the tree growth in a state projection, in matplotlib."""
+    def animate_search(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        step=5,
+        interval=30,
+        figsize=(6.0, 5.0),
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ):
+        """Animate the tree growth in a state projection (:func:`~minilink.planning.search.plotting.animate_search`): an ``AnimationResult``."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_search
 
-        return animate_search(self, **kwargs)
+        return animate_search(
+            self,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            step=step,
+            interval=interval,
+            figsize=figsize,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
 
     ###########################################################################
     # Internal machinery

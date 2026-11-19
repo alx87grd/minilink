@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -30,6 +31,9 @@ from minilink.planning.step_model import is_continuous
 from minilink.planning.step_problems import (
     require_no_period_on_ticks,
 )
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 #: The backward step's methods: the per-node Python reference (pyro's base
 #: ``DynamicProgramming``), and the same step over lookup tables
@@ -748,9 +752,9 @@ class DynamicProgrammingPlanner(Planner):
         trajectory=None,
         title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         The latest solution's cost-to-go table on the grid (:meth:`PlanningSolution.plot_cost_to_go`, the same keywords): a ``PlotResult``.
 
@@ -781,14 +785,63 @@ class DynamicProgrammingPlanner(Planner):
             self.problem, field, grid=self.grid, family="value iteration", **drawn
         )
 
-    def animate_cost_to_go(self, **kwargs):
+    def animate_cost_to_go(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        jmax=None,
+        anchor=None,
+        interval=60,
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ):
+        """Animate the cost-to-go sweeps of the latest solve, a ``solve(record_history=True)`` (:func:`~minilink.planning.dynamic_programming.plotting.animate_cost_to_go`); the colours top at the failure cost by default."""
         record = require_solution(self).record
-        kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
-        return plotting.animate_cost_to_go(self.grid, record, **kwargs)
+        if jmax is None:
+            jmax = plotting.cost_scale_limit(self.out_of_bound_cost)
 
-    def animate_control_law(self, **kwargs):
+        return plotting.animate_cost_to_go(
+            self.grid,
+            record,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            jmax=jmax,
+            anchor=anchor,
+            interval=interval,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
+
+    def animate_control_law(
+        self,
+        *,
+        u_axis=0,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        interval=60,
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ):
+        """Animate the control-law sweeps of the latest solve, a ``solve(record_history=True)`` (:func:`~minilink.planning.dynamic_programming.plotting.animate_control_law`)."""
         record = require_solution(self).record
-        return plotting.animate_control_law(self.grid, record, **kwargs)
+
+        return plotting.animate_control_law(
+            self.grid,
+            record,
+            u_axis=u_axis,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            interval=interval,
+            renderer=renderer,
+            show=show,
+            ax=ax,
+        )
 
     ###########################################################################
     # Internal machinery

@@ -14,72 +14,56 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
 
 ## The API
 
-### Four small names the API settlement left
+### Three small names the API settlement left
 - **Context:** the API settlement before the demo rebuild (PR #139, merged 2026-11-11) logged
-  four names it did not touch, because no ruling listed them; each is a public name, so each
-  waits for you. They are small and independent; the rebuilt demos would meet the
-  last two.
+  names it did not touch, because no ruling listed them; each is a public name, so each
+  waits for you. They are small and independent; the rebuilt demos would meet the last.
   1. `SampledDiagramEvaluator.block_input(path, x, u, k)`, a public method of the compiled
      evaluator (DESIGN §4, one test, the MPC drawing helper): it reads a subsystem's input,
      where ruling 1 made "subsystem" the word for a system placed in a diagram.
   2. `TrajectoryOptimizationPlanner.transcription_options()`, the verbose print's line: it
      names the option records the settlement deleted (the transcription now takes
      `n_steps=` itself) and returns `{"n_steps": N}`; its only caller is the print.
-  3. `animate_control_law(grid, record, *, axis=0, ...)`
-     (`planning/dynamic_programming/plotting.py`; value iteration's planner forwards its
-     keywords to it): the input channel drawn, the idea `plot_control_law` names `u_axis=`.
-     The animation itself stays, with `animate_cost_to_go` (ruled: used in class); only the
-     keyword is asked.
-  4. The planners' `compile(backend=None)` (trajectory optimization, MPPI): `backend` stays
+  3. The planners' `compile(backend=None)` (trajectory optimization, MPPI): `backend` stays
      positional (the MPC calls `planner.compile(backend)`), where `System.compile(*, backend=)`
      is keyword-only.
 - **Options**, per name:
   1. `block_input` → `subsystem_input` (one library caller, one test), or kept as is.
   2. `transcription_options()` → `transcription_numbers()`, folded into the print (no method
      left), or kept as is.
-  3. `animate_control_law(axis=)` → `u_axis=`, as `plot_control_law`; or kept as is.
-  4. `compile(*, backend=None)` keyword-only, as the system's (two callers in the MPC), or
+  3. `compile(*, backend=None)` keyword-only, as the system's (two callers in the MPC), or
      kept positional.
-- **Recommendation:** rename 1 and 3 and make 4 keyword-only (one word, one shape per idea,
+- **Recommendation:** rename 1 and make 3 keyword-only (one word, one shape per idea,
   RULES 2.7 and DESIGN §4); fold 2 into the print, since nothing else reads it.
 - **Blocks:** nothing; each is one commit with its callers, no alias.
 - **Answer:**
 
-### What the plotting review left on the drawing verbs' signatures
-- **Context:** the plotting contract makes `renderer="matplotlib"`, `show=None`, `ax=None`
-  uniform on every `plot_*` (an AST test holds their order and defaults). The review of the
-  finished contract found the drawing verbs differ beyond those three keywords; each point
-  is a public signature or return, so each waits for you:
-  1. **Two plots return a list.** `plot_cost_to_go` and `plot_control_law` given a list of
-     axes pairs (`x_axis=[0, 2], y_axis=[1, 3]`) return `[PlotResult, …]` and ignore `ax=`,
-     so `.save(...)` on the line fails (`planning/dynamic_programming/plotting.py`).
-  2. **The animations' `show`.** `animate`, `render`, `animate_modal` and `plot_diagram`
-     default to `show=True` and refuse `show=None`; the plots and the grid and search
-     animations default to `show=None`.
-  3. **Order and hidden keywords.** `plot_bode` puts `title` after `ax`; `animate_search`
-     and `animate_convergence` put `ax` before `renderer`; `animate_modal` orders `renderer,
-     is_3d, show` where `animate` orders `is_3d, renderer, show`. `Scene.plot`,
-     `ReferenceTrack.plot` and the planners' `animate*` mirrors take `**kwargs`.
-  4. **Secondary keywords.** `grid=` on the scene and cost-field plots against `grid_shape=`
-     on fifteen others; `title=` on `plot_bode` and not on the four other control plots nor
-     on `plot_trajectory`; `figsize=` on seven plots.
-  5. **`Trace.z`,** a 3-D line or point set, is drawn by both renderers and set by no plot
+### What is left of the plots' look and of two small pieces
+- **Context:** the drawing verbs are uniform in their keywords, order, defaults and return
+  (DESIGN §7, held by `test_plot_contract.py`). What the review of the plotting contract
+  found beyond the interface is how the figures look, and two small pieces; each is visible
+  to a student or a design choice, so each waits for you:
+  1. **Axis units.** The control plots read "Time (seconds)", "Magnitude (dB)", "Frequency
+     (rad/s)" (`graphical/control/style.py`); the time signals read "Time [s]", the bracket
+     RULES 2.7 states.
+  2. **A run over a field.** Orange with a black dot and a red cross, labelled "trajectory",
+     on the phase plane; black with a green dot and a red star, labelled "closed loop", on
+     the cost-to-go and the control law.
+  3. **`figsize=`** is a keyword of seven plots (the scene, the track, the cost field, the
+     search and MPC pictures) and of no other.
+  4. **`Trace.z`,** a 3-D line or point set, is drawn by both renderers and set by no plot
      of the library.
-  6. **The record's `axes` off matplotlib** is a small marker object that names itself when
+  5. **The record's `axes` off matplotlib** is a small marker object that names itself when
      read; a property on the record that raises would be one mechanism less, at the price of
      the record no longer being a four-field dataclass.
-  7. **The look.** Axis units read "Time (seconds)" on the control plots and "Time [s]" on
-     the time signals; a run over a field is orange with a black dot on the phase plane,
-     black with a green dot on the cost-to-go.
-- **Options,** per point: 1. one multi-panel figure and one record, or the batch form
-  removed; 2. `show=None` the default on every drawing verb, or only accepted; 3. one order
-  (the plot's own keywords, then `renderer`, `show`, `ax`) and the keywords written out;
-  4. one name per idea, on every plot that has the idea; 5. kept for a 3-D phase plot, or
-  removed until one lands; 6. the marker, or the property; 7. one unit style, one run style.
-- **Recommendation:** 1 one record; 2 `show=None` everywhere; 3 and 4 with your API review,
-  one commit per verb family; 5 removed until a plot needs it; 6 the marker as built; 7 the
-  brackets of RULES 2.7 and the phase plane's colours.
-- **Blocks:** nothing; none changes what a student writes for one plot.
+- **Options,** per point: 1. brackets everywhere, or the control plots' words kept; 2. one
+  run style on every plot, or each kept; 3. `figsize=` on every plot, on none (a size is set
+  on `result.figure`), or as it is; 4. kept for a 3-D phase plot, or removed until one
+  lands; 5. the marker, or the property.
+- **Recommendation:** 1 the brackets of RULES 2.7; 2 the phase plane's colours and
+  "trajectory"; 3 on none; 4 kept, it is small and a 3-D phase plot is on the workboard;
+  5 the marker as built.
+- **Blocks:** nothing.
 - **Answer:**
 
 ### The 3-D car's rear axle: locked, or an open differential?

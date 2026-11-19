@@ -571,10 +571,11 @@ wait for his pass over the demos and features (§1.12):
   `planning/dynamic_programming/plotting.py` (`field_figure`, `value_surface_figure`);
   `plot_field` there has one caller and re-lists its thirteen keywords. One builder, and the
   pass-through inlined.
-- [ ] **One wording for the three keywords** (agent lane, plotting): `draw`'s docstring
-  states `renderer`, `show`, `ax` and `.save(file_name)` once; each public `plot_*` closes on
-  the same sentence pointing to it, and returns `-> PlotResult` in its signature (45 of 55 do
-  not). Done when `test_plot_contract.py` checks the annotation.
+- [ ] **One closing sentence on every plot's docstring** (agent lane, plotting): `draw`'s
+  docstring states `renderer`, `show`, `ax` and `.save(file_name)` once, and the plots that
+  explain them point to it; the student's main verbs (`plot_trajectory`, `plot_bode`, the
+  other facades) say nothing of them. Done when each public `plot_*` closes on the same
+  sentence pointing to `draw`.
 - [ ] **The Plotly live signal plot and the one show step** (agent lane, plotting;
   `minilink/graphical/signals/plotly_backend.py`): it decides where it shows on its own
   (`open_plotly_signal_plot`, its local page), outside `resolve_show`. Done when it shows

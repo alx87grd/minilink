@@ -1,7 +1,14 @@
 """Plotting shortcuts: a system's trajectory, cost, maps, diagram and linear-analysis plots."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from minilink.core.facades.simulation import scored_trajectory
 from minilink.core.inspect import inspect_text
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 ###############################################################################
 # Public API
@@ -18,10 +25,11 @@ class SystemPlotting:
         traj=None,
         *,
         signals=None,
+        title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Convenience shortcut to plot sampled time signals.
 
@@ -63,14 +71,15 @@ class SystemPlotting:
             self,
             traj,
             signals=signals,
+            title=title,
             renderer=renderer,
             show=show,
             ax=ax,
         )
 
     def plot_cost(
-        self, cost, *, of=None, traj=None, renderer="matplotlib", show=None, ax=None
-    ):
+        self, cost, *, of=None, traj=None, renderer="matplotlib", show=True, ax=None
+    ) -> PlotResult:
         """
         Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
 
@@ -110,9 +119,9 @@ class SystemPlotting:
         vmin=None,
         vmax=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Convenience shortcut plotting one output component over swept inputs.
 
@@ -163,9 +172,9 @@ class SystemPlotting:
         vmin=None,
         vmax=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Convenience shortcut plotting the textbook slice of this block's control law.
 
@@ -235,7 +244,7 @@ class SystemPlotting:
 
         return bundle
 
-    def plot_diagram(self, *, show=True, expand=True):
+    def plot_diagram(self, *, expand=True, show=True) -> PlotResult:
         """
         Convenience shortcut to draw the system's diagram: a :class:`PlotResult`.
 
@@ -275,11 +284,11 @@ class LinearPlotting:
         margins=True,
         method="auto",
         eps=1e-6,
-        renderer="matplotlib",
-        show=None,
-        ax=None,
         title=None,
-    ):
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ) -> PlotResult:
         """Bode diagram of one SISO channel, gain and phase margins marked.
 
         See :func:`minilink.analysis.frequency.plot_bode`.
@@ -320,10 +329,11 @@ class LinearPlotting:
         eps=1e-6,
         minimal=None,
         radius=None,
+        title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """Root locus of one SISO channel closed with ``u = -K y``.
 
         See :func:`minilink.analysis.frequency.plot_root_locus`.
@@ -344,6 +354,7 @@ class LinearPlotting:
             eps=eps,
             minimal=minimal,
             radius=radius,
+            title=title,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -362,10 +373,11 @@ class LinearPlotting:
         eps=1e-6,
         minimal=None,
         radius=None,
+        title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """Plot poles and zeros of one SISO channel.
 
         See :func:`minilink.analysis.frequency.plot_pzmap`.
@@ -385,6 +397,7 @@ class LinearPlotting:
             eps=eps,
             minimal=minimal,
             radius=radius,
+            title=title,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -403,10 +416,11 @@ class LinearPlotting:
         n_samples=500,
         method="auto",
         eps=1e-6,
+        title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """Nyquist diagram of one SISO channel, with the critical point ``-1``.
 
         See :func:`minilink.analysis.frequency.plot_nyquist`.
@@ -426,6 +440,7 @@ class LinearPlotting:
             n_samples=n_samples,
             method=method,
             eps=eps,
+            title=title,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -444,10 +459,11 @@ class LinearPlotting:
         n_samples=500,
         method="auto",
         eps=1e-6,
+        title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """Step response of one SISO channel of the linear model, with rise time, settling time and overshoot.
 
         See :func:`minilink.analysis.time_response.plot_step_response`.
@@ -467,6 +483,7 @@ class LinearPlotting:
             n_samples=n_samples,
             method=method,
             eps=eps,
+            title=title,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -494,9 +511,9 @@ class DynamicPlotting(LinearPlotting):
         streamplot=False,
         figsize=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Convenience shortcut to plot a phase-plane vector field.
 
@@ -542,9 +559,9 @@ class StepPlotting(LinearPlotting):
         *,
         signals=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """
         Convenience shortcut to plot sampled step signals.
 

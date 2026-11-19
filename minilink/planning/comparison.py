@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from minilink.graphical.figure import TAB10, FigureSpec, Panel, Trace, draw
+from minilink.graphical.figure import (
+    TAB10,
+    FigureSpec,
+    Panel,
+    Trace,
+    draw,
+    side_by_side,
+)
 from minilink.graphical.signals.time_signals import TIME_ABSCISSA_LABEL
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import ProblemEvaluator
@@ -21,6 +29,9 @@ from minilink.planning.results import (
     drawn_trajectory_of,
     require_cost_to_go,
 )
+
+if TYPE_CHECKING:
+    from minilink.graphical.common.plot_result import PlotResult
 
 # One colour per solution, the same on every row
 SOLUTION_COLORS = TAB10
@@ -144,9 +155,9 @@ class Comparison:
         t=0.0,
         title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """One panel per feedback law, side by side, one colour scale from the problem's inputs: a :class:`PlotResult`, ``title`` above the panels."""
         # One panel per law, each the controller's own, titled by its name
         laws = []
@@ -162,7 +173,7 @@ class Comparison:
                 t=t,
             )
             laws.append(replace(law.panels[0], title=name))
-        spec = side_by_side(laws, title)
+        spec = side_by_side(laws, title or "")
 
         return draw(spec, renderer=renderer, show=show, ax=ax)
 
@@ -178,9 +189,9 @@ class Comparison:
         jmax=None,
         title=None,
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """One panel per cost-to-go field, side by side, one colour scale (``jmax`` or the largest finite value): a :class:`PlotResult`, ``title`` above the panels."""
         sweep = dict(
             x_axis=x_axis,
@@ -214,7 +225,7 @@ class Comparison:
             )
             for name, (x_level, y_level, J) in samples.items()
         ]
-        spec = side_by_side(heatmaps, title)
+        spec = side_by_side(heatmaps, title or "")
 
         return draw(spec, renderer=renderer, show=show, ax=ax)
 
@@ -224,9 +235,9 @@ class Comparison:
         signals=("x", "u"),
         title="plans and runs",
         renderer="matplotlib",
-        show=None,
+        show=True,
         ax=None,
-    ):
+    ) -> PlotResult:
         """The plans and the controllers' runs overlaid, one row per signal component, legend by name: a :class:`PlotResult`, ``title`` over the first row."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.signals.time_signals import signal_figure
@@ -429,15 +440,6 @@ def require_solutions(named):
                 f"{name!r} is not a PlanningSolution: to score a controller, pass the "
                 "problem first, compare(problem, name=controller, ...)"
             )
-
-
-def side_by_side(panels, title):
-    """One row of panels side by side, ``title`` above them, as a description."""
-    n = len(panels)
-
-    return FigureSpec(
-        panels=tuple(panels), title=title or "", n_cols=n, figsize=(4.5 * n, 4.0)
-    )
 
 
 def require_some_cost_to_go(fields):
