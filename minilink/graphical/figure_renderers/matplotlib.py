@@ -168,7 +168,8 @@ def draw_panel(ax, panel, *, given, legend=True):
     # handle drawn for it
     if legend and panel.legend and any(labels_of(panel)):
         unique = legend_entries([ax])
-        ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
+        legend = ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
+        opaque_keys(legend)
 
 
 def legend_beside(fig, axes, panels):
@@ -184,8 +185,15 @@ def legend_beside(fig, axes, panels):
     legend = fig.legend(
         unique.values(), unique.keys(), loc="upper right", fontsize=8, frameon=False
     )
+    opaque_keys(legend)
     width = legend.get_window_extent().width / fig.bbox.width
     fig.tight_layout(rect=(0.0, 0.0, 1.0 - width, 1.0))
+
+
+def opaque_keys(legend):
+    """Draw a legend's keys at full opacity: a faint layer's label still reads."""
+    for handle in legend.legend_handles:
+        handle.set_alpha(1.0)
 
 
 def labels_of(panel):

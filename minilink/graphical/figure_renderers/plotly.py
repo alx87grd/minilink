@@ -69,6 +69,7 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     # The panels, then the figure's title and size
     for k, panel in enumerate(spec.panels):
         draw_panel(fig, panel, *cell_of(k, n_cols))
+    one_key_per_label(fig)
     fig.update_layout(
         title=spec.title or None,
         template=PLOTLY_TEMPLATE,
@@ -195,8 +196,36 @@ def draw_trace(fig, trace: Trace, row, col):
         )
         return
     fig.add_trace(go.Scatter(x=x, y=y, **style, **common), row=row, col=col)
+    if trace.label and trace.alpha < 1.0:
+        draw_opaque_key(fig, x, y, style, trace.label, row, col)
     if trace.arrows and trace.mode != "markers":
         draw_direction_arrows(fig, x, y, trace.color or TAB10[0], row, col)
+
+
+def one_key_per_label(fig):
+    """Each label once in the legend: its first trace keeps the key."""
+    shown = set()
+    for trace in fig.data:
+        if trace.showlegend and trace.name in shown:
+            trace.showlegend = False
+        elif trace.showlegend:
+            shown.add(trace.name)
+
+
+def draw_opaque_key(fig, x, y, style, label, row, col):
+    """The legend key of a faint labelled trace at full opacity.
+
+    Plotly draws a key at its trace's opacity: the faint trace leaves the
+    legend to its first sample at full opacity, a line of one point that draws
+    nothing, both in one ``legendgroup``, so a click on the key shows or hides
+    the trace.
+    """
+    faint = fig.data[-1]
+    faint.update(showlegend=False, legendgroup=label)
+    key = go.Scatter(
+        x=x[:1], y=y[:1], **style, name=label, legendgroup=label, showlegend=True
+    )
+    fig.add_trace(key, row=row, col=col)
 
 
 def draw_direction_arrows(fig, x, y, color, row, col):
