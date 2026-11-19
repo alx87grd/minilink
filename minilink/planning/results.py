@@ -361,7 +361,14 @@ def controller_run_of(solution, dt=None) -> Trajectory:
     if not is_continuous(problem):
         return step_run_of(problem, solution.controller)
 
-    run = problem.compile(solution.controller, dt).trajectory().of("plant")
+    loop_run = problem.compile(solution.controller, dt).trajectory()
+
+    return plain_plant_run_of(loop_run)
+
+
+def plain_plant_run_of(loop_run) -> Trajectory:
+    """The plant's part of a loop's run (a logged plant run as it is) as plain arrays, its signals left out."""
+    run = loop_run.of("plant") if "plant" in loop_run.roles else loop_run
     plant_run = Trajectory(
         t=np.asarray(run.t), x=np.asarray(run.x), u=np.asarray(run.u)
     )

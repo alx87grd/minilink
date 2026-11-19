@@ -29,6 +29,7 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import (
     PlanningSolution,
     controller_run_of,
+    plain_plant_run_of,
     require_cost_to_go,
 )
 from minilink.planning.step_model import is_continuous
@@ -463,14 +464,6 @@ def drawn_runs_of(comparison, name) -> list:
         return [plain_plant_run_of(run) for run in evaluation.trajectories or ()]
 
     return [controller_run_of(comparison.solutions[name])]
-
-
-def plain_plant_run_of(loop_run) -> Trajectory:
-    """The plant's part of a loop's run (a logged plant run as it is) as plain arrays, its signals left out."""
-    run = loop_run.of("plant") if "plant" in loop_run.roles else loop_run
-    plant_run = Trajectory(np.asarray(run.t), np.asarray(run.x), np.asarray(run.u))
-
-    return plant_run
 
 
 def time_span_of(trajectories):
