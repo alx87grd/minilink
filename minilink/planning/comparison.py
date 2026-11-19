@@ -741,9 +741,7 @@ def require_paired(J_a, J_b, names):
 
 
 def require_solutions(named):
-    """Refuse an empty comparison, or a named entry that is not a ``PlanningSolution``."""
-    if not named:
-        raise ValueError("compare needs at least one solution")
+    """Refuse a named entry that is not a ``PlanningSolution``."""
     for name, solution in named.items():
         if not isinstance(solution, PlanningSolution):
             raise TypeError(
