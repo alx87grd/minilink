@@ -22,7 +22,3 @@ examples/demos/rrt/rrt_star_live.py 12
 examples/demos/trajopt/trajopt_holonomic_corridor.py 16
 examples/demos/udes_racecar/mpc_racecar_dynamic.py 30
 examples/demos/udes_racecar/mpc_racecar_kinematic.py 4
-examples/demos/value_iteration/vi_cartpole_swingup.py 4
-examples/demos/value_iteration/vi_double_pendulum_jax.py 12
-examples/demos/value_iteration/vi_pendulum_lqr.py 8
-examples/demos/value_iteration/vi_pendulum_swingup.py 4
