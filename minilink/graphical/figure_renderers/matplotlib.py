@@ -48,12 +48,18 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     # one that holds no other axes and no title of its own
     fills_figure = not given or (len(fig.axes) == len(axes) and not fig.get_suptitle())
 
-    # The panels, then the title above them
+    # Panels on one time axis share one legend beside them, on a figure drawn here;
+    # given axes are left as they are
+    beside = spec.share_x and not given
+
+    # The panels, then the title above them, then the legend beside them
     for target, panel in zip(axes, spec.panels):
-        draw_panel(target, panel, given=given)
+        draw_panel(target, panel, given=given, legend=not beside)
     if spec.title and fills_figure:
         fig.suptitle(spec.title, fontsize=FONT_SIZE + 1)
-    if not given:
+    if beside:
+        legend_beside(fig, axes, spec.panels)
+    elif not given:
         fig.tight_layout()
 
     # A plot shows the figure it makes; a given figure is its owner's to show
@@ -111,13 +117,14 @@ def axes_list(ax, spec: FigureSpec) -> list:
     return axes
 
 
-def draw_panel(ax, panel, *, given):
+def draw_panel(ax, panel, *, given, legend=True):
     """Draw one panel's layers on ``ax``, then its labels, limits and legend.
 
     On a new figure the panel sets everything. On ``given`` axes it keeps what
     they already show: a title or a label is set only where the axes has
     none; empty axes take the panel's limits unless the caller set its own;
     axes that already show something widen their view to hold them.
+    ``legend=False`` leaves the panel's legend to the figure's.
     """
     # What the axes shows before these layers, and its view
     ax.autoscale_view()
@@ -159,11 +166,41 @@ def draw_panel(ax, panel, *, given):
 
     # A legend when a layer carries a label: each label once, with the first
     # handle drawn for it
-    if panel.legend and any(getattr(layer, "label", "") for layer in panel.layers):
-        unique = {}
+    if legend and panel.legend and any(labels_of(panel)):
+        unique = legend_entries([ax])
+        ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
+
+
+def legend_beside(fig, axes, panels):
+    """One legend right of the panels, each label of every panel that asks for one once; the panels laid out in the width left."""
+    asking = [
+        ax for ax, panel in zip(axes, panels) if panel.legend and any(labels_of(panel))
+    ]
+    if not asking:
+        fig.tight_layout()
+        return
+
+    unique = legend_entries(asking)
+    legend = fig.legend(
+        unique.values(), unique.keys(), loc="upper right", fontsize=8, frameon=False
+    )
+    width = legend.get_window_extent().width / fig.bbox.width
+    fig.tight_layout(rect=(0.0, 0.0, 1.0 - width, 1.0))
+
+
+def labels_of(panel):
+    """The labels a panel's layers carry, empty ones included."""
+    return [getattr(layer, "label", "") for layer in panel.layers]
+
+
+def legend_entries(axes) -> dict:
+    """``{label: handle}`` over ``axes``, each label once with the first handle drawn for it."""
+    unique = {}
+    for ax in axes:
         for handle, label in zip(*ax.get_legend_handles_labels()):
             unique.setdefault(label, handle)
-        ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
+
+    return unique
 
 
 def shows_something(ax):
