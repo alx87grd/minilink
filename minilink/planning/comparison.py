@@ -311,7 +311,8 @@ class Comparison:
                 plan = solution.trajectory
                 plan = Trajectory(plan.t, plan.x, plan.u)
                 lines.append(("", color, "dash", 1.5, 1.0, plan))
-        span = time_span_of(trajectory for *_, trajectory in lines)
+        times = [np.asarray(trajectory.t, dtype=float) for *_, trajectory in lines]
+        span = (min(t[0] for t in times), max(t[-1] for t in times))
 
         # One row per component of each signal, its marks read from the signal: the
         # answers' names on the first row
@@ -461,13 +462,6 @@ def drawn_runs_of(comparison, name) -> list:
         return [plain_plant_run_of(run) for run in evaluation.trajectories or ()]
 
     return [controller_run_of(comparison.solutions[name])]
-
-
-def time_span_of(trajectories):
-    """``(t_first, t_last)`` over the trajectories' times."""
-    times = [np.asarray(trajectory.t, dtype=float) for trajectory in trajectories]
-
-    return min(t[0] for t in times), max(t[-1] for t in times)
 
 
 def deadline_marks_of(problem, signal, k) -> tuple:
