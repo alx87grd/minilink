@@ -37,11 +37,17 @@ def show_figure(figure, renderer, show) -> None:
 def show_in_window(fig) -> None:
     """Show the matplotlib figure ``fig`` in its window, alone; a bare script blocks on it until it closes."""
     fig.show()
-    if is_blocking_needed():
-        fig.canvas.mpl_connect(
-            "close_event", lambda event: fig.canvas.stop_event_loop()
-        )
-        fig.canvas.start_event_loop(0)
+    if not is_blocking_needed():
+        return
+
+    # The window's events run in short slices until the figure reports its close.
+    # The close only raises a flag: a stop request sent from inside the close
+    # handler can be consumed by the window's own teardown, and the loop then
+    # never returns
+    closed = []
+    fig.canvas.mpl_connect("close_event", lambda event: closed.append(event))
+    while not closed:
+        fig.canvas.start_event_loop(EVENT_SLICE)
 
 
 def hold_back(figure, renderer):
@@ -99,6 +105,9 @@ def display_now(obj):
 
     display(obj)
 
+
+# The length of one slice of a blocking window's event loop, in seconds
+EVENT_SLICE = 0.05
 
 # One presenter per renderer
 PRESENT = {

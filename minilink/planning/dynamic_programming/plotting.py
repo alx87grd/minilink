@@ -294,7 +294,8 @@ def animate_field(
     ``kind`` is ``"value"`` (the cost-to-go ``J``) or ``"policy"`` (input
     ``axis`` of the greedy law); ``history`` is the ``(t, J, pi)`` list from a
     solve. A value is coloured on ``[0, vmax]``, by default up to the largest
-    value of the last sweep's slice. Drawn with matplotlib.
+    value of the last sweep's slice; a policy on the grid's bounds of its
+    input. Drawn with matplotlib.
     """
     # Lazy import: the graphics load on first use, not with the planning layer
     from minilink.graphical.animation.grid_animations import animate_heatmap
@@ -306,14 +307,15 @@ def animate_field(
         Z = grid.slice_2d(grid.grid_from_array(values), x_axis, y_axis, anchor=anchor)
         return Z.T
 
-    # A value's colours span [0, vmax], the last sweep's largest value by default,
-    # so every frame shares one scale
+    # Every frame shares one colour scale: a value's spans [0, vmax], the last
+    # sweep's largest value by default; a policy's spans its input's bounds
     is_value = kind == "value"
-    top = (
-        last_sweep_max(grid, history, x_axis, y_axis, anchor, vmax)
-        if is_value
-        else None
-    )
+    if is_value:
+        bottom = 0.0
+        top = last_sweep_max(grid, history, x_axis, y_axis, anchor, vmax)
+    else:
+        bottom = grid.u_lb[axis]
+        top = grid.u_ub[axis]
 
     return animate_heatmap(
         grid.x_levels[x_axis],
@@ -322,7 +324,7 @@ def animate_field(
         len(history),
         title_of=lambda i: f"sweep {i}  t={history[i][0]:.2f}",
         cmap="YlOrRd" if is_value else "bwr",
-        vmin=0.0 if is_value else None,
+        vmin=bottom,
         vmax=top,
         x_label=state_axis_label(grid.sys, x_axis),
         y_label=state_axis_label(grid.sys, y_axis),

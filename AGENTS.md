@@ -81,6 +81,15 @@ CONSTITUTION, RULES and DESIGN state what is true and how it works, as a textboo
 
 RULES 5.24 is the review form of this section.
 
+## Demo comments
+
+A comment in a demo, an example or a notebook cell never repeats what the code below it
+says, and never restates a number the code holds: a grid size, a limit, a horizon, a stride,
+a gain. The maintainer tunes those numbers, and a comment that copies one has to be edited
+with it. A section's title comment names the object and, where it has one, its equation in
+symbols (`# Value iteration: J(x) = min_u [ g dt + J(x + f dt) ]`), and stops there. A unit
+beside a number (`TF = 4.0  # [s]`) is not a copy and stays.
+
 ## Non-negotiables
 
 - **Preserve user edits:** never revert or "clean up" the user's manual changes (see Workflow).
