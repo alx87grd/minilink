@@ -1443,7 +1443,7 @@ episode's length on an infinite one), then
 finite              = every x_k and u_k finite
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
 failed              = not finite, or feasibility_margin < 0
-reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
+reachability_margin = Xf.margin(x(t_end), t_end)  reached = finite and margin ≥ 0   (Xf = None: finite)
 cost                = C_N + e^{−ρ horizon} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t0)} g dt  (+inf when not finite; no h on an infinite horizon)
 J                   = cost, or with penalize_failure on cost + failure_cost · (failed or not reached),
                       and cost_bound + failure_cost for a run not finite

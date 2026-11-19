@@ -41,7 +41,7 @@ class Evaluation:
     - ``feasibility_margin``: the least margin of ``x`` to ``X`` and of ``u`` to
       ``U`` along the run, and ``failed`` (not finite, or a negative margin);
     - ``reachability_margin``: the margin of ``x(tf)`` to ``Xf`` (``+inf`` without
-      ``Xf``), and ``reached``;
+      ``Xf``), and ``reached`` (a finite run ending in ``Xf``);
     - ``x0``: the starts, ``(n_runs, n)``.
 
     :attr:`objective` is the problem's criterion over ``J``: the one number a
@@ -144,7 +144,8 @@ def score_run(
         finite              = every x_k and u_k finite
         feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
         failed              = not finite, or feasibility_margin < 0
-        reachability_margin = Xf.margin(x(t_end), t_end)   reached = margin ≥ 0  (no Xf: reached)
+        reachability_margin = Xf.margin(x(t_end), t_end)
+        reached             = finite and margin ≥ 0  (no Xf: finite)
         raw_cost            = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ horizon} h(x(t_end), t_end)
                               (+inf when not finite), t_end = t0 + horizon
         J                   = raw_cost, or with penalize_failure on
@@ -206,7 +207,7 @@ def score_run(
         reachability_margin = xp.asarray(xp.inf)
     else:
         reachability_margin = xp.min(problem.Xf.margin(x[-1], t_end, Xf_params))
-    reached = reachability_margin >= 0.0
+    reached = finite & (reachability_margin >= 0.0)
 
     # raw_cost = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ horizon} h(x(t_end), t_end): the
     # integral the run carried, or the trapezoid on a logged run's samples; 0

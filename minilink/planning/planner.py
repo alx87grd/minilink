@@ -407,7 +407,7 @@ def step_evaluation(
         reachability_margin = np.inf
         if problem.Xf is not None:
             reachability_margin = float(np.min(problem.Xf.margin(xs[-1], t[-1])))
-        reached = reachability_margin >= 0.0
+        reached = finite and reachability_margin >= 0.0
 
         # J = raw_cost, or with the failure charged raw_cost + failure_cost · (failed or
         # not reached), and the cost bound + failure_cost for a run not finite

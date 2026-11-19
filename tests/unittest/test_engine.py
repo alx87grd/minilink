@@ -161,6 +161,22 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_failure_cost():
     assert on["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
 
 
+def test_a_run_that_is_not_finite_never_reaches_the_goal():
+    """Scored on zeros, a diverged run would sit in a goal around the origin: it is not reached."""
+    sys = plant()
+    t = np.linspace(0.0, 1.0, 11)
+    x = np.zeros((2, t.size))
+    x[0, 3] = np.nan
+    run = Trajectory(t, x, np.zeros((1, t.size)))
+
+    at_origin = PlanningProblem(sys, horizon=1.0, Xf=BallSet(np.zeros(2), 0.1))
+    no_goal = PlanningProblem(sys, horizon=1.0)
+
+    assert not score_run(at_origin, run)["reached"]
+    assert not score_run(no_goal, run)["reached"]
+    assert score_run(at_origin, Trajectory(t, np.zeros((2, t.size)), run.u))["reached"]
+
+
 def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
     sys = plant()
     cost = QuadraticCost.from_system(sys)
