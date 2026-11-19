@@ -35,6 +35,8 @@ Plan good and run bad reads "the plan is right; run it with feedback"
   draw) and drawn from there: one run a solid line, several runs each a thin faint line,
   the plan dashed on top. Ruled by the maintainer, superseding a `Comparison.runs`
   attribute of nominal runs.
+  The nominal comparison is the deterministic problem, one run per answer; the spread is
+  the same problem with its distributions, every run drawn.
 - **R5.** A plan longer than the horizon is scored on the horizon: cut at `t0 + T`, the
   state at that instant interpolated. The length cell gives the plan's own length.
 - **R6.** `Comparison.problem` is the judged problem, `None` for a comparison by names only;

@@ -128,6 +128,9 @@ class Comparison:
     the figure draws its goal and limits. Each evaluation :func:`compare`
     makes keeps the judge's runs, one per trial, in its ``trajectories``: the
     one home of the runs the figure draws; memory grows with ``n_trials``.
+    The nominal behaviour of the answers is compared on a deterministic
+    problem, one run each; their spread, on the same problem with its
+    distributions, every run drawn.
 
     ``print`` is the table, each answer read twice, the same columns each
     (``J``, goal, limits, length): its plan as the planner wrote it, cut at

@@ -944,6 +944,7 @@ def test_the_evaluations_keep_the_judges_runs_and_the_figure_draws_them():
     (legend,) = result.figure.legends
     assert all(handle.get_alpha() == 1.0 for handle in legend.legend_handles)
     figure = comparison.plot_trajectory(renderer="plotly", show=False).figure
+    assert figure.layout.legend.x > 1.0 and figure.layout.legend.xanchor == "left"
     keys = [trace for trace in figure.data if trace.showlegend]
     assert [trace.name for trace in keys] == ["Law", "Plan", "limits"]
     assert all(trace.opacity in (None, 1.0) for trace in keys)

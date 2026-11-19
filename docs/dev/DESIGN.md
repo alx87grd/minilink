@@ -1970,7 +1970,8 @@ is a title and a grid of `Panel`s read row by row (`n_cols`, `share_x`, `figsize
 (a bool: a legend when a layer is labelled; matplotlib places it where it fits best, and on
 a figure it draws itself whose panels share the time axis (`share_x`) gathers the labels of
 every panel that asks into one legend beside the panels, a figure drawn on given axes left as
-it is; Plotly draws one per figure, none when no panel asks; each label once, its key
+it is; Plotly draws one per figure, beside the panels when they share the time axis, none
+when no panel asks; each label once, its key
 at full opacity whatever its trace's) and an ordered tuple of layers, of seven kinds: `Trace` (a polyline or a point set, NaN
 breaking a line, `fill=True` closing and filling it), `RefLine`, `Note`, `Heatmap`,
 `Contour`, `Surface`, `Arrows` (quiver or stream). The objects are frozen; a colour is a

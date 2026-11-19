@@ -49,6 +49,18 @@ COLOR_MAPS = {"bwr": "RdBu_r", "coolwarm": "RdBu_r", "seismic": "RdBu_r"}
 ###############################################################################
 
 
+# The legend: inside the top right corner, or beside panels that share the time
+# axis, outside the plotting area (the margin grows to hold it)
+LEGEND_INSIDE = {
+    "x": 0.99,
+    "y": 0.99,
+    "xanchor": "right",
+    "yanchor": "top",
+    "bgcolor": "rgba(255, 255, 255, 0.7)",
+}
+LEGEND_BESIDE = {"x": 1.02, "y": 1.0, "xanchor": "left", "yanchor": "top"}
+
+
 def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     """Draw ``spec`` on a new Plotly figure; ``ax`` is matplotlib's and refused here."""
     require_no_axes(ax)
@@ -73,23 +85,11 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
     fig.update_layout(
         title=spec.title or None,
         template=PLOTLY_TEMPLATE,
-        legend={
-            "x": 0.99,
-            "y": 0.99,
-            "xanchor": "right",
-            "yanchor": "top",
-            "bgcolor": "rgba(255, 255, 255, 0.7)",
-        },
+        legend=LEGEND_BESIDE if spec.share_x else LEGEND_INSIDE,
     )
     if spec.figsize is not None:
         width, height = spec.figsize
         fig.update_layout(width=DPI_FIGURE * width, height=DPI_FIGURE * height)
-
-    # Panels sharing the time axis: the legend beside them, off the curves
-    if spec.share_x:
-        fig.update_layout(
-            legend={"x": 1.02, "y": 1.0, "xanchor": "left", "bgcolor": None}
-        )
 
     # One legend per figure: none when no panel asks for one
     if not any(panel.legend for panel in spec.panels):
