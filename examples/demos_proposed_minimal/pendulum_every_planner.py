@@ -90,6 +90,7 @@ problem_x0 = problem.replace(x0=Uniform([-0.2, -0.5], [0.2, 0.5]))
 
 comparison_x0 = compare(problem_x0, **answers, dt=0.01, n_trials=N_TRIALS)
 print(comparison_x0)
+comparison_x0.plot_trajectory()
 
 # Paired on the same draws: J_VI − J_tracked, start by start
 dJ = comparison_x0.difference("VI", "TrajOpt_tracked")
