@@ -34,12 +34,14 @@ Found by running the README's snippets as written (2026-11-09; run again 2026-11
 machine, JAX 0.12, NumPy backend unless the snippet says otherwise).
 
 ### The "One problem, every planner" example shows two planners missing the goal
-- **Symptom:** README §7 as written: value iteration ends with `success = no`
-  ("max_iterations=1000 reached before tol=0.1 (delta=5.48)") after a warning that an infinite
-  undiscounted horizon has no cost bound (a failure costs 1e6), and `compare` scores it
-  `J = 88.25 (goal missed)`; RRT, whose record says "goal reached", is scored
-  `J = 133.6 (goal missed)`; only trajectory optimization succeeds (`J = 89.82`). Times:
-  value iteration 7.4 s, RRT 0.4 s, trajectory optimization 9.2 s.
+- **Symptom:** README §7 as written: value iteration stops at its iteration cap
+  ("max_iterations=1000 reached before tol=0.1 (delta=5.48)", its record) after a warning
+  that an infinite undiscounted horizon has no cost bound (a failure costs 1e6), and its run
+  misses the goal (`J = 88.25`); RRT, whose record says "goal reached", writes a 5.1 s plan
+  on the 4 s horizon, so its plan and its run both miss the goal (`J = 133.6`); only
+  trajectory optimization's run reaches it (`J = 89.82`, the star). Run again 2026-11-19 on
+  `compare`'s table of plans beside runs; times: value iteration 7.2 s, RRT 0.4 s,
+  trajectory optimization 4.2 s.
 - **Workaround:** none in the snippet; a discount on the problem (`discount_rate=`) or a
   `failure_cost` gives value iteration a cost bound.
 - **Fix:** **[ask]** the README is the maintainer's: the example's numbers chosen so each
