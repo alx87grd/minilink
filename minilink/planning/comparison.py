@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+from minilink.core.trajectory import Trajectory
 from minilink.graphical.figure import (
     TAB10,
     FigureSpec,
@@ -16,7 +17,7 @@ from minilink.graphical.figure import (
     side_by_side,
 )
 from minilink.graphical.signals.time_signals import TIME_ABSCISSA_LABEL
-from minilink.planning.evaluation import Evaluation
+from minilink.planning.evaluation import Evaluation, evaluate_trajectory
 from minilink.planning.evaluator import ProblemEvaluator
 from minilink.planning.plotting import (
     controller_law_figure,
@@ -29,6 +30,7 @@ from minilink.planning.results import (
     drawn_trajectory_of,
     require_cost_to_go,
 )
+from minilink.planning.step_model import is_continuous
 
 if TYPE_CHECKING:
     from minilink.graphical.common.plot_result import PlotResult
@@ -76,9 +78,10 @@ def compare(
         require_solutions(named)
         return Comparison(named)
 
-    # Every entry scored on the same draws, its solution kept for the overlays (each
-    # loop's period as evaluate reads it: a sampled one's own clock, else dt)
-    evaluations = score_entries(
+    # Every entry scored on the same draws, its solution and its evaluator kept for
+    # the table and the overlays (each loop's period as evaluate reads it: a
+    # sampled one's own clock, else dt)
+    evaluators, evaluations = score_entries(
         problem,
         named,
         dict(
@@ -97,7 +100,7 @@ def compare(
         if not isinstance(entry, Evaluation)
     }
 
-    return Comparison(solutions, evaluations)
+    return Comparison(solutions, evaluations, problem, evaluators)
 
 
 @dataclass(frozen=True)
@@ -108,14 +111,28 @@ class Comparison:
     ``solutions`` maps a name to a :class:`~minilink.planning.results.PlanningSolution`
     (a controller entry is wrapped as one); ``evaluations`` maps every scored
     name to its :class:`~minilink.planning.evaluation.Evaluation` (``None`` when
-    :func:`compare` was given no problem). ``print`` is the table, each
-    ``plot_*`` draws every solution on one figure with one scale, and
-    :meth:`difference` reads the paired trials. The first solution's system
-    labels the axes.
+    :func:`compare` was given no problem); ``problem`` is the judged problem,
+    ``None`` for a comparison by names only: the plans are scored on it and
+    the figure draws its goal and limits; ``evaluators`` are the judge's
+    compiled loops, one per scored solution, which the figure runs.
+
+    ``print`` is the table, each answer read twice, the same columns each
+    (``J``, goal, limits, length): its plan as the planner wrote it, cut at
+    the horizon ``t0 + T`` and scored on the problem without simulation (by
+    names only, on its own problem), beside its run, the block it hands out
+    simulated by the judge (on several draws, the criterion and the counts
+    over them). A star marks the best run: the lowest criterion value among
+    the answers whose every run reaches the goal within the limits. The
+    planners' records follow, one line each. Each ``plot_*`` draws every
+    solution on one figure with one scale, and :meth:`difference` reads the
+    paired trials. The judged problem's system labels the axes, else the
+    first solution's.
     """
 
     solutions: dict
     evaluations: dict | None = None
+    problem: PlanningProblem | None = None
+    evaluators: dict | None = field(default=None, repr=False, compare=False)
 
     # The named solutions, read as a mapping
 
@@ -285,33 +302,7 @@ class Comparison:
     # Display
 
     def __str__(self) -> str:
-        # One row per entry: its name, success, record and evaluation
-        scores = self.evaluations or {}
-        names = list(dict.fromkeys([*self.solutions, *scores]))
-        rows = []
-        for name in names:
-            solution = self.solutions.get(name)
-            evaluation = scores.get(name, getattr(solution, "evaluation", None))
-            rows.append(
-                (
-                    name,
-                    "-" if solution is None else ("yes" if solution.success else "no"),
-                    "-" if solution is None else str(solution.record),
-                    "-" if evaluation is None else str(evaluation),
-                )
-            )
-        header = ("", "success", "record", "evaluation")
-
-        # Each column as wide as its widest cell
-        widths = [
-            max(len(row[k]) for row in (header, *rows)) for k in range(len(header))
-        ]
-        lines = [
-            "  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip()
-            for row in (header, *rows)
-        ]
-
-        return "\n".join(lines)
+        return comparison_text(self)
 
 
 def sample_cost_to_go(
@@ -374,7 +365,7 @@ def split_entries(args, entries):
 
 
 def score_entries(problem, named, settings, n_trials, key):
-    """Every entry's :class:`Evaluation` on one key and one backend (NumPy for all when one entry does not trace)."""
+    """``(evaluators, evaluations)``: each scored entry's compiled loop, and every entry's :class:`Evaluation` on one key and one backend (NumPy for all when one entry does not trace)."""
     scored = {n: e for n, e in named.items() if not isinstance(e, Evaluation)}
 
     # The loops compiled, then on NumPy for all when one of them is
@@ -396,7 +387,7 @@ def score_entries(problem, named, settings, n_trials, key):
         else:
             evaluations[name] = evaluators[name].evaluate(key=key, n_trials=n_trials)
 
-    return evaluations
+    return evaluators, evaluations
 
 
 def solution_of(problem, entry):
@@ -405,6 +396,213 @@ def solution_of(problem, entry):
         return entry
 
     return PlanningSolution(problem=problem, controller=entry, record=GivenController())
+
+
+# The table: its two halves, titled, and the columns of each
+PLAN_TITLE = "plan, as the planner wrote it"
+RUN_TITLE = "run, simulated by the judge"
+COLUMNS = ("goal", "limits", "length")
+
+
+def comparison_text(comparison) -> str:
+    """The print text: one line per answer, its plan beside its run, then the records."""
+    scores = comparison.evaluations or {}
+    solutions = comparison.solutions
+    names = list(dict.fromkeys([*solutions, *scores]))
+    runs = {
+        name: scores.get(name, getattr(solutions.get(name), "evaluation", None))
+        for name in names
+    }
+
+    # The numbers: the best run, each plan's score and each run's length
+    best = best_run_of(runs)
+    plans = {name: plan_score_of(comparison, name) for name in names}
+    lengths = {name: run_length_of(comparison, name, runs[name]) for name in names}
+
+    # Formatted last: each half's cells, or the words that span it
+    label = criterion_label_of(runs.values())
+    plan_halves = {
+        name: plan if isinstance(plan, str) else cells(*plan)
+        for name, plan in plans.items()
+    }
+    run_halves = {
+        name: "not scored"
+        if runs[name] is None
+        else cells(runs[name], lengths[name], "*" if name == best else " ")
+        for name in names
+    }
+    headers = (("J", "", *COLUMNS), (label, "", *COLUMNS))
+    lines = table_lines(names, plan_halves, run_halves, headers)
+
+    # The star's footnote, then the planners' own accounts, one line each
+    if best is not None:
+        which = "that" if runs[best].n_trials == 1 else "whose every run"
+        lines += [
+            "",
+            f"* best run: the lowest {label} {which} reaches the goal within the limits",
+        ]
+    solved = [name for name in names if name in solutions]
+    if solved:
+        pad = max(len(name) for name in solved)
+        lines += ["", "records"]
+        lines += [f"  {name:{pad}}  {solutions[name].record}" for name in solved]
+
+    return "\n".join(lines)
+
+
+def best_run_of(runs):
+    """The name of the best run: the lowest ``objective`` among the evaluations whose every run succeeds; ``None`` when none does."""
+    qualified = {
+        name: float(evaluation.objective)
+        for name, evaluation in runs.items()
+        if evaluation is not None and float(evaluation.success_rate) == 1.0
+    }
+    if not qualified:
+        return None
+
+    return min(qualified, key=qualified.get)
+
+
+def plan_score_of(comparison, name):
+    """``(evaluation, length)`` of an answer's plan on the judged problem (by names only, its own), or the words of its plan half."""
+    solution = comparison.solutions.get(name)
+    if solution is None:
+        return "no plan"
+    if solution.trajectory is None:
+        return "no plan" if solution.open_loop else "no plan (a feedback law)"
+    problem = solution.problem if comparison.problem is None else comparison.problem
+    if not is_continuous(problem):
+        return "not scored"
+
+    # The plan as the plant's run on the horizon, scored without simulation
+    plan = solution.trajectory
+    evaluation = evaluate_trajectory(problem, plan_on_horizon(plan, problem))
+    length = float(plan.t[-1] - plan.t[0])
+
+    return evaluation, length
+
+
+def plan_on_horizon(plan, problem) -> Trajectory:
+    """The plan as the plant's run ``(t, x, u)``, cut at ``t0 + T``: the state there interpolated, the input held from the sample before."""
+    t = np.asarray(plan.t, dtype=float)
+    x = np.asarray(plan.x, dtype=float)
+    u = np.asarray(plan.u, dtype=float)
+    if problem.horizon_kind() != "finite":
+        return Trajectory(t, x, u)
+    t_end = float(problem.t0) + float(problem.horizon)
+    if t[-1] <= t_end:
+        return Trajectory(t, x, u)
+
+    # The samples before t0 + T, then x(t0 + T) between its two neighbours
+    kept = t < t_end
+    x_end = np.array([np.interp(t_end, t, x_i) for x_i in x])
+    u_end = u[:, kept][:, -1]
+    cut = Trajectory(
+        np.append(t[kept], t_end),
+        np.column_stack([x[:, kept], x_end]),
+        np.column_stack([u[:, kept], u_end]),
+    )
+
+    return cut
+
+
+def run_length_of(comparison, name, evaluation):
+    """The length of an answer's run: its evaluator's horizon, else its kept run's; ``None`` when no run is known."""
+    evaluator = (comparison.evaluators or {}).get(name)
+    if evaluator is not None:
+        return float(evaluator.horizon)
+    if evaluation is not None and evaluation.trajectories:
+        run = evaluation.trajectories[0]
+        return float(run.t[-1] - run.t[0])
+
+    return None
+
+
+def criterion_label_of(evaluations) -> str:
+    """The run's ``J`` header: ``J`` for one run, else the criterion over the draws (``E[J]``, ``max J``, ``CVaR_α(J)``)."""
+    several = [e for e in evaluations if e is not None and e.n_trials > 1]
+    if not several:
+        return "J"
+    criterion = several[0].criterion
+    if criterion == "expectation":
+        return "E[J]"
+    if criterion == "worst_case":
+        return "max J"
+
+    return f"CVaR_{float(criterion[1]):g}(J)"
+
+
+def cells(evaluation, length, star=""):
+    """One half's cells from its numbers: ``J``, the star, goal, limits, length; words for one run, counts for several."""
+    n = evaluation.n_trials
+    success = np.asarray(evaluation.reached) & ~np.asarray(evaluation.failed)
+    failed = np.asarray(evaluation.failed)
+    finite = np.isfinite(np.asarray(evaluation.raw_cost))
+    J = f"{float(evaluation.objective):.4g}"
+
+    # One run: in words, and its length; several: how many of them
+    if n == 1:
+        goal = "reached" if success[0] else "missed"
+        limits = "diverged" if not finite[0] else "violated" if failed[0] else "ok"
+        span = "" if length is None else f"{length:.3g} s"
+    else:
+        goal = f"{int(success.sum())}/{n}"
+        limits = f"{int((~failed).sum())}/{n}"
+        span = ""
+
+    return J, star, goal, limits, span
+
+
+def table_lines(names, plan_halves, run_halves, headers):
+    """The table's lines: the halves' titles, the header, a rule, one line per answer; each column as wide as its widest cell."""
+    halves = (plan_halves, run_halves)
+
+    # Each column's width, then each half's: its columns or its widest words
+    widths = [
+        [
+            max(
+                len(row[k])
+                for row in (header, *half.values())
+                if not isinstance(row, str)
+            )
+            for k in range(len(header))
+        ]
+        for header, half in zip(headers, halves)
+    ]
+    texts = [
+        {name: half_text(half[name], width, slot) for name in names}
+        for half, width, slot in zip(halves, widths, (False, True))
+    ]
+    header_texts = [
+        half_text(header, width, slot)
+        for header, width, slot in zip(headers, widths, (False, True))
+    ]
+    w_name = max(len(name) for name in names)
+    w_plan = max(len(PLAN_TITLE), len(header_texts[0]), *map(len, texts[0].values()))
+    w_run = max(len(RUN_TITLE), len(header_texts[1]), *map(len, texts[1].values()))
+
+    def line(name, plan, run):
+        return f"{name:{w_name}} │ {plan:{w_plan}} │ {run}".rstrip()
+
+    rule = "─" * (w_name + 1) + "┼" + "─" * (w_plan + 2) + "┼" + "─" * (w_run + 1)
+
+    return [
+        line("", PLAN_TITLE, RUN_TITLE),
+        line("", *header_texts),
+        rule,
+        *(line(name, texts[0][name], texts[1][name]) for name in names),
+    ]
+
+
+def half_text(half, widths, slot) -> str:
+    """One half of a line: its spanning words, or its cells aligned, ``J`` right with the star in its slot, the words left."""
+    if isinstance(half, str):
+        return half
+    J, star, *words = half
+    first = J.rjust(widths[0]) + (f" {star or ' '}" if slot else "")
+    rest = [word.ljust(width) for word, width in zip(words, widths[2:])]
+
+    return "  ".join([first, *rest])
 
 
 def require_no_scoring(dt, n_trials):

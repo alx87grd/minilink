@@ -456,8 +456,14 @@ def test_compare_reads_the_solutions_side_by_side():
     race = compare(VI=vi, LQR=lqr)
     assert len(race) == 2 and race["LQR"] is lqr and list(race) == ["VI", "LQR"]
     table = str(race)
-    assert table.splitlines()[0].split() == ["success", "record", "evaluation"]
-    assert "converged" in table and "closed-loop poles" in table and "J = " in table
+    titles = [half.strip() for half in table.splitlines()[0].split("│")]
+    assert titles == [
+        "",
+        "plan, as the planner wrote it",
+        "run, simulated by the judge",
+    ]
+    assert "converged" in table and "closed-loop poles" in table
+    assert f"{float(vi.evaluation.J[0]):.4g}" in table
 
     axes = race.plot_control_law(show=False).axes
     assert [ax.get_title() for ax in axes] == ["VI", "LQR"]
@@ -479,7 +485,7 @@ def test_compare_reads_the_solutions_side_by_side():
     assert list(scored) == ["VI", "LQR"] and scored["LQR"] is lqr
     J_lqr = evaluate(problem, lqr.controller, dt=0.1, backend="numpy").J
     np.testing.assert_array_equal(scored.evaluations["LQR"].J, J_lqr)
-    assert "J = " in str(scored)
+    assert f"{float(J_lqr[0]):.4g}" in str(scored) and scored.problem is problem
     np.testing.assert_array_equal(
         scored.difference("VI", "LQR"),
         scored.evaluations["VI"].J - scored.evaluations["LQR"].J,
