@@ -197,6 +197,7 @@ def plot_time_signals(
     signals: tuple[str, ...] = ("x", "u"),
     abscissa_label: str = TIME_ABSCISSA_LABEL,
     title: str | None = None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -206,7 +207,7 @@ def plot_time_signals(
         sys, traj, signals=signals, title=title, abscissa_label=abscissa_label
     )
 
-    return draw(figure, renderer=renderer, show=show, ax=ax)
+    return draw(figure, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def open_time_signal_plot(

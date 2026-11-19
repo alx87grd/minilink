@@ -343,7 +343,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     plot of several slices (`x_axis=[0, 2], y_axis=[1, 3]`) returns one record of panels
     side by side, where it returned a list. `plot_scene` and `plot_cost_field` take
     `grid_shape=` (was `grid=`), `animate_control_law` `u_axis=` (was `axis=`); the four
-    control plots and `plot_trajectory` take `title=`, as `plot_bode`. A file is written by the record:
+    control plots and `plot_trajectory` take `title=`, as `plot_bode`, and every plot takes
+    `figsize=None` (the scene, track and tree plots had a size as their default). On the
+    figures: the control plots write their units in brackets (`Time [s]`, `Magnitude [dB]`,
+    `Frequency [rad/s]`, `Real axis [1/s]`; they read `Time (seconds)`, `Magnitude (dB)`),
+    and a run over a field is a black path with a green dot and a red star, named
+    "trajectory", on the phase plane as on the cost-to-go (the phase plane drew it orange,
+    the cost-to-go named it "closed loop"). A file is written by the record:
     `plot_diagram(filename=)`, `animate(html=, save=, file_name=)`, RRT's
     `animate_search(save=)` and value iteration's `animate_cost_to_go(save_path=)` →
     `.save(file_name)` on what the call returns; `animate(native=)` is gone (Meshcat draws

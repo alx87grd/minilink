@@ -154,6 +154,7 @@ class Comparison:
         grid_shape=(101, 101),
         t=0.0,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -175,7 +176,7 @@ class Comparison:
             laws.append(replace(law.panels[0], title=name))
         spec = side_by_side(laws, title or "")
 
-        return draw(spec, renderer=renderer, show=show, ax=ax)
+        return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     def plot_cost_to_go(
         self,
@@ -188,6 +189,7 @@ class Comparison:
         t=0.0,
         jmax=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -227,13 +229,14 @@ class Comparison:
         ]
         spec = side_by_side(heatmaps, title or "")
 
-        return draw(spec, renderer=renderer, show=show, ax=ax)
+        return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     def plot_trajectory(
         self,
         *,
         signals=("x", "u"),
         title="plans and runs",
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -277,7 +280,7 @@ class Comparison:
             panels=tuple(panels), share_x=True, figsize=(8.0, 1.8 * n_rows)
         )
 
-        return draw(spec, renderer=renderer, show=show, ax=ax)
+        return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     # Display
 

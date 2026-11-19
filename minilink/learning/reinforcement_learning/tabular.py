@@ -368,7 +368,7 @@ class TabularLearningPlanner(Planner):
     # Plots
 
     def plot_learning_curve(
-        self, window=20, *, renderer="matplotlib", show=True, ax=None
+        self, window=20, *, figsize=None, renderer="matplotlib", show=True, ax=None
     ) -> PlotResult:
         """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""
         # The episodes' costs J, and the averaging kernel over the window
@@ -382,7 +382,7 @@ class TabularLearningPlanner(Planner):
         panel = Panel(layers=(raw, mean), x_label="episode", y_label="episode cost")
         spec = FigureSpec(panels=(panel,), figsize=(8.0, 3.0))
 
-        return draw(spec, renderer=renderer, show=show, ax=ax)
+        return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     ###########################################################################
     # Internal machinery

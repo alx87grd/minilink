@@ -38,34 +38,6 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
 - **Blocks:** nothing; each is one commit with its callers, no alias.
 - **Answer:**
 
-### What is left of the plots' look and of two small pieces
-- **Context:** the drawing verbs are uniform in their keywords, order, defaults and return
-  (DESIGN §7, held by `test_plot_contract.py`). What the review of the plotting contract
-  found beyond the interface is how the figures look, and two small pieces; each is visible
-  to a student or a design choice, so each waits for you:
-  1. **Axis units.** The control plots read "Time (seconds)", "Magnitude (dB)", "Frequency
-     (rad/s)" (`graphical/control/style.py`); the time signals read "Time [s]", the bracket
-     RULES 2.7 states.
-  2. **A run over a field.** Orange with a black dot and a red cross, labelled "trajectory",
-     on the phase plane; black with a green dot and a red star, labelled "closed loop", on
-     the cost-to-go and the control law.
-  3. **`figsize=`** is a keyword of seven plots (the scene, the track, the cost field, the
-     search and MPC pictures) and of no other.
-  4. **`Trace.z`,** a 3-D line or point set, is drawn by both renderers and set by no plot
-     of the library.
-  5. **The record's `axes` off matplotlib** is a small marker object that names itself when
-     read; a property on the record that raises would be one mechanism less, at the price of
-     the record no longer being a four-field dataclass.
-- **Options,** per point: 1. brackets everywhere, or the control plots' words kept; 2. one
-  run style on every plot, or each kept; 3. `figsize=` on every plot, on none (a size is set
-  on `result.figure`), or as it is; 4. kept for a 3-D phase plot, or removed until one
-  lands; 5. the marker, or the property.
-- **Recommendation:** 1 the brackets of RULES 2.7; 2 the phase plane's colours and
-  "trajectory"; 3 on none; 4 kept, it is small and a 3-D phase plot is on the workboard;
-  5 the marker as built.
-- **Blocks:** nothing.
-- **Answer:**
-
 ### The 3-D car's rear axle: locked, or an open differential?
 - **Context:** the 3-D car (`SuspensionCar3D`, the last rung of the car ladder) drives both rear wheels at one rate `w_rear`, a locked axle (ruled
   2026-11-11). Measured on the built car against the drivetrain bicycle with the same numbers,

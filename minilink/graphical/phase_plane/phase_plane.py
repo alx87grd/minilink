@@ -251,12 +251,20 @@ def trajectory_path(traj, x_axis: int, y_axis: int):
     return x[x_axis, :].copy(), x[y_axis, :].copy()
 
 
-def path_layers(x, y):
-    """A trajectory's path, its start (a dot) and its end (a cross), as layers."""
+def path_layers(x, y, labels=("trajectory", "start", "end")):
+    """A trajectory's path, its start (a green dot) and its end (a red star), as layers: the look of a run over a field."""
     return (
-        Trace(x, y, color="#ff7f0e", width=1.5, alpha=0.85, label="trajectory"),
-        Trace(x[:1], y[:1], color="black", mode="markers", label="start"),
-        Trace(x[-1:], y[-1:], color="red", mode="markers", marker="x", label="end"),
+        Trace(x, y, color="black", width=2.0, label=labels[0]),
+        Trace(x[:1], y[:1], color="green", mode="markers", label=labels[1]),
+        Trace(
+            x[-1:],
+            y[-1:],
+            color="red",
+            mode="markers",
+            marker="*",
+            size=12.0,
+            label=labels[2],
+        ),
     )
 
 

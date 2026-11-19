@@ -716,8 +716,20 @@ def test_the_planner_mirrors_its_latest_solution(make, monkeypatch):
     planner.plot_cost(dt=0.01)
     assert planner.dt is not None
     assert given == [
-        {"dt": planner.dt, "renderer": "matplotlib", "show": False, "ax": None},
-        {"dt": 0.01, "renderer": "matplotlib", "show": True, "ax": None},
+        {
+            "dt": planner.dt,
+            "figsize": None,
+            "renderer": "matplotlib",
+            "show": False,
+            "ax": None,
+        },
+        {
+            "dt": 0.01,
+            "figsize": None,
+            "renderer": "matplotlib",
+            "show": True,
+            "ax": None,
+        },
     ]
 
 
@@ -848,9 +860,9 @@ def test_the_planning_plots_overlay_a_run_and_refuse_what_they_cannot_draw():
     traj = loop.compute_trajectory(tf=1.0, verbose=False).of("plant")
     for solution in (vi, lqr):
         drawn = solution.plot_cost_to_go(trajectory=traj, show=False)
-        assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
+        assert any(line.get_label() == "trajectory" for line in drawn.axes.get_lines())
         drawn = solution.plot_control_law(trajectory=traj, show=False)
-        assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
+        assert any(line.get_label() == "trajectory" for line in drawn.axes.get_lines())
         with pytest.raises(ValueError, match="cannot be used together"):
             solution.plot_cost_to_go(is_3d=True, trajectory=traj, show=False)
     with pytest.raises(ValueError, match="anchor"):

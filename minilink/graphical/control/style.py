@@ -16,12 +16,12 @@ NYQUIST_TITLE = "Nyquist Diagram"
 LINEAR_STEP_TITLE = "Linear Step Response"  # The system is a linear model
 LINEARIZED_STEP_TITLE = "Linearized Step Response"  # It was linearized first
 
-MAGNITUDE_LABEL = "Magnitude (dB)"
-PHASE_LABEL = "Phase (deg)"
-FREQUENCY_LABEL = "Frequency (rad/s)"
-REAL_LABEL = "Real Axis (seconds⁻¹)"
-IMAG_LABEL = "Imaginary Axis (seconds⁻¹)"
-TIME_LABEL = "Time (seconds)"
+MAGNITUDE_LABEL = "Magnitude [dB]"
+PHASE_LABEL = "Phase [deg]"
+FREQUENCY_LABEL = "Frequency [rad/s]"
+REAL_LABEL = "Real axis [1/s]"
+IMAG_LABEL = "Imaginary axis [1/s]"
+TIME_LABEL = "Time [s]"
 AMPLITUDE_LABEL = "Amplitude"
 DEVIATION_LABEL = "Deviation Δy"  # A linearization's response, from its operating point
 

@@ -449,6 +449,7 @@ class StateSpaceGrid:
         vmax=None,
         cmap="YlOrRd",
         title="Cost-to-go",
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -476,7 +477,7 @@ class StateSpaceGrid:
             spec = plotting.value_surface_figure(
                 self, values, **slice_of, cmap=cmap, title=title
             )
-            return draw(spec, renderer=renderer, show=show, ax=ax)
+            return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
         # The heatmap, its colours over [vmin, vmax], vmin 0 by default
         spec = plotting.field_figure(
@@ -489,7 +490,7 @@ class StateSpaceGrid:
             title=title,
         )
 
-        return draw(spec, renderer=renderer, show=show, ax=ax)
+        return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     # Persistence
 

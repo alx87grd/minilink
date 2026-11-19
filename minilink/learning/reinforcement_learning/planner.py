@@ -427,7 +427,7 @@ class ReinforcementLearningPlanner(Planner):
     # Plots
 
     def plot_learning_curve(
-        self, *, renderer="matplotlib", show=True, ax=None
+        self, *, figsize=None, renderer="matplotlib", show=True, ax=None
     ) -> PlotResult:
         """Mean return of the exploration episodes against training steps."""
         # Mean episode return against plant steps, one point per iteration
@@ -440,7 +440,7 @@ class ReinforcementLearningPlanner(Planner):
         )
         spec = FigureSpec(panels=(panel,), figsize=(8.0, 3.0))
 
-        return draw(spec, renderer=renderer, show=show, ax=ax)
+        return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     ###########################################################################
     # Internal machinery

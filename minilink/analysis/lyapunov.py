@@ -182,6 +182,7 @@ def plot_region_of_attraction(
     params=None,
     basin: bool = False,
     trajectories=(),
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -322,7 +323,7 @@ def plot_region_of_attraction(
     )
     spec = FigureSpec(panels=(panel,), figsize=(7.0, 5.5))
 
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+    return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################

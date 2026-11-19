@@ -30,7 +30,7 @@ def plot_tree(
     y_axis: int = 1,
     title: str | None = None,
     path_style: str = "dense",
-    figsize=(6.0, 5.0),
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -51,7 +51,7 @@ def plot_tree(
         y_axis=y_axis,
         title=title,
         path_style=path_style,
-        figsize=figsize,
+        figsize=figsize or (6.0, 5.0),
     )
 
     return draw(spec, renderer=renderer, show=show, ax=ax)

@@ -127,7 +127,7 @@ class Scene:
         t=0.0,
         params=None,
         title=None,
-        figsize=(6.0, 6.0),
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,

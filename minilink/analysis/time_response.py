@@ -153,6 +153,7 @@ def plot_step_response(
     method: str = "auto",
     eps: float = 1e-6,
     title: str | None = None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -186,7 +187,7 @@ def plot_step_response(
     if title is not None:
         figure = replace(figure, title=title)
 
-    return draw(figure, renderer=renderer, show=show, ax=ax)
+    return draw(figure, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################

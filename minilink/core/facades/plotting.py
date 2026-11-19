@@ -26,6 +26,7 @@ class SystemPlotting:
         *,
         signals=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -72,13 +73,22 @@ class SystemPlotting:
             traj,
             signals=signals,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
         )
 
     def plot_cost(
-        self, cost, *, of=None, traj=None, renderer="matplotlib", show=True, ax=None
+        self,
+        cost,
+        *,
+        of=None,
+        traj=None,
+        figsize=None,
+        renderer="matplotlib",
+        show=True,
+        ax=None,
     ) -> PlotResult:
         """
         Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
@@ -98,7 +108,12 @@ class SystemPlotting:
         scored = scored_trajectory(self, of, traj).with_cost(cost)
 
         return scored_system.plot_trajectory(
-            scored, signals=("dJ", "J"), renderer=renderer, show=show, ax=ax
+            scored,
+            signals=("dJ", "J"),
+            figsize=figsize,
+            renderer=renderer,
+            show=show,
+            ax=ax,
         )
 
     def plot_input_output_map(
@@ -118,6 +133,7 @@ class SystemPlotting:
         cmap="bwr",
         vmin=None,
         vmax=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -149,6 +165,7 @@ class SystemPlotting:
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -171,6 +188,7 @@ class SystemPlotting:
         cmap="bwr",
         vmin=None,
         vmax=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -206,6 +224,7 @@ class SystemPlotting:
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -285,6 +304,7 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -309,6 +329,7 @@ class LinearPlotting:
             margins=margins,
             method=method,
             eps=eps,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -330,6 +351,7 @@ class LinearPlotting:
         minimal=None,
         radius=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -355,6 +377,7 @@ class LinearPlotting:
             minimal=minimal,
             radius=radius,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -374,6 +397,7 @@ class LinearPlotting:
         minimal=None,
         radius=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -398,6 +422,7 @@ class LinearPlotting:
             minimal=minimal,
             radius=radius,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -417,6 +442,7 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -441,6 +467,7 @@ class LinearPlotting:
             method=method,
             eps=eps,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -460,6 +487,7 @@ class LinearPlotting:
         method="auto",
         eps=1e-6,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -484,6 +512,7 @@ class LinearPlotting:
             method=method,
             eps=eps,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -558,6 +587,7 @@ class StepPlotting(LinearPlotting):
         traj=None,
         *,
         signals=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -593,6 +623,7 @@ class StepPlotting(LinearPlotting):
                 if self.sample_period is None
                 else TIME_ABSCISSA_LABEL
             ),
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,

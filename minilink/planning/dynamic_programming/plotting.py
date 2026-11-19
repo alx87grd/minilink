@@ -13,10 +13,10 @@ from minilink.graphical.figure import (
     Heatmap,
     Panel,
     Surface,
-    Trace,
     draw,
     side_by_side,
 )
+from minilink.graphical.phase_plane.phase_plane import path_layers
 
 if TYPE_CHECKING:
     from minilink.graphical.common.plot_result import PlotResult
@@ -42,9 +42,10 @@ def plot_cost_to_go(
     vmin=0.0,
     is_3d=False,
     trajectory=None,
-    overlay_labels=("closed loop", "start", "end"),
+    overlay_labels=("trajectory", "start", "end"),
     cmap="YlOrRd",
     title="Cost-to-go",
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -77,7 +78,9 @@ def plot_cost_to_go(
             ).spec.panels[0]
             for x_k, y_k in slices_of(x_axis, y_axis)
         ]
-        return draw(side_by_side(panels), renderer=renderer, show=show, ax=ax)
+        return draw(
+            side_by_side(panels), figsize=figsize, renderer=renderer, show=show, ax=ax
+        )
 
     require_flat_overlay(is_3d, trajectory)
 
@@ -93,7 +96,7 @@ def plot_cost_to_go(
             cmap=cmap,
             title=title,
         )
-        return draw(surface, renderer=renderer, show=show, ax=ax)
+        return draw(surface, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     # The heatmap with the closed-loop trajectory over it
     heatmap = field_figure(
@@ -109,7 +112,7 @@ def plot_cost_to_go(
         overlay=trajectory_layers(trajectory, x_axis, y_axis, overlay_labels),
     )
 
-    return draw(heatmap, renderer=renderer, show=show, ax=ax)
+    return draw(heatmap, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def plot_control_law(
@@ -121,9 +124,10 @@ def plot_control_law(
     y_axis=1,
     anchor=None,
     trajectory=None,
-    overlay_labels=("closed loop", "start", "end"),
+    overlay_labels=("trajectory", "start", "end"),
     cmap="bwr",
     title=None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -156,7 +160,9 @@ def plot_control_law(
             ).spec.panels[0]
             for (x_k, y_k), u_k in zip(slices, u_axes_of(u_axis, slices))
         ]
-        return draw(side_by_side(panels), renderer=renderer, show=show, ax=ax)
+        return draw(
+            side_by_side(panels), figsize=figsize, renderer=renderer, show=show, ax=ax
+        )
 
     # The heatmap with the closed-loop trajectory over it
     return plot_control_law_field(
@@ -169,6 +175,7 @@ def plot_control_law(
         cmap=cmap,
         title=title,
         overlay=trajectory_layers(trajectory, x_axis, y_axis, overlay_labels),
+        figsize=figsize,
         renderer=renderer,
         show=show,
         ax=ax,
@@ -363,6 +370,7 @@ def plot_control_law_field(
     cmap,
     title=None,
     overlay=(),
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -381,6 +389,7 @@ def plot_control_law_field(
         cmap=cmap,
         title=f"Control law u[{u_axis}]" if title is None else title,
         overlay=overlay,
+        figsize=figsize,
         renderer=renderer,
         show=show,
         ax=ax,
@@ -430,6 +439,7 @@ def plot_field(
     cmap,
     title,
     overlay=(),
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -448,7 +458,7 @@ def plot_field(
         overlay=overlay,
     )
 
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+    return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def field_figure(
@@ -501,18 +511,4 @@ def trajectory_layers(trajectory, x_axis, y_axis, labels):
         return ()
     x = trajectory.x
 
-    return (
-        Trace(x[x_axis], x[y_axis], color="black", width=2.0, label=labels[0]),
-        Trace(
-            x[x_axis, :1], x[y_axis, :1], color="green", mode="markers", label=labels[1]
-        ),
-        Trace(
-            x[x_axis, -1:],
-            x[y_axis, -1:],
-            color="red",
-            mode="markers",
-            marker="*",
-            size=12.0,
-            label=labels[2],
-        ),
-    )
+    return path_layers(x[x_axis], x[y_axis], labels)

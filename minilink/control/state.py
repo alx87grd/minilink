@@ -186,13 +186,14 @@ class TimeVaryingFeedback(System):
         return u_cmd
 
     def plot_gain_schedule(
-        self, *, renderer="matplotlib", show=True, ax=None
+        self, *, figsize=None, renderer="matplotlib", show=True, ax=None
     ) -> PlotResult:
         """Draw every entry of the gain schedule ``K(t)`` against time."""
         return plot_gain_schedule(
             self.params["t"],
             self.params["K"],
             title=self.name,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -251,13 +252,14 @@ class TrajectoryFeedback(System):
         return u_cmd
 
     def plot_gain_schedule(
-        self, *, renderer="matplotlib", show=True, ax=None
+        self, *, figsize=None, renderer="matplotlib", show=True, ax=None
     ) -> PlotResult:
         """Draw every entry of the gain schedule ``K(t)`` against time."""
         return plot_gain_schedule(
             self.params["t"],
             self.params["K"],
             title=self.name,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -268,7 +270,14 @@ class TrajectoryFeedback(System):
 
 
 def plot_gain_schedule(
-    t, K, *, title="Gain schedule", renderer="matplotlib", show=True, ax=None
+    t,
+    K,
+    *,
+    title="Gain schedule",
+    figsize=None,
+    renderer="matplotlib",
+    show=True,
+    ax=None,
 ) -> PlotResult:
     """Draw every entry of a gain schedule ``K(t)``, shape ``(N, m, n)``, against time."""
     # Lazy import: the graphics load on first use, not with the core
@@ -276,7 +285,7 @@ def plot_gain_schedule(
 
     spec = gain_schedule_figure(t, K, title=title)
 
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+    return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def gain_schedule_figure(t, K, *, title):

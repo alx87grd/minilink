@@ -1961,7 +1961,7 @@ CSS name or a hex code, and a `Trace` with `color=None` takes the renderer's col
 A field enters a layer only when a plot of the library needs it; no renderer keyword passes through, and a finish one library alone offers is the
 caller's own call on `result.figure` or `result.axes`.
 
-`draw(spec, *, renderer="matplotlib", show=True, ax=None)` draws with
+`draw(spec, *, figsize=None, renderer="matplotlib", show=True, ax=None)` draws with
 `figure_renderers/matplotlib.py` or `figure_renderers/plotly.py`. Matplotlib is the
 reference: it draws every plot, and overlays are its own. Plotly draws a figure of its own
 from the same description, every layer kind, as closely as it can; a renderer is one module
@@ -1972,8 +1972,12 @@ figures (the grid and line animations, the live figures, the colour maps) are th
 modules that import a drawing library; the search plot builds its animation and live frames
 as data, and graphics import no planning module for them. Every drawing verb (`plot*`, `animate*`, `render`) writes its keywords out, its own first,
 then the standard ones it takes, keyword-only and in one order: `renderer="matplotlib"`,
-`show=True`, `ax=None`. Every `plot_*` takes the three and returns one `PlotResult`,
-annotated; `plot_diagram`, a Graphviz graph, takes `show=` alone.
+`show=True`, `ax=None`. Every `plot_*` takes the three, with `figsize=None` just before
+them (the plot's own size, in inches, unless one is given), and returns one `PlotResult`,
+annotated; `plot_diagram`, a Graphviz graph, takes `show=` alone. A run drawn over a field
+has one look on every plot: a black path, a green dot at its start, a red star at its end,
+named "trajectory". An axis label writes its unit in brackets (`Time [s]`,
+`Magnitude [dB]`).
 `tests/unittest/test_plot_contract.py` checks these rules on the source.
 
 - **The record:** `PlotResult(renderer, figure, axes, spec)`. `figure` is the drawn figure

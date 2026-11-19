@@ -36,6 +36,7 @@ def plot_cost_to_go(
     is_3d,
     trajectory,
     title,
+    figsize=None,
     renderer,
     show,
     ax,
@@ -68,6 +69,7 @@ def plot_cost_to_go(
             is_3d=is_3d,
             trajectory=trajectory,
             title="Cost-to-go" if title is None else title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -91,18 +93,18 @@ def plot_cost_to_go(
         surface = cost_to_go_surface(
             problem, x_level, y_level, J, x_axis, y_axis, jmax, title
         )
-        return draw(surface, renderer=renderer, show=show, ax=ax)
+        return draw(surface, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
     # The heatmap with the run over it
     run = grid_plotting.trajectory_layers(
-        trajectory, x_axis, y_axis, ("closed loop", "start", "end")
+        trajectory, x_axis, y_axis, ("trajectory", "start", "end")
     )
     panel = cost_to_go_panel(
         problem, x_level, y_level, J, x_axis, y_axis, jmax, title, run
     )
     heatmap = FigureSpec(panels=(panel,))
 
-    return draw(heatmap, renderer=renderer, show=show, ax=ax)
+    return draw(heatmap, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def plot_control_law(
@@ -118,6 +120,7 @@ def plot_control_law(
     is_3d=False,
     trajectory=None,
     title=None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -156,6 +159,7 @@ def plot_control_law(
             anchor=anchor,
             trajectory=trajectory,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -175,11 +179,11 @@ def plot_control_law(
         title=title,
     )
     run = grid_plotting.trajectory_layers(
-        trajectory, i, j, ("closed loop", "start", "end")
+        trajectory, i, j, ("trajectory", "start", "end")
     )
     spec = overlay(law, [run])
 
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+    return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################
@@ -230,7 +234,7 @@ def sample_field(problem, field, *, x_axis, y_axis, anchor, bounds, grid_shape, 
 
 
 def plot_solution_trajectory(
-    solution, traj, *, signals, renderer, show, ax=None
+    solution, traj, *, signals, figsize=None, renderer, show, ax=None
 ) -> PlotResult:
     """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
     # Lazy import: the signal plots load on first use, not with the planners
@@ -244,6 +248,7 @@ def plot_solution_trajectory(
         traj,
         signals=signals,
         title=f"{kind} ({solution.family})",
+        figsize=figsize,
         renderer=renderer,
         show=show,
         ax=ax,

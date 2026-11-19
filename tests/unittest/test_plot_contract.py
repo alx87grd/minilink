@@ -166,3 +166,18 @@ def test_a_plot_says_it_returns_a_record():
         and (node.returns is None or ast.unparse(node.returns) != "PlotResult")
     ]
     assert bare == []
+
+
+def test_a_plot_takes_a_figure_size_just_before_the_standard_keywords():
+    """``figsize=None``, the plot's own size, on every plot that takes ``renderer=``."""
+    odd = []
+    for path, node in drawing_verbs():
+        keywords = [arg.arg for arg in node.args.kwonlyargs]
+        if not node.name.startswith("plot") or "renderer" not in keywords:
+            continue
+        defaults = dict(zip(keywords, node.args.kw_defaults))
+        before = keywords[keywords.index("renderer") - 1 : keywords.index("renderer")]
+        size = defaults.get("figsize")
+        if before != ["figsize"] or size is None or ast.literal_eval(size) is not None:
+            odd.append(f"{path}::{node.name} {keywords}")
+    assert odd == []

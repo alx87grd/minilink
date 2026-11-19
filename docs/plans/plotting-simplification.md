@@ -137,7 +137,15 @@ The maintainer asked for an interface with no inconsistency left. Every drawing 
 - returns one record: a `plot_*` is annotated `-> PlotResult`, and a plot of several slices
   is one figure of panels side by side, where it returned a list;
 - names one idea one way: `grid_shape=` on the scene and cost-field plots, `u_axis=` on the
-  control-law animation, `title=` on every control plot and on `plot_trajectory`.
+  control-law animation, `title=` on every control plot and on `plot_trajectory`;
+- takes `figsize=None` on every plot, just before the standard keywords: the plot's own
+  size unless one is given, handled once in `draw`.
+
+Ruled the same day, on how the figures look: units in brackets on every axis (the control
+plots read `Time (seconds)`, `Magnitude (dB)`); one look for a run over a field (a black
+path, a green dot, a red star, named "trajectory"). Kept as built: 3-D lines in the
+description, for a 3-D phase plot; the marker a record carries where matplotlib drew no
+axes.
 
 `tests/unittest/test_plot_contract.py` holds each of these on the source.
 

@@ -214,6 +214,7 @@ def plot_sampled_futures(
     x_axis=0,
     y_axis=1,
     n_shown: int = 32,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -237,7 +238,7 @@ def plot_sampled_futures(
         n_shown=n_shown,
     )
 
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+    return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def sampled_futures_figure(futures, plant, pv, *, ticks, x_axis, y_axis, n_shown):

@@ -129,6 +129,7 @@ class PlanningSolution:
         *,
         dt=None,
         signals=("x", "u"),
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -148,6 +149,7 @@ class PlanningSolution:
             self,
             drawn_trajectory_of(self, dt),
             signals=signals,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -180,12 +182,13 @@ class PlanningSolution:
         )
 
     def plot_cost(
-        self, *, dt=None, renderer="matplotlib", show=True, ax=None
+        self, *, dt=None, figsize=None, renderer="matplotlib", show=True, ax=None
     ) -> PlotResult:
         """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`), with the drawing library ``renderer``."""
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
             traj=drawn_trajectory_of(self, dt),
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -204,6 +207,7 @@ class PlanningSolution:
         is_3d=False,
         trajectory=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -235,6 +239,7 @@ class PlanningSolution:
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -253,6 +258,7 @@ class PlanningSolution:
         is_3d=False,
         trajectory=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -288,6 +294,7 @@ class PlanningSolution:
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,

@@ -148,6 +148,7 @@ class Planner(ABC):
         *,
         dt=None,
         signals=("x", "u"),
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -156,6 +157,7 @@ class Planner(ABC):
         return require_solution(self).plot_trajectory(
             dt=self.dt if dt is None else dt,
             signals=signals,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -186,11 +188,15 @@ class Planner(ABC):
         )
 
     def plot_cost(
-        self, *, dt=None, renderer="matplotlib", show=True, ax=None
+        self, *, dt=None, figsize=None, renderer="matplotlib", show=True, ax=None
     ) -> PlotResult:
         """The running cost along the latest solution's plan, else its controller's run on ``dt``, by default the planner's (:meth:`PlanningSolution.plot_cost`)."""
         return require_solution(self).plot_cost(
-            dt=self.dt if dt is None else dt, renderer=renderer, show=show, ax=ax
+            dt=self.dt if dt is None else dt,
+            figsize=figsize,
+            renderer=renderer,
+            show=show,
+            ax=ax,
         )
 
     def plot_control_law(
@@ -206,6 +212,7 @@ class Planner(ABC):
         is_3d=False,
         trajectory=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -222,6 +229,7 @@ class Planner(ABC):
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,
@@ -240,6 +248,7 @@ class Planner(ABC):
         is_3d=False,
         trajectory=None,
         title=None,
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
@@ -256,6 +265,7 @@ class Planner(ABC):
             is_3d=is_3d,
             trajectory=trajectory,
             title=title,
+            figsize=figsize,
             renderer=renderer,
             show=show,
             ax=ax,

@@ -180,12 +180,14 @@ class Arrows:
     color: str | None = None
 
 
-def draw(spec: FigureSpec, *, renderer="matplotlib", show=True, ax=None):
+def draw(spec: FigureSpec, *, figsize=None, renderer="matplotlib", show=True, ax=None):
     """
     Draw ``spec`` with ``renderer`` and return its :class:`PlotResult`.
 
-    Every plot ends on this call, so its three keywords mean the same on each:
+    Every plot ends on this call, so its standard keywords mean the same on each:
 
+    - ``figsize``: the figure's ``(width, height)`` in inches; ``None`` keeps
+      the size the plot chose. It has no effect on axes given as ``ax``.
     - ``renderer``: ``"matplotlib"``, the reference, or ``"plotly"``;
       ``None`` draws nothing and returns the description alone.
     - ``show``: ``True`` shows the figure this plot makes (``"inline"`` or
@@ -202,6 +204,8 @@ def draw(spec: FigureSpec, *, renderer="matplotlib", show=True, ax=None):
     """
     require_panels(spec)
     require_axes(ax)
+    if figsize is not None:
+        spec = replace(spec, figsize=figsize)
     if isinstance(renderer, str):
         renderer = renderer.strip().lower()
 

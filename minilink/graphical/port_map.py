@@ -42,6 +42,7 @@ def plot_input_output_map(
     cmap="bwr",
     vmin=None,
     vmax=None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -121,7 +122,7 @@ def plot_input_output_map(
         cmap=cmap,
     )
 
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+    return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def plot_control_law(
@@ -141,6 +142,7 @@ def plot_control_law(
     cmap="bwr",
     vmin=None,
     vmax=None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -235,7 +237,7 @@ def plot_control_law(
         u_base=u_base,
     )
 
-    return draw(spec, renderer=renderer, show=show, ax=ax)
+    return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 @dataclass(frozen=True)

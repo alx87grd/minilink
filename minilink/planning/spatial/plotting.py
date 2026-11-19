@@ -54,7 +54,7 @@ def plot_scene(
     t: float = 0.0,
     params=None,
     title: str | None = None,
-    figsize=(6.0, 6.0),
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -78,7 +78,7 @@ def plot_scene(
         t=t,
         params=params,
         title=title,
-        figsize=figsize,
+        figsize=figsize or (6.0, 6.0),
     )
 
     return draw(spec, renderer=renderer, show=show, ax=ax)
@@ -91,7 +91,7 @@ def plot_track(
     n_samples: int = 200,
     show_waypoints: bool = True,
     title: str | None = None,
-    figsize=(6.0, 6.0),
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -103,7 +103,7 @@ def plot_track(
         n_samples=n_samples,
         show_waypoints=show_waypoints,
         title=title,
-        figsize=figsize,
+        figsize=figsize or (6.0, 6.0),
     )
 
     return draw(spec, renderer=renderer, show=show, ax=ax)

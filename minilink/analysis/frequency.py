@@ -339,6 +339,7 @@ def plot_bode(
     method: str = "auto",
     eps: float = 1e-6,
     title: str | None = None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -373,7 +374,7 @@ def plot_bode(
         w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
     )
 
-    return draw(figure, renderer=renderer, show=show, ax=ax)
+    return draw(figure, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def plot_pzmap(
@@ -390,6 +391,7 @@ def plot_pzmap(
     minimal: bool | None = None,
     radius: float | None = None,
     title: str | None = None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -418,7 +420,7 @@ def plot_pzmap(
     if title is not None:
         figure = replace(figure, title=title)
 
-    return draw(figure, renderer=renderer, show=show, ax=ax)
+    return draw(figure, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def plot_root_locus(
@@ -436,6 +438,7 @@ def plot_root_locus(
     minimal: bool | None = None,
     radius: float | None = None,
     title: str | None = None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -464,7 +467,7 @@ def plot_root_locus(
     if title is not None:
         figure = replace(figure, title=title)
 
-    return draw(figure, renderer=renderer, show=show, ax=ax)
+    return draw(figure, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 def plot_nyquist(
@@ -481,6 +484,7 @@ def plot_nyquist(
     method: str = "auto",
     eps: float = 1e-6,
     title: str | None = None,
+    figsize=None,
     renderer="matplotlib",
     show=True,
     ax=None,
@@ -505,7 +509,7 @@ def plot_nyquist(
     if title is not None:
         figure = replace(figure, title=title)
 
-    return draw(figure, renderer=renderer, show=show, ax=ax)
+    return draw(figure, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
 
 ###############################################################################

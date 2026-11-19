@@ -418,3 +418,14 @@ def test_side_by_side_puts_panels_in_one_row():
     result = draw(spec, show=False)
     assert spec.n_cols == 2 and spec.title == "two" and len(result.axes) == 2
     plt.close("all")
+
+
+@pytest.mark.parametrize("renderer", RENDERERS)
+def test_a_figure_size_given_at_the_call_replaces_the_plots_own(renderer):
+    result = draw(LAYERS["trace"], figsize=(8.0, 2.0), renderer=renderer, show=False)
+    assert result.spec.figsize == (8.0, 2.0)
+    if renderer == "matplotlib":
+        assert tuple(result.figure.get_size_inches()) == (8.0, 2.0)
+    else:
+        assert (result.figure.layout.width, result.figure.layout.height) == (1200, 300)
+    plt.close("all")

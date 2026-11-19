@@ -98,7 +98,7 @@ class ReferenceTrack:
         n_samples=200,
         show_waypoints=True,
         title=None,
-        figsize=(6.0, 6.0),
+        figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
