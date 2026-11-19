@@ -166,27 +166,25 @@ def draw_panel(ax, panel, *, given, legend=True):
 
     # A legend when a layer carries a label: each label once, with the first
     # handle drawn for it
-    if legend and panel.legend and any(labels_of(panel)):
+    if legend and asks_for_legend(panel):
         unique = legend_entries([ax])
-        legend = ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
-        opaque_keys(legend)
+        box = ax.legend(unique.values(), unique.keys(), loc="best", fontsize=8)
+        opaque_keys(box)
 
 
 def legend_beside(fig, axes, panels):
     """One legend right of the panels, each label of every panel that asks for one once; the panels laid out in the width left."""
-    asking = [
-        ax for ax, panel in zip(axes, panels) if panel.legend and any(labels_of(panel))
-    ]
+    asking = [ax for ax, panel in zip(axes, panels) if asks_for_legend(panel)]
     if not asking:
         fig.tight_layout()
         return
 
     unique = legend_entries(asking)
-    legend = fig.legend(
+    box = fig.legend(
         unique.values(), unique.keys(), loc="upper right", fontsize=8, frameon=False
     )
-    opaque_keys(legend)
-    width = legend.get_window_extent().width / fig.bbox.width
+    opaque_keys(box)
+    width = box.get_window_extent().width / fig.bbox.width
     fig.tight_layout(rect=(0.0, 0.0, 1.0 - width, 1.0))
 
 
@@ -196,9 +194,9 @@ def opaque_keys(legend):
         handle.set_alpha(1.0)
 
 
-def labels_of(panel):
-    """The labels a panel's layers carry, empty ones included."""
-    return [getattr(layer, "label", "") for layer in panel.layers]
+def asks_for_legend(panel):
+    """Whether a panel shows a legend: it asks for one and a layer carries a label."""
+    return panel.legend and any(getattr(layer, "label", "") for layer in panel.layers)
 
 
 def legend_entries(axes) -> dict:
