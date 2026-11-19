@@ -7,6 +7,7 @@ from minilink import (
     DynamicProgrammingPlanner,
     PlanningProblem,
     TimeCost,
+    # QuadraticCost,
 )
 
 INF = 10.0
@@ -19,19 +20,25 @@ plant.inputs["u"].lower = np.array([-1.0])
 plant.inputs["u"].upper = np.array([1.0])
 
 cost = TimeCost.from_system(plant, radius=1e-3)
+
+# cost = QuadraticCost.from_system(
+#     plant, x_bar=np.zeros(2), R=np.array([[10.0]]), S=np.diag([10.0, 10.0])
+# )
+
 problem = PlanningProblem(plant, cost=cost, U=plant.input_box)
 
 planner = DynamicProgrammingPlanner(
     problem,
     x_grid=(201, 201),
-    u_grid=(3,),
+    u_grid=(101,),
     dt=0.05,
     gamma=1.0,
     tol=1e-3,
     max_iterations=800,
     out_of_bound_cost=INF,
+    backend="jax",
 )
-planner.solve(verbose=True)
+planner.solve(verbose=False)
 
 planner.plot_cost_to_go(jmax=INF)
 planner.plot_cost_to_go(jmax=INF, is_3d=True)
