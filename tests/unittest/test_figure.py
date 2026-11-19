@@ -132,6 +132,19 @@ def test_a_panel_without_a_legend_draws_none(renderer):
     plt.close("all")
 
 
+def test_plotly_puts_the_legend_beside_panels_that_share_the_time_axis():
+    panels = (
+        Panel(layers=(Trace(X, X, label="run"),), legend=True),
+        Panel(layers=(Trace(X, -X, label="run"),)),
+    )
+    shared = draw(
+        FigureSpec(panels=panels, share_x=True), renderer="plotly", show=False
+    )
+    alone = draw(one_panel(Trace(X, X, label="run")), renderer="plotly", show=False)
+    assert shared.figure.layout.legend.x > 1
+    assert alone.figure.layout.legend.x < 1
+
+
 def test_traces_without_a_colour_take_the_colour_cycle():
     result = draw(one_panel(Trace(X, X), Trace(X, -X)), show=False)
     first, second = result.axes.lines

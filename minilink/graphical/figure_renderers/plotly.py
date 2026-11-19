@@ -85,6 +85,12 @@ def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
         width, height = spec.figsize
         fig.update_layout(width=DPI_FIGURE * width, height=DPI_FIGURE * height)
 
+    # Panels sharing the time axis: the legend beside them, off the curves
+    if spec.share_x:
+        fig.update_layout(
+            legend={"x": 1.02, "y": 1.0, "xanchor": "left", "bgcolor": None}
+        )
+
     # One legend per figure: none when no panel asks for one
     if not any(panel.legend for panel in spec.panels):
         fig.update_layout(showlegend=False)
