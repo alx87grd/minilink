@@ -1390,8 +1390,8 @@ and one backend (NumPy for all when one entry does not trace), its `dt` as `eval
 it (a sampled controller on its own clock, `dt` only for a continuous one), keeps that
 problem as `Comparison.problem` (`None` by names only) and each scored solution's
 nominal run as `Comparison.runs` (the plant's `Trajectory`: the mean start, nominal
-parameters, the judge's `dt` and backend, run once inside `compare`, the evaluators then
-dropped), and `difference(a, b)` is
+parameters, the judge's `dt` and backend: without draws the scored trial itself, with draws
+one more run of the loop; the evaluators then dropped), and `difference(a, b)` is
 the paired `J_a − J_b`. `print` is the table: each answer read twice, the same columns
 each (`J`, goal, limits, length), its plan as the planner wrote it, cut at `t0 + T` (the
 state there interpolated) and scored on the judged problem by `evaluate_trajectory`

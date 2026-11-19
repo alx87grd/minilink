@@ -86,8 +86,9 @@ records
 ## 5. The implementation
 
 - `compare` keeps the problem (R6) and `Comparison.runs`: name → the judge's nominal run,
-  the plant's part as a plain `Trajectory`, computed once inside `compare` from the
-  evaluators `score_entries` builds, which are then dropped (`None` or no entry for an
+  the plant's part as a plain `Trajectory`, from the evaluators `score_entries` builds,
+  which are then dropped: without draws the scored trial itself (kept by the evaluation,
+  bit-identical to `trajectory()`, no second compile), with draws one `trajectory()` run (`None` or no entry for an
   `Evaluation` entry and by names only, where the figure runs `controller_run_of`). The
   maintainer ruled `runs`, plain data, over keeping the evaluators on the object. No draws
   are kept for the figure.

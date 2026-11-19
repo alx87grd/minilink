@@ -85,7 +85,7 @@ def compare(
     # Every entry scored on the same draws, its solution and its judge's nominal run
     # kept for the table and the overlays (each loop's period as evaluate reads it:
     # a sampled one's own clock, else dt)
-    evaluators, evaluations = score_entries(
+    runs, evaluations = score_entries(
         problem,
         named,
         dict(
@@ -103,7 +103,6 @@ def compare(
         for name, entry in named.items()
         if not isinstance(entry, Evaluation)
     }
-    runs = {name: nominal_run_of(pe) for name, pe in evaluators.items()}
 
     return Comparison(solutions, evaluations, problem, runs)
 
@@ -404,7 +403,13 @@ def split_entries(args, entries):
 
 
 def score_entries(problem, named, settings, n_trials, key):
-    """``(evaluators, evaluations)``: each scored entry's compiled loop, and every entry's :class:`Evaluation` on one key and one backend (NumPy for all when one entry does not trace)."""
+    """
+    ``(runs, evaluations)``: each scored entry's nominal run, and every entry's :class:`Evaluation` on one key and one backend (NumPy for all when one entry does not trace).
+
+    Without draws the scored trial is the nominal run, kept from the
+    evaluation itself; with draws the nominal run is one more run of the
+    loop, from the mean start.
+    """
     scored = {n: e for n, e in named.items() if not isinstance(e, Evaluation)}
 
     # The loops compiled, then on NumPy for all when one of them is
@@ -419,14 +424,21 @@ def score_entries(problem, named, settings, n_trials, key):
                 n: ProblemEvaluator(problem, e, **numpy) for n, e in scored.items()
             }
 
-    evaluations = {}
+    runs, evaluations = {}, {}
     for name, entry in named.items():
         if isinstance(entry, Evaluation):
             evaluations[name] = entry
+            continue
+        pe = evaluators[name]
+        if pe.draws:
+            evaluations[name] = pe.evaluate(key=key, n_trials=n_trials)
+            runs[name] = plain_plant_run_of(pe.trajectory())
         else:
-            evaluations[name] = evaluators[name].evaluate(key=key, n_trials=n_trials)
+            scored_run = pe.evaluate(key=key, n_trials=n_trials, trajectories=True)
+            evaluations[name] = replace(scored_run, trajectories=None)
+            runs[name] = plain_plant_run_of(scored_run.trajectories[0])
 
-    return evaluators, evaluations
+    return runs, evaluations
 
 
 def solution_of(problem, entry):
@@ -437,9 +449,9 @@ def solution_of(problem, entry):
     return PlanningSolution(problem=problem, controller=entry, record=GivenController())
 
 
-def nominal_run_of(evaluator) -> Trajectory:
-    """The judge's nominal run, the plant's part as plain arrays: the mean start, nominal parameters, the evaluator's ``dt`` and backend."""
-    run = evaluator.trajectory().of("plant")
+def plain_plant_run_of(loop_run) -> Trajectory:
+    """The plant's part of a loop's run as plain arrays, its signals left out."""
+    run = loop_run.of("plant")
     plant_run = Trajectory(np.asarray(run.t), np.asarray(run.x), np.asarray(run.u))
 
     return plant_run
