@@ -77,11 +77,10 @@ def compare(
     ``dt`` follows :func:`~minilink.planning.evaluator.evaluate`: a sampled
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
     continuous one runs on ``dt``, the period its loop is integrated on, and
-    with ``dt`` omitted on the evaluator's automatic step. Each evaluation
-    keeps the judge's runs, one per trial (``evaluation.trajectories``), which
-    the figure draws: memory grows with ``n_trials`` (a pendulum's loop runs
-    with their recorded signals, 5 s at ``dt = 0.01``: 17 MB for 4 answers ×
-    100 draws).
+    with ``dt`` omitted on the evaluator's automatic step. The judge's runs
+    are kept, one per trial, so memory grows with ``n_trials`` (a pendulum's
+    loop runs with their recorded signals, 5 s at ``dt = 0.01``: 17 MB for 4
+    answers × 100 draws).
     """
     problem, named = split_entries(args, entries)
 
@@ -128,7 +127,7 @@ class Comparison:
     ``None`` for a comparison by names only: the plans are scored on it and
     the figure draws its goal and limits. Each evaluation :func:`compare`
     makes keeps the judge's runs, one per trial, in its ``trajectories``: the
-    one home of the runs the figure draws; memory grows with ``n_trials``.
+    one home of the runs the figure draws.
     The nominal behaviour of the answers is compared on a deterministic
     problem, one run each; their spread, on the same problem with its
     distributions, every run drawn.
