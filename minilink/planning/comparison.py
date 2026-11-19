@@ -17,7 +17,7 @@ from minilink.graphical.figure import (
     draw,
     side_by_side,
 )
-from minilink.graphical.signals.time_signals import TIME_ABSCISSA_LABEL
+from minilink.graphical.signals.time_signals import TIME_ABSCISSA_LABEL, signal_figure
 from minilink.planning.evaluation import Evaluation, evaluate_trajectory
 from minilink.planning.evaluator import ProblemEvaluator
 from minilink.planning.plotting import (
@@ -287,9 +287,6 @@ class Comparison:
         and the limits. An :class:`~minilink.planning.evaluation.Evaluation`
         entry is drawn when it keeps its runs, else left out.
         """
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.signals.time_signals import signal_figure
-
         runs = {name: drawn_runs_of(self, name) for name in self.evaluations or self}
         colors = {
             name: SOLUTION_COLORS[m % len(SOLUTION_COLORS)]
