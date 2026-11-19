@@ -331,9 +331,9 @@ class Comparison:
                         dash=dash,
                         width=width,
                         alpha=alpha,
-                        label=name if not rows else "",
+                        label=label if not rows else "",
                     )
-                    for (name, color, dash, width, alpha, _), spec in zip(lines, specs)
+                    for (label, color, dash, width, alpha, _), spec in zip(lines, specs)
                 )
                 deadline = deadline_marks_of(problem, signal, k)
                 limits = limit_marks_of(problem, signal, k, span)
