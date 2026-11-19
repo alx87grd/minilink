@@ -800,11 +800,9 @@ def test_the_plan_is_scored_on_the_judged_problem_whatever_the_entries_order():
         comparison = compare(judged, **entries, dt=0.05, backend="numpy")
         assert comparison.problem is judged
 
-        # Scored on [1, 3] (the plan's [0, 2.5] cut at 3, the judged deadline), missing the small goal
-        p = plan.trajectory
-        kept = p.t <= 3.0 + 1e-12
-        cut = Trajectory(p.t[kept], p.x[:, kept], p.u[:, kept])
-        expected = evaluate_trajectory(judged, cut)
+        # Scored on the judged problem, whole: the plan's [0, 2.5] ends before the judged
+        # deadline t0 + T = 3; it misses the small goal
+        expected = evaluate_trajectory(judged, plan.trajectory)
         plan_half, _ = halves_of(str(comparison), "Plan")
         assert plan_half.split()[:2] == [f"{float(expected.J[0]):.4g}", "missed"]
 
