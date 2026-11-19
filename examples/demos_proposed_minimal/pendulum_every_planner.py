@@ -1,4 +1,4 @@
-"""One pendulum swing-up, four planners, one judge: LQR, value iteration, trajectory optimization and RRT."""
+"""One pendulum swing-up, four planners, one judge: each plan beside its run, then over many starts."""
 
 import numpy as np
 
@@ -12,10 +12,13 @@ from minilink import (
     QuadraticCost,
     RRTPlanner,
     TrajectoryOptimizationPlanner,
+    Uniform,
     compare,
+    lqr_trajectory,
 )
 
 TF = 5.0  # [s]
+N_TRIALS = 100  # starts drawn for the second judgement
 
 # The plant: theta = 0 hanging; leaving the state box is a failure
 
@@ -24,7 +27,7 @@ plant.state.lower = np.array([-2.0 * np.pi, -8.0])
 plant.state.upper = np.array([2.0 * np.pi, 8.0])
 
 # The problem: J = ∫ (x − x̄)ᵀ Q (x − x̄) + uᵀ R u dt, from rest hanging to a ball
-# around the upright, inside the state and input boxes
+# around the upright at T, inside the state and input boxes
 
 x_up = np.array([np.pi, 0.0])
 
@@ -39,12 +42,12 @@ problem = PlanningProblem(
     horizon=TF,
 )
 
-# LQR: u = −K (x − x̄), the gain of the model linearized at the upright
+# Four answers: two feedback laws, two open-loop plans
 
-lqr = LQRPlanner(problem).solve(evaluate=True)
+# LQR: u = −K (x − x̄), the gain of the model linearized at the upright
+lqr = LQRPlanner(problem).solve()
 
 # Value iteration: J(x) = min_u [ g(x, u) dt + J(x + f(x, u) dt) ], swept to convergence
-
 vi = DynamicProgrammingPlanner(
     problem.replace(horizon=None),
     x_grid=(101, 101),
@@ -56,25 +59,40 @@ vi = DynamicProgrammingPlanner(
 ).solve()
 
 # Trajectory optimization: min over x(t), u(t) of J, the dynamics as collocation constraints
-
 trajopt = TrajectoryOptimizationPlanner(
     problem, n_steps=25, transcription="direct_collocation"
-).solve(evaluate=True)
+).solve()
 
-# RRT: a tree grown by short constant-torque rollouts until a branch enters the goal
-
+# RRT: a tree of short constant-torque rollouts, grown until a branch enters the goal
 torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]
 rrt = RRTPlanner(
     problem,
     extender=KinodynamicExtender(controls=torques, horizon=0.3, n_steps=6),
     seed=0,
     max_iterations=20000,
-).solve(evaluate=True)
+).solve()
 
-# One judge: each answer run on the same problem, scored the same way
+# A fifth: the optimized plan tracked, u = u_d(t) − K(t) (x − x_d(t)); the plan rides
+# the torque limit, so the correction has no room left inside it
+tracked = lqr_trajectory(plant, trajopt.trajectory, Q=np.diag([10.0, 1.0]), R=np.eye(1))
 
-comparison = compare(problem, LQR=lqr, VI=vi, TrajOpt=trajopt, RRT=rrt, dt=0.01)
+answers = dict(LQR=lqr, VI=vi, TrajOpt=trajopt, RRT=rrt, TrajOpt_tracked=tracked)
+
+# One judgement: each plan scored as written beside its block simulated from the start
+
+comparison = compare(problem, **answers, dt=0.01)
 print(comparison)
-
 comparison.plot_trajectory()
+
+# Many starts: x0 drawn uniformly around rest, J judged in expectation, E[J]
+
+problem_x0 = problem.replace(x0=Uniform([-0.2, -0.5], [0.2, 0.5]))
+
+comparison_x0 = compare(problem_x0, **answers, dt=0.01, n_trials=N_TRIALS)
+print(comparison_x0)
+
+# Paired on the same draws: J_VI − J_tracked, start by start
+dJ = comparison_x0.difference("VI", "TrajOpt_tracked")
+print(f"E[J_VI − J_tracked] = {dJ.mean():.3g}, over {dJ.size} paired starts")
+
 vi.animate()

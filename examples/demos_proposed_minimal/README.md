@@ -16,7 +16,7 @@ one plot and one animation.
 | `cartpole_swingup.py` | a swing-up planned once falls when replayed from another start; LQR feedback along the same plan holds it | 9 s |
 | `pendulum_value_iteration.py` | value iteration swings a pendulum up with a weak motor; the cost-to-go and the law are animated sweep by sweep | 20 s (a laptop) |
 | `cartpole_value_iteration.py` | the same Bellman sweeps on a 4-D grid swing a cart-pole up | 27 s (a laptop) |
-| `pendulum_every_planner.py` | one swing-up problem handed to LQR, value iteration, trajectory optimization and RRT, each answer scored by the same judge in one table | 34 s |
+| `pendulum_every_planner.py` | one swing-up problem for LQR, value iteration, trajectory optimization, RRT and the optimized plan tracked: each plan scored as written beside its run, then the runs judged over 100 random starts | 41 s |
 | `pendulum_pid_gradient_tuning.py` | a PID on its computer's clock, the whole sampled loop differentiated, its three gains tuned by an optimizer | 6 s |
 | `cartpole_lqg.py` | a Kalman filter and an LQR gain balance a cart-pole under noise: one run, then 200 scored | 8 s |
 | `racecar_mpc.py` | a plan made on the kinematic bicycle drives the dynamic racecar through an inner speed loop, round a circuit and its cone | 22 s |
