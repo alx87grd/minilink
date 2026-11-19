@@ -168,6 +168,7 @@ def draw_trace(fig, trace: Trace, row, col):
     common = {
         "name": trace.label or None,
         "showlegend": bool(trace.label),
+        "legendgroup": trace.label or None,
         "opacity": trace.alpha,
         "hovertext": list(trace.hover) or None,
     }
@@ -202,7 +203,9 @@ def draw_trace(fig, trace: Trace, row, col):
         return
     fig.add_trace(go.Scatter(x=x, y=y, **style, **common), row=row, col=col)
     if trace.label and trace.alpha < 1.0:
-        draw_opaque_key(fig, x, y, style, trace.label, row, col)
+        fig.data[-1].update(showlegend=False)
+        if not has_key(fig, trace.label):
+            draw_opaque_key(fig, x, y, style, trace.label, row, col)
     if trace.arrows and trace.mode != "markers":
         draw_direction_arrows(fig, x, y, trace.color or TAB10[0], row, col)
 
@@ -217,16 +220,19 @@ def one_key_per_label(fig):
             shown.add(trace.name)
 
 
+def has_key(fig, label) -> bool:
+    """``True`` when a trace already shows ``label`` in the legend."""
+    return any(trace.showlegend and trace.name == label for trace in fig.data)
+
+
 def draw_opaque_key(fig, x, y, style, label, row, col):
     """The legend key of a faint labelled trace at full opacity.
 
-    Plotly draws a key at its trace's opacity: the faint trace leaves the
-    legend to its first sample at full opacity, a line of one point that draws
-    nothing, both in one ``legendgroup``, so a click on the key shows or hides
-    the trace.
+    Plotly draws a key at its trace's opacity: the faint traces leave the
+    legend to one line of a single point at full opacity, which draws nothing,
+    in the label's ``legendgroup``: a click on the key shows or hides every
+    trace of that label.
     """
-    faint = fig.data[-1]
-    faint.update(showlegend=False, legendgroup=label)
     key = go.Scatter(
         x=x[:1], y=y[:1], **style, name=label, legendgroup=label, showlegend=True
     )

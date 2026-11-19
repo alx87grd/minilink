@@ -704,6 +704,42 @@ def test_the_table_scores_the_plan_cut_at_the_horizon_beside_the_run():
     ]
 
 
+def test_a_plan_that_starts_after_the_deadline_says_so_and_the_table_prints():
+    """A plan beginning at t0 + T or later has nothing on the horizon: its plan half says so, its run is still judged."""
+    from minilink.planning import compare
+
+    problem = judged_move()
+    late = hand_plan(judged_move(t0=5.0))
+    table = str(compare(problem, Plan=late, dt=0.05))
+
+    plan_half, run_half = halves_of(table, "Plan")
+    assert plan_half == "starts after the deadline"
+    assert run_half.split()[-2:] == ["2", "s"]
+
+
+def test_the_table_and_the_figure_keep_the_order_the_entries_were_given():
+    """An entry given as an evaluation keeps its place: the rows and the colours follow the call."""
+    from minilink import evaluate
+    from minilink.control import lqr as lqr_design
+    from minilink.planning import compare
+
+    problem = judged_move()
+    law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
+    scored = evaluate(problem, law, dt=0.05, trajectories=True)
+    comparison = compare(problem, Scored=scored, Plan=hand_plan(problem), dt=0.05)
+
+    rows = [line.split()[0] for line in str(comparison).splitlines()[3:5]]
+    assert rows == ["Scored", "Plan"]
+    labels = list(
+        dict.fromkeys(
+            line.get_label()
+            for line in comparison.plot_trajectory(show=False).axes[0].get_lines()
+            if line.get_label() in ("Scored", "Plan")
+        )
+    )
+    assert labels == ["Scored", "Plan"]
+
+
 def test_the_star_marks_the_lowest_J_among_the_runs_that_succeed():
     """The best run is chosen from the numbers; without one that succeeds, no star and no footnote."""
     from minilink.control import lqr as lqr_design
@@ -917,7 +953,11 @@ def test_the_evaluations_keep_the_judges_runs_and_the_figure_draws_them():
     axes = comparison.plot_trajectory(show=False).axes
     for name in ("Law", "Plan"):
         run = plant_part(comparison.evaluations[name].trajectories[0])
-        (line,) = [line for line in axes[0].get_lines() if line.get_label() == name]
+        (line,) = [
+            line
+            for line in axes[0].get_lines()
+            if line.get_label() == name and line.get_linestyle() == "-"
+        ]
         np.testing.assert_array_equal(line.get_xdata(), np.asarray(run.t))
         np.testing.assert_array_equal(line.get_ydata(), np.asarray(run.x)[0])
         assert line.get_alpha() in (None, 1.0)
@@ -946,18 +986,20 @@ def test_the_evaluations_keep_the_judges_runs_and_the_figure_draws_them():
     keys = [trace for trace in figure.data if trace.showlegend]
     assert [trace.name for trace in keys] == ["Law", "Plan", "limits"]
     assert all(trace.opacity in (None, 1.0) for trace in keys)
-    faint_traces = [trace for trace in figure.data if trace.opacity == FAINT_ALPHA]
-    assert {trace.legendgroup for trace in faint_traces if trace.name} == {
-        "Law",
-        "Plan",
-    }
+    # A key shows or hides every trace of its answer: each run and the plan
+    for name in ("Law", "Plan"):
+        group = [trace for trace in figure.data if trace.legendgroup == name]
+        dashed = [trace for trace in group if trace.line.dash == "dash"]
+        faint = [trace for trace in group if trace.opacity == FAINT_ALPHA]
+        # five runs and one plan on each of the three rows (x₁, x₂, u)
+        assert len(faint) == 5 * 3 and (name != "Plan" or len(dashed) == 3)
 
     # By names only: the controller run once, as before
     names_only = compare(Plan=hand_plan(problem))
     (line,) = [
         line
         for line in names_only.plot_trajectory(show=False).axes[0].get_lines()
-        if line.get_label() == "Plan"
+        if line.get_label() == "Plan" and line.get_linestyle() == "-"
     ]
     assert line.get_alpha() in (None, 1.0)
 

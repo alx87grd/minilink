@@ -44,6 +44,13 @@ Plan good and run bad reads "the plan is right; run it with feedback"
 - **R7.** On a figure matplotlib draws itself whose panels share the time axis, one legend
   sits beside the panels, gathered from every panel's labels; a figure drawn on given axes
   is left as it is. `Panel.legend` stays a bool.
+- **R8.** A plan that begins at or after the deadline `t0 + T` has nothing on the horizon:
+  its plan half reads `starts after the deadline`, and the table still prints.
+- **R9.** The table and the figure keep the order the entries were given, an entry given as
+  an `Evaluation` included.
+- An answer's lines all carry its name: each label once in the legend, and on Plotly a
+  click on the key shows or hides every run and the plan of that answer. The first row and
+  the rows with limits ask for the legend.
 
 ## 3. The table
 

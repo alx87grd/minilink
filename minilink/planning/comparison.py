@@ -301,15 +301,14 @@ class Comparison:
         for name, color in colors.items():
             faint = len(runs[name]) > 1
             width, alpha = (FAINT_WIDTH, FAINT_ALPHA) if faint else (1.5, 1.0)
-            for i, run in enumerate(runs[name]):
-                label = name if i == 0 else ""
-                lines.append((label, color, "solid", width, alpha, run))
+            for run in runs[name]:
+                lines.append((name, color, "solid", width, alpha, run))
         for name, color in colors.items():
             solution = self.solutions.get(name)
             if solution is not None and solution.trajectory is not None:
                 plan = solution.trajectory
                 plan = Trajectory(plan.t, plan.x, plan.u)
-                lines.append(("", color, "dash", 1.5, 1.0, plan))
+                lines.append((name, color, "dash", 1.5, 1.0, plan))
         times = [np.asarray(trajectory.t, dtype=float) for *_, trajectory in lines]
         span = (min(t[0] for t in times), max(t[-1] for t in times))
 
@@ -330,13 +329,13 @@ class Comparison:
                         dash=dash,
                         width=width,
                         alpha=alpha,
-                        label=label if not rows else "",
+                        label=label,
                     )
                     for (label, color, dash, width, alpha, _), spec in zip(lines, specs)
                 )
                 deadline = deadline_marks_of(problem, signal, k)
                 limits = limit_marks_of(problem, signal, k, span)
-                rows.append((row.y_label, deadline + traces + limits))
+                rows.append((row.y_label, deadline + traces + limits, limits))
 
         n_rows = len(rows)
         panels = tuple(
@@ -345,8 +344,9 @@ class Comparison:
                 title=title if i == 0 else "",
                 x_label=TIME_ABSCISSA_LABEL if i == n_rows - 1 else "",
                 y_label=y_label.replace("\n", " "),
+                legend=i == 0 or bool(limits),
             )
-            for i, (y_label, layers) in enumerate(rows)
+            for i, (y_label, layers, limits) in enumerate(rows)
         )
         height = max(2.6, 1.8 * n_rows)
         spec = FigureSpec(panels=panels, share_x=True, figsize=(9.0, height))
@@ -513,7 +513,7 @@ def comparison_text(comparison) -> str:
     """The print text: one line per answer, its plan beside its run, then the records."""
     scores = comparison.evaluations or {}
     solutions = comparison.solutions
-    names = list(dict.fromkeys([*solutions, *scores]))
+    names = list(scores) or list(solutions)
     runs = {
         name: scores.get(name, getattr(solutions.get(name), "evaluation", None))
         for name in names
@@ -578,6 +578,8 @@ def plan_score_of(comparison, name):
     problem = solution.problem if comparison.problem is None else comparison.problem
     if not is_continuous(problem):
         return "not scored"
+    if starts_after_deadline(solution.trajectory, problem):
+        return "starts after the deadline"
 
     # The plan as the plant's run on the horizon, scored without simulation
     plan = solution.trajectory
@@ -585,6 +587,14 @@ def plan_score_of(comparison, name):
     length = float(plan.t[-1] - plan.t[0])
 
     return evaluation, length
+
+
+def starts_after_deadline(plan, problem) -> bool:
+    """``True`` when the plan begins at or after the judged deadline ``t0 + T``: nothing of it is left on the horizon."""
+    if problem.horizon_kind() != "finite":
+        return False
+
+    return float(plan.t[0]) >= float(problem.t0) + float(problem.horizon)
 
 
 def plan_on_horizon(plan, problem) -> Trajectory:
