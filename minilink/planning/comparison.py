@@ -625,18 +625,18 @@ def criterion_label_of(evaluations) -> str:
 def cells(evaluation, length, star=""):
     """One half's cells from its numbers: ``J``, the star, goal, limits, length; words for one run, counts for several."""
     n = evaluation.n_trials
-    success = np.asarray(evaluation.reached) & ~np.asarray(evaluation.failed)
+    reached = np.asarray(evaluation.reached)
     failed = np.asarray(evaluation.failed)
     finite = np.isfinite(np.asarray(evaluation.raw_cost))
     J = f"{float(evaluation.objective):.4g}"
 
     # One run: in words, and its length; several: how many of them
     if n == 1:
-        goal = "reached" if success[0] else "missed"
+        goal = "reached" if reached[0] else "missed"
         limits = "diverged" if not finite[0] else "violated" if failed[0] else "ok"
         span = "" if length is None else f"{length:.3g} s"
     else:
-        goal = f"{int(success.sum())}/{n}"
+        goal = f"{int(reached.sum())}/{n}"
         limits = f"{int((~failed).sum())}/{n}"
         span = ""
 

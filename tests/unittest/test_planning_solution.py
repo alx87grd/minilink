@@ -730,6 +730,17 @@ def test_the_star_marks_the_lowest_J_among_the_runs_that_succeed():
     assert starred == [best]
     assert "* best run: the lowest J that reaches the goal within the limits" in table
 
+    # The cost's own LQR law costs less but leaves the limits: reached, violated, no star
+    optimal = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
+    table = str(compare(problem, Soft=laws["Soft"], Optimal=optimal, dt=0.05))
+    assert halves_of(table, "Optimal")[1].split()[1:3] == ["reached", "violated"]
+    assert halves_of(table, "Soft")[1].split()[1:3] == ["*", "reached"]
+    J = {
+        name: float(halves_of(table, name)[1].split()[0])
+        for name in ("Soft", "Optimal")
+    }
+    assert J["Optimal"] < J["Soft"]
+
     # Nobody reaches a goal that is a point: no star, no footnote
     unreachable = compare(
         judged_move(radius=0.0), **laws, dt=0.05, backend="numpy"
@@ -754,9 +765,8 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
     assert header == ["E[J]", "goal", "limits", "length"]
     _, run_half = halves_of(table, "Law")
     evaluation = comparison.evaluations["Law"]
-    success = int(np.sum(evaluation.reached & ~evaluation.failed))
     assert run_half.split()[-2:] == [
-        f"{success}/5",
+        f"{int(np.sum(evaluation.reached))}/5",
         f"{int(np.sum(~evaluation.failed))}/5",
     ]
 

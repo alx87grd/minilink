@@ -58,13 +58,15 @@ records
 ```
 
 - J as `:.4g`; the star in its own slot, so the numbers stay aligned.
-- **goal**: `reached` / `missed`, from `reached & ~failed`. **limits**: `ok` / `violated`,
-  from `failed` (`diverged` when the run is not finite). The margin's value mixes units
+- **goal**: `reached` / `missed`, from `reached` alone. **limits**: `ok` / `violated`,
+  from `failed` (`diverged` when the run is not finite); a run that reaches the goal
+  outside the limits reads `reached` and `violated`, and earns no star. The margin's value mixes units
   (rad, rad/s, N·m) and stays on `comparison.evaluations[name]`.
 - No plan: the plan half reads `no plan (a feedback law)`; an `Evaluation` entry reads
   `no plan` and a blank length when it keeps no run.
 - Several draws: the J header names the criterion (`E[J]`, the CVaR, `max J`), goal and
-  limits are counts (`183/200`), length blank.
+  limits are counts (`183/200`: the runs that reach, the runs within the limits), length
+  blank.
 - Built from the numbers, formatted last: one `cells` helper, one `line` helper.
 
 ## 4. The figure
