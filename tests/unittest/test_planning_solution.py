@@ -877,50 +877,90 @@ def test_the_legend_sits_beside_the_panels_and_given_axes_are_left_as_they_are()
     plt.close(fig)
 
 
-def test_an_evaluation_entry_is_scored_not_drawn():
-    """Beside a solution it is left out of the figure; alone, the figure is refused."""
+def test_an_evaluation_entry_is_drawn_when_it_keeps_its_runs():
+    """Kept runs are drawn; without them it is left out; alone without them, the figure is refused."""
     from minilink.control import lqr as lqr_design
     from minilink.planning import compare
 
     problem = judged_move()
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
     scored = evaluate(problem, law, dt=0.05)
+    kept = evaluate(problem, law, dt=0.05, trajectories=True)
 
-    axes = compare(problem, A=scored, B=law, dt=0.05).plot_trajectory(show=False).axes
-    assert [
-        line.get_label() for line in axes[0].get_lines() if line.get_label() == "B"
-    ] == ["B"]
-    assert not any(line.get_label() == "A" for ax in axes for line in ax.get_lines())
+    def labels(comparison):
+        axes = comparison.plot_trajectory(show=False).axes
+        return [line.get_label() for line in axes[0].get_lines()]
+
+    assert "B" in labels(compare(problem, A=scored, B=law, dt=0.05))
+    assert "A" not in labels(compare(problem, A=scored, B=law, dt=0.05))
+    assert "A" in labels(compare(problem, A=kept, dt=0.05))
     with pytest.raises(ValueError, match="not drawn"):
         compare(problem, A=scored).plot_trajectory(show=False)
 
 
-def test_the_runs_are_the_judges_nominal_runs_and_the_figure_draws_them():
-    """runs holds one plant Trajectory per scored answer, none for an Evaluation entry or by names only; the solid line is that run."""
+def plant_part(run):
+    """The plant's part of a loop's run."""
+    return run.of("plant") if "plant" in run.roles else run
+
+
+def test_the_evaluations_keep_the_judges_runs_and_the_figure_draws_them():
+    """One run per trial in each evaluation; one run is the solid line, several are faint lines under the plan."""
     from minilink.control import lqr as lqr_design
     from minilink.planning import compare
+    from minilink.planning.comparison import FAINT_ALPHA, FAINT_WIDTH
 
+    law = lqr_design(DoubleIntegrator(), np.eye(2), 0.1 * np.eye(1))
+
+    # Without draws: one run, the solid line on every row is that run
     problem = judged_move()
-    law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    scored = evaluate(problem, law, dt=0.05)
-    comparison = compare(problem, A=scored, Law=law, Plan=hand_plan(problem), dt=0.05)
-
-    assert set(comparison.runs) == {"Law", "Plan"}
-    for run in comparison.runs.values():
-        assert isinstance(run, Trajectory) and not run.signals
-        assert run.x.shape[0] == 2 and run.u.shape[0] == 1
-    alone = problem.compile(law, 0.05).trajectory().of("plant")
-    np.testing.assert_allclose(comparison.runs["Law"].x, np.asarray(alone.x))
-
-    # The solid line of each answer on the first row is its run's first component
+    comparison = compare(problem, Law=law, Plan=hand_plan(problem), dt=0.05)
+    for evaluation in comparison.evaluations.values():
+        assert len(evaluation.trajectories) == 1
     axes = comparison.plot_trajectory(show=False).axes
     for name in ("Law", "Plan"):
+        run = plant_part(comparison.evaluations[name].trajectories[0])
         (line,) = [line for line in axes[0].get_lines() if line.get_label() == name]
-        run = comparison.runs[name]
-        np.testing.assert_array_equal(line.get_xdata(), run.t)
-        np.testing.assert_array_equal(line.get_ydata(), run.x[0])
+        np.testing.assert_array_equal(line.get_xdata(), np.asarray(run.t))
+        np.testing.assert_array_equal(line.get_ydata(), np.asarray(run.x)[0])
+        assert line.get_alpha() in (None, 1.0)
 
-    assert compare(Plan=hand_plan(problem)).runs is None
+    # Five draws: five faint lines per answer, the plan dashed and opaque on top
+    stochastic = judged_move(x0=Uniform([0.8, -0.2], [1.2, 0.2]))
+    entries = dict(Law=law, Plan=hand_plan(stochastic))
+    comparison = compare(stochastic, **entries, dt=0.05, n_trials=5)
+    for evaluation in comparison.evaluations.values():
+        assert len(evaluation.trajectories) == 5
+    result = comparison.plot_trajectory(show=False)
+    lines = result.axes[0].get_lines()
+    faint = [line for line in lines if line.get_alpha() == FAINT_ALPHA]
+    assert len(faint) == 2 * 5
+    assert all(line.get_linewidth() == FAINT_WIDTH for line in faint)
+    (plan,) = [line for line in lines if line.get_linestyle() == "--"]
+    assert plan.get_alpha() in (None, 1.0) and lines.index(plan) > max(
+        lines.index(line) for line in faint
+    )
+
+    # The legend's keys at full opacity, on matplotlib and on Plotly
+    (legend,) = result.figure.legends
+    assert all(handle.get_alpha() == 1.0 for handle in legend.legend_handles)
+    figure = comparison.plot_trajectory(renderer="plotly", show=False).figure
+    keys = [trace for trace in figure.data if trace.showlegend]
+    assert [trace.name for trace in keys] == ["Law", "Plan", "limits"]
+    assert all(trace.opacity in (None, 1.0) for trace in keys)
+    faint_traces = [trace for trace in figure.data if trace.opacity == FAINT_ALPHA]
+    assert {trace.legendgroup for trace in faint_traces if trace.name} == {
+        "Law",
+        "Plan",
+    }
+
+    # By names only: the controller run once, as before
+    names_only = compare(Plan=hand_plan(problem))
+    (line,) = [
+        line
+        for line in names_only.plot_trajectory(show=False).axes[0].get_lines()
+        if line.get_label() == "Plan"
+    ]
+    assert line.get_alpha() in (None, 1.0)
 
 
 # --- the controller is the block handed out; the function is the compiled face's ---

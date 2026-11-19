@@ -42,6 +42,10 @@ LIMIT_COLOR = "#7f7f7f"
 GOAL_COLOR = "#333333"
 SOLUTION_COLORS = tuple(color for color in TAB10 if color != LIMIT_COLOR)
 
+# An answer's runs drawn one per draw: thin and faint, so their spread reads
+FAINT_WIDTH = 0.6
+FAINT_ALPHA = 0.12
+
 
 ###############################################################################
 # Public API
@@ -72,7 +76,11 @@ def compare(
     ``dt`` follows :func:`~minilink.planning.evaluator.evaluate`: a sampled
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
     continuous one runs on ``dt``, the period its loop is integrated on, and
-    with ``dt`` omitted on the evaluator's automatic step.
+    with ``dt`` omitted on the evaluator's automatic step. Each evaluation
+    keeps the judge's runs, one per trial (``evaluation.trajectories``), which
+    the figure draws: memory grows with ``n_trials`` (a pendulum's loop runs
+    with their recorded signals, 5 s at ``dt = 0.01``: 17 MB for 4 answers ×
+    100 draws).
     """
     problem, named = split_entries(args, entries)
 
@@ -82,10 +90,10 @@ def compare(
         require_solutions(named)
         return Comparison(named)
 
-    # Every entry scored on the same draws, its solution and its judge's nominal run
-    # kept for the table and the overlays (each loop's period as evaluate reads it:
-    # a sampled one's own clock, else dt)
-    runs, evaluations = score_entries(
+    # Every entry scored on the same draws, its runs kept, its solution kept for the
+    # table and the overlays (each loop's period as evaluate reads it: a sampled
+    # one's own clock, else dt)
+    evaluations = score_entries(
         problem,
         named,
         dict(
@@ -104,7 +112,7 @@ def compare(
         if not isinstance(entry, Evaluation)
     }
 
-    return Comparison(solutions, evaluations, problem, runs)
+    return Comparison(solutions, evaluations, problem)
 
 
 @dataclass(frozen=True)
@@ -117,12 +125,9 @@ class Comparison:
     name to its :class:`~minilink.planning.evaluation.Evaluation` (``None`` when
     :func:`compare` was given no problem); ``problem`` is the judged problem,
     ``None`` for a comparison by names only: the plans are scored on it and
-    the figure draws its goal and limits; ``runs`` maps every scored solution
-    to the judge's nominal run, the plant's
-    :class:`~minilink.core.trajectory.Trajectory` the figure draws (the mean
-    start, nominal parameters, the judge's ``dt`` and backend; ``None`` by
-    names only, an :class:`~minilink.planning.evaluation.Evaluation` entry
-    having none).
+    the figure draws its goal and limits. Each evaluation :func:`compare`
+    makes keeps the judge's runs, one per trial, in its ``trajectories``: the
+    one home of the runs the figure draws; memory grows with ``n_trials``.
 
     ``print`` is the table, each answer read twice, the same columns each
     (``J``, goal, limits, length): its plan as the planner wrote it, cut at
@@ -140,7 +145,6 @@ class Comparison:
     solutions: dict
     evaluations: dict | None = None
     problem: PlanningProblem | None = None
-    runs: dict | None = None
 
     # The named solutions, read as a mapping
 
@@ -267,36 +271,45 @@ class Comparison:
         ax=None,
     ) -> PlotResult:
         """
-        Each answer's run solid and its plan dashed, one colour per answer, one row per signal component: a :class:`PlotResult`, ``title`` over the first row.
+        Each answer's runs solid and its plan dashed, one colour per answer, one row per signal component: a :class:`PlotResult`, ``title`` over the first row.
 
-        The run is the judge's nominal run (the mean start, nominal
-        parameters, the judge's ``dt`` and backend; on a deterministic
-        problem, the scored run), by names only the controller run once from
-        its problem's start; the plan is drawn whole, past the horizon when it
-        is longer. On a judged problem, each row of ``x`` marks the goal's
-        extent at the deadline ``t0 + T``, each row of ``u`` the input limits,
-        and every row the horizon. The legend holds the answers' names and the
-        limits. An :class:`~minilink.planning.evaluation.Evaluation` entry has
-        nothing to draw and is left out.
+        The runs are the judge's, kept in the answer's evaluation (the plant's
+        part of each): one run is a solid line, several runs (one per draw)
+        thin faint lines; by names only, the controller run once from its
+        problem's start. The plan is drawn on top, whole, past the horizon
+        when it is longer. On a judged problem, each row of ``x`` marks the
+        goal's extent at the deadline ``t0 + T``, each row of ``u`` the input
+        limits, and every row the horizon. The legend holds the answers' names
+        and the limits. An :class:`~minilink.planning.evaluation.Evaluation`
+        entry is drawn when it keeps its runs, else left out.
         """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.signals.time_signals import signal_figure
 
-        require_drawable(self.solutions)
+        runs = {name: drawn_runs_of(self, name) for name in self.evaluations or self}
+        colors = {
+            name: SOLUTION_COLORS[m % len(SOLUTION_COLORS)]
+            for m, name in enumerate(name for name in runs if runs[name])
+        }
+        require_drawable(colors)
         problem = self.problem
         sys = (problem or next(iter(self.solutions.values())).problem).sys
 
-        # Each answer's run solid, then its plan dashed, in the answer's colour
+        # Each answer's runs in its colour, one solid, several thin and faint; then
+        # the plans dashed on top
         lines = []
-        for m, (name, solution) in enumerate(self.items()):
-            color = SOLUTION_COLORS[m % len(SOLUTION_COLORS)]
-            run = (self.runs or {}).get(name)
-            if run is None:
-                run = controller_run_of(solution)
-            lines.append((name, color, "solid", run))
-            if solution.trajectory is not None:
+        for name, color in colors.items():
+            faint = len(runs[name]) > 1
+            width, alpha = (FAINT_WIDTH, FAINT_ALPHA) if faint else (1.5, 1.0)
+            for i, run in enumerate(runs[name]):
+                label = name if i == 0 else ""
+                lines.append((label, color, "solid", width, alpha, run))
+        for name, color in colors.items():
+            solution = self.solutions.get(name)
+            if solution is not None and solution.trajectory is not None:
                 plan = solution.trajectory
-                lines.append(("", color, "dash", Trajectory(plan.t, plan.x, plan.u)))
+                plan = Trajectory(plan.t, plan.x, plan.u)
+                lines.append(("", color, "dash", 1.5, 1.0, plan))
         span = time_span_of(trajectory for *_, trajectory in lines)
 
         # One row per component of each signal, its marks read from the signal: the
@@ -314,9 +327,11 @@ class Comparison:
                         spec.panels[k].layers[0].y,
                         color=color,
                         dash=dash,
+                        width=width,
+                        alpha=alpha,
                         label=name if not rows else "",
                     )
-                    for (name, color, dash, _), spec in zip(lines, specs)
+                    for (name, color, dash, width, alpha, _), spec in zip(lines, specs)
                 )
                 deadline = deadline_marks_of(problem, signal, k)
                 limits = limit_marks_of(problem, signal, k, span)
@@ -403,13 +418,7 @@ def split_entries(args, entries):
 
 
 def score_entries(problem, named, settings, n_trials, key):
-    """
-    ``(runs, evaluations)``: each scored entry's nominal run, and every entry's :class:`Evaluation` on one key and one backend (NumPy for all when one entry does not trace).
-
-    Without draws the scored trial is the nominal run, kept from the
-    evaluation itself; with draws the nominal run is one more run of the
-    loop, from the mean start.
-    """
+    """Every entry's :class:`Evaluation` on one key and one backend (NumPy for all when one entry does not trace), its runs kept."""
     scored = {n: e for n, e in named.items() if not isinstance(e, Evaluation)}
 
     # The loops compiled, then on NumPy for all when one of them is
@@ -424,21 +433,16 @@ def score_entries(problem, named, settings, n_trials, key):
                 n: ProblemEvaluator(problem, e, **numpy) for n, e in scored.items()
             }
 
-    runs, evaluations = {}, {}
+    evaluations = {}
     for name, entry in named.items():
         if isinstance(entry, Evaluation):
             evaluations[name] = entry
-            continue
-        pe = evaluators[name]
-        if pe.draws:
-            evaluations[name] = pe.evaluate(key=key, n_trials=n_trials)
-            runs[name] = plain_plant_run_of(pe.trajectory())
         else:
-            scored_run = pe.evaluate(key=key, n_trials=n_trials, trajectories=True)
-            evaluations[name] = replace(scored_run, trajectories=None)
-            runs[name] = plain_plant_run_of(scored_run.trajectories[0])
+            evaluations[name] = evaluators[name].evaluate(
+                key=key, n_trials=n_trials, trajectories=True
+            )
 
-    return runs, evaluations
+    return evaluations
 
 
 def solution_of(problem, entry):
@@ -449,9 +453,18 @@ def solution_of(problem, entry):
     return PlanningSolution(problem=problem, controller=entry, record=GivenController())
 
 
+def drawn_runs_of(comparison, name) -> list:
+    """The plant runs the figure draws for an answer: its evaluation's, else (by names only) its controller run once; none for an evaluation that keeps no run."""
+    evaluation = (comparison.evaluations or {}).get(name)
+    if evaluation is not None:
+        return [plain_plant_run_of(run) for run in evaluation.trajectories or ()]
+
+    return [controller_run_of(comparison.solutions[name])]
+
+
 def plain_plant_run_of(loop_run) -> Trajectory:
-    """The plant's part of a loop's run as plain arrays, its signals left out."""
-    run = loop_run.of("plant")
+    """The plant's part of a loop's run (a logged plant run as it is) as plain arrays, its signals left out."""
+    run = loop_run.of("plant") if "plant" in loop_run.roles else loop_run
     plant_run = Trajectory(np.asarray(run.t), np.asarray(run.x), np.asarray(run.u))
 
     return plant_run
@@ -523,7 +536,7 @@ def comparison_text(comparison) -> str:
     # The numbers: the best run, each plan's score and each run's length
     best = best_run_of(runs)
     plans = {name: plan_score_of(comparison, name) for name in names}
-    lengths = {name: run_length_of(comparison, name, runs[name]) for name in names}
+    lengths = {name: run_length_of(runs[name]) for name in names}
 
     # Formatted last: each half's cells, or the words that span it
     label = criterion_label_of(runs.values())
@@ -612,13 +625,11 @@ def plan_on_horizon(plan, problem) -> Trajectory:
     return cut
 
 
-def run_length_of(comparison, name, evaluation):
-    """The length of an answer's run: its nominal run's, else its kept run's; ``None`` when no run is known."""
-    run = (comparison.runs or {}).get(name)
-    if run is None and evaluation is not None and evaluation.trajectories:
-        run = evaluation.trajectories[0]
-    if run is None:
+def run_length_of(evaluation):
+    """The length of an evaluation's first run; ``None`` when it keeps none."""
+    if evaluation is None or not evaluation.trajectories:
         return None
+    run = evaluation.trajectories[0]
 
     return float(run.t[-1] - run.t[0])
 
@@ -748,12 +759,13 @@ def require_solutions(named):
             )
 
 
-def require_drawable(solutions):
-    """Refuse a figure of a comparison whose entries are all evaluations: none carries a run to draw."""
-    if not solutions:
+def require_drawable(drawn):
+    """Refuse a figure of a comparison with no run to draw: every entry an evaluation that keeps none."""
+    if not drawn:
         raise ValueError(
-            "no entry carries a controller to draw: an Evaluation entry is scored, "
-            "not drawn; pass a solution or a controller"
+            "no entry carries a run to draw: an Evaluation that keeps no trajectories "
+            "is scored, not drawn; pass a solution, a controller, or "
+            "evaluate(..., trajectories=True)"
         )
 
 

@@ -31,6 +31,10 @@ Plan good and run bad reads "the plan is right; run it with feedback"
   (`success_rate == 1`); one run is the case of one draw. No answer qualifies: no star,
   no footnote.
 - **R4.** The figure draws each answer's run solid and its plan dashed, one colour per answer.
+- **E.** The judge's runs are kept in the evaluations (`evaluation.trajectories`, every
+  draw) and drawn from there: one run a solid line, several runs each a thin faint line,
+  the plan dashed on top. Ruled by the maintainer, superseding a `Comparison.runs`
+  attribute of nominal runs.
 - **R5.** A plan longer than the horizon is scored on the horizon: cut at `t0 + T`, the
   state at that instant interpolated. The length cell gives the plan's own length.
 - **R6.** `Comparison.problem` is the judged problem, `None` for a comparison by names only;
@@ -71,9 +75,12 @@ records
 
 ## 4. The figure
 
-- One row per signal component, as today; per answer, the judge's **nominal run** solid
-  (`ProblemEvaluator.trajectory()`: the mean start, nominal parameters, the judge's `dt`
-  and backend; for a deterministic problem the scored run) and the plan dashed.
+- One row per signal component, as today; per answer, the judge's runs from its
+  evaluation (the plant's part of each): one run solid, several runs thin and faint
+  (width 0.6, alpha 0.12), and the plan dashed, full width, on top. An `Evaluation`
+  entry is drawn when it keeps its trajectories. The legend's keys read at full
+  opacity, a renderer rule (matplotlib's keys drawn opaque; Plotly's key of a faint trace
+  its first sample at full opacity, in the trace's legend group).
 - Decorations follow the signal of each row, not its position: on an `x` row the goal's
   extent at the deadline, a dark grey segment at `t0 + T` (`Xf.bounding_box()`; none for a
   set without one); on a `u` row the input limits, dotted grey lines
@@ -85,13 +92,12 @@ records
 
 ## 5. The implementation
 
-- `compare` keeps the problem (R6) and `Comparison.runs`: name → the judge's nominal run,
-  the plant's part as a plain `Trajectory`, from the evaluators `score_entries` builds,
-  which are then dropped: without draws the scored trial itself (kept by the evaluation,
-  bit-identical to `trajectory()`, no second compile), with draws one `trajectory()` run (`None` or no entry for an
-  `Evaluation` entry and by names only, where the figure runs `controller_run_of`). The
-  maintainer ruled `runs`, plain data, over keeping the evaluators on the object. No draws
-  are kept for the figure.
+- `compare` keeps the problem (R6) and evaluates every scored entry with
+  `trajectories=True`: its evaluation keeps all `n_trials` runs, the one home of the
+  judge's runs (E); memory grows with `n_trials` (the pendulum demo, 4 answers × 100
+  draws, 5 s at `dt = 0.01`: 17.2 MB as the loop runs `evaluate` returns, their recorded
+  signals included; 6.4 MB for the plant's `t, x, u` alone). The run length cell reads the
+  evaluation's first run.
 - The plan is scored in `compare`'s object by `evaluate_trajectory` on
   `Trajectory(p.t, p.x, p.u)`, cut at the horizon (R5).
 - `score_run` (`planning/evaluation.py`): a run that is not finite never reaches the goal,
