@@ -43,12 +43,6 @@ MARKERS_3D = {"star": "diamond"}
 # The colour maps whose matplotlib name Plotly spells otherwise
 COLOR_MAPS = {"bwr": "RdBu_r", "coolwarm": "RdBu_r", "seismic": "RdBu_r"}
 
-
-###############################################################################
-# Public API
-###############################################################################
-
-
 # The legend: inside the top right corner, or beside panels that share the time
 # axis, outside the plotting area (the margin grows to hold it)
 LEGEND_INSIDE = {
@@ -59,6 +53,11 @@ LEGEND_INSIDE = {
     "bgcolor": "rgba(255, 255, 255, 0.7)",
 }
 LEGEND_BESIDE = {"x": 1.02, "y": 1.0, "xanchor": "left", "yanchor": "top"}
+
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 def draw_figure(spec: FigureSpec, *, show, ax=None) -> PlotResult:
