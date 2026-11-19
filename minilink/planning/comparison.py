@@ -12,6 +12,7 @@ from minilink.graphical.figure import (
     TAB10,
     FigureSpec,
     Panel,
+    RefLine,
     Trace,
     draw,
     side_by_side,
@@ -27,7 +28,7 @@ from minilink.planning.plotting import (
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import (
     PlanningSolution,
-    drawn_trajectory_of,
+    controller_run_of,
     require_cost_to_go,
 )
 from minilink.planning.step_model import is_continuous
@@ -35,8 +36,11 @@ from minilink.planning.step_model import is_continuous
 if TYPE_CHECKING:
     from minilink.graphical.common.plot_result import PlotResult
 
-# One colour per solution, the same on every row
-SOLUTION_COLORS = TAB10
+# The problem's marks in greys, which no solution takes: the input limits and the
+# horizon in grey, the goal in dark grey; one colour per solution, the same on every row
+LIMIT_COLOR = "#7f7f7f"
+GOAL_COLOR = "#333333"
+SOLUTION_COLORS = tuple(color for color in TAB10 if color != LIMIT_COLOR)
 
 
 ###############################################################################
@@ -252,50 +256,77 @@ class Comparison:
         self,
         *,
         signals=("x", "u"),
-        title="plans and runs",
+        title="plans (dashed) and runs (solid)",
         figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
     ) -> PlotResult:
-        """The plans and the controllers' runs overlaid, one row per signal component, legend by name: a :class:`PlotResult`, ``title`` over the first row."""
+        """
+        Each answer's run solid and its plan dashed, one colour per answer, one row per signal component: a :class:`PlotResult`, ``title`` over the first row.
+
+        The run is the judge's nominal run (the mean start, nominal
+        parameters, the judge's ``dt`` and backend; on a deterministic
+        problem, the scored run), by names only the controller run once from
+        its problem's start; the plan is drawn whole, past the horizon when it
+        is longer. On a judged problem, each row of ``x`` marks the goal's
+        extent at the deadline ``t0 + T``, each row of ``u`` the input limits,
+        and every row the horizon. The legend holds the answers' names and the
+        limits. An :class:`~minilink.planning.evaluation.Evaluation` entry has
+        nothing to draw and is left out.
+        """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.signals.time_signals import signal_figure
 
-        # One description per solution, on the first solution's system
-        first = next(iter(self.solutions.values()))
-        sys = first.problem.sys
-        specs = {
-            name: signal_figure(sys, drawn_trajectory_of(solution), signals=signals)
-            for name, solution in self.items()
-        }
+        require_drawable(self.solutions)
+        problem = self.problem
+        sys = (problem or next(iter(self.solutions.values())).problem).sys
 
-        # One row per signal component, each solution in its colour on every row; the
-        # rows labelled from the first spec, the names, the legend and the title on
-        # the first
-        rows = next(iter(specs.values())).panels
-        n_rows = len(rows)
-        panels = [
-            Panel(
-                layers=tuple(
+        # Each answer's run solid, then its plan dashed, in the answer's colour
+        lines = []
+        for m, (name, solution) in enumerate(self.items()):
+            color = SOLUTION_COLORS[m % len(SOLUTION_COLORS)]
+            lines.append((name, color, "solid", nominal_run_of(self, name, solution)))
+            if solution.trajectory is not None:
+                plan = solution.trajectory
+                lines.append(("", color, "dash", Trajectory(plan.t, plan.x, plan.u)))
+        span = time_span_of(trajectory for *_, trajectory in lines)
+
+        # One row per component of each signal, its marks read from the signal: the
+        # answers' names on the first row
+        rows = []
+        for signal in signals:
+            specs = [
+                signal_figure(sys, trajectory, signals=(signal,))
+                for *_, trajectory in lines
+            ]
+            for k, row in enumerate(specs[0].panels):
+                traces = tuple(
                     Trace(
                         spec.panels[k].layers[0].x,
                         spec.panels[k].layers[0].y,
-                        color=SOLUTION_COLORS[m % len(SOLUTION_COLORS)],
-                        label=name if k == 0 else "",
+                        color=color,
+                        dash=dash,
+                        label=name if not rows else "",
                     )
-                    for m, (name, spec) in enumerate(specs.items())
-                ),
-                title=title if k == 0 else "",
-                x_label=TIME_ABSCISSA_LABEL if k == n_rows - 1 else "",
-                y_label=row.y_label.replace("\n", " "),
-                legend=True,
+                    for (name, color, dash, _), spec in zip(lines, specs)
+                )
+                deadline = deadline_marks_of(problem, signal, k)
+                limits = limit_marks_of(problem, signal, k, span)
+                rows.append((row.y_label, deadline + traces + limits))
+
+        n_rows = len(rows)
+        panels = tuple(
+            Panel(
+                layers=layers,
+                title=title if i == 0 else "",
+                x_label=TIME_ABSCISSA_LABEL if i == n_rows - 1 else "",
+                y_label=y_label.replace("\n", " "),
             )
-            for k, row in enumerate(rows)
-        ]
-        spec = FigureSpec(
-            panels=tuple(panels), share_x=True, figsize=(8.0, 1.8 * n_rows)
+            for i, (y_label, layers) in enumerate(rows)
         )
+        height = max(2.6, 1.8 * n_rows)
+        spec = FigureSpec(panels=panels, share_x=True, figsize=(9.0, height))
 
         return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
@@ -396,6 +427,65 @@ def solution_of(problem, entry):
         return entry
 
     return PlanningSolution(problem=problem, controller=entry, record=GivenController())
+
+
+def nominal_run_of(comparison, name, solution) -> Trajectory:
+    """The plant's run the figure draws for an answer: its judge's nominal run, else (by names only) its controller run once."""
+    evaluator = (comparison.evaluators or {}).get(name)
+    if evaluator is None:
+        return controller_run_of(solution)
+
+    run = evaluator.trajectory().of("plant")
+    plant_run = Trajectory(np.asarray(run.t), np.asarray(run.x), np.asarray(run.u))
+
+    return plant_run
+
+
+def time_span_of(trajectories):
+    """``(t_first, t_last)`` over the trajectories' times."""
+    times = [np.asarray(trajectory.t, dtype=float) for trajectory in trajectories]
+
+    return min(t[0] for t in times), max(t[-1] for t in times)
+
+
+def deadline_marks_of(problem, signal, k) -> tuple:
+    """
+    The judged problem's deadline on the row of component ``k`` of ``signal``.
+
+    On every row the horizon ``t0 + T``, a dotted grey vertical; on a row of
+    ``x`` also the goal's extent there, a dark grey segment
+    (``Xf.bounding_box()``; none for a set without one). None without a
+    problem or a finite horizon.
+    """
+    if problem is None or problem.horizon_kind() != "finite":
+        return ()
+    t_end = float(problem.t0) + float(problem.horizon)
+    goal = None if problem.Xf is None else problem.Xf.bounding_box()
+
+    marks = [RefLine("x", t_end, color=LIMIT_COLOR, dash="dot")]
+    if signal == "x" and goal is not None:
+        extent = [float(goal.lower[k]), float(goal.upper[k])]
+        marks.append(Trace([t_end, t_end], extent, color=GOAL_COLOR, width=4.0))
+
+    return tuple(marks)
+
+
+def limit_marks_of(problem, signal, k, span) -> tuple:
+    """The judged problem's input limits on the row of component ``k`` of ``u``: dotted grey lines over ``span`` (``U.bounding_box()``), each finite bound; none on another row."""
+    if problem is None or problem.U is None or signal != "u":
+        return ()
+    limits = problem.U.bounding_box()
+    if limits is None:
+        return ()
+
+    bounds = [float(limits.lower[k]), float(limits.upper[k])]
+    marks = tuple(
+        Trace(span, [bound, bound], color=LIMIT_COLOR, dash="dot", label="limits")
+        for bound in bounds
+        if np.isfinite(bound)
+    )
+
+    return marks
 
 
 # The table: its two halves, titled, and the columns of each
@@ -641,6 +731,15 @@ def require_solutions(named):
                 f"{name!r} is not a PlanningSolution: to score a controller, pass the "
                 "problem first, compare(problem, name=controller, ...)"
             )
+
+
+def require_drawable(solutions):
+    """Refuse a figure of a comparison whose entries are all evaluations: none carries a run to draw."""
+    if not solutions:
+        raise ValueError(
+            "no entry carries a controller to draw: an Evaluation entry is scored, "
+            "not drawn; pass a solution or a controller"
+        )
 
 
 def require_some_cost_to_go(fields):
