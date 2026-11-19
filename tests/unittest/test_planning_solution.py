@@ -895,6 +895,34 @@ def test_an_evaluation_entry_is_scored_not_drawn():
         compare(problem, A=scored).plot_trajectory(show=False)
 
 
+def test_the_runs_are_the_judges_nominal_runs_and_the_figure_draws_them():
+    """runs holds one plant Trajectory per scored answer, none for an Evaluation entry or by names only; the solid line is that run."""
+    from minilink.control import lqr as lqr_design
+    from minilink.planning import compare
+
+    problem = judged_move()
+    law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
+    scored = evaluate(problem, law, dt=0.05)
+    comparison = compare(problem, A=scored, Law=law, Plan=hand_plan(problem), dt=0.05)
+
+    assert set(comparison.runs) == {"Law", "Plan"}
+    for run in comparison.runs.values():
+        assert isinstance(run, Trajectory) and not run.signals
+        assert run.x.shape[0] == 2 and run.u.shape[0] == 1
+    alone = problem.compile(law, 0.05).trajectory().of("plant")
+    np.testing.assert_allclose(comparison.runs["Law"].x, np.asarray(alone.x))
+
+    # The solid line of each answer on the first row is its run's first component
+    axes = comparison.plot_trajectory(show=False).axes
+    for name in ("Law", "Plan"):
+        (line,) = [line for line in axes[0].get_lines() if line.get_label() == name]
+        run = comparison.runs[name]
+        np.testing.assert_array_equal(line.get_xdata(), run.t)
+        np.testing.assert_array_equal(line.get_ydata(), run.x[0])
+
+    assert compare(Plan=hand_plan(problem)).runs is None
+
+
 # --- the controller is the block handed out; the function is the compiled face's ---
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -82,9 +82,9 @@ def compare(
         require_solutions(named)
         return Comparison(named)
 
-    # Every entry scored on the same draws, its solution and its evaluator kept for
-    # the table and the overlays (each loop's period as evaluate reads it: a
-    # sampled one's own clock, else dt)
+    # Every entry scored on the same draws, its solution and its judge's nominal run
+    # kept for the table and the overlays (each loop's period as evaluate reads it:
+    # a sampled one's own clock, else dt)
     evaluators, evaluations = score_entries(
         problem,
         named,
@@ -103,8 +103,9 @@ def compare(
         for name, entry in named.items()
         if not isinstance(entry, Evaluation)
     }
+    runs = {name: nominal_run_of(pe) for name, pe in evaluators.items()}
 
-    return Comparison(solutions, evaluations, problem, evaluators)
+    return Comparison(solutions, evaluations, problem, runs)
 
 
 @dataclass(frozen=True)
@@ -117,8 +118,12 @@ class Comparison:
     name to its :class:`~minilink.planning.evaluation.Evaluation` (``None`` when
     :func:`compare` was given no problem); ``problem`` is the judged problem,
     ``None`` for a comparison by names only: the plans are scored on it and
-    the figure draws its goal and limits; ``evaluators`` are the judge's
-    compiled loops, one per scored solution, which the figure runs.
+    the figure draws its goal and limits; ``runs`` maps every scored solution
+    to the judge's nominal run, the plant's
+    :class:`~minilink.core.trajectory.Trajectory` the figure draws (the mean
+    start, nominal parameters, the judge's ``dt`` and backend; ``None`` by
+    names only, an :class:`~minilink.planning.evaluation.Evaluation` entry
+    having none).
 
     ``print`` is the table, each answer read twice, the same columns each
     (``J``, goal, limits, length): its plan as the planner wrote it, cut at
@@ -136,7 +141,7 @@ class Comparison:
     solutions: dict
     evaluations: dict | None = None
     problem: PlanningProblem | None = None
-    evaluators: dict | None = field(default=None, repr=False, compare=False)
+    runs: dict | None = None
 
     # The named solutions, read as a mapping
 
@@ -286,7 +291,10 @@ class Comparison:
         lines = []
         for m, (name, solution) in enumerate(self.items()):
             color = SOLUTION_COLORS[m % len(SOLUTION_COLORS)]
-            lines.append((name, color, "solid", nominal_run_of(self, name, solution)))
+            run = (self.runs or {}).get(name)
+            if run is None:
+                run = controller_run_of(solution)
+            lines.append((name, color, "solid", run))
             if solution.trajectory is not None:
                 plan = solution.trajectory
                 lines.append(("", color, "dash", Trajectory(plan.t, plan.x, plan.u)))
@@ -429,12 +437,8 @@ def solution_of(problem, entry):
     return PlanningSolution(problem=problem, controller=entry, record=GivenController())
 
 
-def nominal_run_of(comparison, name, solution) -> Trajectory:
-    """The plant's run the figure draws for an answer: its judge's nominal run, else (by names only) its controller run once."""
-    evaluator = (comparison.evaluators or {}).get(name)
-    if evaluator is None:
-        return controller_run_of(solution)
-
+def nominal_run_of(evaluator) -> Trajectory:
+    """The judge's nominal run, the plant's part as plain arrays: the mean start, nominal parameters, the evaluator's ``dt`` and backend."""
     run = evaluator.trajectory().of("plant")
     plant_run = Trajectory(np.asarray(run.t), np.asarray(run.x), np.asarray(run.u))
 
@@ -597,15 +601,14 @@ def plan_on_horizon(plan, problem) -> Trajectory:
 
 
 def run_length_of(comparison, name, evaluation):
-    """The length of an answer's run: its evaluator's horizon, else its kept run's; ``None`` when no run is known."""
-    evaluator = (comparison.evaluators or {}).get(name)
-    if evaluator is not None:
-        return float(evaluator.horizon)
-    if evaluation is not None and evaluation.trajectories:
+    """The length of an answer's run: its nominal run's, else its kept run's; ``None`` when no run is known."""
+    run = (comparison.runs or {}).get(name)
+    if run is None and evaluation is not None and evaluation.trajectories:
         run = evaluation.trajectories[0]
-        return float(run.t[-1] - run.t[0])
+    if run is None:
+        return None
 
-    return None
+    return float(run.t[-1] - run.t[0])
 
 
 def criterion_label_of(evaluations) -> str:

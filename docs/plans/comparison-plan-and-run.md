@@ -85,8 +85,12 @@ records
 
 ## 5. The implementation
 
-- `compare` keeps the problem (R6) and the evaluators `score_entries` builds; the figure
-  asks them for the nominal run. No draws are kept for the figure.
+- `compare` keeps the problem (R6) and `Comparison.runs`: name → the judge's nominal run,
+  the plant's part as a plain `Trajectory`, computed once inside `compare` from the
+  evaluators `score_entries` builds, which are then dropped (`None` or no entry for an
+  `Evaluation` entry and by names only, where the figure runs `controller_run_of`). The
+  maintainer ruled `runs`, plain data, over keeping the evaluators on the object. No draws
+  are kept for the figure.
 - The plan is scored in `compare`'s object by `evaluate_trajectory` on
   `Trajectory(p.t, p.x, p.u)`, cut at the horizon (R5).
 - `score_run` (`planning/evaluation.py`): a run that is not finite never reaches the goal,

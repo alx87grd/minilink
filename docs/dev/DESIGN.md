@@ -1388,7 +1388,10 @@ side by side: `plot_control_law` / `plot_cost_to_go` are the overlays on one sca
 entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
 and one backend (NumPy for all when one entry does not trace), its `dt` as `evaluate` reads
 it (a sampled controller on its own clock, `dt` only for a continuous one), keeps that
-problem as `Comparison.problem` (`None` by names only), and `difference(a, b)` is
+problem as `Comparison.problem` (`None` by names only) and each scored solution's
+nominal run as `Comparison.runs` (the plant's `Trajectory`: the mean start, nominal
+parameters, the judge's `dt` and backend, run once inside `compare`, the evaluators then
+dropped), and `difference(a, b)` is
 the paired `J_a − J_b`. `print` is the table: each answer read twice, the same columns
 each (`J`, goal, limits, length), its plan as the planner wrote it, cut at `t0 + T` (the
 state there interpolated) and scored on the judged problem by `evaluate_trajectory`
@@ -1396,7 +1399,7 @@ without simulation (by names only, on its own problem), beside its run, the bloc
 out simulated by the judge (on several draws, the criterion and the counts); a star marks
 the best run, the lowest `objective` among the answers whose every run reaches the goal
 within the limits; the planners' records follow, one line each. `plot_trajectory` draws
-each answer's run solid (the judge's nominal run, `ProblemEvaluator.trajectory()`; by names
+each answer's run solid (`Comparison.runs`, the judge's nominal run; by names
 only, the controller run once) and its plan dashed, one colour per answer, and marks the
 judged problem by each row's signal: the horizon on every row, the goal's extent at
 `t0 + T` (`Xf.bounding_box()`) on the rows of `x`, the input limits (`U.bounding_box()`)
