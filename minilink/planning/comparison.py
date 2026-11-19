@@ -657,43 +657,26 @@ def cells(evaluation, length, star=""):
 
 def table_lines(names, plan_halves, run_halves, headers):
     """The table's lines: the halves' titles, the header, a rule, one line per answer; each column as wide as its widest cell."""
-    halves = (plan_halves, run_halves)
-
-    # Each column's width, then each half's: its columns or its widest words
-    widths = [
-        [
-            max(
-                len(row[k])
-                for row in (header, *half.values())
-                if not isinstance(row, str)
-            )
-            for k in range(len(header))
-        ]
-        for header, half in zip(headers, halves)
-    ]
-    texts = [
-        {name: half_text(half[name], width, slot) for name in names}
-        for half, width, slot in zip(halves, widths, (False, True))
-    ]
-    header_texts = [
-        half_text(header, width, slot)
-        for header, width, slot in zip(headers, widths, (False, True))
-    ]
+    # Each half's header and lines, each column as wide as its widest cell; the
+    # star's slot in the run half alone
+    texts = []
+    for header, half, slot in zip(headers, (plan_halves, run_halves), (False, True)):
+        rows = [header, *(half[name] for name in names)]
+        cell_rows = [row for row in rows if not isinstance(row, str)]
+        widths = [max(len(row[k]) for row in cell_rows) for k in range(len(header))]
+        texts.append([half_text(row, widths, slot) for row in rows])
+    plan_texts, run_texts = texts
     w_name = max(len(name) for name in names)
-    w_plan = max(len(PLAN_TITLE), len(header_texts[0]), *map(len, texts[0].values()))
-    w_run = max(len(RUN_TITLE), len(header_texts[1]), *map(len, texts[1].values()))
+    w_plan = max(len(PLAN_TITLE), *map(len, plan_texts))
+    w_run = max(len(RUN_TITLE), *map(len, run_texts))
 
     def line(name, plan, run):
         return f"{name:{w_name}} │ {plan:{w_plan}} │ {run}".rstrip()
 
     rule = "─" * (w_name + 1) + "┼" + "─" * (w_plan + 2) + "┼" + "─" * (w_run + 1)
+    header, *body = map(line, ["", *names], plan_texts, run_texts)
 
-    return [
-        line("", PLAN_TITLE, RUN_TITLE),
-        line("", *header_texts),
-        rule,
-        *(line(name, texts[0][name], texts[1][name]) for name in names),
-    ]
+    return [line("", PLAN_TITLE, RUN_TITLE), header, rule, *body]
 
 
 def half_text(half, widths, slot) -> str:
