@@ -1383,13 +1383,24 @@ continuous law integrated on the views' optional `dt`, `None` the evaluator's au
 step, and the planner's mirrors pass the planner's own `dt`; nominal parameters; a step
 problem's `rollout`), titled plan or run.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
-side by side: `print` is the table of records and evaluations,
-`plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
-one scale; `compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores every
+side by side: `plot_control_law` / `plot_cost_to_go` are the overlays on one scale;
+`compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores every
 entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
 and one backend (NumPy for all when one entry does not trace), its `dt` as `evaluate` reads
-it (a sampled controller on its own clock, `dt` only for a continuous one), and `difference(a, b)` is
-the paired `J_a − J_b`. `LQRPlanner
+it (a sampled controller on its own clock, `dt` only for a continuous one), keeps that
+problem as `Comparison.problem` (`None` by names only), and `difference(a, b)` is
+the paired `J_a − J_b`. `print` is the table: each answer read twice, the same columns
+each (`J`, goal, limits, length), its plan as the planner wrote it, cut at `t0 + T` (the
+state there interpolated) and scored on the judged problem by `evaluate_trajectory`
+without simulation (by names only, on its own problem), beside its run, the block it hands
+out simulated by the judge (on several draws, the criterion and the counts); a star marks
+the best run, the lowest `objective` among the answers whose every run reaches the goal
+within the limits; the planners' records follow, one line each. `plot_trajectory` draws
+each answer's run solid (the judge's nominal run, `ProblemEvaluator.trajectory()`; by names
+only, the controller run once) and its plan dashed, one colour per answer, and marks the
+judged problem by each row's signal: the horizon on every row, the goal's extent at
+`t0 + T` (`Xf.bounding_box()`) on the rows of `x`, the input limits (`U.bounding_box()`)
+on the rows of `u`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
 first function of `lqr.py`, lowers it to the LQR problem in its matrices, `(A, B, Q, R, S)`, at
 the cost's `(x_bar, u_bar)` (`B` and `R` over the command port; the planner's
