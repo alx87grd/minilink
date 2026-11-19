@@ -329,7 +329,7 @@ def planner_evidence(
     planner's problem (or ``problem``): one run when nothing is random,
     ``n_trials`` draws from key 0 otherwise; ``None`` when the problem declares
     no cost (a search without one). A continuous controller runs on ``dt``, the
-    planner's own step (ruled 2026-11-08: the grid's for value iteration and
+    planner's own step (the grid's for value iteration and
     tabular learning, the environment's for deep learning, the LQR's, an
     open-loop plan's own grid), the law continuous, ``dt`` only how finely its
     loop is integrated; a clocked one on its own clock; ``episode_length`` is the
