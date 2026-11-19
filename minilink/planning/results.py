@@ -339,7 +339,17 @@ def require_cost_to_go(solution, owner=None):
 
 def drawn_trajectory_of(solution, dt=None) -> Trajectory:
     """
-    What a solution's views draw: its plan, else its controller run once from the problem's start.
+    What a solution's views draw: its plan, else its controller run once from the problem's start (:func:`controller_run_of`).
+    """
+    if solution.trajectory is not None:
+        return solution.trajectory
+
+    return controller_run_of(solution, dt)
+
+
+def controller_run_of(solution, dt=None) -> Trajectory:
+    """
+    A solution's controller run once from the problem's start: the plant's run.
 
     The run is the loop the score runs, ``problem.compile(controller, dt)`` (a
     continuous law integrated on ``dt``, ``None`` the automatic step), with
@@ -347,9 +357,6 @@ def drawn_trajectory_of(solution, dt=None) -> Trajectory:
     own run read back (``traj.of("plant")``); on a step problem, its model's
     rollout (:func:`step_run_of`).
     """
-    if solution.trajectory is not None:
-        return solution.trajectory
-
     problem = solution.problem
     if not is_continuous(problem):
         return step_run_of(problem, solution.controller)
