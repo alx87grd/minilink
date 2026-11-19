@@ -1388,21 +1388,19 @@ side by side: `plot_control_law` / `plot_cost_to_go` are the overlays on one sca
 entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
 and one backend (NumPy for all when one entry does not trace), its `dt` as `evaluate` reads
 it (a sampled controller on its own clock, `dt` only for a continuous one), keeps that
-problem as `Comparison.problem` (`None` by names only), keeps the judge's runs in each
-evaluation (`trajectories`, one per trial: memory grows with `n_trials`), and
-`difference(a, b)` is
-the paired `J_a − J_b`. `print` is the table: each answer read twice, the same columns
-each (`J`, goal, limits, length), its plan as the planner wrote it, cut at `t0 + T` (the
-state there interpolated) and scored on the judged problem by `evaluate_trajectory`
-without simulation (by names only, on its own problem), beside its run, the block it hands
-out simulated by the judge (on several draws, the criterion and the counts); a star marks
-the best run, the lowest `objective` among the answers whose every run reaches the goal
-within the limits; the planners' records follow, one line each. `plot_trajectory` draws
-each answer's runs from its evaluation (one run solid, several thin and faint; by names
-only, the controller run once) and its plan dashed on top, one colour per answer, and
-marks the
-judged problem by each row's signal: the horizon on every row, the goal's extent at
-`t0 + T` (`Xf.bounding_box()`) on the rows of `x`, the input limits (`U.bounding_box()`)
+problem as `Comparison.problem` (`None` by names only) and the judge's runs in each
+evaluation (`trajectories`, one per trial: memory grows with `n_trials`);
+`difference(a, b)` is the paired `J_a − J_b`. `print` is the table: each answer read twice, the same
+columns each (`J`, goal, limits, length), its plan as the planner wrote it, cut at
+`t0 + T` and scored on the judged problem by `evaluate_trajectory` without simulation (by
+names only, on its own problem), beside its run, the block it hands out simulated by the
+judge (on several draws, the criterion and the counts); a star marks the lowest
+`objective` among the answers whose every run reaches the goal within the limits; the
+planners' records follow, one line each. `plot_trajectory` draws each answer's runs from
+its evaluation (one run solid, several thin and faint; by names only, the controller run
+once) and its plan dashed on top, one colour per answer, and marks the judged problem by
+each row's signal: the horizon on every row, the goal's extent at `t0 + T`
+(`Xf.bounding_box()`) on the rows of `x`, the input limits (`U.bounding_box()`)
 on the rows of `u`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
 first function of `lqr.py`, lowers it to the LQR problem in its matrices, `(A, B, Q, R, S)`, at
@@ -1967,12 +1965,12 @@ Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`
 `graphical/figure.py`, exported on `minilink.graphical` (not on the root): a `FigureSpec`
 is a title and a grid of `Panel`s read row by row (`n_cols`, `share_x`, `figsize`); a
 `Panel` holds its labels, limits, `x_log`, `y_ticks`, `equal_aspect`, `is_3d`, `legend`
-(a bool: a legend when a layer is labelled; matplotlib places it where it fits best, and on
-a figure it draws itself whose panels share the time axis (`share_x`) gathers the labels of
-every panel that asks into one legend beside the panels, a figure drawn on given axes left as
-it is; Plotly draws one per figure, beside the panels when they share the time axis, none
-when no panel asks; each label once, its key
-at full opacity whatever its trace's) and an ordered tuple of layers, of seven kinds: `Trace` (a polyline or a point set, NaN
+(a bool: a legend when a layer is labelled; matplotlib places it in the panel where it fits
+best, and on a figure it draws itself whose panels share the time axis (`share_x`) gathers
+the labels of every panel that asks into one legend beside the panels, given axes left as
+they are; Plotly draws one per figure, beside the panels when they share the time axis,
+none when no panel asks; each label once, its key at full opacity whatever its trace's)
+and an ordered tuple of layers, of seven kinds: `Trace` (a polyline or a point set, NaN
 breaking a line, `fill=True` closing and filling it), `RefLine`, `Note`, `Heatmap`,
 `Contour`, `Surface`, `Arrows` (quiver or stream). The objects are frozen; a colour is a
 CSS name or a hex code, and a `Trace` with `color=None` takes the renderer's colour cycle.
