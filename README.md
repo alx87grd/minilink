@@ -83,6 +83,8 @@ digital.compute_trajectory(tf=6.0)
 digital.plot_diagram()
 ```
 
+![The digital loop's diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
+
 The classical tools read any system, a loop included: `linearize`, `transfer_function`,
 `plot_bode`, `plot_root_locus`, `plot_pzmap`, `plot_nyquist`, `plot_step_response`. And `lqr`
 designs a state feedback on the linear model at a point (`kalman` and `lqg` are its duals for

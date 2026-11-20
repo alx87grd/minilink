@@ -16,7 +16,6 @@ SHOWCASE = STATIC / "showcase"  # interactive 3-D pages, served by the docs site
 import numpy as np  # noqa: E402
 from asset_export import html_to_gif, montage_png, shrink_gif, svg_to_png  # noqa: E402
 
-from minilink import DynamicSystem  # noqa: E402
 from minilink.core.sets import SingletonSet  # noqa: E402
 
 
@@ -56,37 +55,16 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
 
 
 def diagram_png() -> None:
-    """The README's loop: the custom plant of its "Write a model" section, closed by a PID."""
-    from minilink import PID
+    """The README's diagram: a step reference into the impedance law on a clock, closed on the pendulum."""
+    from minilink import Impedance, Pendulum, Step
     from minilink.graphical.diagrams.dot import get_diagram
 
-    plant = MassSpringDamper()
-    diagram = PID(2.0, 0.5, 1.0) @ plant
+    reference = Step(final_value=[1.0], step_time=1.0)
+    diagram = reference >> (Impedance(Kp=100.0, Kd=20.0) % 0.1) @ Pendulum()
     get_diagram(diagram).render(
         filename=str(STATIC / "diagram_closed_loop"), format="png", cleanup=True
     )
     print("diagram_closed_loop.png")
-
-
-class MassSpringDamper(DynamicSystem):
-    """The README's model, kept in step with its "Write a model" section."""
-
-    def __init__(self):
-        super().__init__(state_dim=2, input_dim=1, output_dim=1)
-
-    def f(self, x, u, t=0, params=None):
-        m, k, b = 1.0, 4.0, 0.3
-        p, v = x
-
-        # m p̈ + b ṗ + k p = u
-        a = (u[0] - b * v - k * p) / m
-
-        return np.array([v, a])
-
-    def h(self, x, u, t=0, params=None):
-        p, v = x
-
-        return np.array([p])  # the sensor reads the position only
 
 
 def tool_montage() -> None:
