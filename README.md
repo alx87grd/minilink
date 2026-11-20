@@ -17,8 +17,8 @@
   </tr>
   <tr>
 <td width="25%" align="center" valign="top">Cart-pole swing-up, trajectory optimization</td>
-<td width="25%" align="center" valign="top"><a href="#7-interactive-play-and-3-d-visualization">UR5 arm, task-space impedance control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a></td>
-<td width="25%" align="center" valign="top"><a href="#4-one-problem-every-planner">Racecar, model predictive control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
+<td width="25%" align="center" valign="top"><a href="#8-interactive-play-and-3-d-visualization">UR5 arm, task-space impedance control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a></td>
+<td width="25%" align="center" valign="top"><a href="#5-one-problem-every-planner">Racecar, model predictive control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
 <td width="25%" align="center" valign="top">Rocket landing, reinforcement learning</td>
   </tr>
 </table>
@@ -47,23 +47,25 @@ conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activat
 
 *Optional system dependencies:* `plot_diagram()` requires Graphviz ([download](https://graphviz.org/download/), then `pip install graphviz`); the Ipopt solver is `conda install -c conda-forge cyipopt` (trajectory optimization runs on SciPy without it).
 
-The snippets below run as one session; sections 3, 4 (MPC) and 6 use JAX.
+The snippets below run as one session; sections 4, 5 (MPC) and 7 use JAX.
 
 ## 1. A closed loop
 
 ```python
-from minilink import Impedance, Pendulum
+from minilink import PID, SingleMass
 
-plant = Pendulum()
-plant.x0 = [2.0, 0.0]
+plant = SingleMass()  # a mass on a spring; the sensor reads its position
+plant.x0 = [1.0, 0.0]
 
-loop = Impedance(Kp=100.0, Kd=20.0) @ plant
-loop.compute_trajectory(tf=6.0)
+loop = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ plant
+loop.compute_trajectory(tf=10.0)
 loop.plot_trajectory()
-loop.animate()
+loop.plot_diagram()
 ```
 
-`ctrl @ plant` closes the feedback loop, and the loop is itself a `System`.
+![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
+
+`ctrl @ plant` closes the feedback loop, inserting the error $e = r - y$ the PID reads, and the loop is itself a `System`.
 
 ## 2. Models and diagrams in code
 
@@ -76,9 +78,11 @@ $$T = \mathrm{tf}(x, u, t; p) \quad \text{(body poses for 3D animation)}$$
 **Functional purity** means equations are stateless: arrays in, arrays out. No simulation time or state is mutated on `self`.
 This purity allows precise numerical integration, reproducible experiments, exact linear analysis, arbitrary composition into nested systems, parallel GPU rollouts, and automatic differentiation.
 
+`SingleMass` is written this way; a model of your own is a class with its `f`, and its `h` when the sensor does not read the whole state:
+
 ```python
 import numpy as np
-from minilink import PID, DynamicSystem
+from minilink import DynamicSystem
 
 
 class MassSpringDamper(DynamicSystem):
@@ -95,46 +99,61 @@ class MassSpringDamper(DynamicSystem):
         return np.array([x[0]])  # sensor measures position only
 
 
-pid_loop = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ MassSpringDamper()
-pid_loop.plot_diagram()
+my_loop = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ MassSpringDamper()
+my_loop.compute_trajectory(tf=10.0)
 ```
-
-![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
 
 Code is the single source of truth:
 
 - **Algebraic shortcuts:** `ctrl @ plant` (feedback loop, with the error block the PID reads), `a >> b` (series), `a + b` (side by side), `sys % Δ` (zero-order hold digital clock sampling).
 - **Explicit wiring:** `diag.connect("controller", "u", "plant", "u")` connects arbitrary multi-loop networks with immediate port checks.
-- **Auto-generated diagrams:** `loop.plot_diagram()` draws the diagram above directly from code.
+- **Auto-generated diagrams:** `loop.plot_diagram()` draws the diagram of section 1 directly from code.
 
 ```python
 from minilink import Step
 
 reference = Step(final_value=[1.0], step_time=1.0)
-digital = reference >> (Impedance(Kp=100.0, Kd=20.0) % 0.1) @ plant
-digital.compute_trajectory(tf=6.0)
+digital = reference >> (PID(Kp=10.0, Ki=1.0, Kd=2.0) % 0.1) @ plant
+digital.compute_trajectory(tf=10.0)
 ```
 
-Because a composite diagram is itself a `DynamicSystem`, **every analysis verb works identically on closed loops**: `loop.linearize()`, `loop.transfer_function()`, `loop.plot_bode()`, `loop.plot_root_locus()`, `loop.plot_pzmap()`, and `loop.plot_step_response()`. State feedback is one call: `lqr` designs on the linear model at a point, and `kalman` and `lqg` are its duals for estimation.
+Because a composite diagram is itself a `DynamicSystem`, **every analysis verb works identically on closed loops**: `loop.linearize()`, `loop.transfer_function()`, `loop.plot_bode()`, `loop.plot_root_locus()`, `loop.plot_pzmap()`, and `loop.plot_step_response()`.
 
 ```python
-from minilink import lqr
-
-loop.transfer_function()     # G(s) = 50 / (s² + 10 s + 54.91)
+loop.transfer_function()  # G(s) = (30 s² + 101 s + 10) / (s⁴ + 10 s³ + 32 s² + 121 s + 10)
 loop.plot_bode()
 loop.plot_root_locus()
+```
+
+## 3. A catalog plant: the pendulum
+
+The catalog's plants are written the same way. From here on, the story follows one pendulum: an
+impedance law (a spring and a damper on the joint) holds it, `lqr` balances it at the upright on
+the linear model there (`kalman` and `lqg` are its duals for estimation), and later sections plan,
+score and tune on it.
+
+```python
+from minilink import Impedance, Pendulum, lqr
+
+plant = Pendulum()
+plant.x0 = [2.0, 0.0]
+
+loop = Impedance(Kp=100.0, Kd=20.0) @ plant
+loop.compute_trajectory(tf=6.0)
+loop.animate()
 
 up = np.array([np.pi, 0.0])
-balance = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=up) @ plant
+K = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=up)
+balance = K @ plant
 balance.compute_trajectory(tf=4.0, x0=[np.pi - 0.5, 0.0])
 balance.animate()
 ```
 
 Parameters are wired through the diagram too: `loop.params` is one nested tree,
 `{'controller': {'Kp': ..., 'Kd': ...}, 'plant': {'m': ..., 'l': ...}}`, and a dotted path such
-as `"plant.l"` names any number in any block. Sections 3, 5 and 6 use it.
+as `"plant.l"` names any number in any block. Sections 4, 6 and 7 use it.
 
-## 3. Differentiable and batched with JAX
+## 4. Differentiable and batched with JAX
 
 The exact same equation $f(x, u, t; p)$ traces under JAX without rewriting physics:
 
@@ -148,14 +167,22 @@ x = np.array([1.0, 0.0])
 A = plant.jacobian("f", "x", x)
 S = plant.jacobian("f", "params", x)
 
+import matplotlib.pyplot as plt
+
+compiled = plant.compile(backend="jax")
 lengths = np.linspace(0.5, 2.0, 1000)
 starts = np.full((1000, 2), [1.0, 0.0])
-swings = plant.compile(backend="jax").rollout_batch(
-    starts, n_steps=1000, dt=0.005, params=dict(plant.params, l=lengths)
-)
+params = dict(plant.params, l=lengths)
+swings = compiled.rollout_batch(starts, n_steps=1000, dt=0.005, params=params)
+
+t = np.linspace(0.0, 5.0, 1001)
+plt.plot(t, swings[:, :, 0].T, color="C0", alpha=0.02)
+plt.show()
 ```
 
-## 4. One problem, every planner
+![1,000 swings, one per rod length](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/batch_rollouts.png)
+
+## 5. One problem, every planner
 
 A `PlanningProblem` bundles the physical plant, boundary sets ($\mathcal{X}, \mathcal{U}, \mathcal{X}_f$), cost function $J$, and horizon $t_f$.
 The identical problem definition is handed to completely different solver paradigms:
@@ -177,35 +204,47 @@ from minilink import (
 )
 from minilink.control import ModelPredictiveController
 
+cost = QuadraticCost.from_system(plant, x_bar=up, S=100 * np.eye(2))
 problem = PlanningProblem(
-    plant, x0=[0.0, 0.0], Xf=BallSet(up, 0.2), horizon=6.0,
-    cost=QuadraticCost.from_system(plant, x_bar=up, S=100 * np.eye(2)),
-    X=plant.state.box, U=plant.input_box,
+    plant,
+    x0=[0.0, 0.0],
+    Xf=BallSet(up, 0.2),
+    horizon=6.0,
+    cost=cost,
+    X=plant.state.box,
+    U=plant.input_box,
 )
 
-vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05).solve()
+vi_planner = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
+vi = vi_planner.solve()
 rrt = RRTPlanner(problem, seed=0).solve()
 opt = TrajectoryOptimizationPlanner(problem, n_steps=60).solve()
 
 look_ahead = problem.replace(horizon=2.0, Xf=None)
-mpc = ModelPredictiveController(TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")) % 0.1
+mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")
+mpc = ModelPredictiveController(mpc_planner) % 0.1
 
 swing_up = vi.controller @ plant
 swing_up.compute_trajectory(tf=6.0, x0=[0.0, 0.0])
 swing_up.animate()
 ```
 
+![Value iteration's swing-up](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pendulum_swingup.gif)
+
 Every planner returns a `PlanningSolution` whose controller is itself a `System`: a feedback law closes the loop via `controller @ plant`, an open-loop plan drives it via `controller >> plant`. MPC is a controller block already, a planner on a 0.1 s clock.
 
-## 5. One score
+## 6. One score
 
 `compare` scores every controller on the same problem: the same model, cost, sets, and draws. Here the mass is uncertain by ±20 %, and each controller runs on the same twenty draws:
 
 ```python
 from minilink import Uniform, compare
 
-uncertain = problem.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
-print(compare(uncertain, VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=20))
+mass = Uniform(0.8, 1.2)
+uncertain = problem.replace(distributions={"plant": {"m": mass}})
+comparison = compare(uncertain, VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=20)
+print(comparison)
+comparison.plot_simulated_trajectory()
 ```
 
 ```
@@ -222,9 +261,11 @@ MPC     │ -                           │ 130.3  95.56      403.2  17/20  20/2
 ===================================================================================
 ```
 
+![The twenty runs of each controller](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/comparison_runs.png)
+
 The two open-loop plans reach the goal on the nominal model and miss it when the mass changes; the two feedback laws reach it on most draws.
 
-## 6. The unified optimization boundary
+## 7. The unified optimization boundary
 
 All transcriptions lower late to a single, canonical mathematical program:
 
@@ -239,18 +280,23 @@ Here: bring the pendulum, released at 2 rad, to rest, by tuning the two gains an
 ```python
 from minilink import Optimizer
 
-task = PlanningProblem(plant, x0=[2.0, 0.0], horizon=5.0, cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)))
+rest_cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
+task = PlanningProblem(plant, x0=[2.0, 0.0], horizon=5.0, cost=rest_cost)
 evaluator = task.compile(Impedance(Kp=1.0, Kd=1.0), backend="jax")
-program = evaluator.program(
-    ["controller.Kp", "controller.Kd", "plant.l"],
-    bounds={"controller.Kp": (0.0, 50.0), "controller.Kd": (0.0, 20.0), "plant.l": (0.5, 2.0)},
-)
+
+bounds = {
+    "controller.Kp": (0.0, 50.0),
+    "controller.Kd": (0.0, 20.0),
+    "plant.l": (0.5, 2.0),
+}
+tuned = ["controller.Kp", "controller.Kd", "plant.l"]
+program = evaluator.program(tuned, bounds=bounds)
 best = Optimizer(program).solve()   # Kp = 1.47, Kd = 3.80, l = 0.5
 ```
 
 The rod length goes to its lower bound, since the cost does not penalize it.
 
-## 7. Interactive play and 3-D visualization
+## 8. Interactive play and 3-D visualization
 
 - **Real-time wall-clock play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame).
 - **Decoupled geometry:** body poses $T = \mathrm{tf}(x, u, t; p)$ describe kinematics without cluttering the differential equations with rendering code.
@@ -264,9 +310,13 @@ The same lines on a robot: a task-space impedance law moves the UR5's hand to a 
 from minilink import TaskImpedance, UR5Manipulator
 
 robot = UR5Manipulator()
-target = Step(initial_value=[-0.8, -0.2, 0.0], final_value=[-0.5, 0.0, 0.5], step_time=1.0)
+hand_start = [-0.8, -0.2, 0.0]
+hand_goal = [-0.5, 0.0, 0.5]
+target = Step(initial_value=hand_start, final_value=hand_goal, step_time=1.0)
+
 arm_loop = target >> TaskImpedance(robot, gravity_comp=True) @ robot
-arm_loop.animate(arm_loop.compute_trajectory(tf=5.0), renderer="meshcat")
+arm_traj = arm_loop.compute_trajectory(tf=5.0)
+arm_loop.animate(arm_traj, renderer="meshcat")
 ```
 
 *Live interactive 3D demos:* [UR-5 Impedance Control](https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html) • [Racecar MPC](https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html).

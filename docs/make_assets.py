@@ -16,7 +16,6 @@ SHOWCASE = STATIC / "showcase"  # interactive 3-D pages, served by the docs site
 import numpy as np  # noqa: E402
 from asset_export import html_to_gif, montage_png, shrink_gif, svg_to_png  # noqa: E402
 
-from minilink import DynamicSystem  # noqa: E402
 from minilink.core.sets import SingletonSet  # noqa: E402
 
 
@@ -56,37 +55,101 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
 
 
 def diagram_png() -> None:
-    """The README's loop: the custom plant of its "Write a model" section, closed by a PID."""
-    from minilink import PID
+    """The README's first loop: a PID closed on the catalog's mass on a spring."""
+    from minilink import PID, SingleMass
     from minilink.graphical.diagrams.dot import get_diagram
 
-    plant = MassSpringDamper()
-    diagram = PID(2.0, 0.5, 1.0) @ plant
+    diagram = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ SingleMass()
     get_diagram(diagram).render(
         filename=str(STATIC / "diagram_closed_loop"), format="png", cleanup=True
     )
     print("diagram_closed_loop.png")
 
 
-class MassSpringDamper(DynamicSystem):
-    """The README's model, kept in step with its "Write a model" section."""
+def batch_rollouts() -> None:
+    """The README's batch: a thousand swings, one per rod length, overlapping."""
+    import matplotlib.pyplot as plt
 
-    def __init__(self):
-        super().__init__(state_dim=2, input_dim=1, output_dim=1)
+    from minilink import Pendulum
 
-    def f(self, x, u, t=0, params=None):
-        m, k, b = 1.0, 4.0, 0.3
-        p, v = x
+    plant = Pendulum()
+    compiled = plant.compile(backend="jax")
+    lengths = np.linspace(0.5, 2.0, 1000)
+    starts = np.full((1000, 2), [1.0, 0.0])
+    params = dict(plant.params, l=lengths)
+    swings = compiled.rollout_batch(starts, n_steps=1000, dt=0.005, params=params)
 
-        # m p̈ + b ṗ + k p = u
-        a = (u[0] - b * v - k * p) / m
+    t = np.linspace(0.0, 5.0, 1001)
+    fig, ax = plt.subplots(figsize=(7.0, 3.0))
+    ax.plot(t, np.asarray(swings)[:, :, 0].T, color="C0", alpha=0.02)
+    ax.set_xlabel("t [s]")
+    ax.set_ylabel("theta [rad]")
+    fig.tight_layout()
+    fig.savefig(STATIC / "batch_rollouts.png", dpi=110)
+    plt.close(fig)
+    print("batch_rollouts.png")
 
-        return np.array([v, a])
 
-    def h(self, x, u, t=0, params=None):
-        p, v = x
+def readme_swing_up():
+    """The README's swing-up problem and its four answers, as its planner section builds them."""
+    from minilink import (
+        BallSet,
+        DynamicProgrammingPlanner,
+        Pendulum,
+        PlanningProblem,
+        QuadraticCost,
+        RRTPlanner,
+        TrajectoryOptimizationPlanner,
+    )
+    from minilink.control import ModelPredictiveController
 
-        return np.array([p])  # the sensor reads the position only
+    plant = Pendulum()
+    up = np.array([np.pi, 0.0])
+    cost = QuadraticCost.from_system(plant, x_bar=up, S=100 * np.eye(2))
+    problem = PlanningProblem(
+        plant,
+        x0=[0.0, 0.0],
+        Xf=BallSet(up, 0.2),
+        horizon=6.0,
+        cost=cost,
+        X=plant.state.box,
+        U=plant.input_box,
+    )
+    vi_planner = DynamicProgrammingPlanner(
+        problem, x_grid=(101, 101), u_grid=(11,), dt=0.05
+    )
+    answers = {
+        "VI": vi_planner.solve(),
+        "RRT": RRTPlanner(problem, seed=0).solve(),
+        "TrajOpt": TrajectoryOptimizationPlanner(problem, n_steps=60).solve(),
+    }
+    look_ahead = problem.replace(horizon=2.0, Xf=None)
+    mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")
+    answers["MPC"] = ModelPredictiveController(mpc_planner) % 0.1
+    return plant, problem, answers
+
+
+def swing_up_gif() -> None:
+    """The README's value-iteration swing-up, closed on the pendulum."""
+    plant, _, answers = readme_swing_up()
+    swing_up = answers["VI"].controller @ plant
+    traj = swing_up.compute_trajectory(tf=6.0, x0=[0.0, 0.0])
+    save_gif(swing_up, traj, "pendulum_swingup.gif", speed=1.0)
+    print("pendulum_swingup.gif")
+
+
+def comparison_runs() -> None:
+    """The README's comparison over the uncertain mass: every controller's twenty runs."""
+    from minilink import Uniform, compare
+
+    _, problem, answers = readme_swing_up()
+    mass = Uniform(0.8, 1.2)
+    uncertain = problem.replace(distributions={"plant": {"m": mass}})
+    comparison = compare(uncertain, n_trials=20, **answers)
+    comparison.plot_simulated_trajectory(show=False).save(
+        STATIC / "comparison_runs.png"
+    )
+    print("comparison_runs.png")
 
 
 def tool_montage() -> None:
@@ -480,6 +543,9 @@ def pipeline_map() -> None:
 ASSETS = {
     "map": (pipeline_map, ["pipeline_map.png"]),
     "diagram": (diagram_png, ["diagram_closed_loop.png"]),
+    "batch": (batch_rollouts, ["batch_rollouts.png"]),
+    "swingup": (swing_up_gif, ["pendulum_swingup.gif"]),
+    "comparison": (comparison_runs, ["comparison_runs.png"]),
     "montage": (tool_montage, ["tool_montage.png"]),
     "cartpole": (gif_cartpole, ["cartpole_swingup.gif"]),
     "ur5": (ur5_impedance, ["ur5_meshcat.gif", "showcase/ur5_impedance.html"]),
