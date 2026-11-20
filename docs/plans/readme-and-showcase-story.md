@@ -51,9 +51,14 @@ the goal; the tuning bounds its three decision variables; reinforcement learning
 the notebook (its default settings do not learn this cost); explicit `connect` wiring stays in
 the tutorials; the README stays compact (it does not grow past the old one).
 
+The showcase notebook is on the same story (2026-11-20, the notebook check green, about a
+minute on a cloud machine), the README's code cell for cell with the plots and animations
+between. Ruled for it: reinforcement learning is its own section, "Learn a law", after the
+score, on its own shaped cost and random starts (trained on the README's problem it learns to
+stay down), scored by `compare` against the section-2 LQR; the own model is the README's
+`MyPendulum` (PID and a partial sensor `h` stay in `basics/`); the run time is measured, not a
+budget the content is cut to.
+
 ## Left
 
-- The notebook on the same story: the judge after the planners with `compare` and the
-  uncertain mass, the same problem and terminal weight, the classical-analysis cell, the tuning
-  with the rod length; then the README's "Learn more" line says it runs this page.
-- The comparison table re-run when the pendulum's point-mass default lands (TODO §1.10).
+- The comparison table, in both, re-run when the pendulum's point-mass default lands (TODO §1.10).

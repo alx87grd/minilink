@@ -273,7 +273,7 @@ discrete-time systems are a sibling family, and `%` puts a block on a clock from
 
 ## Learn more
 
-- [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb): one pendulum through every tool, with reinforcement learning.
+- [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb): this page run end to end, with the plots and animations, and a learned law.
 - [Tutorials](https://github.com/alx87grd/minilink/tree/main/examples/tutorial): `basics/`, `core/`, `advanced/`.
 - [Teaching notebooks](https://github.com/alx87grd/teaching): the course notebooks.
 - [API reference](https://alx87grd.github.io/minilink/) · [Pipelines](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md)
