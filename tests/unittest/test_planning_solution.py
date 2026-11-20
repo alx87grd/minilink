@@ -457,13 +457,12 @@ def test_compare_reads_the_solutions_side_by_side():
     race = compare(VI=vi, LQR=lqr)
     assert len(race) == 2 and race["LQR"] is lqr and list(race) == ["VI", "LQR"]
     table = str(race)
-    titles = [half.strip() for half in table.splitlines()[0].split("│")]
-    assert titles == [
-        "",
-        "plan, as the planner wrote it",
-        "run, simulated by the judge",
-    ]
-    assert "converged" in table and "closed-loop poles" in table
+    assert table.splitlines()[1] == (
+        "Comparison of 2 solutions, each scored on its own problem"
+    )
+    titles = [half.strip() for half in table.splitlines()[3].split("│")]
+    assert titles == ["", "nominal trajectory", "simulation"]
+    assert "converged" not in table and "converged" in str(race["VI"])
     assert f"{float(vi.evaluation.J[0]):.4g}" in table
 
     axes = race.plot_control_law(show=False).axes
@@ -471,14 +470,14 @@ def test_compare_reads_the_solutions_side_by_side():
     assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
     axes = race.plot_cost_to_go(show=False, grid_shape=(9, 9)).axes
     assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
-    axes = race.plot_trajectory(show=False).axes
+    axes = race.plot_simulated_trajectory(show=False).axes
     assert len(axes) == 3 and len(axes[0].get_lines()) == 2
 
     # The same panels with Plotly, titled above them
     laws = race.plot_control_law(title="laws", renderer="plotly", show=False)
     assert [type(trace).__name__ for trace in laws.figure.data] == ["Heatmap"] * 2
     assert laws.figure.layout.title.text == "laws"
-    runs = race.plot_trajectory(renderer="plotly", show=False)
+    runs = race.plot_simulated_trajectory(renderer="plotly", show=False)
     assert [trace.name for trace in runs.figure.data[:2]] == ["VI", "LQR"]
 
     # one evaluation scores every policy on the same draws; a solution stands for its policy
@@ -494,7 +493,8 @@ def test_compare_reads_the_solutions_side_by_side():
 
     # a bare controller and an evaluation already computed take part too
     mixed = compare(problem, LQR=lqr.controller, VI=scored.evaluations["VI"], dt=0.1)
-    assert list(mixed) == ["LQR"] and "given" in str(mixed)
+    assert list(mixed) == ["LQR"] and str(mixed["LQR"].record) == "given"
+    assert [line.split()[0] for line in str(mixed).splitlines()[6:-1]] == ["LQR", "VI"]
     on_grid = DynamicProgrammingPlanner(problem, x_grid=(11, 11), u_grid=(3,), dt=0.2)
     assert np.all(np.isfinite(on_grid.evaluate_policy(lqr).params["values"]))
 
@@ -662,15 +662,15 @@ def hand_plan(problem, length=2.5):
 
 
 def halves_of(table, name):
-    """The plan half and the run half of ``name``'s line in a comparison's table."""
+    """The nominal half and the simulation half of ``name``'s line in a comparison's table."""
     line = next(line for line in table.splitlines() if line.startswith(f"{name} "))
     _, plan, run = (half.strip() for half in line.split("│"))
 
     return plan, run
 
 
-def test_the_table_scores_the_plan_cut_at_the_horizon_beside_the_run():
-    """A plan of 2.5 s on a 2 s horizon is scored on [t0, t0 + 2], the state at t0 + 2 interpolated; its length is its own."""
+def test_the_table_scores_the_nominal_trajectory_cut_at_the_horizon_beside_the_simulation():
+    """A plan of 2.5 s on a 2 s horizon is scored on [t0, t0 + 2], the state at t0 + 2 interpolated."""
     from minilink.control import lqr as lqr_design
     from minilink.planning import compare
     from minilink.planning.evaluation import evaluate_trajectory
@@ -687,21 +687,24 @@ def test_the_table_scores_the_plan_cut_at_the_horizon_beside_the_run():
     cut = evaluate_trajectory(
         problem, Trajectory(p.t[kept], p.x[:, kept], p.u[:, kept])
     )
+    # A framed panel: the title between two rules, a closing rule, as wide as the table
+    lines = table.splitlines()
+    assert lines[1] == "Comparison, DoubleIntegrator, horizon=2"
+    assert lines[0] == lines[2] == lines[-1] == "=" * max(map(len, lines))
+    titles = [half.strip() for half in lines[3].split("│")]
+    assert titles == ["", "nominal trajectory", "simulation"]
+    assert lines[4].split("│")[2].split() == ["J", "goal", "constraints"]
     plan_half, run_half = halves_of(table, "Plan")
-    assert plan_half.split() == [f"{float(cut.J[0]):.4g}", "missed", "ok", "2.5", "s"]
-    assert run_half.split()[-2:] == ["2", "s"]
+    assert plan_half.split() == [f"{float(cut.J[0]):.4g}", "missed", "ok"]
+    assert len(run_half.split()) == 3
 
-    # The law has no plan; its run is the judge's
+    # The law has no nominal trajectory; its simulation is the judge's
     plan_half, run_half = halves_of(table, "Law")
-    assert plan_half == "no plan (a feedback law)"
+    assert plan_half == "-"
     assert run_half.startswith(f"{float(comparison.evaluations['Law'].J[0]):.4g}")
 
-    # The records under the table, one line each
-    assert table.splitlines()[-3:] == [
-        "records",
-        "  Law   given",
-        "  Plan  written by hand",
-    ]
+    # The records stay on the solutions, out of the table
+    assert "given" not in table and "written by hand" not in table
 
 
 def test_a_plan_that_starts_after_the_deadline_says_so_and_the_table_prints():
@@ -714,7 +717,7 @@ def test_a_plan_that_starts_after_the_deadline_says_so_and_the_table_prints():
 
     plan_half, run_half = halves_of(table, "Plan")
     assert plan_half == "starts after the deadline"
-    assert run_half.split()[-2:] == ["2", "s"]
+    assert len(run_half.split()) == 3
 
 
 def test_the_table_and_the_figure_keep_the_order_the_entries_were_given():
@@ -728,64 +731,43 @@ def test_the_table_and_the_figure_keep_the_order_the_entries_were_given():
     scored = evaluate(problem, law, dt=0.05, trajectories=True)
     comparison = compare(problem, Scored=scored, Plan=hand_plan(problem), dt=0.05)
 
-    rows = [line.split()[0] for line in str(comparison).splitlines()[3:5]]
+    rows = [line.split()[0] for line in str(comparison).splitlines()[6:8]]
     assert rows == ["Scored", "Plan"]
     labels = list(
         dict.fromkeys(
             line.get_label()
-            for line in comparison.plot_trajectory(show=False).axes[0].get_lines()
+            for line in comparison.plot_simulated_trajectory(show=False)
+            .axes[0]
+            .get_lines()
             if line.get_label() in ("Scored", "Plan")
         )
     )
     assert labels == ["Scored", "Plan"]
 
 
-def test_the_star_marks_the_lowest_J_among_the_runs_that_succeed():
-    """The best run is chosen from the numbers; without one that succeeds, no star and no footnote."""
+def test_a_run_that_reaches_the_goal_outside_the_constraints_reads_both():
+    """The table states the numbers and ranks nothing: no star, no footnote."""
     from minilink.control import lqr as lqr_design
     from minilink.planning import compare
 
     problem = judged_move(radius=0.5)
-    laws = {
-        "Soft": lqr_design(problem.sys, np.eye(2), 1.0 * np.eye(1)),
-        "Firm": lqr_design(problem.sys, 10.0 * np.eye(2), 0.1 * np.eye(1)),
-        "Slow": lqr_design(problem.sys, 0.1 * np.eye(2), 10.0 * np.eye(1)),
-    }
-    comparison = compare(problem, **laws, dt=0.05, backend="numpy")
-    table = str(comparison)
-
-    # The expected best, from the evaluations
-    succeeding = {
-        name: float(e.objective)
-        for name, e in comparison.evaluations.items()
-        if float(e.success_rate) == 1.0
-    }
-    assert succeeding, "the test needs one law that succeeds"
-    best = min(succeeding, key=succeeding.get)
-    starred = [name for name in laws if halves_of(table, name)[1].split()[1] == "*"]
-    assert starred == [best]
-    assert "* best run: the lowest J that reaches the goal within the limits" in table
-
-    # The cost's own LQR law costs less but leaves the limits: reached, violated, no star
+    soft = lqr_design(problem.sys, np.eye(2), 1.0 * np.eye(1))
     optimal = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    table = str(compare(problem, Soft=laws["Soft"], Optimal=optimal, dt=0.05))
-    assert halves_of(table, "Optimal")[1].split()[1:3] == ["reached", "violated"]
-    assert halves_of(table, "Soft")[1].split()[1:3] == ["*", "reached"]
+    table = str(compare(problem, Soft=soft, Optimal=optimal, dt=0.05))
+
+    # The cost's own LQR law costs less but leaves the input limits
+    assert halves_of(table, "Optimal")[1].split()[1:] == ["reached", "violated"]
+    assert halves_of(table, "Soft")[1].split()[1:] == ["reached", "ok"]
     J = {
         name: float(halves_of(table, name)[1].split()[0])
         for name in ("Soft", "Optimal")
     }
     assert J["Optimal"] < J["Soft"]
-
-    # Nobody reaches a goal that is a point: no star, no footnote
-    unreachable = compare(
-        judged_move(radius=0.0), **laws, dt=0.05, backend="numpy"
-    ).__str__()
-    assert "*" not in unreachable and "best run" not in unreachable
+    assert "*" not in table and "best" not in table
 
 
 def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
-    """Several draws: the criterion heads J, goal and limits are counts; an Evaluation entry has no plan; a run not finite reads diverged."""
+    """Several draws: the criterion heads J, goal and constraints are counts; an Evaluation entry has no nominal trajectory; a run not finite reads diverged."""
     from dataclasses import replace
 
     from minilink.control import lqr as lqr_design
@@ -797,14 +779,27 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
     comparison = compare(problem, Law=law, dt=0.05, n_trials=5, backend="numpy")
     table = str(comparison)
-    header = table.splitlines()[1].split("│")[2].split()
-    assert header == ["E[J]", "goal", "limits", "length"]
+    assert table.splitlines()[1].endswith("criterion=expectation, 5 draws")
+    header = table.splitlines()[4].split("│")[2].split()
+    assert header == ["E[J]", "σ(J)", "max", "J", "goal", "constraints"]
     _, run_half = halves_of(table, "Law")
     evaluation = comparison.evaluations["Law"]
-    assert run_half.split()[-2:] == [
+    statistics = [evaluation.mean, evaluation.std, evaluation.worst]
+    assert run_half.split() == [
+        *(f"{float(value):.4g}" for value in statistics),
         f"{int(np.sum(evaluation.reached))}/5",
         f"{int(np.sum(~evaluation.failed))}/5",
     ]
+
+    # Another criterion comes first, each statistic once
+    for criterion, labels in (
+        (("cvar", 0.2), ["CVaR_0.2(J)", "E[J]", "σ(J)", "max", "J"]),
+        ("worst_case", ["max", "J", "E[J]", "σ(J)"]),
+    ):
+        judged = problem.replace(criterion=criterion)
+        table = str(compare(judged, Law=law, dt=0.05, n_trials=5, backend="numpy"))
+        header = table.splitlines()[4].split("│")[2].split()
+        assert header == [*labels, "goal", "constraints"]
 
     # A run not finite, given as an evaluation that keeps no run
     t = np.linspace(0.0, 2.0, 21)
@@ -817,7 +812,7 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
         judged_move(), Law=law, Diverged=replace(diverged, trajectories=None), dt=0.05
     )
     plan_half, run_half = halves_of(str(mixed), "Diverged")
-    assert plan_half == "no plan"
+    assert plan_half == "-"
     assert run_half.split()[1:] == ["missed", "diverged"]
 
 
@@ -842,8 +837,11 @@ def test_the_plan_is_scored_on_the_judged_problem_whatever_the_entries_order():
         plan_half, _ = halves_of(str(comparison), "Plan")
         assert plan_half.split()[:2] == [f"{float(expected.J[0]):.4g}", "missed"]
 
-        # The figure's horizon is the judged t0 + T on every row
-        axes = comparison.plot_trajectory(show=False).axes
+        # Both figures' horizon is the judged t0 + T on every row
+        axes = [
+            *comparison.plot_nominal_trajectory(show=False).axes,
+            *comparison.plot_simulated_trajectory(show=False).axes,
+        ]
         for ax in axes:
             verticals = [
                 line.get_xdata()[0]
@@ -872,16 +870,21 @@ def test_the_figures_marks_follow_each_rows_signal():
         ]
 
     # On the input row alone: the two limits and the horizon, no goal
-    (u_row,) = [comparison.plot_trajectory(signals=("u",), show=False).axes]
+    (u_row,) = [comparison.plot_simulated_trajectory(signals=("u",), show=False).axes]
     assert marks(u_row, GOAL_COLOR) == []
     limits = [ys for xs, ys in marks(u_row, LIMIT_COLOR) if ys[0] == ys[-1]]
     assert sorted(ys[0] for ys in limits) == [-2.0, 2.0]
 
-    # x rows: the goal's extent at t0 + T = 3, the ball of radius 0.2; the u row: no goal
-    axes = comparison.plot_trajectory(show=False).axes
-    for k in range(2):
-        assert marks(axes[k], GOAL_COLOR) == [((3.0, 3.0), (-0.2, 0.2))]
-    assert marks(axes[2], GOAL_COLOR) == []
+    # x rows: the goal's extent at t0 + T = 3, the ball of radius 0.2; the u row: no
+    # goal; on both figures
+    for plot in (
+        comparison.plot_nominal_trajectory,
+        comparison.plot_simulated_trajectory,
+    ):
+        axes = plot(show=False).axes
+        for k in range(2):
+            assert marks(axes[k], GOAL_COLOR) == [((3.0, 3.0), (-0.2, 0.2))]
+        assert marks(axes[2], GOAL_COLOR) == []
 
 
 def test_the_legend_sits_beside_the_panels_and_given_axes_are_left_as_they_are():
@@ -895,7 +898,7 @@ def test_the_legend_sits_beside_the_panels_and_given_axes_are_left_as_they_are()
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
     comparison = compare(problem, Law=law, Plan=hand_plan(problem), dt=0.05)
 
-    result = comparison.plot_trajectory(show=False)
+    result = comparison.plot_simulated_trajectory(show=False)
     (legend,) = result.figure.legends
     assert [text.get_text() for text in legend.get_texts()] == ["Law", "Plan", "limits"]
     assert all(ax.get_legend() is None for ax in result.axes)
@@ -904,7 +907,7 @@ def test_the_legend_sits_beside_the_panels_and_given_axes_are_left_as_they_are()
 
     fig, given = plt.subplots(3, 1)
     before = [ax.get_position().bounds for ax in given]
-    comparison.plot_trajectory(ax=list(given), show=False)
+    comparison.plot_simulated_trajectory(ax=list(given), show=False)
     assert fig.legends == []
     assert [ax.get_position().bounds for ax in given] == before
     assert given[0].get_legend() is not None
@@ -922,14 +925,14 @@ def test_an_evaluation_entry_is_drawn_when_it_keeps_its_runs():
     kept = evaluate(problem, law, dt=0.05, trajectories=True)
 
     def labels(comparison):
-        axes = comparison.plot_trajectory(show=False).axes
+        axes = comparison.plot_simulated_trajectory(show=False).axes
         return [line.get_label() for line in axes[0].get_lines()]
 
     assert "B" in labels(compare(problem, A=scored, B=law, dt=0.05))
     assert "A" not in labels(compare(problem, A=scored, B=law, dt=0.05))
     assert "A" in labels(compare(problem, A=kept, dt=0.05))
     with pytest.raises(ValueError, match="not drawn"):
-        compare(problem, A=scored).plot_trajectory(show=False)
+        compare(problem, A=scored).plot_simulated_trajectory(show=False)
 
 
 def plant_part(run):
@@ -937,71 +940,93 @@ def plant_part(run):
     return run.of("plant") if "plant" in run.roles else run
 
 
-def test_the_evaluations_keep_the_judges_runs_and_the_figure_draws_them():
-    """One run per trial in each evaluation; one run is the solid line, several are faint lines under the plan."""
+def test_the_evaluations_keep_the_judges_runs_and_the_simulated_figure_draws_them():
+    """One run per trial in each evaluation; one run is the solid line, several are faint lines; no nominal trajectory among them."""
     from minilink.control import lqr as lqr_design
     from minilink.planning import compare
     from minilink.planning.comparison import FAINT_ALPHA, FAINT_WIDTH
 
     law = lqr_design(DoubleIntegrator(), np.eye(2), 0.1 * np.eye(1))
 
-    # Without draws: one run, the solid line on every row is that run
+    # Without draws: one run, the line on every row is that run
     problem = judged_move()
     comparison = compare(problem, Law=law, Plan=hand_plan(problem), dt=0.05)
     for evaluation in comparison.evaluations.values():
         assert len(evaluation.trajectories) == 1
-    axes = comparison.plot_trajectory(show=False).axes
+    axes = comparison.plot_simulated_trajectory(show=False).axes
     for name in ("Law", "Plan"):
         run = plant_part(comparison.evaluations[name].trajectories[0])
-        (line,) = [
-            line
-            for line in axes[0].get_lines()
-            if line.get_label() == name and line.get_linestyle() == "-"
-        ]
+        (line,) = [line for line in axes[0].get_lines() if line.get_label() == name]
         np.testing.assert_array_equal(line.get_xdata(), np.asarray(run.t))
         np.testing.assert_array_equal(line.get_ydata(), np.asarray(run.x)[0])
         assert line.get_alpha() in (None, 1.0)
 
-    # Five draws: five faint lines per answer, the plan dashed and opaque on top
+    # Five draws: five faint lines per answer, and nothing else of theirs
     stochastic = judged_move(x0=Uniform([0.8, -0.2], [1.2, 0.2]))
     entries = dict(Law=law, Plan=hand_plan(stochastic))
     comparison = compare(stochastic, **entries, dt=0.05, n_trials=5)
     for evaluation in comparison.evaluations.values():
         assert len(evaluation.trajectories) == 5
-    result = comparison.plot_trajectory(show=False)
+    result = comparison.plot_simulated_trajectory(show=False)
     lines = result.axes[0].get_lines()
-    faint = [line for line in lines if line.get_alpha() == FAINT_ALPHA]
-    assert len(faint) == 2 * 5
-    assert all(line.get_linewidth() == FAINT_WIDTH for line in faint)
-    (plan,) = [line for line in lines if line.get_linestyle() == "--"]
-    assert plan.get_alpha() in (None, 1.0) and lines.index(plan) > max(
-        lines.index(line) for line in faint
-    )
+    answers = [line for line in lines if line.get_label() in ("Law", "Plan")]
+    assert len(answers) == 2 * 5
+    assert all(line.get_alpha() == FAINT_ALPHA for line in answers)
+    assert all(line.get_linewidth() == FAINT_WIDTH for line in answers)
 
     # The legend's keys at full opacity, on matplotlib and on Plotly
     (legend,) = result.figure.legends
     assert all(handle.get_alpha() == 1.0 for handle in legend.legend_handles)
-    figure = comparison.plot_trajectory(renderer="plotly", show=False).figure
+    figure = comparison.plot_simulated_trajectory(renderer="plotly", show=False).figure
     assert figure.layout.legend.x > 1.0 and figure.layout.legend.xanchor == "left"
     keys = [trace for trace in figure.data if trace.showlegend]
     assert [trace.name for trace in keys] == ["Law", "Plan", "limits"]
     assert all(trace.opacity in (None, 1.0) for trace in keys)
-    # A key shows or hides every trace of its answer: each run and the plan
+    # A key shows or hides every trace of its answer: five runs on each of the three
+    # rows (x₁, x₂, u)
     for name in ("Law", "Plan"):
         group = [trace for trace in figure.data if trace.legendgroup == name]
-        dashed = [trace for trace in group if trace.line.dash == "dash"]
         faint = [trace for trace in group if trace.opacity == FAINT_ALPHA]
-        # five runs and one plan on each of the three rows (x₁, x₂, u)
-        assert len(faint) == 5 * 3 and (name != "Plan" or len(dashed) == 3)
+        assert len(faint) == 5 * 3
 
     # By names only: the controller run once, as before
     names_only = compare(Plan=hand_plan(problem))
     (line,) = [
         line
-        for line in names_only.plot_trajectory(show=False).axes[0].get_lines()
-        if line.get_label() == "Plan" and line.get_linestyle() == "-"
+        for line in names_only.plot_simulated_trajectory(show=False).axes[0].get_lines()
+        if line.get_label() == "Plan"
     ]
     assert line.get_alpha() in (None, 1.0)
+
+
+def test_the_nominal_figure_draws_the_answers_that_carry_one_in_their_colour():
+    """The plan whole and solid, in the colour the simulated figure gives it; a feedback law left out; none at all is refused."""
+    from minilink.control import lqr as lqr_design
+    from minilink.planning import compare
+
+    problem = judged_move()
+    law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
+    plan = hand_plan(problem)
+    comparison = compare(problem, Law=law, Plan=plan, dt=0.05)
+
+    def answer_lines(result):
+        return {
+            line.get_label(): line
+            for line in result.axes[0].get_lines()
+            if line.get_label() in ("Law", "Plan")
+        }
+
+    nominal = answer_lines(comparison.plot_nominal_trajectory(show=False))
+    simulated = answer_lines(comparison.plot_simulated_trajectory(show=False))
+    assert list(nominal) == ["Plan"]
+    line = nominal["Plan"]
+    np.testing.assert_array_equal(line.get_xdata(), np.asarray(plan.trajectory.t))
+    np.testing.assert_array_equal(line.get_ydata(), np.asarray(plan.trajectory.x)[0])
+    assert line.get_linestyle() == "-" and line.get_alpha() in (None, 1.0)
+    assert line.get_color() == simulated["Plan"].get_color()
+
+    with pytest.raises(ValueError, match="no answer carries a nominal trajectory"):
+        compare(problem, Law=law, dt=0.05).plot_nominal_trajectory(show=False)
 
 
 # --- the controller is the block handed out; the function is the compiled face's ---

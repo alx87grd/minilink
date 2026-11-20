@@ -1,4 +1,4 @@
-"""Several solutions of one problem side by side: a table, the laws, the cost-to-go fields, the plans."""
+"""Several solutions of one problem side by side: a table, the laws, the cost-to-go fields, the trajectories."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from minilink.core.reporting import DISP_LINE_WIDTH
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.figure import (
     TAB10,
@@ -25,7 +26,7 @@ from minilink.planning.plotting import (
     cost_to_go_panel,
     sample_field,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, planning_horizon_text
 from minilink.planning.results import (
     PlanningSolution,
     controller_run_of,
@@ -133,16 +134,14 @@ class Comparison:
     distributions, every run drawn.
 
     ``print`` is the table, each answer read twice, the same columns each
-    (``J``, goal, limits, length): its plan as the planner wrote it, cut at
-    the horizon ``t0 + T`` and scored on the problem without simulation (by
-    names only, on its own problem), beside its run, the block it hands out
-    simulated by the judge (on several draws, the criterion and the counts
-    over them). A star marks the best run: the lowest criterion value among
-    the answers whose every run reaches the goal within the limits. The
-    planners' records follow, one line each. Each ``plot_*`` draws every
-    solution on one figure with one scale, and :meth:`difference` reads the
-    paired trials. The judged problem's system labels the axes, else the
-    first solution's.
+    (``J``, goal, constraints): its nominal trajectory, the planner's own, cut
+    at the horizon ``t0 + T`` and scored on the problem without simulation (by
+    names only, on its own problem; ``-`` for an answer without one), beside
+    its simulation, the block it hands out simulated by the judge (on several
+    draws, the criterion and the counts over them). ``print(comparison[name])``
+    shows a planner's record. Each ``plot_*`` draws every solution on one
+    figure with one scale, and :meth:`difference` reads the paired trials. The
+    judged problem's system labels the axes, else the first solution's.
     """
 
     solutions: dict
@@ -263,93 +262,74 @@ class Comparison:
 
         return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
-    def plot_trajectory(
+    def plot_nominal_trajectory(
         self,
         *,
         signals=("x", "u"),
-        title="plans (dashed) and runs (solid)",
+        title="nominal trajectory",
         figsize=None,
         renderer="matplotlib",
         show=True,
         ax=None,
     ) -> PlotResult:
         """
-        Each answer's runs solid and its plan dashed, one colour per answer, one row per signal component: a :class:`PlotResult`, ``title`` over the first row.
+        Each answer's nominal trajectory, one colour per answer, one row per signal component: a :class:`PlotResult`, ``title`` over the first row.
 
-        The runs are the judge's, kept in the answer's evaluation (the plant's
-        part of each): one run is a solid line, several runs (one per draw)
-        thin faint lines; by names only, the controller run once from its
-        problem's start. The plan is drawn on top, whole, past the horizon
-        when it is longer. On a judged problem, each row of ``x`` marks the
-        goal's extent at the deadline ``t0 + T``, each row of ``u`` the input
-        limits, and every row the horizon. The legend holds the answers' names
-        and the limits. An :class:`~minilink.planning.evaluation.Evaluation`
-        entry is drawn when it keeps its runs, else left out.
+        The nominal trajectory is the planner's own, drawn whole, past the
+        horizon when it is longer; the answers without one (a feedback law, an
+        :class:`~minilink.planning.evaluation.Evaluation` entry) are left out.
+        The colours and the marks of the judged problem are those of
+        :meth:`plot_simulated_trajectory`.
         """
-        runs = {name: drawn_runs_of(self, name) for name in self.evaluations or self}
-        colors = {
-            name: SOLUTION_COLORS[m % len(SOLUTION_COLORS)]
-            for m, name in enumerate(name for name in runs if runs[name])
-        }
-        require_drawable(colors)
-        problem = self.problem
-        sys = (problem or next(iter(self.solutions.values())).problem).sys
+        colors = colors_of(self)
 
-        # Each answer's runs in its colour, one solid, several thin and faint; then
-        # the plans dashed on top
+        # Each answer's nominal trajectory, the plant's (t, x, u) alone
         lines = []
-        for name, color in colors.items():
-            faint = len(runs[name]) > 1
-            width, alpha = (FAINT_WIDTH, FAINT_ALPHA) if faint else (1.5, 1.0)
-            for run in runs[name]:
-                lines.append((name, color, "solid", width, alpha, run))
         for name, color in colors.items():
             solution = self.solutions.get(name)
             if solution is not None and solution.trajectory is not None:
                 plan = solution.trajectory
-                plan = Trajectory(plan.t, plan.x, plan.u)
-                lines.append((name, color, "dash", 1.5, 1.0, plan))
-        times = [np.asarray(trajectory.t, dtype=float) for *_, trajectory in lines]
-        span = (min(t[0] for t in times), max(t[-1] for t in times))
+                nominal = Trajectory(plan.t, plan.x, plan.u)
+                lines.append((name, color, 1.5, 1.0, nominal))
+        require_some_nominal(lines)
+        spec = trajectory_figure(self, lines, signals, title)
 
-        # One row per component of each signal, its marks read from the signal: the
-        # answers' names on the first row
-        rows = []
-        for signal in signals:
-            specs = [
-                signal_figure(sys, trajectory, signals=(signal,))
-                for *_, trajectory in lines
-            ]
-            for k, row in enumerate(specs[0].panels):
-                traces = tuple(
-                    Trace(
-                        spec.panels[k].layers[0].x,
-                        spec.panels[k].layers[0].y,
-                        color=color,
-                        dash=dash,
-                        width=width,
-                        alpha=alpha,
-                        label=label,
-                    )
-                    for (label, color, dash, width, alpha, _), spec in zip(lines, specs)
-                )
-                deadline = deadline_marks_of(problem, signal, k)
-                limits = limit_marks_of(problem, signal, k, span)
-                rows.append((row.y_label, deadline + traces + limits, limits))
+        return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
-        n_rows = len(rows)
-        panels = tuple(
-            Panel(
-                layers=layers,
-                title=title if i == 0 else "",
-                x_label=TIME_ABSCISSA_LABEL if i == n_rows - 1 else "",
-                y_label=y_label.replace("\n", " "),
-                legend=i == 0 or bool(limits),
-            )
-            for i, (y_label, layers, limits) in enumerate(rows)
-        )
-        height = max(2.6, 1.8 * n_rows)
-        spec = FigureSpec(panels=panels, share_x=True, figsize=(9.0, height))
+    def plot_simulated_trajectory(
+        self,
+        *,
+        signals=("x", "u"),
+        title="simulation",
+        figsize=None,
+        renderer="matplotlib",
+        show=True,
+        ax=None,
+    ) -> PlotResult:
+        """
+        Each answer's simulations, one colour per answer, one row per signal component: a :class:`PlotResult`, ``title`` over the first row.
+
+        The simulations are the judge's, kept in the answer's evaluation (the
+        plant's part of each): one simulation is a solid line, several (one
+        per draw) thin faint lines; by names only, the controller run once
+        from its problem's start. On a judged problem, each row of ``x`` marks
+        the goal's extent at the deadline ``t0 + T``, each row of ``u`` the
+        input limits, and every row the horizon. The legend holds the answers'
+        names and the limits. An
+        :class:`~minilink.planning.evaluation.Evaluation` entry is drawn when
+        it keeps its runs, else left out.
+        """
+        colors = colors_of(self)
+
+        # Each answer's simulations in its colour, one solid, several thin and faint
+        lines = []
+        for name, color in colors.items():
+            runs = drawn_runs_of(self, name)
+            faint = len(runs) > 1
+            width, alpha = (FAINT_WIDTH, FAINT_ALPHA) if faint else (1.5, 1.0)
+            lines += [(name, color, width, alpha, run) for run in runs]
+        require_drawable(lines)
+        spec = trajectory_figure(self, lines, signals, title)
 
         return draw(spec, figsize=figsize, renderer=renderer, show=show, ax=ax)
 
@@ -454,6 +434,68 @@ def solution_of(problem, entry):
     return PlanningSolution(problem=problem, controller=entry, record=GivenController())
 
 
+def colors_of(comparison) -> dict:
+    """One colour per answer, in the order the entries were given: the same in both trajectory figures."""
+    names = list(comparison.evaluations or comparison.solutions)
+    colors = {
+        name: SOLUTION_COLORS[m % len(SOLUTION_COLORS)] for m, name in enumerate(names)
+    }
+
+    return colors
+
+
+def trajectory_figure(comparison, lines, signals, title) -> FigureSpec:
+    """
+    The figure of ``lines``, ``(name, color, width, alpha, trajectory)`` each: one row per component of each signal, the judged problem's marks read from the row's signal.
+
+    The answers' names label the first row; the judged problem's system
+    labels the axes, else the first solution's.
+    """
+    problem = comparison.problem
+    sys = (problem or next(iter(comparison.solutions.values())).problem).sys
+    times = [np.asarray(trajectory.t, dtype=float) for *_, trajectory in lines]
+    span = (min(t[0] for t in times), max(t[-1] for t in times))
+
+    # One row per component of each signal, its marks read from the signal
+    rows = []
+    for signal in signals:
+        specs = [
+            signal_figure(sys, trajectory, signals=(signal,))
+            for *_, trajectory in lines
+        ]
+        for k, row in enumerate(specs[0].panels):
+            traces = tuple(
+                Trace(
+                    spec.panels[k].layers[0].x,
+                    spec.panels[k].layers[0].y,
+                    color=color,
+                    width=width,
+                    alpha=alpha,
+                    label=label,
+                )
+                for (label, color, width, alpha, _), spec in zip(lines, specs)
+            )
+            deadline = deadline_marks_of(problem, signal, k)
+            limits = limit_marks_of(problem, signal, k, span)
+            rows.append((row.y_label, deadline + traces + limits, limits))
+
+    n_rows = len(rows)
+    panels = tuple(
+        Panel(
+            layers=layers,
+            title=title if i == 0 else "",
+            x_label=TIME_ABSCISSA_LABEL if i == n_rows - 1 else "",
+            y_label=y_label.replace("\n", " "),
+            legend=i == 0 or bool(limits),
+        )
+        for i, (y_label, layers, limits) in enumerate(rows)
+    )
+    height = max(2.6, 1.8 * n_rows)
+    spec = FigureSpec(panels=panels, share_x=True, figsize=(9.0, height))
+
+    return spec
+
+
 def drawn_runs_of(comparison, name) -> list:
     """The plant runs the figure draws for an answer: its evaluation's, else (by names only) its controller run once; none for an evaluation that keeps no run."""
     evaluation = (comparison.evaluations or {}).get(name)
@@ -504,13 +546,16 @@ def limit_marks_of(problem, signal, k, span) -> tuple:
 
 
 # The table: its two halves, titled, and the columns of each
-PLAN_TITLE = "plan, as the planner wrote it"
-RUN_TITLE = "run, simulated by the judge"
-COLUMNS = ("goal", "limits", "length")
+NOMINAL_TITLE = "nominal trajectory"
+SIMULATION_TITLE = "simulation"
+COLUMNS = ("goal", "constraints")
+
+# The J column of one run: its value, the criterion over a single draw
+ONE_RUN = (("J", "objective"),)
 
 
 def comparison_text(comparison) -> str:
-    """The print text: one line per answer, its plan beside its run, then the records."""
+    """The print text: a framed panel, its title, then one line per answer, its nominal trajectory beside its simulation."""
     scores = comparison.evaluations or {}
     solutions = comparison.solutions
     names = list(scores) or list(solutions)
@@ -519,74 +564,51 @@ def comparison_text(comparison) -> str:
         for name in names
     }
 
-    # The numbers: the best run, each plan's score and each run's length
-    best = best_run_of(runs)
-    plans = {name: plan_score_of(comparison, name) for name in names}
-    lengths = {name: run_length_of(runs[name]) for name in names}
+    # The numbers: each nominal trajectory's score, and the statistics the simulations show
+    nominals = {name: nominal_score_of(comparison, name) for name in names}
+    statistics = statistics_of(runs.values())
 
     # Formatted last: each half's cells, or the words that span it
-    label = criterion_label_of(runs.values())
-    plan_halves = {
-        name: plan if isinstance(plan, str) else cells(*plan)
-        for name, plan in plans.items()
+    nominal_halves = {
+        name: nominal if isinstance(nominal, str) else cells(nominal, ONE_RUN)
+        for name, nominal in nominals.items()
     }
-    run_halves = {
-        name: "not scored"
-        if runs[name] is None
-        else cells(runs[name], lengths[name], "*" if name == best else " ")
+    simulation_halves = {
+        name: "not scored" if runs[name] is None else cells(runs[name], statistics)
         for name in names
     }
-    headers = (("J", "", *COLUMNS), (label, "", *COLUMNS))
-    lines = table_lines(names, plan_halves, run_halves, headers)
+    headers = (
+        (*(label for label, _ in ONE_RUN), *COLUMNS),
+        (*(label for label, _ in statistics), *COLUMNS),
+    )
+    lines = table_lines(names, nominal_halves, simulation_halves, headers)
 
-    # The star's footnote, then the planners' own accounts, one line each
-    if best is not None:
-        which = "that" if runs[best].n_trials == 1 else "whose every run"
-        lines += [
-            "",
-            f"* best run: the lowest {label} {which} reaches the goal within the limits",
-        ]
-    solved = [name for name in names if name in solutions]
-    if solved:
-        pad = max(len(name) for name in solved)
-        lines += ["", "records"]
-        lines += [f"  {name:{pad}}  {solutions[name].record}" for name in solved]
+    # The frame: the title between two rules, a closing rule, as wide as the table
+    title = title_of(comparison, runs.values())
+    width = max(DISP_LINE_WIDTH, len(title), *map(len, lines))
+    rule = "=" * width
+    panel = [rule, title, rule, *lines, rule]
 
-    return "\n".join(lines)
+    return "\n".join(panel)
 
 
-def best_run_of(runs):
-    """The name of the best run: the lowest ``objective`` among the evaluations whose every run succeeds; ``None`` when none does."""
-    qualified = {
-        name: float(evaluation.objective)
-        for name, evaluation in runs.items()
-        if evaluation is not None and float(evaluation.success_rate) == 1.0
-    }
-    if not qualified:
-        return None
-
-    return min(qualified, key=qualified.get)
-
-
-def plan_score_of(comparison, name):
-    """``(evaluation, length)`` of an answer's plan on the judged problem (by names only, its own), or the words of its plan half."""
+def nominal_score_of(comparison, name):
+    """The evaluation of an answer's nominal trajectory on the judged problem (by names only, its own), or the words of its half."""
     solution = comparison.solutions.get(name)
-    if solution is None:
-        return "no plan"
-    if solution.trajectory is None:
-        return "no plan" if solution.open_loop else "no plan (a feedback law)"
+    if solution is None or solution.trajectory is None:
+        return "-"
     problem = solution.problem if comparison.problem is None else comparison.problem
     if not is_continuous(problem):
         return "not scored"
     if starts_after_deadline(solution.trajectory, problem):
         return "starts after the deadline"
 
-    # The plan as the plant's run on the horizon, scored without simulation
-    plan = solution.trajectory
-    evaluation = evaluate_trajectory(problem, plan_on_horizon(plan, problem))
-    length = float(plan.t[-1] - plan.t[0])
+    # The nominal trajectory as the plant's run on the horizon, scored without simulation
+    evaluation = evaluate_trajectory(
+        problem, plan_on_horizon(solution.trajectory, problem)
+    )
 
-    return evaluation, length
+    return evaluation
 
 
 def starts_after_deadline(plan, problem) -> bool:
@@ -621,83 +643,113 @@ def plan_on_horizon(plan, problem) -> Trajectory:
     return cut
 
 
-def run_length_of(evaluation):
-    """The length of an evaluation's first run; ``None`` when it keeps none."""
-    if evaluation is None or not evaluation.trajectories:
-        return None
-    run = evaluation.trajectories[0]
+def statistics_of(evaluations) -> tuple:
+    """
+    The simulation half's ``J`` columns, ``(label, Evaluation attribute)`` each.
 
-    return float(run.t[-1] - run.t[0])
-
-
-def criterion_label_of(evaluations) -> str:
-    """The run's ``J`` header: ``J`` for one run, else the criterion over the draws (``E[J]``, ``max J``, ``CVaR_α(J)``)."""
+    One run: ``J``. Several draws: ``E[J]``, ``σ(J)`` and ``max J``, the
+    criterion first when it is not the expectation (a CVaR its own column; the
+    worst case is ``max J`` itself), each statistic once.
+    """
     several = [e for e in evaluations if e is not None and e.n_trials > 1]
     if not several:
-        return "J"
+        return ONE_RUN
     criterion = several[0].criterion
+
+    mean = ("E[J]", "mean")
+    std = ("σ(J)", "std")
+    worst = ("max J", "worst")
     if criterion == "expectation":
-        return "E[J]"
+        return (mean, std, worst)
     if criterion == "worst_case":
-        return "max J"
+        return (worst, mean, std)
+    cvar = (f"CVaR_{float(criterion[1]):g}(J)", "objective")
 
-    return f"CVaR_{float(criterion[1]):g}(J)"
+    return (cvar, mean, std, worst)
 
 
-def cells(evaluation, length, star=""):
-    """One half's cells from its numbers: ``J``, the star, goal, limits, length; words for one run, counts for several."""
+def title_of(comparison, evaluations) -> str:
+    """The panel's title: the judged system and its horizon, and on several draws the criterion and their number; by names only, how many solutions."""
+    problem = comparison.problem
+    if problem is None:
+        n = len(comparison.solutions)
+        return f"Comparison of {n} solutions, each scored on its own problem"
+    title = (
+        f"Comparison, {problem.sys.name}, "
+        f"horizon={planning_horizon_text(problem.horizon)}"
+    )
+
+    # The criterion and the number of draws, when there are several
+    several = [e for e in evaluations if e is not None and e.n_trials > 1]
+    if several:
+        criterion = several[0].criterion
+        if isinstance(criterion, tuple):
+            criterion = f"cvar, alpha={float(criterion[1]):g}"
+        n = max(e.n_trials for e in several)
+        title = f"{title}, criterion={criterion}, {n} draws"
+
+    return title
+
+
+def cells(evaluation, statistics):
+    """One half's cells from its numbers: each statistic's value, then goal and constraints; words for one run, counts for several."""
     n = evaluation.n_trials
     reached = np.asarray(evaluation.reached)
     failed = np.asarray(evaluation.failed)
     finite = np.isfinite(np.asarray(evaluation.raw_cost))
-    J = f"{float(evaluation.objective):.4g}"
+    values = [f"{float(getattr(evaluation, name)):.4g}" for _, name in statistics]
 
-    # One run: in words, and its length; several: how many of them
+    # One run: in words; several: how many of them
     if n == 1:
         goal = "reached" if reached[0] else "missed"
-        limits = "diverged" if not finite[0] else "violated" if failed[0] else "ok"
-        span = "" if length is None else f"{length:.3g} s"
+        constraints = "diverged" if not finite[0] else "violated" if failed[0] else "ok"
     else:
         goal = f"{int(reached.sum())}/{n}"
-        limits = f"{int((~failed).sum())}/{n}"
-        span = ""
+        constraints = f"{int((~failed).sum())}/{n}"
 
-    return J, star, goal, limits, span
+    return (*values, goal, constraints)
 
 
-def table_lines(names, plan_halves, run_halves, headers):
+def table_lines(names, nominal_halves, simulation_halves, headers):
     """The table's lines: the halves' titles, the header, a rule, one line per answer; each column as wide as its widest cell."""
-    # Each half's header and lines, each column as wide as its widest cell; the
-    # star's slot in the run half alone
+    # Each half's header and lines, each column as wide as its widest cell
     texts = []
-    for header, half, slot in zip(headers, (plan_halves, run_halves), (False, True)):
+    for header, half in zip(headers, (nominal_halves, simulation_halves)):
         rows = [header, *(half[name] for name in names)]
         cell_rows = [row for row in rows if not isinstance(row, str)]
         widths = [max(len(row[k]) for row in cell_rows) for k in range(len(header))]
-        texts.append([half_text(row, widths, slot) for row in rows])
-    plan_texts, run_texts = texts
+        texts.append([half_text(row, widths) for row in rows])
+    nominal_texts, simulation_texts = texts
     w_name = max(len(name) for name in names)
-    w_plan = max(len(PLAN_TITLE), *map(len, plan_texts))
-    w_run = max(len(RUN_TITLE), *map(len, run_texts))
+    w_nominal = max(len(NOMINAL_TITLE), *map(len, nominal_texts))
+    w_simulation = max(len(SIMULATION_TITLE), *map(len, simulation_texts))
 
-    def line(name, plan, run):
-        return f"{name:{w_name}} │ {plan:{w_plan}} │ {run}".rstrip()
+    def line(name, nominal, simulation):
+        return f"{name:{w_name}} │ {nominal:{w_nominal}} │ {simulation}".rstrip()
 
-    rule = "─" * (w_name + 1) + "┼" + "─" * (w_plan + 2) + "┼" + "─" * (w_run + 1)
-    header, *body = map(line, ["", *names], plan_texts, run_texts)
+    rule = (
+        "─" * (w_name + 1)
+        + "┼"
+        + "─" * (w_nominal + 2)
+        + "┼"
+        + "─" * (w_simulation + 1)
+    )
+    header, *body = map(line, ["", *names], nominal_texts, simulation_texts)
 
-    return [line("", PLAN_TITLE, RUN_TITLE), header, rule, *body]
+    return [line("", NOMINAL_TITLE, SIMULATION_TITLE), header, rule, *body]
 
 
-def half_text(half, widths, slot) -> str:
-    """One half of a line: its spanning words, or its cells aligned, ``J`` right with the star in its slot, the words left."""
+def half_text(half, widths) -> str:
+    """One half of a line: its spanning words, or its cells aligned, the numbers right, the words left."""
     if isinstance(half, str):
         return half
-    J, star, *words = half
-    first = J.rjust(widths[0]) + (f" {star or ' '}" if slot else "")
-    rest = [word.ljust(width) for word, width in zip(words, widths[2:])]
+    n_numbers = len(half) - len(COLUMNS)
+    numbers = [cell.rjust(width) for cell, width in zip(half[:n_numbers], widths)]
+    words = [
+        cell.ljust(width) for cell, width in zip(half[n_numbers:], widths[n_numbers:])
+    ]
 
-    return "  ".join([first, *rest])
+    return "  ".join([*numbers, *words])
 
 
 def require_no_scoring(dt, n_trials):
@@ -743,6 +795,15 @@ def require_drawable(drawn):
             "no entry carries a run to draw: an Evaluation that keeps no trajectories "
             "is scored, not drawn; pass a solution, a controller, or "
             "evaluate(..., trajectories=True)"
+        )
+
+
+def require_some_nominal(lines):
+    """Refuse a figure of nominal trajectories when no answer carries one."""
+    if not lines:
+        raise ValueError(
+            "no answer carries a nominal trajectory: a feedback law has none; "
+            "plot_simulated_trajectory draws every answer's simulation"
         )
 
 

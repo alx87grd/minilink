@@ -1390,18 +1390,19 @@ and one backend (NumPy for all when one entry does not trace), its `dt` as `eval
 it (a sampled controller on its own clock, `dt` only for a continuous one), keeps that
 problem as `Comparison.problem` (`None` by names only) and the judge's runs in each
 evaluation (`trajectories`, one per trial: memory grows with `n_trials`);
-`difference(a, b)` is the paired `J_a − J_b`. `print` is the table: each answer read twice, the same
-columns each (`J`, goal, limits, length), its plan as the planner wrote it, cut at
-`t0 + T` and scored on the judged problem by `evaluate_trajectory` without simulation (by
-names only, on its own problem), beside its run, the block it hands out simulated by the
-judge (on several draws, the criterion and the counts); a star marks the lowest
-`objective` among the answers whose every run reaches the goal within the limits; the
-planners' records follow, one line each. `plot_trajectory` draws each answer's runs from
-its evaluation (one run solid, several thin and faint; by names only, the controller run
-once) and its plan dashed on top, one colour per answer, and marks the judged problem by
-each row's signal: the horizon on every row, the goal's extent at `t0 + T`
-(`Xf.bounding_box()`) on the rows of `x`, the input limits (`U.bounding_box()`)
-on the rows of `u`. `LQRPlanner
+`difference(a, b)` is the paired `J_a − J_b`. `print` is the table, a framed panel titled by
+the judged system, its horizon and, on several draws, the criterion and their number: each
+answer read twice (`J`, goal, constraints), its nominal trajectory, cut at `t0 + T` and
+scored on the judged problem by `evaluate_trajectory` without simulation (by names only, on
+its own problem; `-` for an answer without one), beside its simulation, the block it hands
+out simulated by the judge (on several draws, the criterion first when it is not the
+expectation, then `E[J]`, `σ(J)` and `max J`, and the counts).
+`plot_nominal_trajectory` draws each answer's nominal trajectory (the answers without one
+left out); `plot_simulated_trajectory` draws each answer's simulations from its evaluation
+(one solid, several thin and faint; by names only, the controller run once). Both use one
+colour per answer and mark the judged problem by each row's signal: the horizon on every
+row, the goal's extent at `t0 + T` (`Xf.bounding_box()`) on the rows of `x`, the input
+limits (`U.bounding_box()`) on the rows of `u`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
 first function of `lqr.py`, lowers it to the LQR problem in its matrices, `(A, B, Q, R, S)`, at
 the cost's `(x_bar, u_bar)` (`B` and `R` over the command port; the planner's

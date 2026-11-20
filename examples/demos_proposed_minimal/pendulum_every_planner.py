@@ -1,4 +1,4 @@
-"""One pendulum swing-up, four planners, one judge: each plan beside its run, then over many starts."""
+"""One pendulum swing-up, four planners, one judge: each nominal trajectory beside its simulation, then over many starts."""
 
 import numpy as np
 
@@ -72,28 +72,37 @@ rrt = RRTPlanner(
     max_iterations=20000,
 ).solve()
 
-# A fifth: the optimized plan tracked, u = u_d(t) − K(t) (x − x_d(t)); the plan rides
-# the torque limit, so the correction has no room left inside it
+# A fifth: the optimized plan tracked, u = u_d(t) − K(t) (x − x_d(t))
 tracked = lqr_trajectory(plant, trajopt.trajectory, Q=np.diag([10.0, 1.0]), R=np.eye(1))
 
-answers = dict(LQR=lqr, VI=vi, TrajOpt=trajopt, RRT=rrt, TrajOpt_tracked=tracked)
-
-# One judgement: each plan scored as written beside its block simulated from the start
-
-comparison = compare(problem, **answers, dt=0.01)
+comparison = compare(
+    problem, LQR=lqr, VI=vi, TrajOpt=trajopt, RRT=rrt, TrajOpt_tracked=tracked, dt=0.01
+)
 print(comparison)
-comparison.plot_trajectory()
+comparison.plot_nominal_trajectory()
+comparison.plot_simulated_trajectory()
 
 # Many starts: x0 drawn uniformly around rest, J judged in expectation, E[J]
 
 problem_x0 = problem.replace(x0=Uniform([-0.2, -0.5], [0.2, 0.5]))
 
-comparison_x0 = compare(problem_x0, **answers, dt=0.01, n_trials=N_TRIALS)
+comparison_x0 = compare(
+    problem_x0,
+    LQR=lqr,
+    VI=vi,
+    TrajOpt=trajopt,
+    RRT=rrt,
+    TrajOpt_tracked=tracked,
+    dt=0.01,
+    n_trials=N_TRIALS,
+)
 print(comparison_x0)
-comparison_x0.plot_trajectory()
+comparison_x0.plot_simulated_trajectory()
 
 # Paired on the same draws: J_VI − J_tracked, start by start
 dJ = comparison_x0.difference("VI", "TrajOpt_tracked")
-print(f"E[J_VI − J_tracked] = {dJ.mean():.3g}, over {dJ.size} paired starts")
+
+comparison.plot_cost_to_go()
+
 
 vi.animate()
