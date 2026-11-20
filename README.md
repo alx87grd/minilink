@@ -47,22 +47,34 @@ All core equation paths are pure functions—arrays in, arrays out—allowing th
 
 ---
 
-## 1. The Minilink Backbone
+## Install
 
-Three mathematical foundations hold the framework together:
-1. **The Model (`System`):** Continuous differential equations $\dot{x} = f(x, u, t; p)$ and observations $y = h(x, u, t; p)$.
-2. **The Task (`PlanningProblem`):** The model paired with boundary sets $\mathcal{X}, \mathcal{U}, \mathcal{X}_f$, cost $J$, and time horizon $t_f$.
-3. **The Solver Boundary (`MathematicalProgram` & `Optimizer`):** Standard non-linear program $\min_z J(z) \text{ s.t. } g(z) \le 0, h(z) = 0$ connecting problems to plug-and-play numerical solvers.
+Python 3.10+. **Recommended: conda**, everything included (JAX, Graphviz, Ipopt, 3-D animation, Jupyter):
 
-One differentiable path connects modeling, analytical control, trajectory optimization, and learning:
+```bash
+git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda env create -f environment.yml && conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+```
 
-![The Minilink Backbone](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
+**Colab**: open any notebook with "Open in Colab", or start yours with:
 
-*Full pipeline reference: [docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).*
+```python
+!git clone https://github.com/alx87grd/minilink
+import sys; sys.path.insert(0, "/content/minilink")
+```
+
+**pip**:
+- `pip install minilink` runs simulation, plots, LQR, and value iteration on standard NumPy, SciPy, and Matplotlib.
+- `pip install "minilink[full]"` adds JAX, Plotly, MeshCat, Pygame, SymPy, and Gymnasium.
+
+*Optional system dependencies:*
+- `plot_diagram()` requires Graphviz ([download](https://graphviz.org/download/), then `pip install graphviz`).
+- Ipopt solver: `conda install -c conda-forge cyipopt` (trajectory optimization runs on SciPy without it).
 
 ---
 
-## 2. Continuous Core & Functional Purity
+## 1. Models and Diagrams in Code
 
 A physical model is defined by three pure mathematical mappings:
 
@@ -97,9 +109,6 @@ plant.x0[0] = 1.0
 plant.compute_trajectory(tf=10.0)
 plant.plot_trajectory()
 ```
----
-
-## 3. Compositional Closure: Diagrams as Code
 
 Code is the single source of truth. Minilink replaces GUI wiring and opaque binary files with pure, version-controlled Python expressions:
 
@@ -125,41 +134,18 @@ Because a composite diagram is itself a `DynamicSystem`, **every analysis verb w
 
 ---
 
-## 4. Interactive Play & 3D Visualization
+## 2. Differentiable & Accelerated with JAX
 
-- **Real-Time Wall-Clock Play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame).
-- **Decoupled Geometry:** Body poses $T = \mathrm{tf}(x, u, t; p)$ describe kinematics without cluttering the differential equations with rendering code.
-- **Hardware-Accelerated 3D WebGL:** `plant.animate(traj, renderer="meshcat")` plays the trajectory in an interactive 3D viewer with orbit, pan, and playback controls: inline in a notebook, in the browser from a script.
-- **One Way to Plot, Animate and Save:** the plots (`plot_trajectory`, `plot_bode`, `plot_cost_to_go`, …) take `renderer="matplotlib"` or `"plotly"`, `show=`, and `ax=` (matplotlib axes, to draw on another plot's) and return a `PlotResult`; the animations return an `AnimationResult`; each saves itself: `result.save("bode.pdf")`, `anim.save("lap.html")`.
-- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), drones (`Drone2D`), and aerospace vehicles (`Rocket`).
+Because every equation path is a pure function, the exact same equation $f(x, u, t; p)$ traces under JAX without rewriting physics:
 
-```python
-from minilink import UR5Manipulator
-
-robot = UR5Manipulator()
-traj = robot.compute_trajectory(tf=5.0)
-anim = robot.animate(traj, renderer="meshcat")  # interactive 3D WebGL
-anim.save("ur5.html")  # a self-contained page
-```
-
-*Live interactive 3D demos:* [UR-5 Impedance Control](https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html) • [Racecar MPC](https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html).
-
----
-
-## 5. Differentiable & Accelerated with JAX
-
-The exact same equation $f(x, u, t; p)$ traces under JAX without rewriting physics:
-
-- **Exact Machine-Precision Sensitivities:** Analytical Jacobians:
+- **Exact Machine-Precision Sensitivities:** Analytical Jacobians, with respect to the state, the input and the parameters:
   $$A = \frac{\partial f}{\partial x}, \quad B = \frac{\partial f}{\partial u}, \quad S_p = \frac{\partial f}{\partial p}$$
-- **Parallel GPU-Batched Rollouts:** Vectorized simulation across parameter sweeps via JAX `vmap` (1,000 rollouts in 0.12–0.16 s on a cloud CPU vs. 32 s in pure Python).
-- **Plant & Controller Co-Design:** Compute closed-loop objective gradients $\nabla_\theta J$ to optimize control gains and physical parameters simultaneously.
+- **Compiled, Parallel GPU-Batched Rollouts:** `compile(backend="jax")` builds the system once; vectorized simulation runs across initial states and parameter sweeps via JAX `vmap` (1,000 rollouts in 0.12–0.16 s on a cloud CPU vs. 32 s in pure Python).
 - **Opt-In Acceleration:** Pure NumPy remains the default classroom engine; JAX is activated with a single flag (`backend="jax"`).
 
 ```python
-import jax
 import numpy as np
-from minilink import PID, Optimizer, Pendulum, PlanningProblem, QuadraticCost
+from minilink import Pendulum
 
 plant = Pendulum()
 x_eq = np.array([np.pi, 0.0])  # the upright equilibrium
@@ -173,40 +159,11 @@ ev = plant.compile(backend="jax")
 x0s = np.tile([1.0, 0.0], (1000, 1))
 lengths = np.linspace(0.5, 2.0, 1000)
 xs = ev.rollout_batch(x0s, n_steps=1000, dt=0.005, params=dict(plant.params, l=lengths))
-
-# Closed-loop gradient descent on gains and physical parameters
-tuning = PlanningProblem(plant, x0=[1.0, 0.0], cost=QuadraticCost.from_system(plant), horizon=4.0)
-pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
-dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)
-best = Optimizer(pe.program(wrt=["controller.Kp", "plant.l"])).solve()
 ```
 
 ---
 
-## 6. The Unified Optimization Boundary
-
-All transcriptions lower late to a single, canonical mathematical program:
-
-$$\min_z J(z; p) \quad \text{s.t.} \quad g(z; p) \le 0, \quad h(z; p) = 0$$
-
-- **Lego-Block Decoupling:** Trajectory collocation, parameter tuning, and policy search all lower to `MathematicalProgram`.
-- **Pluggable Solvers:** Decoupled interfaces allow any optimizer to run on any program:
-  - First-order autodiff: `gd`, `adam`, `l-bfgs` (via JAX).
-  - Constrained non-linear programming: SciPy (`SLSQP`), Ipopt (interior-point).
-  - Custom user algorithms and native fixed-step solvers.
-
-```python
-from minilink import Optimizer
-
-# Solvers plug into any problem definition
-prog = pe.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
-opt = Optimizer(prog, method="l-bfgs")  # or method="ipopt", "slsqp", "adam"
-sol = opt.solve()
-```
-
----
-
-## 7. One Problem, Every Planner
+## 3. One Problem, Every Planner
 
 A `PlanningProblem` bundles the physical plant, boundary sets ($\mathcal{X}, \mathcal{U}, \mathcal{X}_f$), cost function $J$, and horizon $t_f$.
 The identical problem definition is handed to completely different solver paradigms:
@@ -252,50 +209,78 @@ print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 
 ---
 
-## 8. What Minilink is NOT
- 
+## 4. The Unified Optimization Boundary
+
+All transcriptions lower late to a single, canonical mathematical program:
+
+$$\min_z J(z; p) \quad \text{s.t.} \quad g(z; p) \le 0, \quad h(z; p) = 0$$
+
+- **Lego-Block Decoupling:** Trajectory collocation, parameter tuning, and policy search all lower to `MathematicalProgram`.
+- **Plant & Controller Co-Design:** A problem compiled with its controller gives the closed-loop objective and its gradient $\nabla_\theta J$, to optimize control gains and physical parameters simultaneously.
+- **Pluggable Solvers:** Decoupled interfaces allow any optimizer to run on any program:
+  - First-order autodiff: `gd`, `adam`, `l-bfgs` (via JAX).
+  - Constrained non-linear programming: SciPy (`SLSQP`), Ipopt (interior-point).
+  - Custom user algorithms and native fixed-step solvers.
+
+```python
+import jax
+from minilink import PID, Optimizer, Pendulum, PlanningProblem, QuadraticCost
+
+plant = Pendulum()
+
+# Closed-loop gradient descent on gains and physical parameters
+tuning = PlanningProblem(plant, x0=[1.0, 0.0], cost=QuadraticCost.from_system(plant), horizon=4.0)
+pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
+dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)
+best = Optimizer(pe.program(wrt=["controller.Kp", "plant.l"])).solve()
+
+# Solvers plug into any problem definition
+prog = pe.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
+opt = Optimizer(prog, method="l-bfgs")  # or method="ipopt", "slsqp", "adam"
+sol = opt.solve()
+```
+
+---
+
+## 5. Interactive Play & 3D Visualization
+
+- **Real-Time Wall-Clock Play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame).
+- **Decoupled Geometry:** Body poses $T = \mathrm{tf}(x, u, t; p)$ describe kinematics without cluttering the differential equations with rendering code.
+- **Hardware-Accelerated 3D WebGL:** `plant.animate(traj, renderer="meshcat")` plays the trajectory in an interactive 3D viewer with orbit, pan, and playback controls: inline in a notebook, in the browser from a script.
+- **One Way to Plot, Animate and Save:** the plots (`plot_trajectory`, `plot_bode`, `plot_cost_to_go`, …) take `renderer="matplotlib"` or `"plotly"`, `show=`, and `ax=` (matplotlib axes, to draw on another plot's) and return a `PlotResult`; the animations return an `AnimationResult`; each saves itself: `result.save("bode.pdf")`, `anim.save("lap.html")`.
+- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), drones (`Drone2D`), and aerospace vehicles (`Rocket`).
+
+```python
+from minilink import UR5Manipulator
+
+robot = UR5Manipulator()
+traj = robot.compute_trajectory(tf=5.0)
+anim = robot.animate(traj, renderer="meshcat")  # interactive 3D WebGL
+anim.save("ur5.html")  # a self-contained page
+```
+
+*Live interactive 3D demos:* [UR-5 Impedance Control](https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html) • [Racecar MPC](https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html).
+
+---
+
+## 6. How It Fits Together
+
+Three mathematical foundations hold the framework together:
+1. **The Model (`System`):** Continuous differential equations $\dot{x} = f(x, u, t; p)$ and observations $y = h(x, u, t; p)$.
+2. **The Task (`PlanningProblem`):** The model paired with boundary sets $\mathcal{X}, \mathcal{U}, \mathcal{X}_f$, cost $J$, and time horizon $t_f$.
+3. **The Solver Boundary (`MathematicalProgram` & `Optimizer`):** Standard non-linear program $\min_z J(z) \text{ s.t. } g(z) \le 0, h(z) = 0$ connecting problems to plug-and-play numerical solvers.
+
+One differentiable path connects modeling, analytical control, trajectory optimization, and learning:
+
+![The Minilink Backbone](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
+
+*Full pipeline reference: [docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).*
+
+What Minilink is **not**:
+
 1. **Not a Heavy Multibody Contact Engine:** For complex contact or high-DoF meshes, wrap an external multibody simulator as a `System` leaf. Minilink focuses on control architecture, analytical derivatives, and trajectory optimization.
 2. **Not a 100+ Knot Sparse NLP Modeling Language:** Minilink programs and solvers do not exploit sparse Jacobian structure, unlike dedicated sparse modeling packages.
 3. **Continuous-Time is Primary:** Dynamics $f$ represent instantaneous rates ($\dot{x} = dx/dt$), not discrete next-step maps.
- 
----
- 
-## 9. Key Advantages
- 
-| Advantage | What It Solves |
-| --- | --- |
-| **One Model Across All Domains** | Define physics once ($\dot{x} = f$); seamlessly move between frequency analysis, LQR, TrajOpt, and RL without rewriting models. |
-| **Zero-Friction Install** | Pure NumPy/SciPy baseline; runs immediately in 1-click Google Colab with zero compilation. |
-| **Git-Native Diagrams as Code** | Pure Python operators (`>>`, `+`, `@`, `%`) replace opaque binary files with clear, reviewable pull request diffs. |
-| **Hardware-Accelerated with JAX** | Machine-precision autodiff sensitivities, GPU `vmap` rollouts, and exact plant-controller co-design ($\nabla_\theta J$). |
-| **Unified Optimization Boundary** | Standardized `MathematicalProgram` and `PlanningProblem` decouple formulations from plug-and-play numerical solvers. |
-
----
-
-## Install
-
-Python 3.10+. **Recommended: conda**, everything included (JAX, Graphviz, Ipopt, 3-D animation, Jupyter):
-
-```bash
-git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda env create -f environment.yml && conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
-```
-
-**Colab**: open any notebook with "Open in Colab", or start yours with:
-
-```python
-!git clone https://github.com/alx87grd/minilink
-import sys; sys.path.insert(0, "/content/minilink")
-```
-
-**pip**:
-- `pip install minilink` runs simulation, plots, LQR, and value iteration on standard NumPy, SciPy, and Matplotlib.
-- `pip install "minilink[full]"` adds JAX, Plotly, MeshCat, Pygame, SymPy, and Gymnasium.
-
-*Optional system dependencies:*
-- `plot_diagram()` requires Graphviz ([download](https://graphviz.org/download/), then `pip install graphviz`).
-- Ipopt solver: `conda install -c conda-forge cyipopt` (trajectory optimization runs on SciPy without it).
 
 ---
 
