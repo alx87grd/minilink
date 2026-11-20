@@ -1,7 +1,9 @@
 # The examples tree and the repositories around minilink
 
-**What it is:** the layout of `examples/` (options and a recommendation, not decided) and the
-repositories the other material lives in (ruled 2026-11-13; what is left of the move).  
+**What it is:** the layout of `examples/` (options and a recommendation, not decided), the
+repositories the other material lives in (ruled 2026-11-13; what is left of the move), and how
+each of them follows minilink: its branches, its pin, and how a fix reaches a course during a
+term (§3, planned 2026-11-20, not set up).  
 **Lane:** maintainer-owned (student-facing paths and public names; AGENTS.md "Ask first").  
 **Where it sits:** the decision "Where the course material and the projects live" (steps K5
 and K6 of [TODO.md](TODO.md), v0.9); the pinned Colab cell waits in step V6. The examples
@@ -14,7 +16,7 @@ tree is decided with the maintainer's pass over the demos
 | --- | --- | --- | --- |
 | `minilink` | public | the library, the tutorials, the curated demos, tests, docs | depends on nothing else of the maintainer's; every file is one to show a stranger |
 | `alx87grd/teaching` | public | the course and topic notebooks, sorted by topic; mostly on minilink but not limited to it | a course is a list, `courses/<course>.md`, linking the notebooks its notes cite in the notes' order; a notebook on an active course's list is not renamed or moved during its term |
-| `alx87grd/workbench` | private | the maintainer's log, reference, prototypes and private course material; old demos worth a second look | no rules; nothing imports from it |
+| `alx87grd/workbench` | private | the maintainer's log, reference, prototypes and private course material; old demos worth a second look | nothing imports from it; its branches and pins follow §3: prototypes and course material on `main` and `dev`, the log frozen, each entry pinned by commit |
 | a research repository (name not chosen; created when a student needs it) | private | research projects, one folder each; the experimental package | each project pins a tag or a commit; a feature that matures is rewritten into `minilink`, never imported from there |
 
 The sorting question for any file: is it for anyone, for my students, for my lab, or for me?
@@ -41,19 +43,113 @@ All at once, after the fall term:
 2. Every notebook pinned to `0.4.0` (§3).
 3. The links of the course PDFs and pages moved to the teaching repository.
 
-## 3. The pin
+## 3. Branches, pins and fixes
 
-A **tag**, never a branch (it moves) and not a commit hash (unreadable for a student; fine for
-a research project that needs an unreleased state). Tags are bare (`0.3.0`, no `v`), published
-to PyPI by the publish workflow. A release tag is never moved; a fix is a new tag and one
-commit bumping every notebook of the course.
+Planned with the maintainer on 2026-11-20; nothing of it is set up yet (the steps are in §3.6).
 
-**Open, for the maintainer:** the form of the pin in the teaching repository. The ruling of
-2026-10-25 chose `git clone -b <tag>` over `pip install minilink==<tag>` because the notebooks
-imported the examples tree by relative path. In a repository of their own that reason holds
-only for notebooks that still need files of `examples/`; for the others
-`pip install -q minilink==0.4.0` is shorter and faster. Two facts to check per notebook: does
-it import from the examples tree, and does it use `minilink.experimental` (not in the wheel)?
+### 3.1 Three levels of stability
+
+Every piece of material follows minilink at one of three levels, and the level decides its pin:
+
+| Level | Material | Pinned to | The pin moves |
+| --- | --- | --- | --- |
+| **Frozen** | workbench `log/` | one exact minilink commit | never |
+| **Stable** | teaching `main` (the public links), workbench `main` (prototypes, course material) | a minilink release, from PyPI (`minilink[full]==0.4.0`) | to a patch release during a term; to a new minor release between terms |
+| **Following** | teaching `dev`, workbench `dev`, twin branches | minilink `dev` (a twin: the minilink branch of its name) | with every change of minilink `dev` |
+
+### 3.2 The branch map
+
+| | minilink | teaching | workbench |
+| --- | --- | --- | --- |
+| **`main`**, stable | the latest release: tagged, on PyPI | pins that release; **the links the course notes, PDFs and web pages use** | prototypes and course solutions pinned to that release |
+| **`dev`**, moving | where the library changes | follows minilink `dev` | prototypes follow minilink `dev`; a break here is tolerated |
+
+- **The public link is teaching `main`, and it never changes.** A link names a file on
+  `main` (`…/teaching/blob/main/control/frequency_response.ipynb`); what that file runs is the
+  one pin inside it. A course note never has to be edited for a release or a fix.
+- **The `dev` branches move together.** When minilink `dev` changes an API, teaching `dev` and
+  workbench `dev` follow soon after. Teaching's nightly CI runs its `dev` against minilink
+  `dev` and reports a break the next morning. A large change keeps the twin-branch convention:
+  the same branch name in each repository, merged into `dev` together.
+- **Teaching `main` takes a new minor release (0.4 → 0.5) only between terms.** During a term
+  it takes fixes and patch releases only.
+- **A patch release (`0.4.x`) holds fixes only, never an API change.** That is what makes
+  moving every notebook to it during a term safe; CI checks it before the merge.
+
+### 3.3 A fix during a term
+
+**A mistake in a notebook** (a typo, a wrong value, a cell to change):
+
+1. In teaching, branch from `main` (`fix/<what>`), fix the notebook, push.
+2. CI runs the course's notebooks on the pinned release.
+3. Merge into `main`. The link is unchanged; students get the fix the next time they open
+   it (or after restarting the runtime).
+4. Merge `main` into `dev`.
+
+**A bug in minilink that a notebook hits:**
+
+1. At once, when possible: a workaround in the notebook, as above.
+2. The fix in minilink: branch from `main` (the release), fix with a test, merge into `main`,
+   tag the patch (`0.4.1`); the publish workflow puts it on PyPI. Merge `main` into `dev`.
+3. In teaching: branch from `main`, `python tests/set_minilink.py 0.4.1` (the requirements and
+   every notebook's install cell), CI runs every notebook on `0.4.1`, merge into `main`. The
+   next Colab session installs `0.4.1`.
+
+If minilink `main` has already moved to the next minor release while a course still runs on
+the previous one, the patch is cut from that release's tag on a `release/0.4` branch. With minor
+releases only between terms this is rare.
+
+### 3.4 Between terms
+
+1. Teaching `dev` and workbench `dev` are already up to date with minilink `dev`.
+2. minilink: `dev` merged into `main`, the minor release tagged and published.
+3. Teaching: on `dev`, `set_minilink 0.5.0`, CI passes, `dev` merged into `main`.
+4. Workbench: the same, `dev` into `main`; the course solutions follow teaching's pin.
+
+**To check with the calendar:** if the courses run in different sessions, one is always in
+progress and `main` takes only patch releases; a minor release then waits for the gap between
+sessions. If that is too slow, each notebook's install cell can carry its own pin, so a notebook
+outside the active course moves ahead. Kept in reserve.
+
+### 3.5 Workbench
+
+- **A demo while the code moves.** Two conda environments: `minilink` (the editable install of
+  the local checkout, whatever branch it is on) and `minilink-stable` (`minilink[full]` at the
+  release pin, `reference/envs/minilink-stable.yml`). Two checkouts: `~/code/workbench` on
+  `dev`, where the work happens, and `~/code/workbench-main`, a git worktree that stays on
+  `main`. A demo runs from `workbench-main` in `minilink-stable`, whatever state the rest is in.
+  A prototype reaches `main` once it runs on a released minilink; one that needs a feature of
+  `dev` reaches it with the next release.
+- **Course material** (`courses/`) follows teaching: pinned to the same release on `main`,
+  moved between terms or by a patch release.
+- **The log is frozen.** Each entry carries one header line, `# minilink: <commit>`, the exact
+  commit it last ran on; it is never updated to follow minilink. `./run_pinned.sh <entry>` reruns
+  it: it reads the commit, checks out a cached minilink worktree at it (one per commit, under
+  `~/.cache`), and runs the script with that code first on the path, in the `minilink`
+  environment. A log notebook pins the same commit in its first cell for Colab
+  (`%pip install "minilink[full] @ git+https://github.com/alx87grd/minilink@<commit>"`). An entry
+  that fails on a newer JAX can still be brought back from its commit. The entries older than
+  minilink (pyro) stay as they are.
+
+### 3.6 The setup, in order
+
+1. **Written down:** a "Branches and pins" section in each repository's README; in minilink, the
+   release and patch rules in ROADMAP and the term rule in AGENTS.md.
+2. **minilink:** the first teaching release (a `0.3.x` or `0.4.0`, the maintainer's call);
+   `main` is the latest release; the publish workflow runs on a tag.
+3. **teaching:** `tests/set_minilink.py` and a CI test that every notebook's pin matches
+   `requirements.txt`; the Colab cells from `git clone -b dev-consolidation` to `%pip install`
+   at the pin; `dev` created from `main` and `main` pinned to the release; CI on `main` and
+   `dev` at every push, `dev` nightly against minilink `dev`.
+4. **workbench:** a `dev` branch and the `workbench-main` worktree;
+   `reference/envs/minilink-stable.yml`; `run_pinned.sh`; the log header rule in its README; the
+   pin added to the 2025–2026 log entries that use minilink.
+
+**To check before step 3** (from the ruling of 2026-10-25, which chose `git clone -b <tag>`
+because notebooks imported the examples tree by path): a notebook that imports from
+`examples/` or uses `minilink.experimental` (not in the wheel) cannot run on
+`pip install minilink`; each such notebook keeps `git clone -b <tag>` at the same pin, or
+loses the import.
 
 ## 4. The examples tree
 
@@ -127,7 +223,8 @@ each and B2 reduces to the tutorials' own layers.
    `hybrid`, `mpc`, `realtime`, `robotic` and the racecar folder.
 3. **`projects/`:** to the research repository
    (consolidation.md §7), or kept as `research/projects/`.
-4. **The form of the pin** in the teaching repository (§3).
+4. **The form of the pin** in the teaching repository: `pip install` at the release, with
+   `git clone -b <tag>` kept for a notebook that needs the examples tree (§3.6).
 
 When the maintainer rules, the ruling updates this doc and the steps go to
 [TODO.md](TODO.md) in the same change; the commit message carries its why (one fact, one
