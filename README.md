@@ -112,7 +112,7 @@ plant.plot_trajectory()
 
 Code is the single source of truth. Minilink replaces GUI wiring and opaque binary files with pure, version-controlled Python expressions:
 
-- **Algebraic Shortcuts:** `ctrl @ plant` (feedback loop), `a >> b` (series), `a + b` (parallel), `sys % Δ` (zero-order hold digital clock sampling).
+- **Algebraic Shortcuts:** `ctrl @ plant` (feedback loop), `a >> b` (series), `a + b` (side by side), `sys % Δ` (zero-order hold digital clock sampling).
 - **Explicit 1-Line Wiring:** `diag.connect("controller", "u", "plant", "u")` connects arbitrary multi-loop networks with immediate port checks.
 - **Auto-Generated Diagrams:** `loop.plot_diagram()` generates clean, read-only visual inspection diagrams directly from code.
 
