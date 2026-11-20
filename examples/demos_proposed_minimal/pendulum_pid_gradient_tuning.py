@@ -15,6 +15,9 @@ plant = Pendulum()
 u_ss = plant.params["m"] * plant.params["gravity"] * plant.params["l"] * np.sin(R_REF)
 rho = 0.01
 
+df_dp = plant.jacobian(of="f", wrt="params")
+print(df_dp)
+
 cost = QuadraticCost.from_system(
     plant,
     Q=np.diag([1.0 / TF, 0.0]),
@@ -27,12 +30,19 @@ problem = PlanningProblem(plant, cost=cost, horizon=TF)
 # The digital PID: its difference equation on the computer's clock, closed on the plant
 
 pid = PID(Kp=1.0, Ki=0.0, Kd=1.0)
-pe = problem.compile(pid % DT, substeps=1)
-pe.loop.plot_diagram()
+diagram = pid % DT @ plant
+
+diagram.plot_diagram()
+
+pe = problem.compile(diagram, substeps=1)
+
 
 start = pe.params
 start["r"] = np.array([R_REF])
 print(pe.evaluate(start))
+traj = pe.trajectory(start)
+pe.loop.plot_trajectory(traj)
+pe.loop.animate(traj)
 
 # The gradient: ∂J/∂(Kp, Ki, Kd) through the sampled loop, by reverse mode
 
@@ -42,7 +52,10 @@ print(grad["controller"])
 # The tuning: min over (Kp, Ki, Kd) of J
 
 wrt = ["controller.Kp", "controller.Ki", "controller.Kd"]
-best = Optimizer(pe.program(wrt, params=start), method="auto").solve()
+math_program = pe.program(wrt, params=start)
+
+
+best = Optimizer(math_program, method="auto").solve()
 print(best)
 
 # The tuned loop, judged, drawn and played
