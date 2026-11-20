@@ -12,6 +12,19 @@ The v0.4 plan, in reading order: ROADMAP §1 → ROADMAP §5.4 → TODO §1 →
 QUESTIONS (the open design questions) and TODO's "Rows waiting for the maintainer's go".
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
+## Branch roles
+
+The same three roles in minilink, `alx87grd/teaching` and `alx87grd/workbench`
+(docs/plans/repository-structure.md §3):
+
+- **`main`, stable:** in minilink the latest release; teaching and workbench `main` pin that
+  release, and every demo and teaching notebook there works on it.
+- **`dev`, beta:** the latest API; teaching and workbench `dev` install minilink `dev` and are
+  brought back to working as soon as minilink `dev` changes.
+- **`dev-<name>`, alpha** (`dev-alex`, `dev-consolidation`, a feature): experiments; a branch
+  that spans repositories has the same name in each, installs the minilink branch of its name,
+  and merges into `dev` together. Work flows alpha → `dev` → `main`.
+
 ## Before you start: check the remote
 
 A local checkout goes stale: cloud sessions push to `origin` while a local branch sits

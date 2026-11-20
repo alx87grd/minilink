@@ -45,7 +45,11 @@ All at once, after the fall term:
 
 ## 3. Branches, pins and fixes
 
-Planned with the maintainer on 2026-11-20; nothing of it is set up yet (the steps are in §3.6).
+Planned with the maintainer on 2026-11-20. It starts with the move (§2): until then the course
+links point at minilink `main` (`examples/teaching/`), and teaching `main` plays the `dev` role,
+unpinned, following minilink's twin branches. At the move, minilink publishes the release,
+teaching `dev` is created from `main`, `main` is pinned, and the course links move to it. The
+tooling is in place (§3.6); the branches and the pins wait for the move.
 
 ### 3.1 Three levels of stability
 
@@ -62,8 +66,12 @@ Every piece of material follows minilink at one of three levels, and the level d
 | | minilink | teaching | workbench |
 | --- | --- | --- | --- |
 | **`main`**, stable | the latest release: tagged, on PyPI | pins that release; **the links the course notes, PDFs and web pages use** | prototypes and course solutions pinned to that release |
-| **`dev`**, moving | where the library changes | follows minilink `dev` | prototypes follow minilink `dev`; a break here is tolerated |
+| **`dev`**, beta | the latest API and its beta features | follows minilink `dev`; fixed as soon as minilink `dev` changes | prototypes follow minilink `dev`; fixed as soon as possible |
+| **`dev-<name>`**, alpha (`dev-alex`, `dev-consolidation`, a feature) | experiments, usually branched from `dev` | a twin of the minilink branch of the same name, created only when a change spans repositories; installs that branch | the same; may break |
 
+- **Work flows one way: alpha → `dev` → `main`.** An alpha branch merges into `dev` in every
+  repository it spans, together; `dev` reaches `main` with a release. A fix during a term goes
+  to `main` and a patch release (§3.3), then back into `dev`.
 - **The public link is teaching `main`, and it never changes.** A link names a file on
   `main` (`…/teaching/blob/main/control/frequency_response.ipynb`); what that file runs is the
   one pin inside it. A course note never has to be edited for a release or a fix.
@@ -122,34 +130,34 @@ outside the active course moves ahead. Kept in reserve.
   `dev` reaches it with the next release.
 - **Course material** (`courses/`) follows teaching: pinned to the same release on `main`,
   moved between terms or by a patch release.
-- **The log is frozen.** Each entry carries one header line, `# minilink: <commit>`, the exact
-  commit it last ran on; it is never updated to follow minilink. `./run_pinned.sh <entry>` reruns
-  it: it reads the commit, checks out a cached minilink worktree at it (one per commit, under
-  `~/.cache`), and runs the script with that code first on the path, in the `minilink`
-  environment. A log notebook pins the same commit in its first cell for Colab
-  (`%pip install "minilink[full] @ git+https://github.com/alx87grd/minilink@<commit>"`). An entry
-  that fails on a newer JAX can still be brought back from its commit. The entries older than
-  minilink (pyro) stay as they are.
+- **The log is frozen, and each entry runs on Colab.** `python archive.py <script> "<note>"`
+  freezes a script: it refuses when the local minilink has uncommitted changes or a commit not
+  on GitHub, copies the script to `log/<year>/<MM-DD>_<name>/`, and writes a header (the date,
+  the note, `# minilink: <commit>`, and the versions of JAX, NumPy and SciPy it ran with). Beside
+  it, `run.ipynb`: a title cell, one install cell
+  (`%pip install "minilink[full] @ git+https://github.com/alx87grd/minilink@<commit>"` and the
+  recorded versions), the script embedded (workbench is private, so a Colab session never
+  clones it), and a cell that runs it. Opened on Colab, the entry runs on a fresh machine at its
+  commit, with nothing installed locally. An entry is never updated to follow minilink. A script
+  that opens a window (pygame, meshcat, a matplotlib animation) shows only its inline figures
+  there. The entries older than minilink (pyro) stay as they are.
 
 ### 3.6 The setup, in order
 
 1. **Written down:** a "Branches and pins" section in each repository's README; in minilink, the
    release and patch rules in ROADMAP and the term rule in AGENTS.md.
-2. **minilink:** the first teaching release (a `0.3.x` or `0.4.0`, the maintainer's call);
-   `main` is the latest release; the publish workflow runs on a tag.
+2. **minilink, at the move:** the first teaching release (a `0.4.0b1` or `0.4.0`, the
+   maintainer's call); `main` is the latest release; the publish workflow runs on a tag.
 3. **teaching:** `tests/set_minilink.py` and a CI test that every notebook's pin matches
    `requirements.txt`; the Colab cells from `git clone -b dev-consolidation` to `%pip install`
    at the pin; `dev` created from `main` and `main` pinned to the release; CI on `main` and
    `dev` at every push, `dev` nightly against minilink `dev`.
 4. **workbench:** a `dev` branch and the `workbench-main` worktree;
-   `reference/envs/minilink-stable.yml`; `run_pinned.sh`; the log header rule in its README; the
-   pin added to the 2025–2026 log entries that use minilink.
+   `reference/envs/minilink-stable.yml`; `archive.py` and the log rule in its README.
 
-**To check before step 3** (from the ruling of 2026-10-25, which chose `git clone -b <tag>`
-because notebooks imported the examples tree by path): a notebook that imports from
-`examples/` or uses `minilink.experimental` (not in the wheel) cannot run on
-`pip install minilink`; each such notebook keeps `git clone -b <tag>` at the same pin, or
-loses the import.
+**Checked for step 3** (the ruling of 2026-10-25 chose `git clone -b <tag>` because notebooks
+imported the examples tree by path): on 2026-11-20 no teaching notebook imports from
+`examples/` or `minilink.experimental`, so every one installs the wheel.
 
 ## 4. The examples tree
 

@@ -26,6 +26,10 @@ one plot and one animation.
 | `drone_learns_to_fly.py` | a neural law trained by reinforcement brings a drone back to hover from a random start | 43 s |
 | `rrt_star_obstacles.py` | a tree rewires among obstacles and its path shortens, drawn while it solves | 31 s |
 | `offroad_car_game.py` | the 3-D car on its suspension, driven by hand over rolling hills | interactive |
+| `pendulum_classical_control.py` | upright inverted pendulum: equilibrium, linearization, transfer function, root locus, controllability, LQR, modes, saturating region of attraction | ~2 min (laptop; RoA simulation pass) |
+| `cartpole_classical_control.py` | the same classical and state-space walkthrough on a cart-pole; four-state basin plot for the region | ~3 min (laptop; RoA dominates) |
 
-The run times are on one cloud machine unless marked. `racecar_mpc.py` and `ur5_impedance.py` animate in
+The run times are on one cloud machine unless marked. Frequency-domain plots (Bode, margins) stay in
+`examples/demos/analysis/` and the teaching notebooks; these two scripts are the consolidated
+analysis-and-control syllabus demo. `racecar_mpc.py` and `ur5_impedance.py` animate in
 the MeshCat viewer, and `offroad_car_game.py` needs a keyboard or a gamepad.
