@@ -26,6 +26,17 @@ examples") are decided here.
    physical parameter.
 7. **The same lines on a robot.** The UR5 in 3-D, one catalog line, `game()`.
 
+**The top of the README** (ruled 2026-11-20): title and tagline, badges, the GIF row, the
+pitch, then Install. The GIFs stay first, each captioned by its system and method and linked to
+its beat (cart-pole swing-up, trajectory optimization → beat 4; UR5 arm, joint impedance
+control → beat 2; racecar, model predictive control → beat 4; rocket landing, reinforcement
+learning → beat 4); beat 7 links back to the 3-D pages instead of repeating them. The pipeline
+map leaves the first screen for "How it fits together".
+
+**The tone** (ruled 2026-11-20): plain and factual, as a textbook states it. A heading or a
+caption says what the thing is or does; no promotional adjectives ("hardware-accelerated",
+"zero-friction", "lego-block", "seamless", "exact machine-precision").
+
 The README adds Install first and "How it fits together" (the three foundations, the pipeline
 map, what minilink is not) last. Out of the story, linked from the tutorials: MPPI, region of
 attraction, the spatial scene, the realtime simulator, C export, sets and fields as objects.
