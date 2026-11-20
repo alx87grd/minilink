@@ -301,6 +301,13 @@ per commit:
   timeout counts as a failure only after the same demo, on the base branch, finishes in time.
 - **Never start a long run on a half-edited tree**, and never edit modules while one imports
   them: finish the edit, then run.
+- **Every run an agent starts is headless.** A script, demo, notebook or prototype run
+  outside pytest sets `MINILINK_HEADLESS=1` (tests/README.md, "Full functionality run"): without it a
+  figure, a diagram's PDF, a Meshcat page or a pygame window opens on the maintainer's screen,
+  in minilink, teaching and workbench alike. Prefer the project's runners, which set it
+  (`tests/demo_checks/run_all_demos.py`, `run_notebook_checks.py`); an ad hoc runner, and
+  teaching's `tests/run_notebooks.py`, get it from the environment. A live game also needs a
+  short `tf` (`game(tf=2.0)`), or it never ends.
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 
