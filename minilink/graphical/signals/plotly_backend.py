@@ -8,6 +8,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from minilink.graphical.common.environment import detect_env, is_headless
+from minilink.graphical.common.plotly_style import LEGEND_KEY
 from minilink.graphical.figure import draw
 from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
@@ -79,9 +80,9 @@ class PlotlyLivePlotHandle(LivePlotHandle):
         """Redraw each trace from a new trajectory or description, with the same panels."""
         spec = figure_of_update(traj_or_figure, self.figure_of, title=title)
 
-        # In place: the same traces take the new samples, in one batched redraw
-        # when the figure has one (a FigureWidget)
-        require_same_trace_count(spec, len(self.fig.data))
+        # In place: each panel's trace takes the new samples, in one batched redraw
+        # when the figure has one (a FigureWidget); the legend keys are not panels
+        require_same_trace_count(spec, len(signal_traces_of(self.fig)))
         batch = getattr(self.fig, "batch_update", None)
         if callable(batch):
             with self.fig.batch_update():
@@ -230,11 +231,24 @@ class PlotlyPollHandler(BaseHTTPRequestHandler):
 
 
 def redraw_traces(fig, spec, title):
-    """Move each trace of ``fig`` to its panel's samples and label; retitle it when ``title`` is given."""
-    for trace_obj, panel in zip(fig.data, spec.panels, strict=True):
+    """Move each panel's trace of ``fig`` to its samples and label, and its legend key to the first sample; retitle it when ``title`` is given."""
+    keys = {trace.legendgroup: trace for trace in fig.data if trace.meta == LEGEND_KEY}
+    for trace_obj, panel in zip(signal_traces_of(fig), spec.panels, strict=True):
         trace = panel.layers[0]
         trace_obj.x = trace.x
         trace_obj.y = trace.y
         trace_obj.name = trace.label
+
+        # The key stays on the window's first sample, so it never stretches the axes
+        key = keys.get(trace_obj.legendgroup)
+        if key is not None:
+            key.x = trace.x[:1]
+            key.y = trace.y[:1]
+            key.name = trace.label
     if title is not None:
         fig.update_layout(title=title)
+
+
+def signal_traces_of(fig) -> list:
+    """The traces of ``fig`` that draw a panel's signal: every one but the legend keys."""
+    return [trace for trace in fig.data if trace.meta != LEGEND_KEY]

@@ -9,6 +9,7 @@ from minilink.simulation.realtime import PygameInput
 car = OffRoadCar3D(terrain=Bumps(), wheel_angles=True)
 
 # The ground: rolling hills 1.6 m from crest to trough and 30 m long, drawn over 120 m
+
 # around the start
 
 car.params["terrain"]["amplitude"] = 0.8  # [m]

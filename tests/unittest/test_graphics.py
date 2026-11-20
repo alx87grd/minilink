@@ -1591,6 +1591,32 @@ class TestPlotlySignalPlot(unittest.TestCase):
         handle.update(traj1)
         np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
 
+    def test_plotly_live_update_moves_faint_traces_and_their_legend_keys(self):
+        """A faint labelled trace draws a legend key of its own: the update moves both, the key to the first sample."""
+        pytest.importorskip("plotly")
+        from minilink.graphical.common.plotly_style import LEGEND_KEY
+        from minilink.graphical.figure import FigureSpec, Panel, Trace
+        from minilink.graphical.signals.plotly_backend import open_plotly_signal_plot
+
+        def figure(scale):
+            t = np.array([0.0, 1.0, 2.0])
+            return FigureSpec(
+                panels=(
+                    Panel(layers=(Trace(t, scale * t, alpha=0.5, label="faint"),)),
+                    Panel(layers=(Trace(t, -scale * t, label="opaque"),)),
+                )
+            )
+
+        handle = open_plotly_signal_plot(figure(1.0), show=False)
+        keys = [trace for trace in handle.fig.data if trace.meta == LEGEND_KEY]
+        self.assertEqual([key.name for key in keys], ["faint"])
+
+        handle.update(figure(3.0))
+        signals = [trace for trace in handle.fig.data if trace.meta != LEGEND_KEY]
+        np.testing.assert_allclose(signals[0].y, [0.0, 3.0, 6.0])
+        np.testing.assert_allclose(signals[1].y, [0.0, -3.0, -6.0])
+        self.assertEqual((tuple(keys[0].x), tuple(keys[0].y)), ((0.0,), (0.0,)))
+
     def test_plotly_ylabels_bracket_units_once(self):
         pytest.importorskip("plotly")
         sys = Integrator_plotly_renderer()

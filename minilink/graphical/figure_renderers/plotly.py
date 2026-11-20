@@ -11,7 +11,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 from minilink.graphical.common.plot_result import NoAxes, PlotResult
-from minilink.graphical.common.plotly_style import PLOTLY_TEMPLATE
+from minilink.graphical.common.plotly_style import LEGEND_KEY, PLOTLY_TEMPLATE
 from minilink.graphical.common.show import show_figure
 from minilink.graphical.figure import (
     TAB10,
@@ -231,10 +231,16 @@ def draw_opaque_key(fig, x, y, style, label, row, col):
     Plotly draws a key at its trace's opacity: the faint traces leave the
     legend to one line of a single point at full opacity, which draws nothing,
     in the label's ``legendgroup``: a click on the key shows or hides every
-    trace of that label.
+    trace of that label. It is tagged ``LEGEND_KEY``, so a live update skips it.
     """
     key = go.Scatter(
-        x=x[:1], y=y[:1], **style, name=label, legendgroup=label, showlegend=True
+        x=x[:1],
+        y=y[:1],
+        **style,
+        name=label,
+        legendgroup=label,
+        showlegend=True,
+        meta=LEGEND_KEY,
     )
     fig.add_trace(key, row=row, col=col)
 
