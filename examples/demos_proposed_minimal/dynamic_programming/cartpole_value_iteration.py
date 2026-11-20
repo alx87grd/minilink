@@ -41,6 +41,12 @@ problem = PlanningProblem(plant, cost=SwingUpCost(), horizon=np.inf, U=plant.inp
 grid = StateSpaceGrid(
     problem, x_grid=(31, 51, 31, 51), u_grid=(5,), dt=0.02, precompute=False
 )
+
+# grid = StateSpaceGrid(
+#     problem, x_grid=(51, 51, 51, 51), u_grid=(5,), dt=0.02, precompute=False
+# )
+
+
 planner = DynamicProgrammingPlanner(
     problem, grid=grid, backend="jax", gamma=1.0, out_of_bound_cost=500.0
 )

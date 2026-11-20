@@ -1204,12 +1204,7 @@ def problem_text(problem, horizon):
 def stochastic_problem_text(problem, horizon):
     """The print text of a stochastic problem: the deterministic one with its criterion and laws."""
     headline, body = problem_parts(problem, horizon)
-    criterion = problem.criterion
-    if isinstance(criterion, tuple):
-        criterion_s = f"cvar, alpha={criterion[1]:g}"
-    else:
-        criterion_s = str(criterion)
-    headline = f"{headline}, criterion={criterion_s}"
+    headline = f"{headline}, criterion={criterion_text(problem.criterion)}"
 
     if problem.start_law is not None:
         body.append(body_line("x0", inspect_inline(problem.start_law)))
@@ -1241,6 +1236,14 @@ def problem_parts(problem, horizon):
             body.append(body_line(label, inspect_inline(item)))
 
     return headline, body
+
+
+def criterion_text(criterion) -> str:
+    """The criterion as printed: ``expectation``, ``worst_case`` or ``cvar, alpha=α``."""
+    if isinstance(criterion, tuple):
+        return f"cvar, alpha={float(criterion[1]):g}"
+
+    return str(criterion)
 
 
 def planning_horizon_text(horizon):

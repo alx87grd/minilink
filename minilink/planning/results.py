@@ -64,8 +64,9 @@ class PlanningSolution:
         ``ReinforcementLearningRecord``, ``RiccatiRecord``, ``MPPIRecord``),
         each with a ``success`` flag and a one-line ``str``.
     trajectory : Trajectory, optional
-        The plan an open-loop planner computed, on its own grid and model;
-        ``None`` for a feedback law (its views run the controller).
+        The nominal trajectory an open-loop planner computed, its plan's
+        ``(t, x, u)`` on its own grid and model; ``None`` for a feedback law
+        (its views simulate the controller).
     cost_to_go : Field, optional
         ``J(x)``, the method's own estimate under its own model, where the
         method produces one: a :class:`~minilink.core.fields.GridField` for
@@ -122,7 +123,8 @@ class PlanningSolution:
 
         return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name).lower()
 
-    # Views, run on demand: the plan, else the controller run from the problem's start
+    # Views, run on demand: the nominal trajectory, else the controller simulated from the
+    # problem's start
 
     def plot_trajectory(
         self,
@@ -135,14 +137,14 @@ class PlanningSolution:
         ax=None,
     ) -> PlotResult:
         """
-        Draw the plan, else the controller's run from the problem's start, on the problem's system.
+        Draw the nominal trajectory, else the controller's simulation from the problem's start, on the problem's system.
 
-        The run is the loop the score runs, ``problem.compile(controller, dt)``
+        The simulation is the loop the score runs, ``problem.compile(controller, dt)``
         (a continuous law integrated on ``dt``, ``None`` the evaluator's
         automatic step; a clocked one on its own clock; a step problem's
         model), once from the start with nominal parameters. The planner's
         mirror passes its own ``dt``, the step of its evidence. The figure is
-        titled plan or run. ``renderer`` is the drawing library,
+        titled nominal trajectory or simulation. ``renderer`` is the drawing library,
         ``"matplotlib"`` or ``"plotly"``.
         """
         return plot_solution_trajectory(
@@ -167,7 +169,7 @@ class PlanningSolution:
         renderer="matplotlib",
         show=True,
     ):
-        """Animate the plan, else the controller's run from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system, with the keywords of its ``animate``."""
+        """Animate the nominal trajectory, else the controller's simulation from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system, with the keywords of its ``animate``."""
         traj = drawn_trajectory_of(self, dt)
 
         return self.problem.sys.animate(
@@ -184,7 +186,7 @@ class PlanningSolution:
     def plot_cost(
         self, *, dt=None, figsize=None, renderer="matplotlib", show=True, ax=None
     ) -> PlotResult:
-        """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`), with the drawing library ``renderer``."""
+        """Draw the running cost and ``J(t)`` along the nominal trajectory, else the controller's simulation on ``dt`` (:meth:`plot_trajectory`), with the drawing library ``renderer``."""
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
             traj=drawn_trajectory_of(self, dt),
@@ -317,7 +319,7 @@ class PlanningSolution:
         if self.open_loop:
             raise ValueError(
                 "an open-loop controller u = pi(t) has no control law to draw; "
-                "plot_trajectory draws the plan"
+                "plot_trajectory draws the nominal trajectory"
             )
 
 
@@ -339,7 +341,7 @@ def require_cost_to_go(solution, owner=None):
 
 def drawn_trajectory_of(solution, dt=None) -> Trajectory:
     """
-    What a solution's views draw: its plan, else its controller run once from the problem's start (:func:`controller_run_of`).
+    What a solution's views draw: its nominal trajectory, else its controller simulated once from the problem's start (:func:`controller_run_of`).
     """
     if solution.trajectory is not None:
         return solution.trajectory
@@ -406,13 +408,13 @@ def episode_ticks_of(model, episode_length=None) -> int:
 
 
 def solution_text(solution):
-    """The print text of a solution: its method, law, plan, evaluation and record."""
+    """The print text of a solution: its method, law, nominal trajectory, evaluation and record."""
     law = "u = pi(t), open loop" if solution.open_loop else "u = pi(x), feedback"
     if solution.trajectory is None:
-        trajectory = "none (a feedback law: the views run the controller)"
+        trajectory = "none (a feedback law: the views simulate the controller)"
     else:
         trajectory = (
-            f"plan of {solution.trajectory.n_samples} samples over "
+            f"nominal, {solution.trajectory.n_samples} samples over "
             f"{solution.trajectory.tf - solution.trajectory.t0:.3g} s"
         )
     evaluation = "none" if solution.evaluation is None else str(solution.evaluation)

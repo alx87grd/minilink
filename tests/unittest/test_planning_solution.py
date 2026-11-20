@@ -418,10 +418,9 @@ def test_solution_verbs_draw_what_the_planner_produced():
         problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, gamma=0.9, tol=1.0
     ).solve()
     result = unscored.plot_trajectory(show=False)
-    assert result.figure._suptitle.get_text() == "run (value iteration)"
-    assert (
-        plan.plot_trajectory(show=False).figure._suptitle.get_text().startswith("plan")
-    )
+    assert result.figure._suptitle.get_text() == "simulation (value iteration)"
+    title = plan.plot_trajectory(show=False).figure._suptitle.get_text()
+    assert title.startswith("nominal trajectory")
 
 
 def test_planner_shortcuts_draw_the_latest_solution():
@@ -814,6 +813,45 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
     plan_half, run_half = halves_of(str(mixed), "Diverged")
     assert plan_half == "-"
     assert run_half.split()[1:] == ["missed", "diverged"]
+
+
+def test_the_judged_criterion_heads_the_table_whatever_the_entries_carry():
+    """An evaluation made under another criterion is read under the judged one; draws that differ read as a range; one run among draws has no spread."""
+    from minilink.control import lqr as lqr_design
+    from minilink.planning import compare
+    from minilink.planning.evaluation import reduce_criterion
+
+    problem = judged_move(x0=Uniform([0.8, -0.2], [1.2, 0.2]))
+    law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
+    soft = lqr_design(problem.sys, np.eye(2), 1.0 * np.eye(1))
+
+    # Judged in expectation: a CVaR evaluation given first does not set the columns
+    given = evaluate(
+        problem.replace(criterion=("cvar", 0.4)), soft, dt=0.05, n_trials=5
+    )
+    table = str(compare(problem, Given=given, Law=law, dt=0.05, n_trials=5))
+    assert table.splitlines()[1].endswith("criterion=expectation, 5 draws")
+    header = table.splitlines()[4].split("│")[2].split()
+    assert header[:3] == ["E[J]", "σ(J)", "max"]
+    assert halves_of(table, "Given")[1].split()[0] == f"{float(given.mean):.4g}"
+
+    # Judged under a CVaR: every row's first column is that CVaR of its own J
+    judged = problem.replace(criterion=("cvar", 0.4))
+    given = evaluate(problem, soft, dt=0.05, n_trials=5)
+    comparison = compare(judged, Given=given, Law=law, dt=0.05, n_trials=5)
+    table = str(comparison)
+    assert "criterion=cvar, alpha=0.4" in table.splitlines()[1]
+    for name, evaluation in (("Given", given), ("Law", comparison.evaluations["Law"])):
+        cvar = float(reduce_criterion(evaluation.J, ("cvar", 0.4)))
+        assert halves_of(table, name)[1].split()[0] == f"{cvar:.4g}"
+
+    # Ten draws beside five: a range; one run beside them: its J, no spread
+    ten = evaluate(problem, soft, dt=0.05, n_trials=10)
+    one = evaluate(judged_move(), soft, dt=0.05)
+    table = str(compare(problem, Ten=ten, One=one, Law=law, dt=0.05, n_trials=5))
+    assert table.splitlines()[1].endswith("5–10 draws")
+    J, *spread = halves_of(table, "One")[1].split()[:3]
+    assert J == f"{float(one.J[0]):.4g}" and spread == ["-", "-"]
 
 
 def test_the_plan_is_scored_on_the_judged_problem_whatever_the_entries_order():

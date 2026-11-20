@@ -236,12 +236,13 @@ def sample_field(problem, field, *, x_axis, y_axis, anchor, bounds, grid_shape, 
 def plot_solution_trajectory(
     solution, traj, *, signals, figsize=None, renderer, show, ax=None
 ) -> PlotResult:
-    """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
+    """The solution's nominal trajectory, or its controller's simulation ``traj``, on its system, the figure titled as one or the other."""
     # Lazy import: the signal plots load on first use, not with the planners
     from minilink.graphical.signals.time_signals import plot_time_signals
 
-    # The title says which: the plan the planner computed, or the controller's run
-    kind = "plan" if solution.trajectory is not None else "run"
+    # The title says which: the nominal trajectory the planner computed, or the
+    # controller's simulation
+    kind = "nominal trajectory" if solution.trajectory is not None else "simulation"
 
     return plot_time_signals(
         solution.problem.sys,

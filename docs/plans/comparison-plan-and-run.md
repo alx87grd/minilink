@@ -56,7 +56,11 @@ Nominal good and simulation bad reads "the plan is right; run it with feedback"
 - **R11.** On several draws the simulation half shows `E[J]`, `σ(J)` and `max J` from the
   evaluation (`mean`, `std`, `worst`). A criterion other than the expectation comes first,
   its own column (`CVaR_α(J)`), and a statistic is shown once: the worst-case criterion is
-  `max J` itself. σ, not the variance: it reads in the units of J, beside the mean.
+  `max J` itself. σ, not the variance: it reads in the units of J, beside the mean. The
+  criterion is the judged problem's, read on every row's `J` whatever criterion an
+  `Evaluation` entry was made with (by names only, the first evaluation's over several
+  draws). Entries with different numbers of draws title a range (`5–10 draws`); one run
+  among several draws shows its `J` in the first column and `-` in the others.
 - An answer's lines all carry its name: each label once in the legend, and on Plotly a
   click on the key shows or hides every line of that answer. The first row and the rows
   with limits ask for the legend.

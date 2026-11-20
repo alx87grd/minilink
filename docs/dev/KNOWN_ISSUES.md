@@ -39,8 +39,8 @@ machine, JAX 0.12, NumPy backend unless the snippet says otherwise).
   that an infinite undiscounted horizon has no cost bound (a failure costs 1e6), and its run
   misses the goal (`J = 88.25`); RRT, whose record says "goal reached", writes a 5.1 s plan
   on the 4 s horizon, so its plan and its run both miss the goal (`J = 133.6`); only
-  trajectory optimization's run reaches it (`J = 89.82`, the star). Run again 2026-11-19 on
-  `compare`'s table of plans beside runs; times: value iteration 7.2 s, RRT 0.4 s,
+  trajectory optimization's run reaches it (`J = 89.82`). Run again 2026-11-19 on
+  `compare`'s table of nominal trajectories beside simulations; times: value iteration 7.2 s, RRT 0.4 s,
   trajectory optimization 4.2 s.
 - **Workaround:** none in the snippet; a discount on the problem (`discount_rate=`) or a
   `failure_cost` gives value iteration a cost bound.

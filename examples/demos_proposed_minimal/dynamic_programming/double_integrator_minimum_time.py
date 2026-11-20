@@ -38,7 +38,10 @@ planner = DynamicProgrammingPlanner(
     out_of_bound_cost=INF,
     backend="jax",
 )
-planner.solve(verbose=False)
+planner.solve(verbose=False, record_history=True)
+
+# planner.animate_cost_to_go()
+# planner.animate_control_law()
 
 planner.plot_cost_to_go(jmax=INF)
 planner.plot_cost_to_go(jmax=INF, is_3d=True)

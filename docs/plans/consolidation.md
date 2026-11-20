@@ -307,7 +307,7 @@ Seen while drafting, and left as they are:
 - In `racecar_mpc.py` the car laps on the outer half of its lane, not on the line: the cost
   only keeps it inside the lane. A pull toward the line (the track's distance field) made
   the plan stall, and a narrower lane too; neither is in the draft.
-- `Comparison.plot_trajectory` scores an infinite-horizon answer on a default 10 s, with a
+- `Comparison.plot_simulated_trajectory` scores an infinite-horizon answer on a default 10 s, with a
   warning, whatever the horizon of the problem it was compared on (`advanced/02`).
 
 ### 4.7 Demos to add later (noted 2026-11-12, none drafted)

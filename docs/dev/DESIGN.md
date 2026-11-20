@@ -1377,11 +1377,15 @@ grid planner's table drawn on the grid's own nodes unless the call asks for anot
 these plots, like every plot, return a `PlotResult` and the animations an
 `AnimationResult` (§7); `is_3d=True` draws the surface of the field in place of the
 heatmap, one figure; `plot_trajectory`, `animate` and `plot_cost` draw the
-plan when there is one, else the controller run once from the problem's start through
-the problem's evaluator (`problem.compile(controller, dt)`, the loop the score runs: a
-continuous law integrated on the views' optional `dt`, `None` the evaluator's automatic
-step, and the planner's mirrors pass the planner's own `dt`; nominal parameters; a step
-problem's `rollout`), titled plan or run.
+nominal trajectory when there is one, else the controller simulated once from the problem's
+start through the problem's evaluator (`problem.compile(controller, dt)`, the loop the score
+runs: a continuous law integrated on the views' optional `dt`, `None` the evaluator's
+automatic step, and the planner's mirrors pass the planner's own `dt`; nominal parameters; a
+step problem's `rollout`), titled nominal trajectory or simulation. The words keep one role
+each: a planner computes a **plan**; the `(t, x, u)` that plan predicts, `solution.trajectory`,
+is its **nominal trajectory**, the reference a tracking law follows; the judge's run of the
+block handed out is its **simulation**. **Nominal** means the reference without
+uncertainty, as in the nominal state `x̄` and the deterministic `problem.nominal()`.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
 side by side: `plot_control_law` / `plot_cost_to_go` are the overlays on one scale;
 `compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores every
@@ -1395,8 +1399,8 @@ the judged system, its horizon and, on several draws, the criterion and their nu
 answer read twice (`J`, goal, constraints), its nominal trajectory, cut at `t0 + T` and
 scored on the judged problem by `evaluate_trajectory` without simulation (by names only, on
 its own problem; `-` for an answer without one), beside its simulation, the block it hands
-out simulated by the judge (on several draws, the criterion first when it is not the
-expectation, then `E[J]`, `σ(J)` and `max J`, and the counts).
+out simulated by the judge (on several draws, the judged problem's criterion first when it
+is not the expectation, then `E[J]`, `σ(J)` and `max J`, and the counts).
 `plot_nominal_trajectory` draws each answer's nominal trajectory (the answers without one
 left out); `plot_simulated_trajectory` draws each answer's simulations from its evaluation
 (one solid, several thin and faint; by names only, the controller run once). Both use one
