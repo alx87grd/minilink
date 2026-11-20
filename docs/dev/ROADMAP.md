@@ -814,7 +814,7 @@ whose controller is scored by the one judge, `evaluate` and `compare(problem, ..
 model, cost, sets, start law and disturbances for every approach. This is the contribution the
 toolbox can make that the specialised tools do not, and it ranks above new planners:
 - the `compare` path is hardened first (its maturity is TRL 4 in §3, "Planning / evaluation");
-  the README tells the comparison as its climax ([readme-and-showcase-story.md](../plans/readme-and-showcase-story.md));
+  the README and the showcase notebook show it on one problem ([readme-and-showcase-story.md](../plans/readme-and-showcase-story.md));
 - a comparison is fair when it also reports what each approach was given and what it spent:
   the model access (equations, gradients, samples only), the compute time, the samples or
   iterations, and the numbers a user tuned;

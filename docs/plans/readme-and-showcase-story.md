@@ -42,9 +42,11 @@ attraction, the spatial scene, the realtime simulator, C export, sets and fields
 
 ## Where it stands
 
-The README is on the story (2026-11-20, every snippet run as one session in about 50 s, the
+The README is on the story, its text the old README's sentences where they fit (2026-11-20, every snippet run as one session in about 50 s, the
 contract test green). Ruled while drafting it: `+` is "side by side", not "parallel"; the user's
-own model is plain NumPy and the JAX section uses the catalog pendulum; LQR sits with the
+own model is the mass-spring-damper with its sensor `h`, closed by a PID, whose diagram shows the
+error block `@` inserts (the README's central figure, restored); it is plain NumPy, and the JAX
+section uses the catalog pendulum; LQR sits with the
 classical tools in section 2, so section 3 is derivatives and batches only; the comparison
 draws the mass (±20 %), and a terminal weight in the problem's cost makes every planner aim for
 the goal; the tuning bounds its three decision variables; reinforcement learning is a link to
@@ -55,8 +57,8 @@ The showcase notebook is on the same story (2026-11-20, the notebook check green
 minute on a cloud machine), the README's code cell for cell with the plots and animations
 between. Ruled for it: reinforcement learning is its own section, "Learn a law", after the
 score, on its own shaped cost and random starts (trained on the README's problem it learns to
-stay down), scored by `compare` against the section-2 LQR; the own model is the README's
-`MyPendulum` (PID and a partial sensor `h` stay in `basics/`); the run time is measured, not a
+stay down), scored by `compare` against the section-2 LQR; the own model, its PID
+and its diagram are the README's; the run time is measured, not a
 budget the content is cut to.
 
 ## Left
