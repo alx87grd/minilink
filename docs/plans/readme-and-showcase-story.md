@@ -10,12 +10,11 @@ examples") are decided here.
 
 1. **Ten lines.** The catalog pendulum, a controller, `@`, simulate.
 2. **Diagrams in code.** `>>`, `+`, `%`; your own model (it is its `f`), after the catalog
-   plant; the loop is a system, so the classical analysis (`plot_bode`, root locus, margins)
-   reads it. Ends on the parameters: `loop.params` is the tree the wiring carries, and a path
+   plant; the loop is a system, so the classical analysis (`transfer_function`, `plot_bode`,
+   root locus) reads it, and `lqr` designs on the linear model (`kalman`, `lqg` its duals). Ends on the parameters: `loop.params` is the tree the wiring carries, and a path
    (`"plant.l"`, `"controller.Kp"`) names any number in any block.
 3. **One `f`.** Derivatives and batches in `x`, `u` and any parameter (the parameter Jacobian
-   taken away from an equilibrium); LQR from the linear model, `kalman` its dual and the observer
-   one more block; NumPy by default, JAX by one flag.
+   taken away from an equilibrium), exact under JAX; NumPy by default, JAX by one flag.
 4. **One problem, every planner.** Value iteration, RRT, trajectory optimization, RL, and MPC (a
    planner on a clock is a controller), each answer a controller closed on the plant. MPC stays in
    the README too, its name changed with GMC714's pins (G3) if they move it.
@@ -41,14 +40,20 @@ The README adds Install first and "How it fits together" (the three foundations,
 map, what minilink is not) last. Out of the story, linked from the tutorials: MPPI, region of
 attraction, the spatial scene, the realtime simulator, C export, sets and fields as objects.
 
-## Left to draft
+## Where it stands
 
-- The wording, beat by beat, README and notebook together; the pitch (a draft in the chat of
-  2026-11-20 ends on the fair comparison and on NumPy first).
-- **[ask]** Beat 6's example: bounds on the decision variables (recommended), gains only, or a
-  cost that prices the parameters. The README's co-design today converges to a negative gain and
-  a 3.5 cm rod; its three-gain PID tuning to negative gains too.
-- **[ask]** Beat 5's example: the planners' numbers chosen so each reaches the goal (value
-  iteration needs a cost bound: `discount_rate=` or `failure_cost`), with an uncertain parameter.
-- The notebook: the judge moved up after the planners, `compare` beside `evaluate`, one
-  classical-analysis cell, one observer cell, the parameter tree at the end of the diagrams.
+The README is on the story (2026-11-20, every snippet run as one session in about 50 s, the
+contract test green). Ruled while drafting it: `+` is "side by side", not "parallel"; the user's
+own model is plain NumPy and the JAX section uses the catalog pendulum; LQR sits with the
+classical tools in section 2, so section 3 is derivatives and batches only; the comparison
+draws the mass (±20 %), and a terminal weight in the problem's cost makes every planner aim for
+the goal; the tuning bounds its three decision variables; reinforcement learning is a link to
+the notebook (its default settings do not learn this cost); explicit `connect` wiring stays in
+the tutorials; the README stays compact (it does not grow past the old one).
+
+## Left
+
+- The notebook on the same story: the judge after the planners with `compare` and the
+  uncertain mass, the same problem and terminal weight, the classical-analysis cell, the tuning
+  with the rod length; then the README's "Learn more" line says it runs this page.
+- The comparison table re-run when the pendulum's point-mass default lands (TODO §1.10).

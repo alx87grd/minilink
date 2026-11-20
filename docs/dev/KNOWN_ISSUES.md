@@ -28,32 +28,6 @@ lands. Last checked against the code: 2026-11-18 (NumPy 2.5, JAX 0.12, a cloud m
 - **Fix:** none: the bare item write on a leaf stays a plain dict write, by the maintainer's
   ruling of 2026-11-05 (DESIGN §4, "Parameters", rule 5).
 
-## The README's examples
-
-Found by running the README's snippets as written (2026-11-09; run again 2026-11-18, a cloud
-machine, JAX 0.12, NumPy backend unless the snippet says otherwise).
-
-### The "One problem, every planner" example shows two planners missing the goal
-- **Symptom:** README §7 as written: value iteration stops at its iteration cap
-  ("max_iterations=1000 reached before tol=0.1 (delta=5.48)", its record) after a warning
-  that an infinite undiscounted horizon has no cost bound (a failure costs 1e6), and its run
-  misses the goal (`J = 88.25`); RRT, whose record says "goal reached", writes a 5.1 s plan
-  on the 4 s horizon, so its plan and its run both miss the goal (`J = 133.6`); only
-  trajectory optimization's run reaches it (`J = 89.82`). Run again 2026-11-19 on
-  `compare`'s table of nominal trajectories beside simulations; times: value iteration 7.2 s, RRT 0.4 s,
-  trajectory optimization 4.2 s.
-- **Workaround:** none in the snippet; a discount on the problem (`discount_rate=`) or a
-  `failure_cost` gives value iteration a cost bound.
-- **Fix:** **[ask]** the README is the maintainer's: the example's numbers chosen so each
-  planner reaches the goal, decided with the kept demo set (TODO §1.12).
-
-### The co-design example returns a negative gain and a 3.5 cm pendulum
-- **Symptom:** README §5: `Optimizer(pe.program(wrt=["controller.Kp", "plant.l"])).solve()`
-  converges to `z* = [-1.162, 0.0349]` (`J* = 5.506`): nothing bounds the gain or the rod
-  length, so the optimum is not a design one would build.
-- **Workaround:** optimize the gains only, or a cost that prices the parameters.
-- **Fix:** **[ask]** with the entry above: bounds on the decision variables, or another pair.
-
 ## Planning
 
 ### A tree search that never leaves its root cannot be scored
