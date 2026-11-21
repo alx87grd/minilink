@@ -18,7 +18,7 @@
   <tr>
 <td width="25%" align="center" valign="top">Cart-pole swing-up, trajectory optimization</td>
 <td width="25%" align="center" valign="top">UR5 arm, task-space impedance control<br/><a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a></td>
-<td width="25%" align="center" valign="top"><a href="#3-one-problem-every-planner-one-evaluation">Racecar, model predictive control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
+<td width="25%" align="center" valign="top"><a href="#3-the-planning-pipeline">Racecar, model predictive control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
 <td width="25%" align="center" valign="top">Rocket landing, reinforcement learning</td>
   </tr>
 </table>
@@ -41,25 +41,14 @@ Or with pip: `pip install "minilink[full]"`, or `pip install minilink` for NumPy
 
 ## 1. Block diagrams as code
 
-```python
-from minilink import PID, SimplePendulum
-
-plant = SimplePendulum()
-pid = PID(Kp=10.0, Ki=1.0, Kd=2.0)
-diagram = pid @ plant
-diagram.plot_diagram()
-```
-
-![closed-loop diagram](./docs/_static/diagram_closed_loop.png)
-
-**Custom block:** just define `f` and `h`.
+A block is its equations: define `f` and `h`, and `@` closes the loop.
 
 ```python
 import numpy as np
-from minilink import DynamicSystem
+from minilink import PID, DynamicSystem
 
 
-class MyPendulum(DynamicSystem):
+class SimplePendulum(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=2, input_dim=1, output_dim=1)
 
@@ -68,30 +57,49 @@ class MyPendulum(DynamicSystem):
         return np.array([dtheta, u[0] - 9.81 * np.sin(theta)])
 
     def h(self, x, u, t=0, params=None):
-        return x[:1]
+        return x[:1]  # the sensor reads the angle
 
 
-diagram = pid @ MyPendulum()
+pid = PID(Kp=10.0, Ki=1.0, Kd=2.0)
+diagram = pid @ SimplePendulum()
+diagram.plot_diagram()
 ```
 
-## 2. One equation, many tools
+![closed-loop diagram](./docs/_static/diagram_closed_loop.png)
 
-A model is three pure functions:
+## 2. Analysis
 
-$$\dot{x} = f(x, u, t; p), \qquad y = h(x, u, t; p), \qquad T = \mathrm{tf}(x, u, t; p)$$
-
-dynamics, outputs and body poses. Stateless, arrays in and arrays out, so every tool can integrate, linearize, batch and differentiate them:
+A model is three pure functions, $\dot{x} = f(x, u, t; p)$, $y = h(x, u, t; p)$ and the body poses $T = \mathrm{tf}(x, u, t; p)$: stateless, arrays in and arrays out, so every tool can simulate, linearize and differentiate them.
 
 ```python
-import numpy as np
-from minilink import (
-    BallSet, Pendulum, PlanningProblem, QuadraticCost,
-    ReinforcementLearningPlanner, TrajectoryOptimizationPlanner,
-)
+from minilink import Pendulum, lqr
+from minilink.analysis import plot_region_of_attraction, region_of_attraction
 
-plant = Pendulum()  # measures its full state
+plant = Pendulum()
 up = np.array([np.pi, 0.0])
+
 plant.plot_bode()
+plant.plot_root_locus(x_bar=up)
+plant.compute_trajectory(tf=6.0, x0=[2.0, 0.0])
+plant.plot_trajectory()
+
+balance = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=up) @ plant
+region = region_of_attraction(balance, x_bar=up)
+plot_region_of_attraction(balance, region)
+```
+
+![Frequency response, root locus, simulation and Lyapunov region of attraction](./docs/_static/tool_analysis.png)
+
+## 3. The planning pipeline
+
+One problem, described once; every planner solves it, and `compare` evaluates their controllers on its stochastic version.
+
+```python
+from minilink import (
+    BallSet, DynamicProgrammingPlanner, PlanningProblem, QuadraticCost, RRTPlanner,
+    ReinforcementLearningPlanner, TrajectoryOptimizationPlanner, Uniform, compare,
+)
+from minilink.control import ModelPredictiveController
 
 cost = QuadraticCost.from_system(plant, x_bar=up, S=100 * np.eye(2))
 swing_up = PlanningProblem(
@@ -103,38 +111,21 @@ swing_up = PlanningProblem(
     X=plant.state.box,
     U=plant.input_box,
 )
+
 opt = TrajectoryOptimizationPlanner(swing_up, n_steps=60).solve(live_plot=True)
-
-ppo = ReinforcementLearningPlanner(swing_up, dt=0.05, gamma=0.99)
-ppo.solve(n_timesteps=100_000)
-ppo.plot_learning_curve()
-```
-
-![Frequency response, trajectory optimization and reinforcement learning on one pendulum](./docs/_static/tool_breadth.png)
-
-## 3. One problem, every planner, one evaluation
-
-Every planner takes the same problem and returns a controller that is itself a `System`. `compare` evaluates them on the same draws, here with the mass uncertain by ±20 %:
-
-```python
-from minilink import DynamicProgrammingPlanner, RRTPlanner, Uniform, compare
-from minilink.control import ModelPredictiveController
-
-vi_planner = DynamicProgrammingPlanner(swing_up, x_grid=(101, 101), u_grid=(11,), dt=0.05)
-vi = vi_planner.solve()
+vi = DynamicProgrammingPlanner(swing_up, x_grid=(101, 101), u_grid=(11,), dt=0.05).solve()
 rrt = RRTPlanner(swing_up, seed=0).solve()
-
+ppo = ReinforcementLearningPlanner(swing_up, dt=0.05, gamma=0.99).solve(n_timesteps=100_000)
 look_ahead = swing_up.replace(horizon=2.0, Xf=None)
 mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")
 mpc = ModelPredictiveController(mpc_planner) % 0.1
 
-mass = Uniform(0.8, 1.2)
-uncertain = swing_up.replace(distributions={"plant": {"m": mass}})
+uncertain = swing_up.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
 comparison = compare(uncertain, VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=20)
 comparison.plot_simulated_trajectory()
 ```
 
-![The angular rate of each controller's twenty runs](./docs/_static/comparison_runs.png)
+![Trajectory optimization, reinforcement learning and the Monte Carlo evaluation](./docs/_static/tool_planning.png)
 
 The open-loop plans miss the goal once the mass changes (0 of 20); the feedback laws reach it (value iteration 20 of 20, MPC 17 of 20).
 
@@ -148,7 +139,7 @@ from minilink import Impedance, Optimizer
 
 rest_cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
 rest = PlanningProblem(plant, x0=[2.0, 0.0], horizon=5.0, cost=rest_cost)
-task = rest.replace(distributions={"plant": {"m": mass}})
+task = rest.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
 evaluator = task.compile(Impedance(Kp=1.0, Kd=1.0), backend="jax")
 
 expected_cost = lambda params: evaluator.evaluate(params, n_trials=20).objective

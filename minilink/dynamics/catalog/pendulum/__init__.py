@@ -11,7 +11,6 @@ from minilink.dynamics.catalog.pendulum.pendulum import (
     InvertedPendulum,
     NoisyPendulum,
     Pendulum,
-    SimplePendulum,
     TwoIndependentPendulums,
 )
 
@@ -24,7 +23,6 @@ __all__ = [
     "Pendulum",
     "NoisyPendulum",
     "RotatingCartPole",
-    "SimplePendulum",
     "TwoIndependentPendulums",
     "UnderactuatedRotatingCartPole",
 ]
