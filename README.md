@@ -163,11 +163,13 @@ The open-loop plans miss the goal once the mass changes (0 of 20); the feedback 
 
 Tune a controller on the evaluation itself. The closed loop, an impedance law bringing the pendulum to rest from $\theta = 2$ rad:
 
-$$\dot{x} = f(x, u; m), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}, \qquad p = (K_p, K_d)$$
+$$\dot{x} = f(x, u; p, m), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}$$
 
 $$J(p) = \int_0^{t_f} \left(x^\top Q\, x + u^\top R\, u\right) dt$$
 
-The loop, compiled, gives the expected cost and its gradient through the whole simulation:
+where $p$ is the loop's whole parameter tree, the controller's gains and every number of the plant and the cost (`{"controller": {"Kp": ..., "Kd": ...}, "plant": {"l": ..., ...}, ...}`), and the mass $m$ is drawn.
+
+The loop, compiled, gives the expected cost and its gradient with respect to every leaf of the tree, through the whole simulation:
 
 $$\mathbb{E}_m\big[J(p)\big], \qquad \nabla_p\, \mathbb{E}_m\big[J(p)\big]$$
 
@@ -184,9 +186,9 @@ expected_cost = lambda params: evaluator.evaluate(params, n_trials=20).objective
 gradient = jax.grad(expected_cost)(evaluator.params)
 ```
 
-The gains, named by their paths, become a program; an `Optimizer` solves it:
+The gains, named by their paths in the tree, become the decision variables $z = (K_p, K_d)$ of a program; an `Optimizer` solves it:
 
-$$\min_{K_p,\, K_d} \ \mathbb{E}_m\big[J(p)\big] \quad \text{s.t.} \quad 0 \le K_p \le 50, \quad 0 \le K_d \le 20$$
+$$\min_{z = (K_p,\, K_d)} \ \mathbb{E}_m\big[J(z; p)\big] \quad \text{s.t.} \quad 0 \le K_p \le 50, \quad 0 \le K_d \le 20$$
 
 ```python
 from minilink import Optimizer
