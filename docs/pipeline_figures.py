@@ -173,8 +173,8 @@ PATHS = {
     "Analyze": r"$\dot{\tilde{x}} = A\tilde{x} + B\tilde{u}$",
     "Design": r"$\lambda(A - BK) = \{p_i\}$",
     "Plan": r"$\pi^* = \mathrm{arg\,min}_{\pi}\; J$",
-    "Learn": r"$\theta \leftarrow \theta + \eta \nabla_{\theta} \mathbb{E}[G]$",
-    "Evaluate": r"$J(\theta) = \mathbb{E}[J]$",
+    "Learn": r"$p \leftarrow p + \eta \nabla_{p} \mathbb{E}[G]$",
+    "Evaluate": r"$J(p) = \mathbb{E}[J]$",
 }
 # (fill, stroke, ink) per tool: a sweep around the wheel, left to right
 ACCENT = {
@@ -615,7 +615,7 @@ def library_map():
         "PlanningProblem",
         [
             r"$J = \int_0^{t_f} g(x, u, t)\, dt \;+\; h(x(t_f))$",
-            r"$x \in X \quad u \in U \quad x(0) = x_0 \quad x(t_f) \in X_f$",
+            r"$x \in \mathcal{X} \quad u \in \mathcal{U} \quad x(0) = x_0 \quad x(t_f) \in \mathcal{X}_f$",
         ],
         pic_problem,
         92,

@@ -18,7 +18,7 @@
   <tr>
 <td width="25%" align="center" valign="top">Cart-pole swing-up, trajectory optimization</td>
 <td width="25%" align="center" valign="top">UR5 arm, task-space impedance control<br/><a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a></td>
-<td width="25%" align="center" valign="top"><a href="#3-the-planning-pipeline">Racecar, model predictive control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
+<td width="25%" align="center" valign="top">Racecar, model predictive control<br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
 <td width="25%" align="center" valign="top">Rocket landing, reinforcement learning</td>
   </tr>
 </table>
@@ -69,7 +69,7 @@ diagram.plot_diagram()
 
 ## 2. Analysis
 
-The classical tools on a catalog pendulum: its frequency response, the root locus of $u = -k\,\theta$ at the upright, a simulation.
+The classical tools on a catalog pendulum: its frequency response, the root locus of $u = -k\,(\theta - \pi)$ at the upright, a simulation.
 
 ```python
 from minilink import Pendulum
@@ -100,9 +100,9 @@ plot_region_of_attraction(balance, region)
 
 The task, described once: the plant, its sets and its cost over the horizon $t_f$,
 
-$$x(0) = x_0, \qquad x(t) \in \mathcal{X}, \qquad u(t) \in \mathcal{U}, \qquad x(t_f) \in \mathcal{X}_f = \{x : \lVert x - x_{\text{up}} \rVert \le 0.2\},$$
+$$x(0) = x_0, \qquad x(t) \in \mathcal{X}, \qquad u(t) \in \mathcal{U}, \qquad x(t_f) \in \mathcal{X}_f = \lbrace x : \lVert x - \bar{x} \rVert \le 0.2 \rbrace,$$
 
-$$J = \int_0^{t_f} \left(\tilde{x}^\top Q\, \tilde{x} + u^\top R\, u\right) dt + \tilde{x}(t_f)^\top S\, \tilde{x}(t_f), \qquad \tilde{x} = x - x_{\text{up}}.$$
+$$J = \int_0^{t_f} \left(\tilde{x}^\top Q\, \tilde{x} + u^\top R\, u\right) dt + \tilde{x}(t_f)^\top S\, \tilde{x}(t_f), \qquad \tilde{x} = x - \bar{x}.$$
 
 ```python
 from minilink import BallSet, PlanningProblem, QuadraticCost
@@ -114,7 +114,7 @@ swing_up = PlanningProblem(
     Xf=BallSet(up, 0.2),
     horizon=6.0,
     cost=cost,
-    X=plant.state.box,
+    X=plant.state_box,
     U=plant.input_box,
 )
 ```
@@ -123,7 +123,9 @@ Every planner solves the same problem and returns a controller.
 
 ```python
 from minilink import (
-    DynamicProgrammingPlanner, RRTPlanner, ReinforcementLearningPlanner,
+    DynamicProgrammingPlanner,
+    RRTPlanner,
+    ReinforcementLearningPlanner,
     TrajectoryOptimizationPlanner,
 )
 
@@ -163,11 +165,11 @@ The open-loop plans miss the goal once the mass changes (0 of 20); the feedback 
 
 Tune a controller on the evaluation itself. The closed loop, an impedance law bringing the pendulum to rest from $\theta = 2$ rad:
 
-$$\dot{x} = f(x, u; p, m), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}$$
+$$\dot{x} = f(x, u, t; p), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}$$
 
 $$J(p) = \int_0^{t_f} \left(x^\top Q\, x + u^\top R\, u\right) dt$$
 
-where $p$ is the loop's whole parameter tree, the controller's gains and every number of the plant and the cost (`{"controller": {"Kp": ..., "Kd": ...}, "plant": {"l": ..., ...}, ...}`), and the mass $m$ is drawn.
+where $p$ is the loop's whole parameter tree (the controller's gains, every number of the plant and the cost), and its mass leaf $m \sim \mathcal{U}(0.8,\ 1.2)$ is drawn.
 
 The loop, compiled, gives the expected cost and its gradient with respect to every leaf of the tree, through the whole simulation:
 
@@ -182,7 +184,10 @@ rest = PlanningProblem(plant, x0=[2.0, 0.0], horizon=5.0, cost=rest_cost)
 task = rest.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
 evaluator = task.compile(Impedance(Kp=1.0, Kd=1.0), backend="jax")
 
-expected_cost = lambda params: evaluator.evaluate(params, n_trials=20).objective
+def expected_cost(params):
+    return evaluator.evaluate(params, n_trials=20).objective
+
+
 gradient = jax.grad(expected_cost)(evaluator.params)
 ```
 
@@ -199,7 +204,7 @@ program = evaluator.program(gains, bounds=bounds, n_trials=20)
 best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54; expected cost 19.3 → 11.0
 ```
 
-This program is a `MathematicalProgram`, the one shape every transcription lowers to (trajectory optimization's collocation, a tuning task like this one, a policy search) and the `Optimizer` solves, by the method it names (`l-bfgs`, `gd`, `adam`; with constraints, `slsqp`, `trust-constr` or `ipopt`):
+This program is a `MathematicalProgram`, the one shape every transcription lowers to (collocation, a tuning task, a policy search); the `Optimizer` solves it by the method it names (`l-bfgs`, `gd`, `adam`; with constraints, `slsqp`, `trust-constr` or `ipopt`):
 
 $$\min_{z} \ J(z; p) \quad \text{s.t.} \quad h(z; p) = 0, \quad g(z; p) \ge 0, \quad z_{\text{lower}} \le z \le z_{\text{upper}}$$
 
@@ -213,7 +218,7 @@ Three objects hold it together: the model (`System`), the task (`PlanningProblem
 
 - Not a multibody contact engine: wrap one as a `System` leaf.
 - Not a sparse NLP modeling language.
-- Continuous time first: `f` is a rate, and `%` puts a block on a clock.
+- Not discrete-time first: `f` is a rate, and `%` puts a block on a clock.
 
 ## Learn more
 
