@@ -197,7 +197,7 @@ program = evaluator.program(gains, bounds=bounds, n_trials=20)
 best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54; expected cost 19.3 → 11.0
 ```
 
-This program is a `MathematicalProgram`, the one shape every transcription lowers to (trajectory optimization's collocation, a tuning task like this one, a policy search) and every `Optimizer` method solves (`l-bfgs`, `slsqp`, `trust-constr`, `ipopt`, `gd`, `adam`):
+This program is a `MathematicalProgram`, the one shape every transcription lowers to (trajectory optimization's collocation, a tuning task like this one, a policy search) and the `Optimizer` solves, by the method it names (`l-bfgs`, `gd`, `adam`; with constraints, `slsqp`, `trust-constr` or `ipopt`):
 
 $$\min_{z} \ J(z; p) \quad \text{s.t.} \quad h(z; p) = 0, \quad g(z; p) \ge 0, \quad z_{\text{lower}} \le z \le z_{\text{upper}}$$
 
