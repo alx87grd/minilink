@@ -159,7 +159,13 @@ The open-loop plans miss the goal once the mass changes (0 of 20); the feedback 
 
 ## 4. From evaluation to controller
 
-A controller in its loop, compiled: the expected cost $\mathbb{E}_m[J(p)]$ is a function of every parameter $p$ of the loop, and $\nabla_p\, \mathbb{E}_m[J]$ runs through the whole simulation.
+The evaluation is a differentiable function of the loop's parameters, so a controller $u = \pi(x; p)$ is tuned on it:
+
+$$\min_{p} \ \mathbb{E}_m\big[J(p)\big], \qquad J(p) = \int_0^{t_f} \left(x^\top Q\, x + u^\top R\, u\right) dt, \qquad \dot{x} = f\big(x, \pi(x; p); m\big),$$
+
+with $\nabla_p\, \mathbb{E}_m[J]$ through the whole simulation. Here an impedance law $u = -K_p\, \theta - K_d\, \dot{\theta}$, $p = (K_p, K_d)$, brings the pendulum to rest from $\theta = 2$ rad.
+
+The loop, compiled, gives the expected cost and its gradient.
 
 ```python
 import jax
@@ -174,7 +180,7 @@ expected_cost = lambda params: evaluator.evaluate(params, n_trials=20).objective
 gradient = jax.grad(expected_cost)(evaluator.params)
 ```
 
-The gains, named by their paths, become a program, $\min_{K_p, K_d} \mathbb{E}_m[J]$ within their bounds; an `Optimizer` solves it.
+The gains, named by their paths, become the program, within their bounds; an `Optimizer` solves it.
 
 ```python
 from minilink import Optimizer
