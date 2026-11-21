@@ -29,11 +29,15 @@ All core equation paths are pure functions—arrays in, arrays out—allowing th
 
 ## Install
 
+Recommended, everything included (JAX, Graphviz, Ipopt, 3-D animation, Jupyter):
+
 ```bash
-pip install "minilink[full]"    # or: pip install minilink, NumPy only
+git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda env create -f environment.yml && conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Or everything in conda: `conda env create -f environment.yml` in a clone.
+Or with pip: `pip install "minilink[full]"`, or `pip install minilink` for NumPy only.
 
 ## 1. Block diagrams as code
 
