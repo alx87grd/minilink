@@ -27,19 +27,6 @@ Minilink is an open-source Python framework for dynamical systems, control, opti
 Write a physical model once in pure textbook ODE equations as the core object in Minilink: a `System`. Compose models and blocks into block diagrams, which are also just new Systems. This unified `System` is the standard interface to all tools: classical and modern control, optimal control (MPC, MPPI), machine learning (neural networks, reinforcement learning), and parameter optimization.
 All core equation paths are pure functions—arrays in, arrays out—allowing the exact same code to work with either a minimalist NumPy/SciPy/Matplotlib setup or a JAX backend to compile, batch, and autodifferentiate the same equations.
 
-## The Minilink backbone
-
-Three mathematical foundations hold the framework together:
-1. **The model (`System`):** continuous differential equations $\dot{x} = f(x, u, t; p)$ and observations $y = h(x, u, t; p)$.
-2. **The task (`PlanningProblem`):** the model paired with boundary sets $\mathcal{X}, \mathcal{U}, \mathcal{X}_f$, cost $J$, and time horizon $t_f$.
-3. **The solver boundary (`MathematicalProgram` & `Optimizer`):** a standard nonlinear program $\min_z J(z)$ s.t. $g(z) \ge 0,\ h(z) = 0$ connecting problems to plug-and-play numerical solvers.
-
-One differentiable path connects modeling, analytical control, trajectory optimization, and learning:
-
-![The Minilink Backbone](./docs/_static/pipeline_map.png)
-
-*Full pipeline reference: [docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).*
-
 ## Install
 
 Python 3.10+. **pip**:
@@ -88,7 +75,7 @@ $$T = \mathrm{tf}(x, u, t; p) \quad \text{(body poses for 3D animation)}$$
 
 **Functional purity** means equations are stateless: arrays in, arrays out. No simulation time or state is mutated on `self`.
 This purity allows precise numerical integration, reproducible experiments, exact linear analysis, arbitrary composition into nested systems, parallel GPU rollouts, and automatic differentiation.
-So the same pendulum goes from a Bode plot to a neural policy, one line each:
+The tools below read the whole state, so the plant is the catalog `Pendulum`, which measures it, and the same pendulum goes from a Bode plot to a neural policy, one line each:
 
 ```python
 import numpy as np
@@ -178,6 +165,19 @@ best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54: the score falls from 
 
 - **Pluggable solvers:** `method=` picks one: `l-bfgs`, `slsqp`, `trust-constr` (SciPy), `gd`, `adam` (first-order), `ipopt`.
 - **Opt-in acceleration:** pure NumPy remains the default classroom engine; JAX is activated with a single flag (`backend="jax"`), and batches 1,000 rollouts in 0.4 s on a cloud CPU against about 50 s in a NumPy loop.
+
+## The Minilink backbone
+
+Three mathematical foundations hold the framework together:
+1. **The model (`System`):** continuous differential equations $\dot{x} = f(x, u, t; p)$ and observations $y = h(x, u, t; p)$.
+2. **The task (`PlanningProblem`):** the model paired with boundary sets $\mathcal{X}, \mathcal{U}, \mathcal{X}_f$, cost $J$, and time horizon $t_f$.
+3. **The solver boundary (`MathematicalProgram` & `Optimizer`):** a standard nonlinear program $\min_z J(z)$ s.t. $g(z) \ge 0,\ h(z) = 0$ connecting problems to plug-and-play numerical solvers.
+
+One differentiable path connects modeling, analytical control, trajectory optimization, and learning:
+
+![The Minilink Backbone](./docs/_static/pipeline_map.png)
+
+*Full pipeline reference: [docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).*
 
 ## What Minilink is not
 
