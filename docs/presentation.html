@@ -655,7 +655,7 @@ plant.<span class="token-fn">plot_trajectory</span>()</div>
           <div class="block-title">Code as Single Source of Truth</div>
           <ul class="bullet-list" style="gap: 4px; font-size: 0.81rem; line-height: 1.35;">
             <li><strong>No Drag-and-Drop Tax:</strong> Replaces Simulink's mouse-driven wiring and opaque binary <code>.slx</code> files with pure, version-controlled Python expressions.</li>
-            <li><strong>Expressive Shortcuts:</strong> Common topologies wire instantly: <code>C &gt;&gt; G</code> (series), <code>A + B</code> (parallel), <code>C @ G</code> (feedback), <code>sys % Δ</code> ($ZOH$ digital clock sampling).</li>
+            <li><strong>Expressive Shortcuts:</strong> Common topologies wire instantly: <code>C &gt;&gt; G</code> (series), <code>A + B</code> (side by side), <code>C @ G</code> (feedback), <code>sys % Δ</code> ($ZOH$ digital clock sampling).</li>
             <li><strong>Explicit 1-Line Wiring:</strong> Canonical <code>diag.connect(src, port, dst, port)</code> and <code>disconnect()</code> wire arbitrary multi-loop networks with immediate port checks.</li>
             <li><strong>Full Syllabus Analysis:</strong> Closed loops analyze directly via <code>bode()</code>, <code>nyquist()</code>, <code>root_locus()</code>, <code>linearize()</code>, and state-space <code>kalman()</code>.</li>
             <li><strong>Headless CI/CD &amp; Testing:</strong> Runs natively in automated Linux Docker containers and GitHub Actions with zero display servers or license seat fees.</li>

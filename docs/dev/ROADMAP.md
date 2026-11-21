@@ -813,8 +813,8 @@ search, trajectory optimization, MPC, reinforcement learning), each answer a `Pl
 whose controller is scored by the one judge, `evaluate` and `compare(problem, ...)`: the same
 model, cost, sets, start law and disturbances for every approach. This is the contribution the
 toolbox can make that the specialised tools do not, and it ranks above new planners:
-- the `compare` path is hardened first (its maturity is TRL 4 in §3, "Planning / evaluation"),
-  and the README's own comparison example is fixed (KNOWN_ISSUES, "The README's examples");
+- the `compare` path is hardened first (its maturity is TRL 4 in §3, "Planning / evaluation");
+  the README and the showcase notebook show it on one problem ([readme-and-showcase-story.md](../plans/readme-and-showcase-story.md));
 - a comparison is fair when it also reports what each approach was given and what it spent:
   the model access (equations, gradients, samples only), the compute time, the samples or
   iterations, and the numbers a user tuned;
@@ -899,8 +899,7 @@ class.
 - **Phase 5, the maintainer's pass, then the surface redrafted on it** (TODO §1.12 and §2):
   the maintainer's pass over the demos and the features, the kept demo set, then the tests
   rebuilt from a clean slate around it; the course notebooks, their content the
-  maintainer's; the clean-up lane below. The cart-pole RL demo's budget, the README's two
-  headline examples and the root list are decided with the kept set.
+  maintainer's; the clean-up lane below. The cart-pole RL demo's budget and the root list are decided with the kept set.
 - **Phase 6, the release** (TODO §1.10): the student-facing numbers re-pinned once, after the
   maintainer checks the demos on `dev`, with the pendulum's point-mass default; the course
   notebooks on the new names; the merge to `main`; the `0.4.0` tag.

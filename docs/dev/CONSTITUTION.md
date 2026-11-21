@@ -108,7 +108,7 @@ parameter family reach any object the way they reach `f`. An object that does no
    Purity is what enables arbitrary nesting, solver stepping, vectorized batches, and autodiff.
 3. **Compositional closure.** Wiring continuous Systems together via operators (`@`, `>>`, `+`)
    yields a continuous `System`. The set of continuous Systems is algebraically closed under
-   series, parallel, and feedback connections: a flow diagram compiles down to an identical
+   series, side-by-side, and feedback connections: a flow diagram compiles down to an identical
    pure continuous dynamical system ($\dot{X} = F(X, U, t; P)$). Any property or tool valid
    for a leaf is valid for a composite flow diagram. Step and sampled composition (`%`, then
    `@`, `>>` and `+` between step systems; `sampled @ continuous` the one place the two worlds
@@ -177,7 +177,7 @@ When trade-offs or design tensions arise, higher-ranked principles strictly over
   equations, multi-link kinematics, or external engines). Once constructed, downstream tools cannot tell the difference.
 - **Hard physics behind leaves:** Contact engines and external multibody sit behind optional
   leaves. Downstream tools still see a `System`.
-- **Composition grammar is frozen early:** Series, parallel, and feedback (`>>`, `+`, `@`)
+- **Composition grammar is frozen early:** Series, side by side, and feedback (`>>`, `+`, `@`)
   are the composition language of the continuous algebra; `DiagramSystem.connect()` and
   `feedback()` are the explicit-wiring entry points for topologies the operators do not
   reach. The sibling step algebra adds exactly one operator, `%`, which puts a block on a

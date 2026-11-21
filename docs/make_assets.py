@@ -16,7 +16,6 @@ SHOWCASE = STATIC / "showcase"  # interactive 3-D pages, served by the docs site
 import numpy as np  # noqa: E402
 from asset_export import html_to_gif, montage_png, shrink_gif, svg_to_png  # noqa: E402
 
-from minilink import DynamicSystem  # noqa: E402
 from minilink.core.sets import SingletonSet  # noqa: E402
 
 
@@ -56,37 +55,411 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
 
 
 def diagram_png() -> None:
-    """The README's loop: the custom plant of its "Write a model" section, closed by a PID."""
-    from minilink import PID
+    """The README's first loop: a PID closed on the simple pendulum it writes, its angle measured."""
+    from minilink import PID, DynamicSystem
     from minilink.graphical.diagrams.dot import get_diagram
 
-    plant = MassSpringDamper()
-    diagram = PID(2.0, 0.5, 1.0) @ plant
+    class SimplePendulum(DynamicSystem):
+        def __init__(self):
+            super().__init__(state_dim=2, input_dim=1, output_dim=1)
+
+        def f(self, x, u, t=0, params=None):
+            theta, dtheta = x
+            return np.array([dtheta, u[0] - 9.81 * np.sin(theta)])
+
+        def h(self, x, u, t=0, params=None):
+            return x[:1]
+
+    diagram = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ SimplePendulum()
     get_diagram(diagram).render(
         filename=str(STATIC / "diagram_closed_loop"), format="png", cleanup=True
     )
     print("diagram_closed_loop.png")
 
 
-class MassSpringDamper(DynamicSystem):
-    """The README's model, kept in step with its "Write a model" section."""
+# The README figures' style: one blue series on a light surface, recessive gray axes
+BLUE, GHOST, SURFACE, INK, MUTED, GRID = (
+    "#2a78d6",
+    "#9ec5f4",
+    "#fcfcfb",
+    "#0b0b0b",
+    "#52514e",
+    "#e6e5e1",
+)
+ORANGE = "#eb6834"  # the second series, a run that starts outside the region
 
-    def __init__(self):
-        super().__init__(state_dim=2, input_dim=1, output_dim=1)
 
-    def f(self, x, u, t=0, params=None):
-        m, k, b = 1.0, 4.0, 0.3
-        p, v = x
+def figure_style(axes) -> None:
+    """The plain style of the README's plots: no top or right spine, a light grid behind."""
+    for ax in axes:
+        ax.set_facecolor(SURFACE)
+        ax.grid(color=GRID, lw=0.6)
+        ax.set_axisbelow(True)
+        for side in ("top", "right"):
+            ax.spines[side].set_visible(False)
 
-        # m p̈ + b ṗ + k p = u
-        a = (u[0] - b * v - k * p) / m
 
-        return np.array([v, a])
+def style_rc() -> dict:
+    """Matplotlib settings for the README's plots: small gray ticks and labels, left-aligned bold titles."""
+    return {
+        "font.size": 9,
+        "axes.edgecolor": MUTED,
+        "axes.labelcolor": MUTED,
+        "xtick.color": MUTED,
+        "ytick.color": MUTED,
+        "axes.titlecolor": INK,
+        "axes.titlesize": 10,
+        "axes.titleweight": "bold",
+        "axes.titlelocation": "left",
+        "axes.titlepad": 8,
+    }
 
-    def h(self, x, u, t=0, params=None):
-        p, v = x
 
-        return np.array([p])  # the sensor reads the position only
+def swing_up_iterates():
+    """The README's swing-up solved by trajectory optimization: the initial guess and every iterate."""
+    from minilink import TrajectoryOptimizationPlanner
+    from minilink.planning.initial_guess import default_initial_trajectory
+
+    _, problem = readme_problem()
+    solution = TrajectoryOptimizationPlanner(problem, n_steps=60).solve(
+        record_history=True
+    )
+    history = solution.record.history
+    guess = default_initial_trajectory(problem, history[0].trajectory.t)
+
+    return guess, history
+
+
+def trajopt_iterations() -> None:
+    """Trajectory optimization iterate by iterate: the guess, then each iterate drawn over the faded ones."""
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation, PillowWriter
+
+    guess, history = swing_up_iterates()
+    frames = [(guess, "initial guess")] + [
+        (
+            it.trajectory,
+            f"iteration {it.iteration + 1}    J = {it.J:,.0f}    "
+            f"defect = {it.max_equality_violation:.1e}",
+        )
+        for it in history
+    ]
+    n = len(frames)
+    # The first iterates move the most: they stay three frames each, the guess six, the end fourteen
+    shown = [0] * 6 + [k for k in range(1, 8) for _ in range(3)]
+    shown += [k for k in range(8, n) if k % 3 == 0 or k == n - 1] + [n - 1] * 14
+
+    plt.rcParams.update(style_rc())
+    fig, (ax_q, ax_u) = plt.subplots(
+        2,
+        1,
+        figsize=(6.4, 3.8),
+        sharex=True,
+        facecolor=SURFACE,
+        gridspec_kw={"height_ratios": [3, 2]},
+    )
+    figure_style((ax_q, ax_u))
+    ax_q.axhline(np.pi, color=MUTED, lw=0.8, ls=(0, (3, 3)))
+    ax_q.text(0.05, np.pi + 0.15, "upright", color=MUTED, fontsize=8)
+    ax_q.set(ylabel="θ [rad]", xlim=(0.0, 6.0), ylim=(-2.0, 4.2))
+    ax_u.set(ylabel="τ [Nm]", xlabel="t [s]", ylim=(-5.8, 5.8))
+    for bound in (-5.0, 5.0):
+        ax_u.axhline(bound, color=MUTED, lw=0.8, ls=(0, (1, 2)))
+    line_q = ax_q.plot([], [], color=BLUE, lw=2.2)[0]
+    line_u = ax_u.plot([], [], color=BLUE, lw=2.0)[0]
+    label = ax_q.text(
+        0.99, 0.04, "", transform=ax_q.transAxes, ha="right", va="bottom", color=INK
+    )
+    fig.suptitle(
+        "Trajectory optimization, iterate by iterate",
+        x=0.02,
+        ha="left",
+        color=INK,
+        fontsize=10,
+        fontweight="bold",
+    )
+    fig.tight_layout()
+    faded = []
+
+    def draw(frame):
+        k = shown[frame]
+        while len(faded) < k:
+            previous = frames[len(faded)][0]
+            ax_q.plot(previous.t, previous.x[0], color=GHOST, lw=0.8, alpha=0.5)
+            ax_u.plot(previous.t, previous.u[0], color=GHOST, lw=0.8, alpha=0.5)
+            faded.append(previous)
+        trajectory, text = frames[k]
+        line_q.set_data(trajectory.t, trajectory.x[0])
+        line_u.set_data(trajectory.t, trajectory.u[0])
+        label.set_text(text)
+
+    out = STATIC / "trajopt_iterations.gif"
+    animation = FuncAnimation(fig, draw, frames=len(shown))
+    animation.save(
+        out, writer=PillowWriter(fps=6), dpi=100, savefig_kwargs={"facecolor": SURFACE}
+    )
+    plt.close(fig)
+    shrink_gif(out)
+    print("trajopt_iterations.gif")
+
+
+def readme_problem():
+    """The README's swing-up problem: from hanging to the upright ball, with a terminal weight on where it ends."""
+    from minilink import BallSet, Pendulum, PlanningProblem, QuadraticCost
+
+    plant = Pendulum()
+    up = np.array([np.pi, 0.0])
+    cost = QuadraticCost.from_system(plant, x_bar=up, S=100 * np.eye(2))
+    problem = PlanningProblem(
+        plant,
+        x0=[0.0, 0.0],
+        Xf=BallSet(up, 0.2),
+        horizon=6.0,
+        cost=cost,
+        X=plant.state.box,
+        U=plant.input_box,
+    )
+
+    return plant, problem
+
+
+def readme_swing_up():
+    """The README's swing-up problem and its four answers, as its planner section builds them."""
+    from minilink import (
+        DynamicProgrammingPlanner,
+        RRTPlanner,
+        TrajectoryOptimizationPlanner,
+    )
+    from minilink.control import ModelPredictiveController
+
+    plant, problem = readme_problem()
+    vi_planner = DynamicProgrammingPlanner(
+        problem, x_grid=(101, 101), u_grid=(11,), dt=0.05
+    )
+    look_ahead = problem.replace(horizon=2.0, Xf=None)
+    mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")
+    answers = {
+        "VI": vi_planner.solve(),
+        "RRT": RRTPlanner(problem, seed=0).solve(),
+        "TrajOpt": TrajectoryOptimizationPlanner(problem, n_steps=60).solve(),
+        "MPC": ModelPredictiveController(mpc_planner) % 0.1,
+    }
+
+    return plant, problem, answers
+
+
+def tool_analysis() -> None:
+    """The README's analysis: the frequency response, the root locus, a simulation, the Lyapunov region."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    from minilink import Pendulum, lqr
+    from minilink.analysis import region_of_attraction
+
+    plant = Pendulum()
+    up = np.array([np.pi, 0.0])
+    balance = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=up) @ plant
+    C = np.array([[1.0, 0.0]])
+
+    # G(jω) = C (jωI − A)⁻¹ B about the hanging rest, the angle per torque
+    A = plant.jacobian("f", "x", np.zeros(2))
+    B = plant.jacobian("f", "u", np.zeros(2)).reshape(2, 1)
+    w = np.logspace(-1, 2, 400)
+    G = np.array([(C @ np.linalg.solve(1j * wk * np.eye(2) - A, B))[0, 0] for wk in w])
+
+    # The roots of A − k B C at the upright, u = −k θ swept from zero
+    A_up = plant.jacobian("f", "x", up)
+    B_up = plant.jacobian("f", "u", up).reshape(2, 1)
+    gains = np.linspace(0.0, 40.0, 400)
+    roots = np.array([np.linalg.eigvals(A_up - k * B_up @ C) for k in gains])
+
+    free = plant.compute_trajectory(tf=6.0, x0=[2.0, 0.0])
+
+    # V(x) = (x − x̄)ᵀ P (x − x̄) ≤ c, its boundary, and runs from inside and outside it
+    region = region_of_attraction(balance, x_bar=up)
+    P, level = region.params["P"], region.params["level"]
+    phi = np.linspace(0.0, 2.0 * np.pi, 300)
+    L = np.linalg.cholesky(np.linalg.inv(P / level))
+    boundary = up[:, None] + L @ np.vstack([np.cos(phi), np.sin(phi)])
+    offsets = [
+        [1.2, 0.0],
+        [-1.2, 0.0],
+        [0.0, 3.5],
+        [0.0, -3.5],
+        [1.0, 2.5],
+        [-1.0, -2.5],
+    ]
+    offsets += [[2.6, 0.0], [-2.6, 2.0]]
+    starts = [up + np.array(d) for d in offsets]
+
+    plt.rcParams.update(style_rc())
+    fig, axes = plt.subplots(1, 4, figsize=(15.0, 3.1), facecolor=SURFACE)
+    figure_style(axes)
+
+    ax = axes[0]
+    ax.semilogx(w, 20 * np.log10(np.abs(G)), color=BLUE, lw=2)
+    ax.set(title="Frequency response", xlabel="ω [rad/s]", ylabel="|θ / τ| [dB]")
+
+    ax = axes[1]
+    ax.axhline(0.0, color=MUTED, lw=0.6)
+    ax.axvline(0.0, color=MUTED, lw=0.6)
+    for branch in roots.T:
+        ax.plot(branch.real, branch.imag, color=BLUE, lw=2)
+    ax.plot(roots[0].real, roots[0].imag, "x", color=INK, ms=7, mew=1.5)
+    ax.set(title="Root locus", xlabel="Re(s)", ylabel="Im(s)")
+
+    ax = axes[2]
+    ax.plot(free.t, free.x[0], color=BLUE, lw=2)
+    ax.set(title="Simulation", xlabel="t [s]", ylabel="θ [rad]")
+
+    ax = axes[3]
+    ax.fill(*boundary, color=to_rgba(BLUE, 0.12), lw=0)
+    ax.plot(*boundary, color=BLUE, lw=1.5, label="V ≤ c")
+    labelled = set()
+    for start in starts:
+        inside = (start - up) @ P @ (start - up) <= level
+        color = BLUE if inside else ORANGE
+        label = "start inside" if inside else "start outside"
+        run = balance.compute_trajectory(tf=6.0, x0=start)
+        ax.plot(run.x[0], run.x[1], color=color, lw=1.0, alpha=0.9)
+        ax.plot(
+            *start, "o", color=color, ms=3, label=None if label in labelled else label
+        )
+        labelled.add(label)
+    ax.plot(*up, "+", color=INK, ms=8)
+    ax.set(
+        title="Lyapunov region of attraction", xlabel="θ [rad]", ylabel="dθ/dt [rad/s]"
+    )
+    ax.set(xlim=(np.pi - 3.5, np.pi + 3.5), ylim=(-7.5, 7.5))
+    ax.legend(loc="upper right", frameon=False, fontsize=7.5, labelcolor=MUTED)
+
+    fig.tight_layout(w_pad=2.0)
+    fig.savefig(STATIC / "tool_analysis.png", dpi=130, facecolor=SURFACE)
+    plt.close(fig)
+    print("tool_analysis.png")
+
+
+def tool_planning() -> None:
+    """The README's planning pipeline: trajectory optimization's iterates, a PPO training run, the evaluation."""
+    import jax.numpy as jnp
+    import matplotlib.pyplot as plt
+
+    from minilink import (
+        CostFunction,
+        PlanningProblem,
+        ReinforcementLearningPlanner,
+        Uniform,
+        compare,
+    )
+
+    guess, history = swing_up_iterates()
+    plant, problem, answers = readme_swing_up()
+
+    # PPO learns from its reward alone: the panel shows a run on the swing-up shaped for it,
+    # 1 + cos θ from random starts, the reward lowest at the upright from every angle
+    class SwingUpCost(CostFunction):
+        def g(self, x, u, t=0.0, params=None):
+            return 1.0 + jnp.cos(x[0]) + 0.01 * x[1] ** 2 + 0.01 * u[0] ** 2
+
+        def h(self, x, t=0.0, params=None):
+            return 0.0
+
+    start = Uniform([-np.pi, -1.0], [np.pi, 1.0])
+    shaped = PlanningProblem(
+        plant, cost=SwingUpCost(), horizon=np.inf, x0=start, U=plant.input_box
+    )
+    learner = ReinforcementLearningPlanner(
+        shaped,
+        dt=0.05,
+        features=lambda x: jnp.array([jnp.cos(x[0]), jnp.sin(x[0]), 0.1 * x[1]]),
+        hidden=(32, 32),
+        n_rollouts=64,
+        n_steps_per_update=32,
+        batch_size=256,
+        learning_rate=3e-3,
+        gamma=0.97,
+    )
+    learner.solve(n_timesteps=120_000)
+    steps = np.array([h["n_timesteps"] for h in learner.history]) / 1e3
+    returns = np.array([h["ep_return_mean"] for h in learner.history])
+
+    mass = Uniform(0.8, 1.2)
+    uncertain = problem.replace(distributions={"plant": {"m": mass}})
+    comparison = compare(uncertain, n_trials=20, **answers)
+    source = comparison.plot_simulated_trajectory(show=False).figure.axes[1]
+
+    plt.rcParams.update(style_rc())
+    fig, axes = plt.subplots(
+        1,
+        3,
+        figsize=(15.0, 3.2),
+        facecolor=SURFACE,
+        gridspec_kw={"width_ratios": [1.0, 1.0, 1.25]},
+    )
+    figure_style(axes)
+
+    ax = axes[0]
+    ax.axhline(np.pi, color=MUTED, lw=0.8, ls=(0, (3, 3)))
+    ax.text(0.05, np.pi + 0.18, "upright", color=MUTED, fontsize=8)
+    ax.plot(
+        guess.t, guess.x[0], color=MUTED, lw=1.0, ls=(0, (4, 3)), label="initial guess"
+    )
+    for k, it in enumerate(history[:-1]):
+        label = "iterates" if k == 0 else None
+        ax.plot(
+            it.trajectory.t,
+            it.trajectory.x[0],
+            color=GHOST,
+            lw=0.8,
+            alpha=0.6,
+            label=label,
+        )
+    final = history[-1].trajectory
+    ax.plot(final.t, final.x[0], color=BLUE, lw=2.2, label="solution")
+    ax.set(title="Trajectory optimization", xlabel="t [s]", ylabel="θ [rad]")
+    ax.set(xlim=(0.0, 6.0), ylim=(-2.0, 4.2))
+    ax.legend(loc="lower right", frameon=False, fontsize=8, labelcolor=MUTED)
+
+    ax = axes[1]
+    ax.plot(steps, returns, color=BLUE, lw=2)
+    ax.set(title="Reinforcement learning (PPO)", xlabel="training steps [×1000]")
+    ax.set(ylabel="mean episode return")
+
+    # The evaluation's angular-rate row, copied line by line in the answers' colours
+    ax = axes[2]
+    for line in source.get_lines():
+        t, rate = line.get_data()
+        if len(t) < 3:
+            continue
+        label = None if line.get_label().startswith("_") else line.get_label()
+        ax.plot(
+            t,
+            rate,
+            color=line.get_color(),
+            lw=line.get_linewidth(),
+            alpha=line.get_alpha(),
+            label=label,
+        )
+    handles, labels = ax.get_legend_handles_labels()
+    entries = dict(zip(labels, handles))
+    legend = ax.legend(
+        entries.values(),
+        entries.keys(),
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        frameon=False,
+        fontsize=8,
+    )
+    for handle in legend.legend_handles:
+        handle.set_alpha(1.0)
+        handle.set_linewidth(2.0)
+    ax.set(title="Monte Carlo evaluation, mass ±20 %", xlabel="t [s]")
+    ax.set(ylabel="dθ/dt [rad/s]", xlim=(0.0, 6.0))
+
+    fig.tight_layout(w_pad=2.0)
+    fig.savefig(STATIC / "tool_planning.png", dpi=130, facecolor=SURFACE)
+    plt.close(fig)
+    print("tool_planning.png")
 
 
 def tool_montage() -> None:
@@ -480,6 +853,9 @@ def pipeline_map() -> None:
 ASSETS = {
     "map": (pipeline_map, ["pipeline_map.png"]),
     "diagram": (diagram_png, ["diagram_closed_loop.png"]),
+    "analysis": (tool_analysis, ["tool_analysis.png"]),
+    "planning": (tool_planning, ["tool_planning.png"]),
+    "trajopt": (trajopt_iterations, ["trajopt_iterations.gif"]),
     "montage": (tool_montage, ["tool_montage.png"]),
     "cartpole": (gif_cartpole, ["cartpole_swingup.gif"]),
     "ur5": (ur5_impedance, ["ur5_meshcat.gif", "showcase/ur5_impedance.html"]),

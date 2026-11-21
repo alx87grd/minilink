@@ -31,7 +31,7 @@ as the maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| Your pass over the demos and features, then the tests' clean slate | MS-D1 | v0.4 (next) | which demos and features stay; nothing is deleted before it. Decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the README's two headline examples, the supported plants, GMC714's pins (§1.12) |
+| Your pass over the demos and features, then the tests' clean slate | MS-D1 | v0.4 (next) | which demos and features stay; nothing is deleted before it. Decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
 | The car models' review: the 3-D car, its presets and looks | K8-0 | v0.4 | the choices the agent took while building, listed in [vehicle-models.md](vehicle-models.md) §8: the presets' names and numbers, the suspension part, the locked axle, no downforce, the read-only projects' one-keyword edits (§2) |
 | The mechanical hierarchy and the car models' base | S32 | v0.4, with your pass, or later | your review: which class is the child of which, the cars' base, the mass matrix's one name, `C(q, v)` or `C(q, dq)`, `actuators=` a count (§2) |
 | The root list regenerated from the kept demos | — | v0.4 (end, with K8-1) | your review of the drafted list (§1.13) |
@@ -229,6 +229,10 @@ No open row: the contract is DESIGN §4, "Fields". The rest of the field object
   - `Pendulum`'s default inertia `I = 0`, the textbook point mass (`ω = √(g/l)`, 3.13 rad/s for
     `m = l = 1`; today `I = 1` gives 2.21), built with that re-pin and not before (the
     maintainer's ruling 6b of 2026-11-10); the scalar inertia keeps the letter `I`;
+  - the README's images back to absolute URLs before the merge to `main`: they are relative
+    (`./docs/_static/...`) while the README is reworked, so a branch shows its own figures,
+    and PyPI shows a relative image broken (the maintainer, 2026-11-21; the README's table and
+    figures re-run with the pendulum's new default, readme-and-showcase-story.md);
   - the PR from `dev` to `main`;
   - the `0.4.0` tag.
 
@@ -277,9 +281,6 @@ surface, the test layers' options) and the draft scripts of
     apart. Options: a larger budget, another reward or exploration setting, or the demo shown as
     one seed's result. Also seen: `evaluate` reports every seed feasible and reached at
     `J ≈ 1756` (seed 5), to check against its `X` (`|θ| ≤ 20`);
-  - the README's two headline examples **[ask — student-facing]**: the planner comparison's
-    numbers so each planner reaches the goal, and bounds on the co-design example
-    (KNOWN_ISSUES, "The README's examples");
   - the supported plants (K8-3) and GMC714's pinned names (G3), both in §2, drawn after it.
 
   Done when the kept demo set and the new suite replace the old ones.
