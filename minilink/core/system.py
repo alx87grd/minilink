@@ -172,6 +172,11 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         return self.outputs["y"].dim if "y" in self.outputs else 0
 
     @property
+    def state_box(self):
+        """The state's bounds as a set, ``lower <= x <= upper``: ``X=sys.state_box``."""
+        return self.state.box
+
+    @property
     def input_box(self):
         """The input ports' bounds as an input set, stacked in port order: ``U=sys.input_box``."""
         # Lazy import: the sets import the backends, which load after the system

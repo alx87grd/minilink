@@ -58,6 +58,18 @@ class TestPlanningArchitecture(unittest.TestCase):
 
         return TestPlant()
 
+    def test_the_state_box_and_the_input_box_are_the_declared_bounds(self):
+        """``X=sys.state_box, U=sys.input_box``: the state's and the inputs' declared ranges as sets."""
+        sys = self.make_system()
+
+        np.testing.assert_array_equal(sys.state_box.lower, [-1.0, -2.0])
+        np.testing.assert_array_equal(sys.state_box.upper, [1.0, 2.0])
+        np.testing.assert_array_equal(sys.input_box.lower, [-3.0])
+        np.testing.assert_array_equal(sys.input_box.upper, [4.0])
+
+        problem = PlanningProblem(sys=sys, x0=sys.x0, X=sys.state_box, U=sys.input_box)
+        np.testing.assert_array_equal(problem.X.upper, [1.0, 2.0])
+
     def make_single_integrator(self):
 
         class SingleIntegrator(DynamicSystem):
