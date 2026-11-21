@@ -9,7 +9,7 @@ the head of [TODO.md](../plans/TODO.md#rows-waiting-for-the-maintainers-go). Kno
 A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
 file. The core's architecture is of record: the v0.3 rulings and the v0.4 rulings of
-2026-11-04 to 2026-11-11 live in DESIGN and RULES. Open here: four small names the API
+2026-11-04 to 2026-11-11 live in DESIGN and RULES. Open here: three small names the API
 settlement (PR #139) left, four questions on the car ladder, two on the architecture, and one on the vision.
 
 ## The API
@@ -191,20 +191,20 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
      (positional), `"auto"` on `problem.compile`;
   10. `Field.as_set(*, lower, upper)` is keyword-only with a sentinel; `FieldSet(field,
       lower=0.0, upper=None)` is positional with another default;
-  12. `StepPlanningProblem.transition(x, u, k, params)` has no default for `k`, and
+  11. `StepPlanningProblem.transition(x, u, k, params)` has no default for `k`, and
       `terminal(x, t, params)` takes `t` where its sibling takes `k`;
-  13. `SingletonSet.residual(z, params)` has no `t`; `margin(z, t, params)` has.
+  12. `SingletonSet.residual(z, params)` has no `t`; `margin(z, t, params)` has.
 - **Siblings whose surfaces differ:**
-  14. the step `compute_trajectory` has no `port`, `n_samples` or `solver_warnings`, and
+  13. the step `compute_trajectory` has no `port`, `n_samples` or `solver_warnings`, and
       another keyword order;
-  15. `Planner.animate` takes `**kwargs` where the planner's plots spell every keyword;
-  16. `StepPlanningProblem` has no `compile`, `nominal`, `goal_point`, `discount_factor` or
+  14. `Planner.animate` takes `**kwargs` where the planner's plots spell every keyword;
+  15. `StepPlanningProblem` has no `compile`, `nominal`, `goal_point`, `discount_factor` or
       `drawn_paths`, and a `disturbances` property that always returns `{}`;
-  17. three draw verbs on the problem with three defaults: `realize(key=None, n=1)`,
+  16. three draw verbs on the problem with three defaults: `realize(key=None, n=1)`,
       `sample_x0(key, n=None)`, `sample_params(key)`;
-  18. the problem's parameter tree has an `"X0"` key only when the start is not the singleton
+  17. the problem's parameter tree has an `"X0"` key only when the start is not the singleton
       at `x0`, so its keys depend on how the start was given;
-  19. `Uniform.lower` and `upper` are read-only where `Gaussian.mean` and `BoxSet.lower` can
+  18. `Uniform.lower` and `upper` are read-only where `Gaussian.mean` and `BoxSet.lower` can
       be set; the base `Set` has no `dim`, so `MarginField(CallableSet(...)).dim` raises.
 - **Public members that read as internal:** the wiring mixin's `init_wiring`,
   `new_subsystem_id`, `get_local_state`, `get_local_input`, `subsystem_params`,

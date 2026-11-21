@@ -21,7 +21,7 @@ The same three roles in minilink, `alx87grd/teaching` and `alx87grd/workbench`
   release, and every demo and teaching notebook there works on it.
 - **`dev`, beta:** the latest API; teaching and workbench `dev` install minilink `dev` and are
   brought back to working as soon as minilink `dev` changes.
-- **`dev-<name>`, alpha** (`dev-alex`, `dev-consolidation`, a feature): experiments; a branch
+- **`dev-<name>`, alpha** (`dev-alex`, a feature): experiments; a branch
   that spans repositories has the same name in each, installs the minilink branch of its name,
   and merges into `dev` together. Work flows alpha → `dev` → `main`.
 

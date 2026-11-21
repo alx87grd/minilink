@@ -492,9 +492,9 @@ maintainer's pass keeps (§1.12), and to the tutorial notebooks.
   empty and the notebook checks pass.
   Also: the facade gaps the import allowlist records closed
   (`tests/unittest/teaching_import_allowlist.txt`; scan: examples#13).
-- [ ] **The planning demos on the solution verbs** (D1.4) **[ask]**: `vi_pendulum_lqr.py` runs
-  on `compare(...)` and the solution's plots; the other planning demos the pass keeps follow
-  it, their hand-rolled comparisons replaced by `solution.plot_*` and `compare(...)`.
+- [ ] **The planning demos on the solution verbs** (D1.4) **[ask]**: the planning demos the
+  pass keeps run on `compare(...)` and the solution's plots (as
+  `demos_proposed_minimal/pendulum_every_planner.py` does), their hand-rolled comparisons replaced by `solution.plot_*` and `compare(...)`.
   Also: the Simulator under RULES 2.4, which keeps `last_traj` and `last_solve_time_s`
   besides the `sys.traj` shortcut (the maintainer held it, 2026-11-04); its `last_debug`
   stays a diagnostic.
@@ -532,9 +532,6 @@ wait for his pass over the demos and features (§1.12):
   `test_stochastic_policy.py`, `test_blocks.py`'s white-noise test). Compare the normals to a
   tolerance, keep the bits exact, and reword `standard_normal`'s "identical on NumPy and
   JAX". Done when the suite is green on a fresh install.
-- [ ] **`vi_cartpole_swingup.py` exceeds the demo sweep's 300 s limit** (about 320 s on a
-  cloud machine, before and after the plotting contract): shrink its grid or raise its
-  limit in the sweep's manifest.
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;

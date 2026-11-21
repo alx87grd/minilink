@@ -671,7 +671,7 @@ GRO501 (§4.2, v0.2) and GMC714 (§4.3, v0.3). A course is
 
 | Topic | Surface | Material | Gate |
 | --- | --- | --- | --- |
-| Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupPolicy`, `plot_cost_to_go` / `plot_control_law` | `pendulum_value_iteration`, `pendulum_value_iteration_vs_lqr`, `demos/value_iteration/` | `tf` reads the problem's `t0 + horizon`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
+| Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupPolicy`, `plot_cost_to_go` / `plot_control_law` | `pendulum_value_iteration`, `pendulum_value_iteration_vs_lqr`, `demos_proposed_minimal/dynamic_programming/` | `tf` reads the problem's `t0 + horizon`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
 | LQR + linearization | `linearize`, `lqr` (on arrays, a linear model or the plant), `plot_control_law` | `basics/02_analyze_and_control`, `demos/control/` | — (green today) |
 | Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `multiple_shooting`, `single_shooting`), `QuadraticCost` | `basics/03_plan_and_sample`, `advanced/02_optimal_control`, `demos/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
 | Reinforcement Learning (tabular on the grid, neural in native JAX) | `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control; `EpsilonGreedy`, `UCB`), `PlanningProblem` with laws, `ReinforcementLearningPlanner` (REINFORCE / actor-critic / PPO / SAC), `NeuralPolicy`, `evaluate` | `advanced/04_reinforcement_learning.ipynb`, `pendulum_value_iteration_vs_lqr_vs_rl.ipynb`, `drone_ppo.ipynb`, `gymnasium_interface.ipynb`, `demos/rl/` (pendulum, cart-pole, drone, rocket) | pure-JAX training on compiled plant (pendulum swing-up, 120k steps in 12.5 s on CPU, 0% failure over 50 trials); neural policy closed loop linearizes, simulates, and plots Bode; those names (plus `Evaluation`, `Gaussian` / `Uniform`) are on the root prelude. Notebooks solve with the native planner; Gymnasium stays taught as the domain standard and `Sys2Gym` + SB3 stay as the external bridge |
@@ -882,8 +882,7 @@ release, ROADMAP's former v0.4 features become v0.5. The rows are TODO §1 and �
 of TODO's "Next, in order": what changes a public name or a behaviour first, the surface
 redrafted once on the settled names, the numbers re-pinned once, additive work last.
 
-**Where it stands (2026-11-18).** The consolidation runs are merged, on the branch
-`dev-consolidation`, ahead of `dev`: the API settled on one vocabulary (PR #139), the car
+**Where it stands (2026-11-21).** The consolidation runs are merged into `dev`: the API settled on one vocabulary (PR #139), the car
 models on one ladder (PR #141; [vehicle-models.md](../plans/vehicle-models.md)), the analysis
 tools returning the object or the arrays they compute (2026-11-15), and the plots on one
 contract (PR #143, with a review pass after it). Their contracts are DESIGN's; every name
@@ -911,7 +910,7 @@ class.
 consolidation, not a redraft at equal size: the code converged over v0.3 and v0.4 while what
 surrounds it grew (a test per rule, a doc section per ruling, a plan doc per run). Its success
 is measured in lines removed. The numbers below are orientation for whoever does the work,
-not a budget and not enforced by a check; measured on `dev-consolidation` as PR #143 and its
+not a budget and not enforced by a check; measured as PR #143 and its
 review left it (2026-11-18), tracked `.py` files and notebooks only, and the two rows dated
 2026-11-12 on `dev` as PR #141 left it.
 
@@ -920,7 +919,7 @@ review left it (2026-11-18), tracked `.py` files and notebooks only, and the two
 | Library (`minilink/`) | 81 598 lines, 289 files | 55 000 to 60 000 lines |
 | Tests | 43 586 lines, 104 files | 12 000 to 15 000 lines |
 | Benchmarks | 5 886 lines | 1 000 to 2 000 lines (the regression gate) |
-| Demos | 94 scripts | 12 to 15 scripts |
+| Demos | 85 scripts (2026-11-21) | 12 to 15 scripts |
 | Projects and `minilink/experimental/` | 10 351 lines (2026-11-12) | none here (`workbench`, private) |
 | Tutorial notebooks | 18 | 6 to 8 |
 | Course and topic notebooks | none here: moved to `teaching` (2026-11-13) | none here |

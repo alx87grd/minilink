@@ -804,9 +804,9 @@ The port names drive three tools:
   block with no law to draw (a plant, a filter, `plot_space = None`) refuses,
   and `plot_input_output_map()` sweeps any input of any block. Engine in `graphical/port_map.py` (module
   twin for third-party blocks).
-- **`DynamicProgrammingPlanner.evaluate_policy(block)`** adapts a block that reads the
-  state on `x` (or `y`) and commands `u` into `u = policy(x)` (grid state on the
-  measurement port, reference pinned).
+- **`DynamicProgrammingPlanner.evaluate_policy(block)`** reads a block that reads the
+  state on `x` (or `y`) and commands `u` as its law `u = π(x)` (grid state on the
+  measurement port, reference pinned) and returns its cost-to-go `J^π` on the grid.
 
 A block with other port names still simulates, compiles, and wires by hand —
 the standard names only unlock the shortcuts and the tools. A law on `y` with
@@ -1046,7 +1046,7 @@ global state stacking order: inlined leaves replace each nested box at the same 
 position as that box's inner states, so ``x``, ``x0``, and native
 :meth:`~minilink.core.diagram.DiagramSystem.f` agree with the unflattened diagram.
 Wires and diagram outputs that read a nested box are rewired to the inner subsystem
-behind that port. The returned report's ``id_map`` keys each leaf by its nested path,
+behind that port. The returned ``id_map`` keys each leaf by its nested path,
 ``/`` at every level (``"loop/inner/plant"``), to its flat id; the params remap reads it,
 so a renamed subsystem (``loop__plant2`` when the name was taken) still gets its params.
 
@@ -1183,7 +1183,8 @@ Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous di
 An input left unwired is a constant at its declared `nominal_value`,
 never an error or a warning; `plot_diagram()`
 shows it as unconnected. Time-varying sources belong in the diagram; forcing
-via `compute_trajectory(u=)`. Facades default `backend="numpy"`.
+via `compute_trajectory(u=)`. The `System` facades default `backend="numpy"`; the planning
+entry points (`problem.compile`, `evaluate`, `compare`) default to `"auto"`.
 
 **What `n_steps` and `n_samples` count.** `n_steps` counts transitions, the textbook `N`
 (`rollout`, `rollout_batch`, `compute_rollout`, a step problem, `solve_steps`: `N` periods,
@@ -1995,7 +1996,8 @@ as data, and graphics import no planning module for them. Every drawing verb (`p
 then the standard ones it takes, keyword-only and in one order: `renderer="matplotlib"`,
 `show=True`, `ax=None`. Every `plot_*` takes the three, with `figsize=None` just before
 them (the plot's own size, in inches, unless one is given), and returns one `PlotResult`,
-annotated; `plot_diagram`, a Graphviz graph, takes `show=` alone. A run drawn over a field
+annotated; `plot_diagram`, a Graphviz graph, takes `show=` (and its own `expand=`) without
+`renderer=` and `ax=`. A run drawn over a field
 has one look on every plot: a black path, a green dot at its start, a red star at its end,
 named "trajectory". An axis label writes its unit in brackets (`Time [s]`,
 `Magnitude [dB]`).

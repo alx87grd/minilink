@@ -67,7 +67,7 @@ Every piece of material follows minilink at one of three levels, and the level d
 | --- | --- | --- | --- |
 | **`main`**, stable | the latest release: tagged, on PyPI | pins that release; **the links the course notes, PDFs and web pages use** | prototypes and course solutions pinned to that release |
 | **`dev`**, beta | the latest API and its beta features | follows minilink `dev`; fixed as soon as minilink `dev` changes | prototypes follow minilink `dev`; fixed as soon as possible |
-| **`dev-<name>`**, alpha (`dev-alex`, `dev-consolidation`, a feature) | experiments, usually branched from `dev` | a twin of the minilink branch of the same name, created only when a change spans repositories; installs that branch | the same; may break |
+| **`dev-<name>`**, alpha (`dev-alex`, a feature) | experiments, usually branched from `dev` | a twin of the minilink branch of the same name, created only when a change spans repositories; installs that branch | the same; may break |
 
 - **Work flows one way: alpha → `dev` → `main`.** An alpha branch merges into `dev` in every
   repository it spans, together; `dev` reaches `main` with a release. A fix during a term goes
@@ -166,8 +166,8 @@ imported the examples tree by path): on 2026-11-20 no teaching notebook imports 
 | Folder | Content |
 | --- | --- |
 | `tutorial/` | three layers, `basics/` (3 notebooks), `core/` (9), `advanced/` (5), and one showcase |
-| `demos/<chapter>/` | 94 scripts in 18 chapters: the package names plus `rrt`, `hybrid`, `mpc`, `realtime`, `robotic`, `trajopt`, `value_iteration`, `udes_racecar` |
-| `demos_proposed_minimal/` | 9 scripts, the draft of the curated set |
+| `demos/<chapter>/` | 85 scripts in 17 chapters: the package names plus `evaluation`, `rrt`, `hybrid`, `mpc`, `realtime`, `robotic`, `trajopt`, `udes_racecar` |
+| `demos_proposed_minimal/` | 16 scripts, the draft of the curated set (two in `dynamic_programming/`) |
 | `projects/` | 3 multi-file applications (`car_trajopt`, `mpc`, `pathtracking`) |
 
 The tree carries three axes: by *form* (scripts or notebooks), by *package*

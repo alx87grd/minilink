@@ -11,11 +11,11 @@ Status legend: **Done** = equivalent landed · **Partial** = framework exists, g
 ## Summary
 
 Shrunk 2026-09-05 to the **open** rows; landed symbols are listed
-once in the name map at the end. Counts recounted from the tables below on 2026-10-24.
+once in the name map at the end. Counts recounted from the tables below on 2026-10-24 (the Pacejka row on 2026-11-21).
 
 | Bucket | Pyro | Done | Partial | TODO | Drop |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Library symbols | 105 | 85 | 10 | 4 | 6 |
+| Library symbols | 105 | 86 | 10 | 3 | 6 |
 | Example scripts | 195 | 29 | 47 | 83 | 36 |
 
 Parity is part of the **v0.5** milestone ([ROADMAP.md §5.5](../dev/ROADMAP.md#55-v05--features-on-the-core)).
@@ -31,7 +31,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Framework | `pyro/dynamic/stochastic.py` | NoiseSignal | `minilink/blocks/sources.py` | noise ports in diagrams | **Partial** | No StochasticSystemWrapper |
 | Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed ([TODO.md](TODO.md) Later) |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py`, `minilink/dynamics/catalog/vehicles/tires.py` | `LinearSaturation`, `LinearTire`, `BrushTire`, `MagicFormulaTire` | **Partial** | Four laws behind one call, `tire.forces(kappa, alpha, Fz, mu, c_kappa, c_alpha, params)`, the slips in `tire_slip` and `wheel_slip`; no tire ABC |
-| Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | [TODO.md](TODO.md) Later |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `minilink/dynamics/catalog/vehicles/tires.py` | `MagicFormulaTire` | **Done** | the magic formula, one of the four tire laws |
 | Catalog | `pyro/dynamic/vehicle_steering.py` | HolonomicMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene + mount | **Partial** | Scene replaces plant wrapper |
 | Catalog | `pyro/dynamic/vehicle_steering.py` | Holonomic3DMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** | Scene replaces plant wrapper |
 | Catalog | `pyro/dynamic/vehicle_steering.py` | KinematicCarModelwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
@@ -70,26 +70,26 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 
 | Pyro script | Status | Minilink equivalent / notes |
 | --- | --- | --- |
-| `courses/corom_impedance_control/corom_robots.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/corom_impedance_control/custom_drilling_controller.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/corom_impedance_control/custom_drilling_controller_test.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/corom_impedance_control/twolinkrobot_effector_impedance_controller.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/corom_impedance_control/twolinkrobot_joint_impedance_controller.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gmc714/demo_simple_pendulum_multiple_controller_options.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gmc714/manipulator_dynamic_terms.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro501/float_mass_pids/one_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro501/float_mass_pids/three_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro501/float_mass_pids/two_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro501/mass-spring-dampers/one_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro501/mass-spring-dampers/three_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro501/mass-spring-dampers/two_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro640/prob/abcd1234.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro640/prob/demo_crash_commande_en_position.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro640/prob/gro640_robots.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro640/prob/test_commande_en_force.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro640/prob/test_commande_en_position.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro640/prob/test_f.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro640/prob/test_trajectoire_3D.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/corom_impedance_control/corom_robots.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/corom_impedance_control/custom_drilling_controller.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/corom_impedance_control/custom_drilling_controller_test.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/corom_impedance_control/twolinkrobot_effector_impedance_controller.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/corom_impedance_control/twolinkrobot_joint_impedance_controller.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gmc714/demo_simple_pendulum_multiple_controller_options.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gmc714/manipulator_dynamic_terms.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro501/float_mass_pids/one_mass_with_pid.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro501/float_mass_pids/three_mass_with_pid.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro501/float_mass_pids/two_mass_with_pid.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro501/mass-spring-dampers/one_mass_with_pid.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro501/mass-spring-dampers/three_mass_with_pid.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro501/mass-spring-dampers/two_mass_with_pid.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro640/prob/abcd1234.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro640/prob/demo_crash_commande_en_position.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro640/prob/gro640_robots.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro640/prob/test_commande_en_force.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro640/prob/test_commande_en_position.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro640/prob/test_f.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
+| `courses/udes_gro640/prob/test_trajectoire_3D.py` | **TODO** | Not ported; its laws exist (`control/robotic.py`, `control/siso.py`) |
 | `courses/udes_gro860/dp_mass_min_time_policy_evaluation.py` | **Partial** | Core tool demos exist; course variant not ported |
 | `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
 
@@ -171,7 +171,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | `demos_by_system/pendulum_simple/simple_pendulum_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos/value_iteration/vi_minimum_time.py (mass) + examples/demos/value_iteration/vi_pendulum_swingup.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos_proposed_minimal/dynamic_programming/double_integrator_minimum_time.py (mass) + examples/demos_proposed_minimal/pendulum_value_iteration.py |
 | `demos_by_system/plane/plane_cobra.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/plane/plane_simple_controller.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_effector_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
@@ -205,9 +205,9 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | `demos_by_tool/dynamicprogramming/active_suspension.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/braking_reachability.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/car_braking.py` | **TODO** | DP specialty demo not ported |
-| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/value_iteration/vi_double_pendulum_jax.py |
+| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | — (`vi_double_pendulum_jax.py` deleted 2026-11-18) |
 | `demos_by_tool/dynamicprogramming/helicopter_tunnel.py` | **TODO** | DP specialty demo not ported |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/value_iteration/vi_pendulum_swingup.py (grid tuning differs) |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos_proposed_minimal/pendulum_value_iteration.py (grid tuning differs) |
 | `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | `ReachabilityCost` not in minilink (check at C1); demo TODO |
 | `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |
@@ -271,7 +271,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | StochasticSystemWrapper | **Drop** | Noise ports only unless reversed |
 | University course folders | **Drop** | Port ideas via library demos, not 1:1 |
 | Research projects (asimov, ugv, wcrt, …) | **Drop** | Out of library scope |
-| Pacejka tire | **TODO/review** | [TODO.md](TODO.md) Later |
+| Pacejka tire | **Done** | `MagicFormulaTire` (`dynamics/catalog/vehicles/tires.py`) |
 
 ---
 

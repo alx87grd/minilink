@@ -16,7 +16,7 @@ knows every demo and every test layer, and a CI that answers in minutes.
 - **Nothing is deleted before the maintainer's pass.** He decides himself which demos and
   which features stay. This document lists candidates, recommendations and drafts, not
   decisions: "delete", "move" and "reduce" name what the maintainer may choose, not what an
-  agent does. `examples/demos/` (94 scripts) and `examples/demos_proposed_minimal/` (9) both
+  agent does. `examples/demos/` (85 scripts) and `examples/demos_proposed_minimal/` (16) both
   stay as they are until then.
 - **The value-iteration animations stay** (`animate_cost_to_go`, `animate_control_law`): they
   are used in class, whatever the demo set. They are in no candidate row. The sweep history
@@ -122,7 +122,9 @@ with RRT, with MPC) and a folder by tool. Minilink's design removes the reason: 
 any `System`, and one `PlanningProblem` goes to every planner under one judge, so a script
 whose content is "tool X on plant Y" shows nothing a reader could not write in three lines.
 
-The 94 scripts of `examples/demos/` as counted on 2026-11-12:
+The 94 scripts of `examples/demos/` as counted on 2026-11-12 (85 since the maintainer's
+deletions of 2026-11-18 and 2026-11-20: the six `value_iteration/` scripts, the minimum-time one
+moved to `demos_proposed_minimal/dynamic_programming/`, and three `analysis/` scripts):
 
 - 31 use the pendulum, each with another tool: one row of the table, in 31 files;
 - six racecar scripts and six value-iteration scripts are variants of one another;
@@ -181,13 +183,13 @@ Open in the list, each the maintainer's:
 
 | Today | Scripts | Goes to |
 | --- | --- | --- |
-| `analysis/` | 10 | the tutorials (analysis and control); none kept |
+| `analysis/` | 7 | the tutorials (analysis and control); none kept |
 | `core/`, `blocks/` | 8 | the tutorials (systems); `readme_examples` kept (13) |
 | `hybrid/` | 6 | the tutorial on discrete and sampled systems; none kept |
 | `graphical/`, `optimization/` | 6 | the tutorials; none kept |
 | `compile/` | 14 | 3 and 10 kept; `lqg_monte_carlo` into 2; the rest to the differentiable tutorial or the private repository |
 | `control/` | 9 | 4 kept; `lqg_cartpole` into 2; the rest to the tutorials, the two Pyro ports out |
-| `value_iteration/` | 6 | into 1; the 4-D cases to the private repository |
+| `value_iteration/` | deleted (2026-11-18) | its minimum-time case moved to `demos_proposed_minimal/dynamic_programming/` |
 | `mpc/`, `udes_racecar/` | 11 | 5 and 6 kept; `mppi_pendulum` into 1; the rest out |
 | `trajopt/`, `rrt/` | 5 | 11 kept; `rrt_pendulum_swingup` into 1; the corridor scripts out |
 | `rl/` | 4 | 8 kept; the rest out |
@@ -509,17 +511,17 @@ question for each is trust and size, not use.
 | Chunk | Size | Recommendation | Pri. | Conf. | Why |
 | --- | --- | --- | --- | --- | --- |
 | Research projects (`examples/projects/`: car trajectory optimization, MPC, path tracking) | 31 files, 7 900 lines of Python in 29 scripts | move to the research repo | 1 | H | More code than all demos together, read-only for agents, and it subclasses catalog classes, so it blocks renames. Pinned to a release in its own repository it stops constraining the library. |
-| The old demo folders (`examples/demos/`, 94 scripts) | 5 800 lines | the maintainer's pass: which stay, which are rewritten, which go, after a snapshot tag | 1 | H | The curated set would replace them. The good ideas are listed in §4.4 and §4.7; your own favourites go to the scratchpad first. |
-| The proposed demos (`examples/demos_proposed_minimal/`, 9 scripts) | 790 lines | keep; becomes `examples/demos/` once you choose | 1 | M | Waits for your selection, and for the choice between the two racecar cascade demos. |
+| The old demo folders (`examples/demos/`, 85 scripts) | 5 800 lines | the maintainer's pass: which stay, which are rewritten, which go, after a snapshot tag | 1 | H | The curated set would replace them. The good ideas are listed in §4.4 and §4.7; your own favourites go to the scratchpad first. |
+| The proposed demos (`examples/demos_proposed_minimal/`, 16 scripts) | 1 360 lines | keep; becomes `examples/demos/` once you choose | 1 | M | Waits for your selection, and for the choice between the two racecar cascade demos. |
 | Showcase, basics, advanced tutorials | 9 notebooks | keep | 3 | H | Just brought up to date; one per audience. |
 | Core notebooks (`examples/tutorial/core/`, 9) | 9 notebooks | keep until the API review, then turn into the developer docs or delete | 2 | H | Your working documents for that review. |
 | Unit tests (`tests/unittest/`, 80 files) | 41 400 lines | reduce, by rewriting around contracts | 2 | M | Half the size of the library. Five files over 1 500 lines. Not a deletion: each file is rewritten when its module passes the API review, keeping the contract tests and the textbook checks. |
 | Vocabulary test (`test_vocabulary.py`) | 1 090 lines | minimize | 2 | M | Guards the public names; shrinks with the surface. |
 | Tests of experimental code (`tests/experimental/`) | 430 lines | move with the code | 1 | H | |
 | Demo and notebook checks (`tests/demo_checks/`, `tests/run/`) | 1 600 lines | keep | 3 | H | The gate that kept the tutorials honest in this run. |
-| Benchmarks (`benchmarks/`, 26 files) | 5 900 lines | reduce to core | 2 | M | Keep the regression gate CI runs and the speed claims the README makes (four suites). The scenarios and host profiles beyond that are the scratchpad's. |
+| Benchmarks (`benchmarks/`, 35 files) | 5 900 lines | reduce to core | 2 | M | Keep the regression gate CI runs and the speed claims the README makes (four suites). The scenarios and host profiles beyond that are the scratchpad's. |
 | Developer docs (`docs/dev/`) | 4 600 lines | reduce | 2 | M | DESIGN and RULES are law; ROADMAP and QUESTIONS shrink as v0.4 closes. |
-| Plan docs (`docs/plans/`, 10 beside TODO) | 3 400 lines | keep | 3 | H | The landed plans are deleted; what remains is the design of what is not built, and this document. The pyro parity table is re-audited after the demo pass. |
+| Plan docs (`docs/plans/`, 13 and the index beside TODO) | 3 050 lines | keep | 3 | H | The landed plans are deleted; what remains is the design of what is not built, and this document. The pyro parity table is re-audited after the demo pass. |
 | API docs (`docs/api/`, Sphinx) | 550 lines | keep | 3 | H | Generated from docstrings. |
 
 ## 8. Behind the kept surface: what could be cleaned
@@ -603,12 +605,12 @@ proposed off-road game passes `plot_renderer="plotly"`, and two tutorials show
 | The evaluator's adaptive SciPy path (`ProblemEvaluator`, `solver="scipy…"`) | Tests only. | 70 | a keyword value | M |
 | `compile(flatten=True)` | Tests only; on a step diagram it raises "not supported yet". | 50 | public keyword | H |
 | The `"direct"` transcription backend | Passed nowhere. | 15 | behaviour | M |
-| Dubins steering for RRT (`search/dubins.py`, `DubinsSteering`) | Tests only: no demo, tutorial or project. Keep with a car demo, or it goes to the scratchpad. | 220 | public class | L |
+| Dubins steering for RRT (`search/dubins.py`; `DubinsSteering` in `search/steering.py`) | Tests only: no demo, tutorial or project. Keep with a car demo, or it goes to the scratchpad. | 115 | public class | L |
 | `Tree(nearest_method="kd_tree")` | Tests only. | 35 | none | M |
 | The reward-rebuild branch of the learning planner (`reward="stage"`) | A keyword no caller passes; the environment's own option stays. | 15 | none | M |
 | Custom gravity hook on the arm impedance laws (`gravity=`, signature probing) | Tests only; two of its guards can never fire. | 35 | public keyword | M |
 | Law keywords: label and unit overrides on `Impedance`, `y_filt0`, integrator clamps, `autowire(strict=)` | Passed by no example, except `autowire(strict=True)` in two old demos. | 50 | public keywords | M |
-| A pluggable diagram-exporter layer with one backend (`graphical/diagrams/export.py`) | Graphviz is the only exporter; the layer exists for a test. | 90 | exported names | H |
+| A pluggable diagram-exporter layer with one backend (`graphical/diagrams/export.py`) | Graphviz is the only exporter; the layer exists for a test. | 69 | exported names | H |
 | Mesh tools: the Collada loader (`load_collada`, `collada_mesh`), `split_by_radius`, `refine` | No caller, tests included. | 200 | none | H |
 | JAX setup: `configure_jax`, two backend tuples | No library caller; called by the projects, the benchmarks and the tests, always with the default. | 35 | a public name | M |
 | Save and load of a grid's successor tables (`Discretizer.save`, `load`) | No caller, tests included. Useful for a long solve; keep if a course uses it. | 15 | public methods | L |
@@ -650,7 +652,7 @@ A reader does not know the rulings; these are its claims set against them.
 | --- | --- | --- | --- |
 | `planning/evaluator.py` | 1 415 | about 400: construct, evaluate, program, realize, run, score | validation 150; sampled-loop support 70; batch-axis tree utilities 70 (they belong with params); program packing 60; failure-cost recompute 60; held plans 40; the adaptive path and the live plot (above) |
 | `planning/problems.py` | 1 253 | about 500, of which 120 are the class docstring | coercers and validators 350; the stochastic-draw helpers 150; print text 60 |
-| `planning/dynamic_programming/dp.py` | 1 086 | about 350: the backup, the two cost tables, the solution | policy evaluation 100 (used in teaching); the loop reference 60; JAX dispatch and plot forwarders; the table and record classes |
+| `planning/dynamic_programming/dp.py` | 1 141 | about 350: the backup, the two cost tables, the solution | policy evaluation 100 (used in teaching); the loop reference 60; JAX dispatch and plot forwarders; the table and record classes |
 
 For the first two, the split into a subpackage (the open question in QUESTIONS) would put the
 core in a file a student can read in one sitting.

@@ -29,7 +29,11 @@ All core equation paths are pure functions—arrays in, arrays out—allowing th
 
 ## Install
 
-Recommended, everything included (JAX, Graphviz, Ipopt, 3-D animation, Jupyter):
+```bash
+pip install "minilink[full]"
+```
+
+Conda is recommended to also install binaries for Graphviz and Ipopt.
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -37,11 +41,19 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Or with pip: `pip install "minilink[full]"`, or `pip install minilink` for NumPy only.
-
 ## 1. Block diagrams as code
 
-A block is its equations, $\dot{x} = f(x, u, t; p)$ and $y = h(x, u, t; p)$: pure functions, arrays in and arrays out, so every tool can simulate, linearize and differentiate them. Define `f` and `h`, and `@` closes the loop.
+A block is its equations:
+
+$$
+\dot{x} = f(x, u, t; p)
+$$
+
+$$
+y = h(x, u, t; p)
+$$
+
+Pure functions, arrays in and arrays out. Define `f` and `h`, and `@` closes the loop.
 
 ```python
 import numpy as np
@@ -96,9 +108,9 @@ plot_region_of_attraction(balance, region)
 
 ![Frequency response, root locus, simulation and Lyapunov region of attraction](./docs/_static/tool_analysis.png)
 
-## 3. The planning pipeline
+## 3. A unified planning pipeline, from MPC to RL
 
-The task, described once: the plant, its sets and its cost over the horizon $t_f$,
+All planning tools (LQR, MPC, VI, RRT, RL) work from a unified task description: the plant, contraint sets and a cost function over the horizon $t_f$,
 
 $$x(0) = x_0, \qquad x(t) \in \mathcal{X}, \qquad u(t) \in \mathcal{U}, \qquad x(t_f) \in \mathcal{X}_f = \lbrace x : \lVert x - \bar{x} \rVert \le 0.2 \rbrace,$$
 
@@ -119,7 +131,7 @@ swing_up = PlanningProblem(
 )
 ```
 
-Every planner solves the same problem and returns a controller.
+Every planner returns a controller block, also a `System` that can be included in a block diagram.
 
 ```python
 from minilink import (
@@ -145,7 +157,8 @@ mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax
 mpc = ModelPredictiveController(mpc_planner) % 0.1
 ```
 
-`compare` evaluates the controllers on the problem's stochastic version, the same 20 draws of the mass for each:
+The task description can be stochastic, with parameters drawn from a distribution.
+`compare` is a method to evaluate multiple controllers on the same task, if the problem is stochastic, multiple simulations are run in parallel using vmap.
 
 $$\mathbb{E}_{m}\big[J\big], \qquad m \sim \mathcal{U}(0.8,\ 1.2)$$
 
@@ -159,19 +172,15 @@ comparison.plot_simulated_trajectory()
 
 ![Trajectory optimization, reinforcement learning and the Monte Carlo evaluation](./docs/_static/tool_planning.png)
 
-The open-loop plans miss the goal once the mass changes (0 of 20); the feedback laws reach it (value iteration 20 of 20, MPC 17 of 20).
+## 4. Optimization with respect to any parameters
 
-## 4. From evaluation to controller
-
-Tune a controller on the evaluation itself. The closed loop, an impedance law bringing the pendulum to rest from $\theta = 2$ rad:
+The evaluation of a controller on a task is a function of the parameters of the task and the controller, $J(p)$, which can be optimized with respect to any parameters in the tree. For exemple, the closed loop, an impedance law bringing the pendulum to rest from $\theta = 2$ rad:
 
 $$\dot{x} = f(x, u, t; p), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}$$
 
 $$J(p) = \int_0^{t_f} \left(x^\top Q\, x + u^\top R\, u\right) dt$$
 
-where $p$ is the loop's whole parameter tree (the controller's gains, every number of the plant and the cost), and its mass leaf $m \sim \mathcal{U}(0.8,\ 1.2)$ is drawn.
-
-The loop, compiled, gives the expected cost and its gradient with respect to every leaf of the tree, through the whole simulation:
+where $p$ is the loop's whole parameter tree (the controller's gains, every number of the plant and the cost), and its mass leaf $m \sim \mathcal{U}(0.8,\ 1.2)$ is drawn from a uniform distribution. The evaluation method gives the expected cost and its gradient with respect to every leaf of the tree, through the whole simulation:
 
 $$\mathbb{E}_m\big[J(p)\big], \qquad \nabla_p\, \mathbb{E}_m\big[J(p)\big]$$
 
@@ -207,6 +216,18 @@ best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54; expected cost 19.3 �
 This program is a `MathematicalProgram`, the one shape every transcription lowers to (collocation, a tuning task, a policy search); the `Optimizer` solves it by the method it names (`l-bfgs`, `gd`, `adam`; with constraints, `slsqp`, `trust-constr` or `ipopt`):
 
 $$\min_{z} \ J(z; p) \quad \text{s.t.} \quad h(z; p) = 0, \quad g(z; p) \ge 0, \quad z_{\text{lower}} \le z \le z_{\text{upper}}$$
+
+## 5. Compiled, differentiated, batched
+
+With `backend="jax"`, the same `f` compiles to an evaluator of pure JAX functions: `jax.jit`, `jax.grad` and `jax.vmap` apply to them, and the tools above use them inside (the gradient of section 4, its 20 draws of the mass run as one batch). A thousand pendulums, released from a thousand angles, in one call:
+
+```python
+evaluator = plant.compile(backend="jax")
+starts = np.column_stack([np.linspace(-3.0, 3.0, 1000), np.zeros(1000)])
+swings = evaluator.rollout_batch(starts, n_steps=1000, dt=0.005)  # 1000 runs × 1000 RK4 steps
+```
+
+The batch runs in a few hundredths of a second on a laptop CPU.
 
 ## The Minilink backbone
 

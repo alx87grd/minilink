@@ -39,7 +39,7 @@ Reading the table:
 
 Both PPOs normalize the advantages, so the policy gradient does not see the reward scale. The value loss does: the critic regresses returns of order 10^3 to 10^4.
 
-Both optimizers clip the gradient to a global norm of 0.5, taken over the policy and the critic together (`clip_by_global_norm` of `optimization/optimizers/first_order.py`, through `Adam`'s `max_grad_norm=0.5`, on the whole parameter tree). The critic's gradient therefore sets the clip factor, and the policy's share is shrunk with it.
+Both optimizers clip the gradient to a global norm of 0.5, taken over the policy and the critic together (the global-norm clip inside `AdamLaw` of `optimization/optimizers/first_order.py`, its `max_grad_norm=0.5`, on the whole parameter tree). The critic's gradient therefore sets the clip factor, and the policy's share is shrunk with it.
 
 Measured on one minibatch of 64, as the median over 20 minibatches, with the default planner:
 

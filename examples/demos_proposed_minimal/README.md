@@ -3,9 +3,9 @@
 A draft for the maintainer's review: the scripts proposed as the whole demo set of the
 consolidated library, written beside the existing `examples/demos/`, which they do not
 replace until he rules. Seven are the shortlist; `racecar_mppi.py` and
-`racecar_fast_lap.py` are two prototypes added after it, and
-`pendulum_value_iteration.py` and `cartpole_value_iteration.py` the two value-iteration
-swing-ups. The reasoning is in
+`racecar_fast_lap.py` are two prototypes added after it;
+`pendulum_value_iteration.py` and `dynamic_programming/` hold the value-iteration
+examples; `offroad_car_game.py` and the two classical-control walkthroughs came last. The reasoning is in
 [docs/plans/consolidation.md](../../docs/plans/consolidation.md), §4: the tutorials
 carry what fits in a notebook, and a demo is kept only for a story a notebook tells badly.
 Each script tells one story, shows the diagram where the wiring is the point, and ends on
@@ -15,7 +15,8 @@ one plot and one animation.
 | --- | --- | --- |
 | `cartpole_swingup.py` | a swing-up planned once falls when replayed from another start; LQR feedback along the same plan holds it | 9 s |
 | `pendulum_value_iteration.py` | value iteration swings a pendulum up with a weak motor; the cost-to-go and the law are animated sweep by sweep | 20 s (a laptop) |
-| `cartpole_value_iteration.py` | the same Bellman sweeps on a 4-D grid swing a cart-pole up | 27 s (a laptop) |
+| `dynamic_programming/cartpole_value_iteration.py` | the same Bellman sweeps on a 4-D grid swing a cart-pole up | 27 s (a laptop) |
+| `dynamic_programming/double_integrator_minimum_time.py` | the minimum-time law of a double integrator, value iteration's bang-bang switching curve | — |
 | `pendulum_every_planner.py` | one swing-up problem for LQR, value iteration, trajectory optimization, RRT and the optimized plan tracked: each nominal trajectory scored as written beside its simulation, then the simulations judged over random starts | 47 s |
 | `pendulum_pid_gradient_tuning.py` | a PID on its computer's clock, the whole sampled loop differentiated, its three gains tuned by an optimizer | 6 s |
 | `cartpole_lqg.py` | a Kalman filter and an LQR gain balance a cart-pole under noise: one run, then 200 scored | 8 s |

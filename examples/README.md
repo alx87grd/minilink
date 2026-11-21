@@ -15,6 +15,7 @@ examples/
   tutorial/                    # basics/ (students), core/ (the foundation), advanced/ (tools) + the showcase
   demos/<chapter>/             # Canonical single-file textbook scripts, by topic (the chapters' areas)
   demos/udes_racecar/          # Plant folder: MPC and path tracking on the 1/10 car
+  demos_proposed_minimal/      # The draft of the curated demo set, for the maintainer's pass
 
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
   projects/<name>/             # Multi-file applications (pathtracking, car_trajopt, mpc)
