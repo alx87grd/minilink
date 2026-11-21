@@ -132,7 +132,10 @@ opt = TrajectoryOptimizationPlanner(swing_up, n_steps=60).solve(live_plot=True)
 vi = DynamicProgrammingPlanner(swing_up, x_grid=(101, 101), u_grid=(11,), dt=0.05).solve()
 rrt = RRTPlanner(swing_up, seed=0).solve()
 ppo = ReinforcementLearningPlanner(swing_up, dt=0.05, gamma=0.99).solve(n_timesteps=100_000)
-mpc = ModelPredictiveController(TrajectoryOptimizationPlanner(swing_up, n_steps=20)) % 0.1
+
+look_ahead = swing_up.replace(horizon=2.0, Xf=None)
+mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")
+mpc = ModelPredictiveController(mpc_planner) % 0.1
 ```
 
 `compare` evaluates the controllers on the problem's stochastic version, $\mathbb{E}_m[J]$ with the mass $m \sim \mathcal{U}(0.8, 1.2)$, the same 20 draws for each.
@@ -147,7 +150,7 @@ comparison.plot_simulated_trajectory()
 
 ![Trajectory optimization, reinforcement learning and the Monte Carlo evaluation](./docs/_static/tool_planning.png)
 
-The open-loop plans miss the goal once the mass changes (0 of 20); value iteration's feedback law reaches it on every draw.
+The open-loop plans miss the goal once the mass changes (0 of 20); the feedback laws reach it (value iteration 20 of 20, MPC 17 of 20).
 
 ## 4. From evaluation to controller
 
