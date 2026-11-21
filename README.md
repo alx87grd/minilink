@@ -92,14 +92,10 @@ plot_region_of_attraction(balance, region)
 
 ## 3. The planning pipeline
 
-One problem, described once; every planner solves it, and `compare` evaluates their controllers on its stochastic version.
+The task, described once: the plant, the cost, the start, the goal, the limits and the horizon.
 
 ```python
-from minilink import (
-    BallSet, DynamicProgrammingPlanner, PlanningProblem, QuadraticCost, RRTPlanner,
-    ReinforcementLearningPlanner, TrajectoryOptimizationPlanner, Uniform, compare,
-)
-from minilink.control import ModelPredictiveController
+from minilink import BallSet, PlanningProblem, QuadraticCost
 
 cost = QuadraticCost.from_system(plant, x_bar=up, S=100 * np.eye(2))
 swing_up = PlanningProblem(
@@ -111,14 +107,31 @@ swing_up = PlanningProblem(
     X=plant.state.box,
     U=plant.input_box,
 )
+```
+
+Every planner solves the same problem and returns a controller.
+
+```python
+from minilink import (
+    DynamicProgrammingPlanner, RRTPlanner, ReinforcementLearningPlanner,
+    TrajectoryOptimizationPlanner,
+)
+from minilink.control import ModelPredictiveController
 
 opt = TrajectoryOptimizationPlanner(swing_up, n_steps=60).solve(live_plot=True)
 vi = DynamicProgrammingPlanner(swing_up, x_grid=(101, 101), u_grid=(11,), dt=0.05).solve()
 rrt = RRTPlanner(swing_up, seed=0).solve()
 ppo = ReinforcementLearningPlanner(swing_up, dt=0.05, gamma=0.99).solve(n_timesteps=100_000)
+
 look_ahead = swing_up.replace(horizon=2.0, Xf=None)
 mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")
 mpc = ModelPredictiveController(mpc_planner) % 0.1
+```
+
+`compare` evaluates the controllers on the problem's stochastic version: the mass uncertain by ±20 %, the same 20 draws for each.
+
+```python
+from minilink import Uniform, compare
 
 uncertain = swing_up.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
 comparison = compare(uncertain, VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=20)
@@ -131,11 +144,11 @@ The open-loop plans miss the goal once the mass changes (0 of 20); the feedback 
 
 ## 4. From evaluation to controller
 
-The expected cost is a differentiable function of every parameter in the loop, named by its path, so an `Optimizer` tunes a controller on its gradient. Here an impedance law brings the pendulum to rest under the uncertain mass:
+A controller in its loop, compiled: the expected cost is a function of every parameter, with its gradient through the whole simulation.
 
 ```python
 import jax
-from minilink import Impedance, Optimizer
+from minilink import Impedance
 
 rest_cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
 rest = PlanningProblem(plant, x0=[2.0, 0.0], horizon=5.0, cost=rest_cost)
@@ -143,7 +156,13 @@ task = rest.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
 evaluator = task.compile(Impedance(Kp=1.0, Kd=1.0), backend="jax")
 
 expected_cost = lambda params: evaluator.evaluate(params, n_trials=20).objective
-gradient = jax.grad(expected_cost)(evaluator.params)  # through the whole simulation
+gradient = jax.grad(expected_cost)(evaluator.params)
+```
+
+The gains, named by their paths, become a program; an `Optimizer` tunes them.
+
+```python
+from minilink import Optimizer
 
 gains = ["controller.Kp", "controller.Kd"]
 bounds = {"controller.Kp": (0.0, 50.0), "controller.Kd": (0.0, 20.0)}
