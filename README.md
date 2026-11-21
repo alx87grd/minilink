@@ -126,12 +126,17 @@ from minilink import (
     DynamicProgrammingPlanner, RRTPlanner, ReinforcementLearningPlanner,
     TrajectoryOptimizationPlanner,
 )
-from minilink.control import ModelPredictiveController
 
 opt = TrajectoryOptimizationPlanner(swing_up, n_steps=60).solve(live_plot=True)
 vi = DynamicProgrammingPlanner(swing_up, x_grid=(101, 101), u_grid=(11,), dt=0.05).solve()
 rrt = RRTPlanner(swing_up, seed=0).solve()
 ppo = ReinforcementLearningPlanner(swing_up, dt=0.05, gamma=0.99).solve(n_timesteps=100_000)
+```
+
+MPC runs on a receding-horizon version of the problem: every 0.1 s it solves a 2 s look-ahead again from the measured state.
+
+```python
+from minilink.control import ModelPredictiveController
 
 look_ahead = swing_up.replace(horizon=2.0, Xf=None)
 mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax")
