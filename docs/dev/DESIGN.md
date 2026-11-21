@@ -1307,7 +1307,7 @@ serves every solve path: `make_optimizer_backend(method, options=)` gives the pr
 among them, as the offline `Optimizer` does.
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
-owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
+owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state_box`,
 `U=plant.input_box`, or a `BoxSet` over the inputs, wrapped), cost, the continuous `horizon` `T` and its start `t0` (the
 run spans `[t0, t0 + T]`, `t0 = 0` by default; a run starts there, costs, sets and
 references read absolute time, the discount counts from it, the fixed grids of the

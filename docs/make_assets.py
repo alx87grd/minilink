@@ -298,7 +298,7 @@ def tool_analysis() -> None:
 
     ax = axes[0]
     ax.semilogx(w, 20 * np.log10(np.abs(G)), color=BLUE, lw=2)
-    ax.set(title="Frequency response", xlabel="ω [rad/s]", ylabel="|θ / τ| [dB]")
+    ax.set(title="Frequency response", xlabel="ω [rad/s]", ylabel="|θ / u| [dB]")
 
     ax = axes[1]
     ax.axhline(0.0, color=MUTED, lw=0.6)
@@ -327,9 +327,7 @@ def tool_analysis() -> None:
         )
         labelled.add(label)
     ax.plot(*up, "+", color=INK, ms=8)
-    ax.set(
-        title="Lyapunov region of attraction", xlabel="θ [rad]", ylabel="dθ/dt [rad/s]"
-    )
+    ax.set(title="Lyapunov region of attraction", xlabel="θ [rad]", ylabel="θ̇ [rad/s]")
     ax.set(xlim=(np.pi - 3.5, np.pi + 3.5), ylim=(-7.5, 7.5))
     ax.legend(loc="upper right", frameon=False, fontsize=7.5, labelcolor=MUTED)
 
@@ -454,7 +452,7 @@ def tool_planning() -> None:
         handle.set_alpha(1.0)
         handle.set_linewidth(2.0)
     ax.set(title="Monte Carlo evaluation, mass ±20 %", xlabel="t [s]")
-    ax.set(ylabel="dθ/dt [rad/s]", xlim=(0.0, 6.0))
+    ax.set(ylabel="θ̇ [rad/s]", xlim=(0.0, 6.0))
 
     fig.tight_layout(w_pad=2.0)
     fig.savefig(STATIC / "tool_planning.png", dpi=130, facecolor=SURFACE)
