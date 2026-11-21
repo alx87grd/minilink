@@ -1,10 +1,10 @@
-"""Single pendulums: actuated, with noise ports, inverted, and two uncoupled ones."""
+"""Single pendulums: actuated, simple, with noise ports, inverted, and two uncoupled ones."""
 
 import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2
-from minilink.core.system import fastest_time_constant
+from minilink.core.system import DynamicSystem, fastest_time_constant
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -129,6 +129,88 @@ class Pendulum(MechanicalSystem):
         tau_d = xp.array([d * omega])
 
         return tau_d
+
+    def get_kinematic_geometry(self):
+        length = self.params["l"]
+
+        return {"world": pivot_mount(length), "link": link_geometry(length)}
+
+    def tf(self, x, u, t=0, params=None):
+        return {"link": SE2(0.0, 0.0, x[0])}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
+        length = params["l"]
+        torque = u[0]
+        max_torque = self.inputs["u"].upper[0]
+
+        # A third of a turn at the torque limit
+        sweep = torque * (2.0 * np.pi / 3.0) / max_torque
+        arc = torque_arc(sweep, length / 5.0)
+
+        return {"link": [arc]}
+
+
+class SimplePendulum(DynamicSystem):
+    """Simple pendulum: a point mass on a massless rod, driven by a torque, its angle measured::
+
+    m l² θ̈ = τ − m g l sin θ − d θ̇,    y = θ
+    """
+
+    def __init__(self, length=1.0, mass=1.0):
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.array([-5.0])
+        self.inputs["u"].upper = np.array([5.0])
+
+        # Parameters
+        self.params = {
+            "m": mass,
+            "l": length,
+            "gravity": 9.81,
+            "d": 0.0,
+        }
+
+        # Signal labels and units
+        self.state.labels = ["theta", "dtheta"]
+        self.state.units = ["rad", "rad/s"]
+        self.inputs["u"].labels = ["tau"]
+        self.inputs["u"].units = ["Nm"]
+        self.outputs["y"].labels = ["theta"]
+        self.outputs["y"].units = ["rad"]
+
+        # Graphics: no camera_scale, so the view follows params["l"]
+        self.camera_target = np.array([0.0, 0.0, 0.0])
+        self.camera_plot_axes = (0, 1)
+
+    def f(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+
+        m = params["m"]
+        l = params["l"]
+        gravity = params["gravity"]
+        d = params["d"]
+
+        theta = x[0]
+        dtheta = x[1]
+        tau = u[0]
+
+        # m l² θ̈ = τ − m g l sin θ − d θ̇
+        ddtheta = (tau - m * gravity * l * xp.sin(theta) - d * dtheta) / (m * l**2)
+
+        dx = xp.stack([dtheta, ddtheta])
+
+        return dx
+
+    def h(self, x, u, t=0.0, params=None):
+        theta = x[0:1]
+
+        return theta
 
     def get_kinematic_geometry(self):
         length = self.params["l"]

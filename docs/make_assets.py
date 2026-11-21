@@ -55,11 +55,11 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
 
 
 def diagram_png() -> None:
-    """The README's first loop: a PID closed on the catalog's mass on a spring."""
-    from minilink import PID, SingleMass
+    """The README's first loop: a PID closed on the catalog's simple pendulum, its angle measured."""
+    from minilink import PID, SimplePendulum
     from minilink.graphical.diagrams.dot import get_diagram
 
-    diagram = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ SingleMass()
+    diagram = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ SimplePendulum()
     get_diagram(diagram).render(
         filename=str(STATIC / "diagram_closed_loop"), format="png", cleanup=True
     )

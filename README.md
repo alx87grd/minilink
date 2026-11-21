@@ -62,9 +62,9 @@ conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activat
 ## 1. Block diagrams as code
 
 ```python
-from minilink import PID, SingleMass
+from minilink import PID, SimplePendulum
 
-plant = SingleMass()
+plant = SimplePendulum()
 pid = PID(Kp=10.0, Ki=1.0, Kd=2.0)
 diagram = pid @ plant
 diagram.plot_diagram()

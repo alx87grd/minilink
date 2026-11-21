@@ -62,6 +62,7 @@ from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot
 from minilink.dynamics.catalog.pendulum.pendulum import (
     InvertedPendulum,
     Pendulum,
+    SimplePendulum,
     TwoIndependentPendulums,
 )
 from minilink.dynamics.catalog.vehicles.car_presets_3d import (
@@ -138,6 +139,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("FloatingTwoMass", FloatingTwoMass),
     CatalogCheckEntry("FloatingThreeMass", FloatingThreeMass),
     CatalogCheckEntry("Pendulum", Pendulum),
+    CatalogCheckEntry("SimplePendulum", SimplePendulum),
     CatalogCheckEntry("InvertedPendulum", InvertedPendulum),
     CatalogCheckEntry("TwoIndependentPendulums", TwoIndependentPendulums),
     CatalogCheckEntry("Acrobot", Acrobot),
