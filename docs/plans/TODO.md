@@ -229,6 +229,10 @@ No open row: the contract is DESIGN §4, "Fields". The rest of the field object
   - `Pendulum`'s default inertia `I = 0`, the textbook point mass (`ω = √(g/l)`, 3.13 rad/s for
     `m = l = 1`; today `I = 1` gives 2.21), built with that re-pin and not before (the
     maintainer's ruling 6b of 2026-11-10); the scalar inertia keeps the letter `I`;
+  - the README's images back to absolute URLs before the merge to `main`: they are relative
+    (`./docs/_static/...`) while the README is reworked, so a branch shows its own figures,
+    and PyPI shows a relative image broken (the maintainer, 2026-11-21; the README's table and
+    figures re-run with the pendulum's new default, readme-and-showcase-story.md);
   - the PR from `dev` to `main`;
   - the `0.4.0` tag.
 

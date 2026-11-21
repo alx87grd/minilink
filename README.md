@@ -10,10 +10,10 @@
 
 <table>
   <tr>
-<td width="25%" align="center" valign="bottom"><img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/cartpole_swingup.gif" alt="Cart-pole swing-up, trajectory optimization" width="100%"/></td>
-<td width="25%" align="center" valign="bottom"><img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/ur5_meshcat.gif" alt="UR5 arm, task-space impedance control" width="100%"/></td>
-<td width="25%" align="center" valign="bottom"><img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/racecar_mpc.gif" alt="Racecar, model predictive control" width="100%"/></td>
-<td width="25%" align="center" valign="bottom"><img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/rocket_landing.gif" alt="Rocket landing, reinforcement learning" width="100%"/></td>
+<td width="25%" align="center" valign="bottom"><img src="./docs/_static/cartpole_swingup.gif" alt="Cart-pole swing-up, trajectory optimization" width="100%"/></td>
+<td width="25%" align="center" valign="bottom"><img src="./docs/_static/ur5_meshcat.gif" alt="UR5 arm, task-space impedance control" width="100%"/></td>
+<td width="25%" align="center" valign="bottom"><img src="./docs/_static/racecar_mpc.gif" alt="Racecar, model predictive control" width="100%"/></td>
+<td width="25%" align="center" valign="bottom"><img src="./docs/_static/rocket_landing.gif" alt="Rocket landing, reinforcement learning" width="100%"/></td>
   </tr>
   <tr>
 <td width="25%" align="center" valign="top">Cart-pole swing-up, trajectory optimization</td>
@@ -36,7 +36,7 @@ Three mathematical foundations hold the framework together:
 
 One differentiable path connects modeling, analytical control, trajectory optimization, and learning:
 
-![The Minilink Backbone](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
+![The Minilink Backbone](./docs/_static/pipeline_map.png)
 
 *Full pipeline reference: [docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).*
 
@@ -70,7 +70,7 @@ diagram = pid @ plant
 diagram.plot_diagram()
 ```
 
-![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
+![closed-loop diagram](./docs/_static/diagram_closed_loop.png)
 
 Code is the single source of truth:
 
@@ -120,7 +120,7 @@ ppo.solve(n_timesteps=100_000)
 ppo.plot_learning_curve()
 ```
 
-![Frequency response, trajectory optimization and reinforcement learning on one pendulum](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/tool_breadth.png)
+![Frequency response, trajectory optimization and reinforcement learning on one pendulum](./docs/_static/tool_breadth.png)
 
 The same plant takes `lqr`, `kalman`, value iteration, RRT, MPC, and the rest: each is one more line.
 
@@ -146,7 +146,7 @@ comparison = compare(uncertain, VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=2
 comparison.plot_simulated_trajectory()
 ```
 
-![The twenty runs of each controller](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/comparison_runs.png)
+![The twenty runs of each controller](./docs/_static/comparison_runs.png)
 
 The two open-loop plans reach the goal on the nominal model and miss it when the mass changes (0 of 20 draws); the two feedback laws reach it on most draws (value iteration 20 of 20, MPC 17 of 20).
 

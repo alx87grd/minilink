@@ -63,4 +63,7 @@ budget the content is cut to.
 
 ## Left
 
+- The README's images are relative while it is reworked; they go back to absolute URLs before
+  the merge to `main` and the `0.4.0` tag (TODO §1.10).
+
 - The comparison table, in both, re-run when the pendulum's point-mass default lands (TODO §1.10).
