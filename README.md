@@ -41,7 +41,7 @@ Or with pip: `pip install "minilink[full]"`, or `pip install minilink` for NumPy
 
 ## 1. Block diagrams as code
 
-A block is its equations: define `f` and `h`, and `@` closes the loop.
+A block is its equations, $\dot{x} = f(x, u, t; p)$ and $y = h(x, u, t; p)$: pure functions, arrays in and arrays out, so every tool can simulate, linearize and differentiate them. Define `f` and `h`, and `@` closes the loop.
 
 ```python
 import numpy as np
@@ -69,7 +69,7 @@ diagram.plot_diagram()
 
 ## 2. Analysis
 
-A model is three pure functions, $\dot{x} = f(x, u, t; p)$, $y = h(x, u, t; p)$ and the body poses $T = \mathrm{tf}(x, u, t; p)$: stateless, arrays in and arrays out, so every tool can simulate, linearize and differentiate them.
+The classical tools, on a catalog pendulum and its LQR:
 
 ```python
 from minilink import Pendulum, lqr
