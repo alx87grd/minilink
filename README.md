@@ -29,22 +29,11 @@ All core equation paths are pure functions—arrays in, arrays out—allowing th
 
 ## Install
 
-Python 3.10+. **pip**:
-- `pip install minilink` runs simulation, plots, LQR, and value iteration on standard NumPy, SciPy, and Matplotlib.
-- `pip install "minilink[full]"` adds JAX, Plotly, MeshCat, Pygame, SymPy, and Gymnasium.
-
-**Conda**, everything included (JAX, Graphviz, Ipopt, 3-D animation, Jupyter):
-
 ```bash
-git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda env create -f environment.yml && conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+pip install "minilink[full]"    # or: pip install minilink, NumPy only
 ```
 
-**Colab**: open any notebook with "Open in Colab", or start yours with
-`!git clone https://github.com/alx87grd/minilink` and `import sys; sys.path.insert(0, "/content/minilink")`.
-
-*Optional system dependencies:* `plot_diagram()` requires Graphviz ([download](https://graphviz.org/download/), then `pip install graphviz`); the Ipopt solver is `conda install -c conda-forge cyipopt` (trajectory optimization runs on SciPy without it).
+Or everything in conda: `conda env create -f environment.yml` in a clone.
 
 ## 1. Block diagrams as code
 
@@ -59,23 +48,13 @@ diagram.plot_diagram()
 
 ![closed-loop diagram](./docs/_static/diagram_closed_loop.png)
 
-Code is the single source of truth:
-
-- **Algebraic shortcuts:** `ctrl @ plant` (feedback loop, with the error $e = r - y$ the PID reads), `a >> b` (series), `a + b` (side by side), `sys % Δ` (zero-order hold digital clock sampling).
-- **Explicit wiring:** `diag.connect("controller", "u", "plant", "u")` connects arbitrary multi-loop networks with immediate port checks.
-- **Closed loops are systems:** `diagram.compute_trajectory()`, `diagram.transfer_function()`, `diagram.plot_bode()`: every tool works identically on a closed loop.
-
 ## 2. One equation, many tools
 
-A physical model is defined by three pure mathematical mappings:
+A model is three pure functions:
 
-$$\dot{x} = f(x, u, t; p) \quad \text{(dynamics)}$$
-$$y = h(x, u, t; p) \quad \text{(outputs, default } y = x\text{)}$$
-$$T = \mathrm{tf}(x, u, t; p) \quad \text{(body poses for 3D animation)}$$
+$$\dot{x} = f(x, u, t; p), \qquad y = h(x, u, t; p), \qquad T = \mathrm{tf}(x, u, t; p)$$
 
-**Functional purity** means equations are stateless: arrays in, arrays out. No simulation time or state is mutated on `self`.
-This purity allows precise numerical integration, reproducible experiments, exact linear analysis, arbitrary composition into nested systems, parallel GPU rollouts, and automatic differentiation.
-The tools below read the whole state, so the plant is the catalog `Pendulum`, which measures it, and the same pendulum goes from a Bode plot to a neural policy, one line each:
+dynamics, outputs and body poses. Stateless, arrays in and arrays out, so every tool can integrate, linearize, batch and differentiate them:
 
 ```python
 import numpy as np
