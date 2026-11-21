@@ -18,7 +18,7 @@
   <tr>
 <td width="25%" align="center" valign="top">Cart-pole swing-up, trajectory optimization</td>
 <td width="25%" align="center" valign="top">UR5 arm, task-space impedance control<br/><a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a></td>
-<td width="25%" align="center" valign="top"><a href="#3-one-problem-every-planner-one-score">Racecar, model predictive control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
+<td width="25%" align="center" valign="top"><a href="#3-one-problem-every-planner-one-evaluation">Racecar, model predictive control</a><br/><a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a></td>
 <td width="25%" align="center" valign="top">Rocket landing, reinforcement learning</td>
   </tr>
 </table>
@@ -48,6 +48,28 @@ diagram.plot_diagram()
 
 ![closed-loop diagram](./docs/_static/diagram_closed_loop.png)
 
+**Custom block:** just define `f` and `h`.
+
+```python
+import numpy as np
+from minilink import DynamicSystem
+
+
+class MyPendulum(DynamicSystem):
+    def __init__(self):
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
+
+    def f(self, x, u, t=0, params=None):
+        theta, dtheta = x
+        return np.array([dtheta, u[0] - 9.81 * np.sin(theta)])
+
+    def h(self, x, u, t=0, params=None):
+        return x[:1]
+
+
+diagram = pid @ MyPendulum()
+```
+
 ## 2. One equation, many tools
 
 A model is three pure functions:
@@ -59,11 +81,11 @@ dynamics, outputs and body poses. Stateless, arrays in and arrays out, so every 
 ```python
 import numpy as np
 from minilink import (
-    BallSet, Pendulum, PlanningProblem, QuadraticCost, Uniform,
+    BallSet, Pendulum, PlanningProblem, QuadraticCost,
     ReinforcementLearningPlanner, TrajectoryOptimizationPlanner,
 )
 
-plant = Pendulum()
+plant = Pendulum()  # measures its full state
 up = np.array([np.pi, 0.0])
 plant.plot_bode()
 
@@ -79,23 +101,19 @@ swing_up = PlanningProblem(
 )
 opt = TrajectoryOptimizationPlanner(swing_up, n_steps=60).solve(live_plot=True)
 
-start = Uniform([np.pi - 0.5, -1.0], [np.pi + 0.5, 1.0])
-balance = PlanningProblem(plant, x0=start, cost=cost, horizon=5.0, U=plant.input_box)
-ppo = ReinforcementLearningPlanner(balance, dt=0.05)
+ppo = ReinforcementLearningPlanner(swing_up, dt=0.05, gamma=0.99)
 ppo.solve(n_timesteps=100_000)
 ppo.plot_learning_curve()
 ```
 
 ![Frequency response, trajectory optimization and reinforcement learning on one pendulum](./docs/_static/tool_breadth.png)
 
-The same plant takes `lqr`, `kalman`, value iteration, RRT, MPC, and the rest: each is one more line.
+## 3. One problem, every planner, one evaluation
 
-## 3. One problem, every planner, one score
-
-The identical problem definition is handed to completely different solver paradigms, and every planner returns a `PlanningSolution` whose controller is itself a `System`: a feedback law closes the loop via `controller @ plant`, an open-loop plan drives it via `controller >> plant`. `compare` scores every controller on the same problem: the same model, cost, sets, and draws. Here the swing-up of section 2, with the pendulum's mass uncertain by ±20 %:
+Every planner takes the same problem and returns a controller that is itself a `System`. `compare` evaluates them on the same draws, here with the mass uncertain by ±20 %:
 
 ```python
-from minilink import DynamicProgrammingPlanner, RRTPlanner, compare
+from minilink import DynamicProgrammingPlanner, RRTPlanner, Uniform, compare
 from minilink.control import ModelPredictiveController
 
 vi_planner = DynamicProgrammingPlanner(swing_up, x_grid=(101, 101), u_grid=(11,), dt=0.05)
@@ -114,15 +132,11 @@ comparison.plot_simulated_trajectory()
 
 ![The angular rate of each controller's twenty runs](./docs/_static/comparison_runs.png)
 
-The two open-loop plans reach the goal on the nominal model and miss it when the mass changes (0 of 20 draws); the two feedback laws reach it on most draws (value iteration 20 of 20, MPC 17 of 20).
+The open-loop plans miss the goal once the mass changes (0 of 20); the feedback laws reach it (value iteration 20 of 20, MPC 17 of 20).
 
-## 4. From score to controller
+## 4. From evaluation to controller
 
-All transcriptions lower late to a single, canonical mathematical program:
-
-$$\min_z J(z; p) \quad \text{s.t.} \quad g(z; p) \ge 0, \quad h(z; p) = 0$$
-
-The score of section 3 is such a $J$: a function of every parameter in the diagram, the controller's gains and the plant's numbers alike, named by its path (`"controller.Kp"`, `"plant.m"`). The exact same equation traces under JAX without rewriting physics, so its gradient runs through the whole simulation, and the `Optimizer` tunes the controller on it. Here an impedance law brings the pendulum to rest over the uncertain mass:
+The expected cost is a differentiable function of every parameter in the loop, named by its path, so an `Optimizer` tunes a controller on its gradient. Here an impedance law brings the pendulum to rest under the uncertain mass:
 
 ```python
 import jax
@@ -133,43 +147,32 @@ rest = PlanningProblem(plant, x0=[2.0, 0.0], horizon=5.0, cost=rest_cost)
 task = rest.replace(distributions={"plant": {"m": mass}})
 evaluator = task.compile(Impedance(Kp=1.0, Kd=1.0), backend="jax")
 
-score = lambda params: evaluator.evaluate(params, n_trials=20).objective
-gradient = jax.grad(score)(evaluator.params)
+expected_cost = lambda params: evaluator.evaluate(params, n_trials=20).objective
+gradient = jax.grad(expected_cost)(evaluator.params)  # through the whole simulation
 
 gains = ["controller.Kp", "controller.Kd"]
 bounds = {"controller.Kp": (0.0, 50.0), "controller.Kd": (0.0, 20.0)}
 program = evaluator.program(gains, bounds=bounds, n_trials=20)
-best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54: the score falls from 19.3 to 11.0
+best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54; expected cost 19.3 → 11.0
 ```
-
-- **Pluggable solvers:** `method=` picks one: `l-bfgs`, `slsqp`, `trust-constr` (SciPy), `gd`, `adam` (first-order), `ipopt`.
-- **Opt-in acceleration:** pure NumPy remains the default classroom engine; JAX is activated with a single flag (`backend="jax"`), and batches 1,000 rollouts in 0.4 s on a cloud CPU against about 50 s in a NumPy loop.
 
 ## The Minilink backbone
 
-Three mathematical foundations hold the framework together:
-1. **The model (`System`):** continuous differential equations $\dot{x} = f(x, u, t; p)$ and observations $y = h(x, u, t; p)$.
-2. **The task (`PlanningProblem`):** the model paired with boundary sets $\mathcal{X}, \mathcal{U}, \mathcal{X}_f$, cost $J$, and time horizon $t_f$.
-3. **The solver boundary (`MathematicalProgram` & `Optimizer`):** a standard nonlinear program $\min_z J(z)$ s.t. $g(z) \ge 0,\ h(z) = 0$ connecting problems to plug-and-play numerical solvers.
-
-One differentiable path connects modeling, analytical control, trajectory optimization, and learning:
+Three objects hold it together: the model (`System`), the task (`PlanningProblem`) and the solver (`MathematicalProgram` and `Optimizer`).
 
 ![The Minilink Backbone](./docs/_static/pipeline_map.png)
 
-*Full pipeline reference: [docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).*
-
 ## What Minilink is not
 
-1. **Not a heavy multibody contact engine:** for complex contact or high-DoF meshes, wrap an external multibody simulator as a `System` leaf.
-2. **Not a sparse NLP modeling language:** Minilink programs and solvers do not exploit sparse Jacobian structure.
-3. **Continuous time is primary:** dynamics $f$ represent instantaneous rates ($\dot{x} = dx/dt$), not discrete next-step maps; a clock is applied from outside with `%`.
+- Not a multibody contact engine: wrap one as a `System` leaf.
+- Not a sparse NLP modeling language.
+- Continuous time first: `f` is a rate, and `%` puts a block on a clock.
 
-## Learn more and tutorials
+## Learn more
 
-- [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb): this page run end to end, with the plots and animations; about a minute to run.
-- [Tutorials](https://github.com/alx87grd/minilink/tree/main/examples/tutorial): three layers: `basics/` (model, connect, simulate; start with `01_minilink`), `core/` (the foundation objects and the problem pipeline), `advanced/` (discrete and hybrid loops, optimal control, MPC, RL, differentiable loops).
-- [Teaching notebooks](https://github.com/alx87grd/teaching): course and topic notebooks in their own repository: control, dynamic programming, LQR, MPC, reinforcement learning.
-- **Interactive play and 3-D:** `plant.game()` drives plants with keyboard or gamepad; `animate(traj, renderer="meshcat")` plays a trajectory in an interactive 3-D viewer ([UR-5 impedance control](https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html) • [racecar MPC](https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html)).
-- [Interactive pitch deck](https://alx87grd.github.io/minilink/presentation.html) · [API reference](https://alx87grd.github.io/minilink/).
+- [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb): this page with its plots and animations.
+- [Tutorials](https://github.com/alx87grd/minilink/tree/main/examples/tutorial): `basics/`, `core/`, `advanced/`.
+- [Teaching notebooks](https://github.com/alx87grd/teaching): control, dynamic programming, LQR, MPC, reinforcement learning.
+- [Pitch deck](https://alx87grd.github.io/minilink/presentation.html) · [API reference](https://alx87grd.github.io/minilink/) · [Pipelines](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md)
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).

@@ -122,16 +122,9 @@ def breadth_strip() -> None:
     """The README's one equation, many tools: the frequency response, trajectory optimization, PPO."""
     import matplotlib.pyplot as plt
 
-    from minilink import (
-        Pendulum,
-        PlanningProblem,
-        QuadraticCost,
-        ReinforcementLearningPlanner,
-        Uniform,
-    )
+    from minilink import Pendulum, ReinforcementLearningPlanner
 
     plant = Pendulum()
-    up = np.array([np.pi, 0.0])
 
     # G(jω) = C (jωI − A)⁻¹ B about the hanging rest, the angle per torque
     A = plant.jacobian("f", "x", np.zeros(2))
@@ -142,12 +135,8 @@ def breadth_strip() -> None:
 
     guess, history = swing_up_iterates()
 
-    start = Uniform([np.pi - 0.5, -1.0], [np.pi + 0.5, 1.0])
-    cost = QuadraticCost.from_system(plant, x_bar=up)
-    balance = PlanningProblem(
-        plant, x0=start, cost=cost, horizon=5.0, U=plant.input_box
-    )
-    learner = ReinforcementLearningPlanner(balance, dt=0.05)
+    _, swing_up = readme_problem()
+    learner = ReinforcementLearningPlanner(swing_up, dt=0.05, gamma=0.99)
     learner.solve(n_timesteps=100_000)
     steps = np.array([h["n_timesteps"] for h in learner.history]) / 1e3
     returns = np.array([h["ep_return_mean"] for h in learner.history])
