@@ -69,7 +69,7 @@ diagram.plot_diagram()
 
 ## 2. Analysis
 
-The classical tools, on a catalog pendulum and its LQR:
+The classical tools, on a catalog pendulum and its LQR, down to its Lyapunov region of attraction $V(x) = (x - \bar{x})^\top P (x - \bar{x}) \le c$:
 
 ```python
 from minilink import Pendulum, lqr
@@ -92,7 +92,9 @@ plot_region_of_attraction(balance, region)
 
 ## 3. The planning pipeline
 
-The task, described once: the plant, the cost, the start, the goal, the limits and the horizon.
+The task, described once: the plant, the start, the goal, the limits, the horizon $t_f$ and the cost
+
+$$J = \int_0^{t_f} \left(\tilde{x}^\top Q\, \tilde{x} + u^\top R\, u\right) dt + \tilde{x}(t_f)^\top S\, \tilde{x}(t_f), \qquad \tilde{x} = x - x_{\text{up}}.$$
 
 ```python
 from minilink import BallSet, PlanningProblem, QuadraticCost
@@ -128,7 +130,7 @@ mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax
 mpc = ModelPredictiveController(mpc_planner) % 0.1
 ```
 
-`compare` evaluates the controllers on the problem's stochastic version: the mass uncertain by ±20 %, the same 20 draws for each.
+`compare` evaluates the controllers on the problem's stochastic version, $\mathbb{E}_m[J]$ with the mass $m \sim \mathcal{U}(0.8, 1.2)$, the same 20 draws for each.
 
 ```python
 from minilink import Uniform, compare
@@ -144,7 +146,7 @@ The open-loop plans miss the goal once the mass changes (0 of 20); the feedback 
 
 ## 4. From evaluation to controller
 
-A controller in its loop, compiled: the expected cost is a function of every parameter, with its gradient through the whole simulation.
+A controller in its loop, compiled: the expected cost $\mathbb{E}_m[J(p)]$ is a function of every parameter $p$ of the loop, and $\nabla_p\, \mathbb{E}_m[J]$ runs through the whole simulation.
 
 ```python
 import jax
@@ -159,7 +161,7 @@ expected_cost = lambda params: evaluator.evaluate(params, n_trials=20).objective
 gradient = jax.grad(expected_cost)(evaluator.params)
 ```
 
-The gains, named by their paths, become a program; an `Optimizer` tunes them.
+The gains, named by their paths, become a program, $\min_{K_p, K_d} \mathbb{E}_m[J]$ within their bounds; an `Optimizer` solves it.
 
 ```python
 from minilink import Optimizer
