@@ -133,7 +133,7 @@ comparison = compare(uncertain, VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=2
 comparison.plot_simulated_trajectory()
 ```
 
-![The twenty runs of each controller](./docs/_static/comparison_runs.png)
+![The angular rate of each controller's twenty runs](./docs/_static/comparison_runs.png)
 
 The two open-loop plans reach the goal on the nominal model and miss it when the mass changes (0 of 20 draws); the two feedback laws reach it on most draws (value iteration 20 of 20, MPC 17 of 20).
 

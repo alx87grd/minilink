@@ -319,9 +319,35 @@ def comparison_runs() -> None:
     mass = Uniform(0.8, 1.2)
     uncertain = problem.replace(distributions={"plant": {"m": mass}})
     comparison = compare(uncertain, n_trials=20, **answers)
-    comparison.plot_simulated_trajectory(show=False).save(
-        STATIC / "comparison_runs.png"
+    result = comparison.plot_simulated_trajectory(show=False)
+
+    # The angular rate's row alone: the plans' runs fan out, the feedback laws' stay together
+    fig = result.figure
+    angle, rate, torque = fig.axes[:3]
+    for ax in (angle, torque):
+        fig.delaxes(ax)
+    for legend in list(fig.legends):
+        legend.remove()
+    rate.set_xlabel("Time [s]")
+    rate.tick_params(labelbottom=True)
+    fig.set_size_inches(9.0, 3.0)
+    rate.set_position([0.08, 0.18, 0.74, 0.76])
+
+    # One legend entry per answer, in the colour its runs are drawn with
+    handles, labels = rate.get_legend_handles_labels()
+    entries = dict(zip(labels, handles))
+    legend = rate.legend(
+        entries.values(),
+        entries.keys(),
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        frameon=False,
+        fontsize=9,
     )
+    for handle in legend.legend_handles:
+        handle.set_alpha(1.0)
+        handle.set_linewidth(2.0)
+    fig.savefig(STATIC / "comparison_runs.png", dpi=130)
     print("comparison_runs.png")
 
 
