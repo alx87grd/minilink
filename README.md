@@ -143,7 +143,9 @@ mpc_planner = TrajectoryOptimizationPlanner(look_ahead, n_steps=20, backend="jax
 mpc = ModelPredictiveController(mpc_planner) % 0.1
 ```
 
-`compare` evaluates the controllers on the problem's stochastic version, $\mathbb{E}_m[J]$ with the mass $m \sim \mathcal{U}(0.8, 1.2)$, the same 20 draws for each.
+`compare` evaluates the controllers on the problem's stochastic version, the same 20 draws of the mass for each:
+
+$$\mathbb{E}_{m}\big[J\big], \qquad m \sim \mathcal{U}(0.8,\ 1.2)$$
 
 ```python
 from minilink import Uniform, compare
@@ -194,6 +196,10 @@ bounds = {"controller.Kp": (0.0, 50.0), "controller.Kd": (0.0, 20.0)}
 program = evaluator.program(gains, bounds=bounds, n_trials=20)
 best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54; expected cost 19.3 → 11.0
 ```
+
+This program is a `MathematicalProgram`, the one shape every transcription lowers to (trajectory optimization's collocation, a tuning task like this one, a policy search) and every `Optimizer` method solves (`l-bfgs`, `slsqp`, `trust-constr`, `ipopt`, `gd`, `adam`):
+
+$$\min_{z} \ J(z; p) \quad \text{s.t.} \quad h(z; p) = 0, \quad g(z; p) \ge 0, \quad z_{\text{lower}} \le z \le z_{\text{upper}}$$
 
 ## The Minilink backbone
 
