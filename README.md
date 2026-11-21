@@ -79,9 +79,9 @@ diagram.plot_diagram()
 
 ![closed-loop diagram](./docs/_static/diagram_closed_loop.png)
 
-## 2. Analysis
+## 2. Simulation, design and analysis from the same code
 
-The classical tools on a catalog pendulum: its frequency response, the root locus of $u = -k\,(\theta - \pi)$ at the upright, a simulation.
+Exemple with a pendulum, its frequency response, the root locus of $u = -k\,(\theta - \pi)$ at the upright, and a simulation.
 
 ```python
 from minilink import Pendulum
@@ -95,7 +95,7 @@ plant.compute_trajectory(tf=6.0, x0=[2.0, 0.0])
 plant.plot_trajectory()
 ```
 
-An LQR balances it at the upright, and its Lyapunov function bounds a region of attraction, $V(x) = (x - \bar{x})^\top P (x - \bar{x}) \le c$.
+Here a LQR design a controller that balances it at the upright, and its Lyapunov function bounds a region of attraction, $V(x) = (x - \bar{x})^\top P (x - \bar{x}) \le c$.
 
 ```python
 from minilink import lqr
@@ -105,6 +105,8 @@ balance = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=up) @ plant
 region = region_of_attraction(balance, x_bar=up)
 plot_region_of_attraction(balance, region)
 ```
+
+Each tool either work directly on the non-linear `f` or linearize it around a nominal point for linear analysis tools.
 
 ![Frequency response, root locus, simulation and Lyapunov region of attraction](./docs/_static/tool_analysis.png)
 
