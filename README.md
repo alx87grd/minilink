@@ -69,11 +69,10 @@ diagram.plot_diagram()
 
 ## 2. Analysis
 
-The classical tools, on a catalog pendulum and its LQR, down to its Lyapunov region of attraction $V(x) = (x - \bar{x})^\top P (x - \bar{x}) \le c$:
+The classical tools on a catalog pendulum: its frequency response, the root locus of $u = -k\,\theta$ at the upright, a simulation.
 
 ```python
-from minilink import Pendulum, lqr
-from minilink.analysis import plot_region_of_attraction, region_of_attraction
+from minilink import Pendulum
 
 plant = Pendulum()
 up = np.array([np.pi, 0.0])
@@ -82,6 +81,13 @@ plant.plot_bode()
 plant.plot_root_locus(x_bar=up)
 plant.compute_trajectory(tf=6.0, x0=[2.0, 0.0])
 plant.plot_trajectory()
+```
+
+An LQR balances it at the upright, and its Lyapunov function bounds a region of attraction, $V(x) = (x - \bar{x})^\top P (x - \bar{x}) \le c$.
+
+```python
+from minilink import lqr
+from minilink.analysis import plot_region_of_attraction, region_of_attraction
 
 balance = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=up) @ plant
 region = region_of_attraction(balance, x_bar=up)
@@ -92,7 +98,9 @@ plot_region_of_attraction(balance, region)
 
 ## 3. The planning pipeline
 
-The task, described once: the plant, the start, the goal, the limits, the horizon $t_f$ and the cost
+The task, described once: the plant, its sets and its cost over the horizon $t_f$,
+
+$$x(0) = x_0, \qquad x(t) \in \mathcal{X}, \qquad u(t) \in \mathcal{U}, \qquad x(t_f) \in \mathcal{X}_f = \{x : \lVert x - x_{\text{up}} \rVert \le 0.2\},$$
 
 $$J = \int_0^{t_f} \left(\tilde{x}^\top Q\, \tilde{x} + u^\top R\, u\right) dt + \tilde{x}(t_f)^\top S\, \tilde{x}(t_f), \qquad \tilde{x} = x - x_{\text{up}}.$$
 
