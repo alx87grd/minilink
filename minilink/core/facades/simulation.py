@@ -248,6 +248,94 @@ class DynamicSimulation:
 
         return traj
 
+    def rollout_batch(
+        self,
+        x0,
+        tf=None,
+        u=None,
+        *,
+        t0=0.0,
+        dt=None,
+        n_steps=None,
+        params=None,
+        solver="rk4",
+        backend="auto",
+    ):
+        """
+        Roll out a batch of trajectories from initial states ``x0`` (shape ``(B, n)``).
+
+        Uses ``jax.vmap`` via :meth:`compile` when JAX is available and the
+        system traces (``backend="auto"`` or ``"jax"``), and falls back to a
+        NumPy loop when ``backend="numpy"`` or JAX is unavailable.
+
+        Parameters
+        ----------
+        x0 : array_like, shape ``(B, n)``
+            One initial state per rollout in the batch.
+        tf : float, optional
+            End time in seconds (defaults to ``10.0`` when neither ``tf``,
+            ``n_steps``, nor ``u`` is given). Mutually exclusive with
+            ``n_steps``.
+        u : array_like, optional
+            Held inputs per step: ``None`` (nominal input), ``(N, m)`` shared
+            by every member, or ``(B, N, m)`` one sequence per member.
+        t0 : float
+            Start time in seconds (default ``0.0``).
+        dt : float, optional
+            Integration step in seconds; defaults to the system's automatic
+            step (``AUTO_DT_SCALE * smallest_time_constant``).
+        n_steps : int, optional
+            Number of integration steps (mutually exclusive with ``tf``).
+        params : dict, optional
+            Parameter tree; any leaf with one more leading dimension than the
+            system's own (leading axis ``B``) is swept across the batch.
+        solver : {"rk4", "euler"}
+            Fixed-step integration formula (default ``"rk4"``).
+        backend : {"auto", "jax", "numpy"}
+            Array backend: ``"auto"`` (default) tries JAX ``vmap`` and falls
+            back to NumPy.
+
+        Returns
+        -------
+        t : np.ndarray, shape ``(N + 1,)``
+            Sample times from ``t0`` to ``t0 + N * dt``.
+        x : np.ndarray, shape ``(B, N + 1, n)``
+            Sampled states for every rollout in the batch.
+        """
+        from minilink.core.backends import BACKEND_JAX
+        from minilink.core.compile.compiler import build_on_auto
+
+        t, dt_step, steps = batch_time_grid(self, tf, t0, dt, n_steps, u)
+        chosen, ev = build_on_auto(
+            lambda b: self.compile(backend=b),
+            backend=backend,
+        )
+        if chosen == BACKEND_JAX:
+            xs = np.asarray(
+                ev.rollout_batch(
+                    x0,
+                    u,
+                    t0=t0,
+                    dt=dt_step,
+                    n_steps=steps,
+                    params=params,
+                    solver=solver,
+                )
+            )
+        else:
+            xs = numpy_rollout_batch(
+                ev,
+                x0,
+                u,
+                t0=t0,
+                dt=dt_step,
+                n_steps=steps,
+                params=params,
+                solver=solver,
+            )
+
+        return t, xs
+
 
 class StepSimulation:
     """
@@ -724,3 +812,93 @@ def plant_subsystem_layouts(plant_op, offset):
         return {}
 
     return subsystem_layouts(plant, (), offset, "plant/")
+
+
+def batch_time_grid(system, tf, t0, dt, n_steps, u):
+    """Resolve ``(t, dt, n_steps)`` for :meth:`DynamicSimulation.rollout_batch`."""
+    from minilink.core.system import automatic_step_of
+
+    if tf is not None and n_steps is not None:
+        raise ValueError("pass tf or n_steps, not both")
+
+    t0 = float(t0)
+    dt_step = automatic_step_of(system.solver_info) if dt is None else float(dt)
+    if dt_step <= 0.0:
+        raise ValueError(f"dt must be positive, got {dt_step}")
+
+    if n_steps is None:
+        if tf is None and u is not None:
+            steps = int(np.asarray(u).shape[-2])
+        else:
+            end = 10.0 if tf is None else float(tf)
+            duration = end - t0
+            if duration < 0.0:
+                raise ValueError(f"tf ({end}) must be >= t0 ({t0})")
+            steps = 0 if duration == 0.0 else max(1, int(round(duration / dt_step)))
+            if steps > 0:
+                dt_step = duration / steps
+    else:
+        steps = int(n_steps)
+        if steps < 0:
+            raise ValueError(f"n_steps must be non-negative, got {steps}")
+
+    t = np.linspace(t0, t0 + steps * dt_step, steps + 1)
+
+    return t, dt_step, steps
+
+
+def take_batch_member(params, reference, index, batch):
+    """Slice one member ``index`` out of a batched parameter tree (leaves with leading axis ``batch``)."""
+    if isinstance(params, dict):
+        return {
+            key: take_batch_member(val, reference[key], index, batch)
+            for key, val in params.items()
+        }
+    arr = np.asarray(params)
+    ref_ndim = np.ndim(reference)
+    if arr.ndim == ref_ndim + 1:
+        if arr.shape[0] != batch:
+            raise ValueError(
+                f"batched parameter leaf has leading axis {arr.shape[0]}, expected {batch}"
+            )
+        return arr[index]
+
+    return params
+
+
+def numpy_rollout_batch(ev, x0s, u_sequences, *, t0, dt, n_steps, params, solver):
+    """NumPy fallback for :meth:`DynamicSimulation.rollout_batch`: one rollout per batch member."""
+    x0s = np.asarray(x0s, dtype=float)
+    if x0s.ndim != 2 or x0s.shape[1] != ev.n:
+        raise ValueError(f"x0 must have shape (B, {ev.n}); got {x0s.shape}")
+    batch = int(x0s.shape[0])
+
+    if u_sequences is None:
+        u_arr = None
+        per_member_u = False
+    else:
+        u_arr = np.asarray(u_sequences, dtype=float)
+        if u_arr.ndim == 2:
+            per_member_u = False
+        elif u_arr.ndim == 3 and u_arr.shape[0] == batch:
+            per_member_u = True
+        else:
+            raise ValueError(
+                f"u must have shape (N, {ev.m}) or ({batch}, N, {ev.m}); got {u_arr.shape}"
+            )
+        if u_arr.shape[-2] != n_steps:
+            raise ValueError("n_steps disagrees with u")
+
+    runs = []
+    for i in range(batch):
+        u_i = u_arr[i] if per_member_u else u_arr
+        p_i = (
+            None
+            if params is None
+            else take_batch_member(params, ev._frozen_params, i, batch)
+        )
+        runs.append(
+            ev.rollout(x0s[i], u_i, t0, dt, p_i, solver=solver, n_steps=n_steps)
+        )
+
+    return np.stack(runs, axis=0)

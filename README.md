@@ -30,7 +30,8 @@ All core equation paths are pure functions—arrays in, arrays out—allowing th
 ## Install
 
 ```bash
-pip install "minilink[full]"
+pip install minilink          # core: NumPy, SciPy, Matplotlib
+pip install "minilink[full]"  # + JAX, Plotly, Meshcat, Pygame, SymPy, Gymnasium
 ```
 
 Conda is recommended to also install binaries for Graphviz and Ipopt.
@@ -106,7 +107,7 @@ region = region_of_attraction(balance, x_bar=up)
 plot_region_of_attraction(balance, region)
 ```
 
-Each tool either works directly on the non-linear `f` or linearize it around a nominal point for linear analysis tools.
+Each tool either works directly on the nonlinear `f` or linearizes it around a nominal point.
 
 ![Frequency response, root locus, simulation and Lyapunov region of attraction](./docs/_static/tool_analysis.png)
 
@@ -114,9 +115,9 @@ Each tool either works directly on the non-linear `f` or linearize it around a n
 
 All planning tools (LQR, MPC, VI, RRT, RL) work from a unified task description: the plant, constraint sets and a cost function over the horizon $t_f$,
 
-$$x(0) = x_0, \qquad x(t) \in \mathcal{X}, \qquad u(t) \in \mathcal{U}, \qquad x(t_f) \in \mathcal{X}_f = \lbrace x : \lVert x - \bar{x} \rVert \le 0.2 \rbrace,$$
+$$J = \int_0^{t_f} g(x, u, t)\, dt + h\big(x(t_f), t_f\big)$$
 
-$$J = \int_0^{t_f} \left(\tilde{x}^\top Q\, \tilde{x} + u^\top R\, u\right) dt + \tilde{x}(t_f)^\top S\, \tilde{x}(t_f), \qquad \tilde{x} = x - \bar{x}.$$
+$$\dot{x} = f(x, u, t), \qquad x(0) = x_0, \qquad x(t) \in \mathcal{X}, \qquad u(t) \in \mathcal{U}, \qquad x(t_f) \in \mathcal{X}_f$$
 
 ```python
 from minilink import BallSet, PlanningProblem, QuadraticCost
@@ -133,7 +134,7 @@ swing_up = PlanningProblem(
 )
 ```
 
-Every planner returns a controller block, also a `System` that can be included in a block diagram.
+Every planner returns a `PlanningSolution` whose `.controller` is a `System` block ready to drop into a block diagram.
 
 ```python
 from minilink import (
@@ -160,9 +161,9 @@ mpc = ModelPredictiveController(mpc_planner) % 0.1
 ```
 
 The task description can be stochastic, with parameters drawn from a distribution.
-`compare` is a method to evaluate multiple controllers on the same task; if the problem is stochastic, multiple simulations are run in parallel using vmap.
+`compare` evaluates multiple controllers on the same task; if the problem is stochastic, the trials run in parallel with JAX (`jax.vmap`).
 
-$$\mathbb{E}_{m}\big[J\big], \qquad m \sim \mathcal{U}(0.8,\ 1.2)$$
+$$\mathbb{E}_{p \sim \mathcal{P}}\big[J(p)\big]$$
 
 ```python
 from minilink import Uniform, compare
@@ -174,15 +175,15 @@ comparison.plot_simulated_trajectory()
 
 ![Trajectory optimization, reinforcement learning and the Monte Carlo evaluation](./docs/_static/tool_planning.png)
 
-## 4. Optimization with respect to any parameters
+## 4. Optimization with respect to any parameter
 
-The evaluation of a controller on a task is a function of the parameters of the task and the controller, $J(p)$, which can be optimized with respect to any parameters in the tree. For example, the closed loop, an impedance law bringing the pendulum to rest from $\theta = 2$ rad:
+Evaluating a controller on a task defines a function $J(p)$ of the whole parameter tree—plant, controller, and cost—that can be differentiated through the simulation. For example, an impedance law bringing the pendulum to rest under an uncertain mass $m$:
 
 $$\dot{x} = f(x, u, t; p), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}$$
 
 $$J(p) = \int_0^{t_f} \left(x^\top Q\, x + u^\top R\, u\right) dt$$
 
-where $p$ is the loop's whole parameter tree (the controller's gains, every number of the plant and the cost), and its mass leaf $m \sim \mathcal{U}(0.8,\ 1.2)$ is drawn from a uniform distribution. The evaluation method gives the expected cost and its gradient with respect to every leaf of the tree, through the whole simulation:
+With `backend="jax"`, the evaluator gives the expected cost and its gradient with respect to every parameter in the tree:
 
 $$\mathbb{E}_m\big[J(p)\big], \qquad \nabla_p\, \mathbb{E}_m\big[J(p)\big]$$
 
@@ -204,7 +205,7 @@ gradient = jax.grad(expected_cost)(evaluator.params)
 
 The gains, named by their paths in the tree, become the decision variables $z = (K_p, K_d)$ of a program; an `Optimizer` solves it:
 
-$$\min_{z = (K_p,\, K_d)} \ \mathbb{E}_m\big[J(z; p)\big] \quad \text{s.t.} \quad 0 \le K_p \le 50, \quad 0 \le K_d \le 20$$
+$$\min_{z = (K_p,\, K_d)} \ \mathbb{E}_m\big[J(z; p)\big] \quad \text{s.t.} \quad z_{\text{lower}} \le z \le z_{\text{upper}}$$
 
 ```python
 from minilink import Optimizer
@@ -215,13 +216,13 @@ program = evaluator.program(gains, bounds=bounds, n_trials=20)
 best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54; expected cost 19.3 → 11.0
 ```
 
-This program is a `MathematicalProgram`, the one shape every transcription lowers to (collocation, a tuning task, a policy search); the `Optimizer` solves it by the method it names (`l-bfgs`, `gd`, `adam`; with constraints, `slsqp`, `trust-constr` or `ipopt`):
+This program is a `MathematicalProgram`, the one shape every transcription lowers to (collocation, a tuning task, a policy search); the `Optimizer` solves it with the chosen method (`l-bfgs`, `gd`, `adam`; with constraints, `slsqp`, `trust-constr`, or `ipopt`):
 
 $$\min_{z} \ J(z; p) \quad \text{s.t.} \quad h(z; p) = 0, \quad g(z; p) \ge 0, \quad z_{\text{lower}} \le z \le z_{\text{upper}}$$
 
 ## 5. Compiled, differentiated, batched
 
-With `backend="jax"`, the same `f` compiles to an evaluator of pure JAX functions: `jax.jit`, `jax.grad` and `jax.vmap` apply to them, and the tools above use them inside (the gradient of section 4, its 20 draws of the mass run as one batch). A thousand pendulums, released from a thousand angles, in one call:
+With `backend="jax"`, catalog plants—and any custom `f` written with `array_module(x, u)`—compile to pure JAX functions: `jax.jit`, `jax.grad`, and `jax.vmap` apply directly, and the tools above use them under the hood. A thousand pendulums, released from a thousand angles, in one call:
 
 ```python
 evaluator = plant.compile(backend="jax")

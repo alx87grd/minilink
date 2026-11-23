@@ -618,6 +618,108 @@ class PlanningProblem:
 
         return failure_cost
 
+    def evaluate(
+        self,
+        controller,
+        dt=None,
+        *,
+        solver="rk4",
+        substeps=None,
+        n_trials=None,
+        key=0,
+        trajectories=False,
+        backend="auto",
+        episode_length=None,
+    ):
+        """
+        Score ``controller`` on this problem: delegates to :func:`~minilink.planning.evaluator.evaluate`.
+        """
+        # Lazy import: the evaluator imports this module
+        from minilink.planning.evaluator import evaluate as evaluate_problem
+
+        return evaluate_problem(
+            self,
+            controller,
+            dt,
+            solver=solver,
+            substeps=substeps,
+            n_trials=n_trials,
+            key=key,
+            trajectories=trajectories,
+            backend=backend,
+            episode_length=episode_length,
+        )
+
+    def compare(
+        self,
+        *args,
+        dt=None,
+        n_trials=None,
+        key=0,
+        solver="rk4",
+        substeps=None,
+        backend="auto",
+        episode_length=None,
+        **entries,
+    ):
+        """
+        Score and compare several controllers on this problem: delegates to :func:`~minilink.planning.comparison.compare`.
+        """
+        # Lazy import: the comparison module imports this module
+        from minilink.planning.comparison import compare as compare_problem
+
+        return compare_problem(
+            self,
+            *args,
+            dt=dt,
+            n_trials=n_trials,
+            key=key,
+            solver=solver,
+            substeps=substeps,
+            backend=backend,
+            episode_length=episode_length,
+            **entries,
+        )
+
+    def program(
+        self,
+        controller,
+        wrt,
+        *,
+        bounds=None,
+        n_trials=None,
+        key=0,
+        dt=None,
+        solver="rk4",
+        substeps=None,
+        backend="auto",
+        episode_length=None,
+        params=None,
+    ):
+        """
+        Export the parameter-optimization :class:`~minilink.optimization.mathematical_program.MathematicalProgram` over ``wrt``.
+
+        Delegates to ``self.compile(controller, ...).program(wrt, ...)`` so the
+        loop is compiled, evaluated over the problem's draws, and lowered to an
+        NLP in one call.
+        """
+        pe = self.compile(
+            controller,
+            dt,
+            solver=solver,
+            substeps=substeps,
+            backend=backend,
+            episode_length=episode_length,
+        )
+
+        return pe.program(
+            wrt,
+            bounds=bounds,
+            key=key,
+            n_trials=n_trials,
+            params=params,
+        )
+
     def compile(
         self,
         controller,

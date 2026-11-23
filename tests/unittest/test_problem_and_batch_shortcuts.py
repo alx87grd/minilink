@@ -1,0 +1,188 @@
+"""Contract tests for PlanningProblem shortcuts (evaluate, compare, program) and DynamicSystem.rollout_batch."""
+
+from __future__ import annotations
+
+import inspect
+from importlib.util import find_spec
+
+import numpy as np
+import pytest
+
+from minilink import (
+    Impedance,
+    Optimizer,
+    Pendulum,
+    PlanningProblem,
+    QuadraticCost,
+    Uniform,
+    compare,
+    evaluate,
+)
+
+JAX_AVAILABLE = find_spec("jax") is not None
+
+
+class TestPlanningProblemShortcuts:
+    """PlanningProblem.evaluate, .compare, and .program match their standalone/evaluator twins."""
+
+    def test_evaluate_signature_matches_standalone(self):
+        fn_params = list(inspect.signature(evaluate).parameters.values())[1:]
+        method_params = list(
+            inspect.signature(PlanningProblem.evaluate).parameters.values()
+        )[1:]
+        assert [p.name for p in method_params] == [p.name for p in fn_params]
+        assert [p.default for p in method_params] == [p.default for p in fn_params]
+
+    def test_evaluate_matches_standalone_result(self):
+        plant = Pendulum()
+        cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
+        problem = PlanningProblem(plant, x0=[1.0, 0.0], horizon=2.0, cost=cost)
+        ctrl = Impedance(Kp=5.0, Kd=2.0)
+
+        via_method = problem.evaluate(ctrl, dt=0.05, backend="numpy")
+        via_fn = evaluate(problem, ctrl, dt=0.05, backend="numpy")
+
+        assert np.isclose(via_method.objective, via_fn.objective)
+        assert np.allclose(via_method.J, via_fn.J)
+
+    def test_compare_matches_standalone(self):
+        plant = Pendulum()
+        cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
+        problem = PlanningProblem(
+            plant,
+            x0=[1.0, 0.0],
+            horizon=2.0,
+            cost=cost,
+            distributions={"plant": {"m": Uniform(0.9, 1.1)}},
+        )
+        soft = Impedance(Kp=2.0, Kd=1.0)
+        stiff = Impedance(Kp=10.0, Kd=3.0)
+
+        via_method = problem.compare(
+            Soft=soft, Stiff=stiff, dt=0.05, n_trials=4, backend="numpy"
+        )
+        via_fn = compare(
+            problem, Soft=soft, Stiff=stiff, dt=0.05, n_trials=4, backend="numpy"
+        )
+
+        assert list(via_method.evaluations) == list(via_fn.evaluations)
+        for name in via_fn.evaluations:
+            assert np.isclose(
+                via_method.evaluations[name].objective,
+                via_fn.evaluations[name].objective,
+            )
+
+    def test_program_matches_compiled_evaluator_and_solves(self):
+        plant = Pendulum()
+        cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
+        problem = PlanningProblem(plant, x0=[1.0, 0.0], horizon=2.0, cost=cost)
+        ctrl = Impedance(Kp=1.0, Kd=1.0)
+        wrt = ["controller.Kp", "controller.Kd"]
+        bounds = {"controller.Kp": (0.0, 30.0), "controller.Kd": (0.0, 15.0)}
+
+        prog_method = problem.program(
+            ctrl, wrt, bounds=bounds, dt=0.05, backend="numpy"
+        )
+        prog_compiled = problem.compile(ctrl, dt=0.05, backend="numpy").program(
+            wrt, bounds=bounds
+        )
+
+        z0 = np.array([1.0, 1.0])
+        assert np.isclose(prog_method.J(z0), prog_compiled.J(z0))
+
+        best = Optimizer(prog_method, method="slsqp").solve()
+        assert best.success
+        assert best.J < prog_method.J(z0)
+
+
+class TestSystemRolloutBatch:
+    """DynamicSystem.rollout_batch works on NumPy and JAX and agrees across backends."""
+
+    def test_numpy_rollout_batch_matches_individual_rollouts(self):
+        plant = Pendulum()
+        starts = np.array([[0.5, 0.0], [1.5, 0.0], [-1.0, 0.5]])
+
+        t, xs = plant.rollout_batch(starts, tf=1.0, dt=0.05, backend="numpy")
+
+        assert t.shape == (21,)
+        assert np.isclose(t[0], 0.0)
+        assert np.isclose(t[-1], 1.0)
+        assert xs.shape == (3, 21, 2)
+
+        ev = plant.compile(backend="numpy")
+        for i, x0 in enumerate(starts):
+            single = ev.rollout(x0, None, 0.0, 0.05, n_steps=20)
+            assert np.allclose(xs[i], single)
+
+    def test_numpy_rollout_batch_with_batched_params_and_inputs(self):
+        plant = Pendulum()
+        lengths = np.array([0.5, 1.0, 2.0])
+        starts = np.tile([1.0, 0.0], (3, 1))
+        params = dict(plant.params, l=lengths)
+        u_shared = np.full((10, 1), 0.5)
+
+        t, xs = plant.rollout_batch(
+            starts,
+            u=u_shared,
+            dt=0.05,
+            n_steps=10,
+            params=params,
+            solver="euler",
+            backend="numpy",
+        )
+
+        assert t.shape == (11,)
+        assert xs.shape == (3, 11, 2)
+        # Shorter pendulum accelerates faster under gravity
+        assert abs(xs[0, -1, 0] - xs[2, -1, 0]) > 1e-2
+
+        # Per-member inputs (B, N, m)
+        u_batch = np.zeros((3, 10, 1))
+        u_batch[1, :, 0] = 2.0
+        _, xs_u = plant.rollout_batch(
+            starts, u=u_batch, dt=0.05, n_steps=10, backend="numpy"
+        )
+        assert not np.allclose(xs_u[0], xs_u[1])
+
+    def test_rollout_batch_validation(self):
+        plant = Pendulum()
+        starts = np.zeros((2, 2))
+        with pytest.raises(ValueError, match="not both"):
+            plant.rollout_batch(starts, tf=1.0, n_steps=10, dt=0.1, backend="numpy")
+        with pytest.raises(ValueError, match="positive"):
+            plant.rollout_batch(starts, tf=1.0, dt=0.0, backend="numpy")
+        with pytest.raises(ValueError, match="shape"):
+            plant.rollout_batch(np.zeros((2, 5)), tf=1.0, dt=0.1, backend="numpy")
+
+    def test_compiled_numpy_evaluator_rollout_batch_raises_type_error(self):
+        plant = Pendulum()
+        starts = np.zeros((2, 2))
+        with pytest.raises(TypeError, match="JAX evaluator"):
+            plant.compile(backend="numpy").rollout_batch(starts, n_steps=5, dt=0.01)
+
+        step_ev = plant.discretize(0.01).compile(backend="numpy")
+        with pytest.raises(TypeError, match="JAX evaluator"):
+            step_ev.rollout_batch(starts, n_steps=5)
+
+    @pytest.mark.jax
+    @pytest.mark.skipif(not JAX_AVAILABLE, reason="JAX not installed")
+    def test_jax_and_numpy_rollout_batch_agree(self):
+        plant = Pendulum()
+        starts = np.column_stack([np.linspace(-2.0, 2.0, 8), np.zeros(8)])
+        lengths = np.linspace(0.6, 1.8, 8)
+        params = dict(plant.params, l=lengths)
+
+        t_np, xs_np = plant.rollout_batch(
+            starts, tf=1.0, dt=0.02, params=params, backend="numpy"
+        )
+        t_jax, xs_jax = plant.rollout_batch(
+            starts, tf=1.0, dt=0.02, params=params, backend="jax"
+        )
+        t_auto, xs_auto = plant.rollout_batch(
+            starts, tf=1.0, dt=0.02, params=params, backend="auto"
+        )
+
+        assert np.allclose(t_np, t_jax)
+        assert np.allclose(xs_np, xs_jax, rtol=1e-12, atol=1e-12)
+        assert np.allclose(t_np, t_auto)
+        assert np.allclose(xs_np, xs_auto, rtol=1e-12, atol=1e-12)

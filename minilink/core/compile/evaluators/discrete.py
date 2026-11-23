@@ -15,6 +15,7 @@ from minilink.core.compile.evaluators.base import (
     every_subsystem,
     gather_u,
     outputs_from_ports,
+    require_jax_evaluator,
     require_jax_traceable,
     subsystems_params,
 )
@@ -83,6 +84,7 @@ class DiscreteEvaluator(Evaluator):
         more dimension than the compiled value is a family. Returns
         ``(B, N + 1, n)``.
         """
+        require_jax_evaluator(self, "rollout_batch")
         t0 = self.jnp.asarray(t0, dtype=float)
 
         return self.batched_rollout(
