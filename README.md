@@ -81,7 +81,7 @@ diagram.plot_diagram()
 
 ## 2. Simulation, design and analysis from the same code
 
-Exemple with a pendulum, its frequency response, the root locus of $u = -k\,(\theta - \pi)$ at the upright, and a simulation.
+Example with a pendulum: its frequency response, the root locus of $u = -k\,(\theta - \pi)$ at the upright, and a simulation.
 
 ```python
 from minilink import Pendulum
@@ -95,7 +95,7 @@ plant.compute_trajectory(tf=6.0, x0=[2.0, 0.0])
 plant.plot_trajectory()
 ```
 
-Here a LQR design a controller that balances it at the upright, and its Lyapunov function bounds a region of attraction, $V(x) = (x - \bar{x})^\top P (x - \bar{x}) \le c$.
+Here an LQR designs a controller that balances it at the upright, and its Lyapunov function bounds a region of attraction, $V(x) = (x - \bar{x})^\top P (x - \bar{x}) \le c$.
 
 ```python
 from minilink import lqr
@@ -106,13 +106,13 @@ region = region_of_attraction(balance, x_bar=up)
 plot_region_of_attraction(balance, region)
 ```
 
-Each tool either work directly on the non-linear `f` or linearize it around a nominal point for linear analysis tools.
+Each tool either works directly on the non-linear `f` or linearize it around a nominal point for linear analysis tools.
 
 ![Frequency response, root locus, simulation and Lyapunov region of attraction](./docs/_static/tool_analysis.png)
 
 ## 3. A unified planning pipeline, from MPC to RL
 
-All planning tools (LQR, MPC, VI, RRT, RL) work from a unified task description: the plant, contraint sets and a cost function over the horizon $t_f$,
+All planning tools (LQR, MPC, VI, RRT, RL) work from a unified task description: the plant, constraint sets and a cost function over the horizon $t_f$,
 
 $$x(0) = x_0, \qquad x(t) \in \mathcal{X}, \qquad u(t) \in \mathcal{U}, \qquad x(t_f) \in \mathcal{X}_f = \lbrace x : \lVert x - \bar{x} \rVert \le 0.2 \rbrace,$$
 
@@ -160,7 +160,7 @@ mpc = ModelPredictiveController(mpc_planner) % 0.1
 ```
 
 The task description can be stochastic, with parameters drawn from a distribution.
-`compare` is a method to evaluate multiple controllers on the same task, if the problem is stochastic, multiple simulations are run in parallel using vmap.
+`compare` is a method to evaluate multiple controllers on the same task; if the problem is stochastic, multiple simulations are run in parallel using vmap.
 
 $$\mathbb{E}_{m}\big[J\big], \qquad m \sim \mathcal{U}(0.8,\ 1.2)$$
 
@@ -176,7 +176,7 @@ comparison.plot_simulated_trajectory()
 
 ## 4. Optimization with respect to any parameters
 
-The evaluation of a controller on a task is a function of the parameters of the task and the controller, $J(p)$, which can be optimized with respect to any parameters in the tree. For exemple, the closed loop, an impedance law bringing the pendulum to rest from $\theta = 2$ rad:
+The evaluation of a controller on a task is a function of the parameters of the task and the controller, $J(p)$, which can be optimized with respect to any parameters in the tree. For example, the closed loop, an impedance law bringing the pendulum to rest from $\theta = 2$ rad:
 
 $$\dot{x} = f(x, u, t; p), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}$$
 
