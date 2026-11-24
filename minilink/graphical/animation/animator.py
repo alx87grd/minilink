@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import numpy as np
 
 from minilink.graphical.animation.camera import (
@@ -70,6 +72,9 @@ class Animator:
 
         # Memory
         self._overlay_kinematics = {}  # Each overlay's kinematic geometry, by id
+        # The kinematic geometry of the system and of every system inside it, by id:
+        # built once, the same primitives in every frame of the session
+        self._kinematics = {}
         # The auto-fit camera (``camera_scale is None``): fixed for the whole session
         # so live frames do not jitter; animations refit it over the trajectory
         self._auto_camera = None
@@ -175,7 +180,7 @@ class Animator:
         frame is presented non-blocking with no interval.
         """
         if kinematic is None:
-            kinematic = self.sys.get_kinematic_geometry()
+            kinematic = self.kinematic_geometry()
         frame = self.resolve_frame(x, u, t, kinematic=kinematic)
 
         backend.open_scene(
@@ -198,7 +203,7 @@ class Animator:
         hooks each call, so live sessions render the same visuals as playback.
         """
         if kinematic is None:
-            kinematic = self.sys.get_kinematic_geometry()
+            kinematic = self.kinematic_geometry()
         frame = self.resolve_frame(x, u, t, kinematic=kinematic)
 
         backend.draw_frame(
@@ -211,6 +216,13 @@ class Animator:
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def kinematic_geometry(self):
+        """The system's kinematic geometry, built once for the session."""
+        with held_kinematic_geometry(self.sys, self._kinematics):
+            kinematic = self.sys.get_kinematic_geometry()
+
+        return kinematic
 
     def build_frames(self, traj, schedule, *, kinematic, camera_override, overlays=()):
         """Resolve every frame of the playback schedule, the auto-fit camera refit over them all."""
@@ -252,7 +264,10 @@ class Animator:
         """Resolve one frame to a per-frame ``(primitives, transforms, camera)`` dict."""
         # The system's frames, its draw list, and its camera from the hints
         frames = ensure_world_frame(self.sys.tf(x, u, t))
-        dynamic = self.sys.get_dynamic_geometry(x, u, t)
+        # A diagram draws its subsystems' kinematic geometry through this hook:
+        # each subsystem builds its own once, not once per frame
+        with held_kinematic_geometry(self.sys, self._kinematics):
+            dynamic = self.sys.get_dynamic_geometry(x, u, t)
         primitives, transforms = split_draw_list(frames, kinematic, dynamic)
         camera = resolve_camera_from_hints(
             self.sys, frames, x, u, t, override=camera_override
@@ -354,6 +369,57 @@ def make_renderer(name: str, animator: Animator) -> AnimationRenderer:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+@contextmanager
+def held_kinematic_geometry(sys, memory):
+    """
+    Inside the block, ``sys`` and every system inside it give the kinematic geometry they built first.
+
+    ``memory`` keeps each system's geometry by id, across blocks. The systems
+    are left as they were on the way out.
+    """
+    systems = systems_inside(sys)
+    shadowed = [vars(system).get("get_kinematic_geometry") for system in systems]
+    for system in systems:
+        system.get_kinematic_geometry = remembered_geometry(system, memory)
+    try:
+        yield
+    finally:
+        for system, own in zip(systems, shadowed):
+            if own is None:
+                del system.get_kinematic_geometry
+            else:
+                system.get_kinematic_geometry = own
+
+
+def systems_inside(sys) -> list:
+    """``sys``, a diagram's subsystems and a sampled system's source, at every depth, each once."""
+    systems, stack = {}, [sys]
+    while stack:
+        system = stack.pop()
+        if id(system) in systems:
+            continue
+        systems[id(system)] = system
+        stack.extend(getattr(system, "subsystems", {}).values())
+        source = getattr(system, "source", None)
+        if hasattr(source, "get_kinematic_geometry"):
+            stack.append(source)
+
+    return list(systems.values())
+
+
+def remembered_geometry(system, memory):
+    """``system.get_kinematic_geometry``, called once: ``memory`` holds its answer by the system's id."""
+    build = system.get_kinematic_geometry
+
+    def get_kinematic_geometry():
+        if id(system) not in memory:
+            memory[id(system)] = build()
+
+        return memory[id(system)]
+
+    return get_kinematic_geometry
 
 
 def split_draw_list(frames, kinematic, dynamic):
