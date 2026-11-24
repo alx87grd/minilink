@@ -70,10 +70,11 @@ class ProblemEvaluator:
     its sample is the plant's input, constant over each step, as
     ``plant.compute_trajectory(u=plan.u, dt=…)`` holds it::
 
-        pe = problem.compile(pid, dt=0.01)
-        report = pe.evaluate()                                   # the Evaluation
-        dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)
-        program = pe.program(wrt=["controller.Kp", "controller.Kd"])
+        J = problem.compile(pid, dt=0.01)   # J(p), the closed loop's performance index
+        J(J.params)                          # the objective at p, a number
+        dJ = jax.grad(J)(J.params)           # its gradient, every leaf of the tree
+        report = J.evaluate()                # the Evaluation: rates, spread, the runs
+        program = J.program(wrt=["controller.Kp", "controller.Kd"])
 
     Parameters
     ----------
@@ -102,6 +103,11 @@ class ProblemEvaluator:
     episode_length : float, optional
         Length of the run of an infinite-horizon problem (by default 10 s,
         announced, rounded up to whole periods of ``dt``).
+    n_trials : int, optional
+        The draws of a stochastic problem that :meth:`evaluate`, ``J(p)`` and
+        :meth:`program` read when a call names none.
+    key : int
+        The seed of those draws when a call names none.
     """
 
     def __init__(
@@ -114,6 +120,8 @@ class ProblemEvaluator:
         substeps=None,
         backend="auto",
         episode_length=None,
+        n_trials=None,
+        key=0,
     ):
         require_one_of("backend", backend, BACKENDS)
         self.adaptive = adaptive_options(solver)
@@ -121,6 +129,10 @@ class ProblemEvaluator:
             require_step_knobs(solver, 1 if substeps is None else substeps)
         else:
             backend = require_numpy_for_adaptive(backend)
+
+        # The draws a call reads when it names none
+        self.n_trials = n_trials
+        self.key = key
 
         # The task and the loop that runs it: a continuous diagram, or a sampled
         # loop on its own clock, its plant integrated at the step asked; a held
@@ -242,19 +254,23 @@ class ProblemEvaluator:
 
         return self.run(params, x0)
 
-    def evaluate(self, params=None, key=0, n_trials=None, *, trajectories=False):
+    def __call__(self, params=None, key=None, n_trials=None):
+        """``J(p)``: the objective of :meth:`evaluate` at ``params``, so ``jax.grad(J)(J.params)`` is its gradient."""
+        return self.evaluate(params, key, n_trials).objective
+
+    def evaluate(self, params=None, key=None, n_trials=None, *, trajectories=False):
         """
         The :class:`Evaluation` of the loop on the problem: one run, or ``n_trials`` draws.
 
         A deterministic problem is one run (``n_trials`` 1 or unset); a stochastic
-        problem draws ``n_trials`` starts and parameter overrides from ``key``. On
-        JAX the whole evaluation traces, so ``jax.grad`` of ``.objective`` gives
-        the gradient with respect to every leaf of ``params``.
-        ``trajectories=True`` keeps the runs' trajectories in
+        problem draws ``n_trials`` starts and parameter overrides from ``key``
+        (unset: the compile's). On JAX the whole evaluation traces, so
+        ``jax.grad`` of ``.objective`` gives the gradient with respect to every
+        leaf of ``params``. ``trajectories=True`` keeps the runs' trajectories in
         :attr:`Evaluation.trajectories` (outside a trace).
         """
         params = self.merged(params)
-        n_trials = trials_of(self.draws, n_trials)
+        key, n_trials = self.draws_of(key, n_trials)
 
         # The draws, the cost of a failure and the cost bound of a run not finite,
         # then the runs and their scores, batched on JAX
@@ -271,14 +287,14 @@ class ProblemEvaluator:
             criterion=criterion_of(self.problem),
         )
 
-    def program(self, wrt, bounds=None, key=0, n_trials=None, *, params=None):
+    def program(self, wrt, bounds=None, key=None, n_trials=None, *, params=None):
         """
         The tuning program over the leaves ``wrt``: ``min_z J(z)`` with the declared sets as rows.
 
         ``J(z)`` is the objective of :meth:`evaluate` with the leaves named by
         ``wrt`` (dotted paths into :attr:`params`, as ``"controller.Kp"``) read
         from ``z`` and every other leaf at its current value; the draws are
-        realized once, from ``key``. The constraint rows ``g(z) ≥ 0`` are the
+        realized once, from ``key`` (unset: the compile's). The constraint rows ``g(z) ≥ 0`` are the
         per-trial feasibility margin when ``X`` or ``U`` is bounded and the
         reachability margin when ``Xf`` is set. ``bounds`` maps a path to
         ``(lower, upper)`` (``None`` for an open side). ``params`` is the base
@@ -304,7 +320,7 @@ class ProblemEvaluator:
 
         base = self.merged(params)
         z0 = self.pack(base, wrt)
-        n_trials = trials_of(self.draws, n_trials)
+        key, n_trials = self.draws_of(key, n_trials)
         rows = declared_rows(self.problem)
 
         # The draws, the failure cost and the cost bound stay fixed when the start and
@@ -441,6 +457,13 @@ class ProblemEvaluator:
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def draws_of(self, key, n_trials):
+        """The ``(key, n_trials)`` a call runs on: its own, else the compile's."""
+        key = self.key if key is None else key
+        n_trials = self.n_trials if n_trials is None else n_trials
+
+        return key, trials_of(self.draws, n_trials)
 
     def merged(self, params):
         """The tree a call runs on: the compile's numbers for ``None``, else ``params`` checked complete against them, each leaf in its default's dtype and shape (one trace for every value)."""

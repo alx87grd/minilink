@@ -138,7 +138,7 @@ then this table.
 | --- | --- |
 | `PV-1` the batch rollout | done |
 | `PV-2` the free functions and the names-only comparison | done |
-| `PV-3` `J` | open |
+| `PV-3` `J` | done |
 | `PV-4` `problem.program` | open |
 | `PV-5` README and showcase | open |
 | `PV-6` `array_module` | open |
@@ -155,6 +155,8 @@ then this table.
   table shows the RRT* plan, simulated by the judge, missing the goal its nominal trajectory
   reaches (its steps are not uniform): reported to the maintainer, not changed.
 - README §3 still calls the free `compare` until `PV-5`.
+- `PV-3`: `J.evaluate`, `J.program` and `J(p)` take `key=None`, read as the compile's
+  `key` (0 by default), so a call that names no key runs as before.
 
 **For the maintainer after the merge:** `alx87grd/teaching` and `alx87grd/workbench` on `dev`
 call the removed names; search them for `evaluate(`, `compare(`, `.program(` on a problem,

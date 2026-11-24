@@ -196,3 +196,51 @@ class TestSystemRolloutBatch:
 
         assert not np.allclose(rk4, euler)
         assert np.allclose(euler, euler_np, rtol=1e-12, atol=1e-12)
+
+
+class TestTheCompiledObjective:
+    """J = problem.compile(controller): J(p) is the objective, its draws fixed at the compile."""
+
+    def rest_task(self, stochastic):
+        plant = Pendulum()
+        cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
+        task = PlanningProblem(plant, x0=[2.0, 0.0], horizon=2.0, cost=cost)
+        if stochastic:
+            task = task.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
+        return task
+
+    def test_J_of_p_is_the_objective(self):
+        task = self.rest_task(stochastic=False)
+        J = task.compile(Impedance(Kp=1.0, Kd=1.0), dt=0.05, backend="numpy")
+
+        assert np.isclose(J(), J.evaluate().objective)
+        assert np.isclose(J(J.params), J.evaluate(J.params).objective)
+
+    def test_the_draws_are_the_compiles_unless_a_call_names_its_own(self):
+        task = self.rest_task(stochastic=True)
+        controller = Impedance(Kp=1.0, Kd=1.0)
+        J = task.compile(controller, dt=0.05, n_trials=6, key=3, backend="numpy")
+
+        assert J.evaluate().n_trials == 6
+        assert np.isclose(J(), J.evaluate(key=3, n_trials=6).objective)
+        assert J.evaluate(n_trials=2).n_trials == 2
+
+        unset = task.compile(controller, dt=0.05, backend="numpy")
+        with pytest.raises(ValueError, match="needs n_trials"):
+            unset()
+
+    @pytest.mark.jax
+    @pytest.mark.skipif(not JAX_AVAILABLE, reason="JAX not installed")
+    def test_the_gradient_of_J_is_the_gradient_of_its_objective(self):
+        import jax
+
+        task = self.rest_task(stochastic=True)
+        J = task.compile(Impedance(Kp=1.0, Kd=1.0), dt=0.05, n_trials=4, backend="jax")
+
+        dJ = jax.grad(J)(J.params)
+        by_hand = jax.grad(lambda p: J.evaluate(p, n_trials=4).objective)(J.params)
+
+        for leaf in ("Kp", "Kd"):
+            np.testing.assert_allclose(
+                dJ["controller"][leaf], by_hand["controller"][leaf], rtol=1e-12
+            )

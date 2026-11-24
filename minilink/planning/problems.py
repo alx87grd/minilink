@@ -745,13 +745,18 @@ class PlanningProblem:
         substeps=None,
         backend="auto",
         episode_length=None,
+        n_trials=None,
+        key=0,
     ):
         """
-        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem.
+        ``J``, the :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem: its performance index ``J(p)``.
 
         The controller closed on the plant (or a built loop with a ``plant`` block),
-        compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
-        parameter of the run, ``pe.program(wrt)`` exports the tuning program.
+        compiled once: ``J(p)`` is the objective at the parameter tree ``p``,
+        ``J.params`` holds every parameter of the run (``jax.grad(J)(J.params)``
+        is the gradient), ``J.evaluate()`` the full score, ``J.program(wrt)``
+        the tuning program. ``n_trials`` and ``key`` fix the draws of a
+        stochastic problem those calls read when they name none.
         A sampled controller (``pid % 0.01``) runs the sampled loop on its own
         clock: ``dt`` omitted reads its base period. On a sampled loop
         ``substeps`` is the plant's steps per base period, ``None`` the
@@ -770,6 +775,8 @@ class PlanningProblem:
             substeps=substeps,
             backend=backend,
             episode_length=episode_length,
+            n_trials=n_trials,
+            key=key,
         )
 
     def discretize(self, dt, *, solver="rk4", substeps=1):
