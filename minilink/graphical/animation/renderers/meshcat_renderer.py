@@ -547,6 +547,40 @@ def flush_commands(vis):
         window.flush()
 
 
+def pose_quaternions(poses) -> np.ndarray:
+    """
+    The rotations of ``poses`` (N x 4 x 4) as the viewer's quaternions ``(x, y, z, w)``, N x 4.
+
+    The quaternion of a rotation is the eigenvector of the largest eigenvalue
+    of its symmetric 4x4 matrix ``K``, with ``w >= 0``; all the poses of a
+    track are solved in one call.
+    """
+    m = poses[:, :3, :3]
+    m00, m01, m02 = m[:, 0, 0], m[:, 0, 1], m[:, 0, 2]
+    m10, m11, m12 = m[:, 1, 0], m[:, 1, 1], m[:, 1, 2]
+    m20, m21, m22 = m[:, 2, 0], m[:, 2, 1], m[:, 2, 2]
+
+    # Only the lower triangle of K is read
+    K = np.zeros((len(poses), 4, 4))
+    K[:, 0, 0] = m00 - m11 - m22
+    K[:, 1, 0] = m01 + m10
+    K[:, 1, 1] = m11 - m00 - m22
+    K[:, 2, 0] = m02 + m20
+    K[:, 2, 1] = m12 + m21
+    K[:, 2, 2] = m22 - m00 - m11
+    K[:, 3, 0] = m21 - m12
+    K[:, 3, 1] = m02 - m20
+    K[:, 3, 2] = m10 - m01
+    K[:, 3, 3] = m00 + m11 + m22
+    K /= 3.0
+    eigenvalues, eigenvectors = np.linalg.eigh(K)
+    largest = np.argmax(eigenvalues, axis=1)
+    q = eigenvectors[np.arange(len(poses)), :, largest]
+    xyzw = q * np.where(q[:, 3:4] < 0.0, -1.0, 1.0)
+
+    return xyzw
+
+
 class MeshcatCanvas:
     """Maps primitives to meshcat geometry under a scene path."""
 
@@ -1147,7 +1181,7 @@ class MeshcatRenderer(AnimationRenderer):
     def _keyframe_slot_pose(self, animation_obj, frames, i: int) -> None:
         """Pose of slot ``i``: placed at its first frame, keyframed only if it moves."""
         tf = self.canvas._tf
-        poses = []
+        keys, poses = [], []
         for k, frame in enumerate(frames):
             if i >= len(frame["primitives"]):
                 continue
@@ -1155,16 +1189,22 @@ class MeshcatRenderer(AnimationRenderer):
                 frame["primitives"][i], frame["transforms"][i], tf
             )
             if T is not None:
-                poses.append((k, np.asarray(T, dtype=float)))
+                keys.append(k)
+                poses.append(np.asarray(T, dtype=float))
         if not poses:
             return
+        poses = np.stack(poses)
         path = self.canvas._base_path(i)
-        path.set_transform(poses[0][1])
-        if all(np.allclose(T, poses[0][1], rtol=0.0, atol=1e-12) for _, T in poses):
+        path.set_transform(poses[0])
+        if np.all(np.abs(poses - poses[0]) <= 1e-12):
             return
-        for k, T in poses:
-            with animation_obj.at_frame(path, k) as frame_vis:
-                frame_vis.set_transform(T)
+        # One track of positions and one of rotations, a key per frame
+        positions = poses[:, :3, 3].tolist()
+        quaternions = pose_quaternions(poses).tolist()
+        clip = animation_obj.at_frame(path, keys[0]).get_clip()
+        for k, position, quaternion in zip(keys, positions, quaternions):
+            clip.set_property(k, "position", "vector3", position)
+            clip.set_property(k, "quaternion", "quaternion", quaternion)
 
     def _set_native_animation(self, frames, schedule):
         """Build a Visualizer, keyframe the native Meshcat animation, and play it."""
