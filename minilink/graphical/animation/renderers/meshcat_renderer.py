@@ -423,6 +423,88 @@ def _rotation_from_a_to_b(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.eye(3) + K + K @ K * ((1.0 - c) / (s * s))
 
 
+# Commands sent before the server's answers are read (a frame's poses, a clip's pages)
+_PIPELINE_DEPTH = 256
+
+
+class PipelinedWindow:
+    """
+    A Meshcat viewer window whose commands leave without waiting for each answer.
+
+    The window's own socket asks and waits, one command at a time, and the wait
+    is most of the cost of a frame. This one sends the commands back to back on
+    a socket of its own and reads the server's answers together, at ``flush``:
+    the server receives the same commands in the same order. Everything else
+    (the page, its address, the browser handshake) is the window's, asked once
+    the pipeline is empty.
+    """
+
+    def __init__(self, window):
+        # Lazy imports: Meshcat's own dependencies, loaded with the first viewer
+        import umsgpack
+        import zmq
+
+        self.window = window
+        self.pack = umsgpack.packb
+        self.socket = window.context.socket(zmq.DEALER)
+        self.socket.connect(window.zmq_url)
+        self.pending = 0
+
+    def send(self, command):
+        data = command.lower()
+        # the empty first part is the envelope the server's reply socket expects
+        self.socket.send_multipart(
+            [
+                b"",
+                data["type"].encode("utf-8"),
+                data["path"].encode("utf-8"),
+                self.pack(data),
+            ]
+        )
+        self.pending += 1
+        if self.pending >= _PIPELINE_DEPTH:
+            self.flush()
+
+    def flush(self):
+        """Wait until the server has answered every command sent."""
+        while self.pending > 0:
+            self.socket.recv_multipart()
+            self.pending -= 1
+
+    def wait(self):
+        self.flush()
+        return self.window.wait()
+
+    def get_scene(self):
+        self.flush()
+        return self.window.get_scene()
+
+    def get_image(self):
+        self.flush()
+        return self.window.get_image()
+
+    def __getattr__(self, name):
+        return getattr(self.window, name)
+
+
+def pipelined(vis):
+    """``vis`` with its commands pipelined to its server; a viewer without a server is returned as is."""
+    # Lazy import: Meshcat is optional
+    from meshcat.visualizer import ViewerWindow
+
+    if isinstance(getattr(vis, "window", None), ViewerWindow):
+        vis.window = PipelinedWindow(vis.window)
+
+    return vis
+
+
+def flush_commands(vis):
+    """Wait until the server of ``vis`` has answered every command sent to it."""
+    window = getattr(vis, "window", None)
+    if isinstance(window, PipelinedWindow):
+        window.flush()
+
+
 class MeshcatCanvas:
     """Maps primitives to meshcat geometry under a scene path."""
 
@@ -854,7 +936,7 @@ class MeshcatRenderer(AnimationRenderer):
     ) -> None:
         meshcat = _import_meshcat()
         self.show = show
-        self.vis = meshcat.Visualizer()
+        self.vis = pipelined(meshcat.Visualizer())
         # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
         self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         if show:
@@ -875,6 +957,7 @@ class MeshcatRenderer(AnimationRenderer):
         # tree already holds commands, so nothing is sent before it.
         self._place_eye(camera)
         self._set_backdrop()
+        flush_commands(self.vis)
 
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         # The camera target stays at the orbit origin, so everything is drawn
@@ -890,6 +973,8 @@ class MeshcatRenderer(AnimationRenderer):
             self.canvas.ensure_object(i, prim)
             self.canvas.update_primitive(i, prim, shift @ np.asarray(T, dtype=float))
         self._slide_furniture(camera)
+        # the frame is drawn when the server has taken all of it
+        flush_commands(self.vis)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
@@ -1040,11 +1125,13 @@ class MeshcatRenderer(AnimationRenderer):
     def _set_native_animation(self, frames, schedule):
         """Build a Visualizer, keyframe the native Meshcat animation, and play it."""
         meshcat = _import_meshcat()
-        self.vis = meshcat.Visualizer()
+        self.vis = pipelined(meshcat.Visualizer())
         # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
         self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         animation_obj = self._build_meshcat_animation(frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)
+        flush_commands(self.vis)
+
         return animation_obj
 
     def build_clip(
