@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from itertools import product
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import matplotlib.animation as animation
+import matplotlib.image as image
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -402,6 +405,7 @@ class MatplotlibRenderer(AnimationRenderer):
         self.fig = None
         self.ax = None
         self.canvas = None
+        self.layers = None  # The clip's frames drawn in layers, flat views only
 
     def _apply_camera(self, ax, camera, is_3d):
         """Apply view limits, labels, and (3D) view orientation from *camera*."""
@@ -537,6 +541,7 @@ class MatplotlibRenderer(AnimationRenderer):
 
         # The first frame is on the figure before the animation plays
         update(0)
+        self.layers = None if is_3d else LayeredFrames(fig, ax, canvas)
 
         return fig, ani
 
@@ -550,7 +555,10 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def show_clip(self, clip, place):
         """Play the clip inline (an HTML player) or in its window."""
-        show_matplotlib_clip(*clip.built(), place)
+        fig, ani = clip.built()
+        show_matplotlib_clip(
+            fig, ani, place, layers=self.layers, fps=1000.0 / clip.schedule.interval_ms
+        )
 
     def save_clip(self, clip, path):
         """A ``.gif`` (the default) or a video through ffmpeg (``.mp4``); a clip of one frame also as an image (``.png``, ``.pdf``, ``.svg``, …)."""
@@ -567,7 +575,9 @@ class MatplotlibRenderer(AnimationRenderer):
             # for an animation never played
             ani._draw_was_started = True
         else:
-            written = save_matplotlib_clip(ani, path, clip.schedule.target_fps)
+            written = save_matplotlib_clip(
+                ani, path, clip.schedule.target_fps, layers=self.layers
+            )
 
         # A figure built for the file alone is not left for the notebook to show
         hold_back(fig, "matplotlib")
@@ -585,13 +595,18 @@ CLIP_SUFFIXES = ("", ".gif", ".mp4")
 PLAYING = set()
 
 
-def show_matplotlib_clip(fig, ani, place):
-    """Play ``ani`` inline, as an HTML player displayed now, or in its window."""
+def show_matplotlib_clip(fig, ani, place, *, layers=None, fps=None):
+    """
+    Play ``ani`` inline, as an HTML player displayed now, or in its window.
+
+    With ``layers`` (and the clip's ``fps``), the player's frames are drawn in
+    layers: the same images, without a full draw of the figure for each.
+    """
     if place == "inline":
         # Lazy import: IPython is optional, needed only in a notebook
         from IPython.display import HTML, display
 
-        display(HTML(ani.to_jshtml()))
+        display(HTML(player_html(ani, layers=layers, fps=fps)))
         plt.close(fig)
         return
 
@@ -601,14 +616,40 @@ def show_matplotlib_clip(fig, ani, place):
     show_in_window(fig)
 
 
-def save_matplotlib_clip(ani, path, fps):
-    """Write ``ani`` to ``path``: a GIF without a suffix or with ``.gif``, an ``.mp4`` video through ffmpeg."""
+def player_html(ani, *, layers=None, fps=None) -> str:
+    """The HTML player of ``ani``, its frames embedded."""
+    if layers is None or fps is None:
+        return ani.to_jshtml()
+
+    with TemporaryDirectory() as folder:
+        path = Path(folder, "player.html")
+        writer = LayeredHTMLWriter(
+            layers, fps=fps, embed_frames=True, default_mode="loop"
+        )
+        ani.save(str(path), writer=writer)
+        html = path.read_text()
+
+    return html
+
+
+def save_matplotlib_clip(ani, path, fps, *, layers=None):
+    """
+    Write ``ani`` to ``path``: a GIF without a suffix or with ``.gif``, an ``.mp4`` video through ffmpeg.
+
+    With ``layers``, the frames are drawn in layers: the same images, without
+    a full draw of the figure for each.
+    """
     path = Path(path)
     require_clip_suffix(path)
     if not path.suffix:
         path = path.with_suffix(".gif")
-    writer = "pillow" if path.suffix.lower() == ".gif" else "ffmpeg"
-    ani.save(str(path), writer=writer, fps=fps, dpi=DPI_EXPORT)
+    is_gif = path.suffix.lower() == ".gif"
+    if layers is None or not (is_gif or animation.writers.is_available("ffmpeg")):
+        writer = "pillow" if is_gif else "ffmpeg"
+        ani.save(str(path), writer=writer, fps=fps, dpi=DPI_EXPORT)
+    else:
+        writer_of = LayeredPillowWriter if is_gif else LayeredFFMpegWriter
+        ani.save(str(path), writer=writer_of(layers, fps=fps), dpi=DPI_EXPORT)
 
     return path
 
@@ -620,3 +661,200 @@ def require_clip_suffix(path):
             "a matplotlib animation saves as a .gif or an .mp4 video, "
             f"got {path.name!r}; pass a file name ending in .gif or .mp4"
         )
+
+
+# Frames drawn in layers
+#
+# A full draw of a figure spends most of its time on what does not move: the tick
+# labels and their fonts, the axis labels, the figure itself. A clip's frames
+# share them while the view holds still, so they are drawn once and kept as an
+# image; a frame is that image with the rest drawn over it, in the order of a
+# full draw.
+
+
+class LayeredFrames:
+    """
+    The frames of a flat animation as images, each the same as a full draw of the figure.
+
+    ``rgba()`` gives the frame the figure holds. While the view (the axis
+    limits and labels) is the one of the frame before, the background is the
+    image kept for that view, and only the primitives' artists, the grid and
+    tick lines, the frame and the title are drawn over it. A frame on a new
+    view is a full draw.
+    """
+
+    def __init__(self, fig, ax, canvas):
+        self.fig = fig
+        self.ax = ax
+        self.canvas = canvas  # The MatplotlibCanvas: its drawn_objects are the frame's
+        self.shown = None  # The figure's own canvas and dpi, set back at close
+        self.shown_dpi = None
+        self.agg = None
+        self.view = None  # The view of the last frame
+        self.title_position = None  # Where a full draw of this view puts the title
+        self.background = None  # (view, image, ticks drawn) of the kept background
+
+    def open(self, dpi) -> None:
+        """Draw at ``dpi`` on a canvas of its own until :meth:`close`."""
+        self.shown = self.fig.canvas
+        self.shown_dpi = self.fig.dpi
+        # the resolution without resizing a window that shows the figure
+        self.fig._set_dpi(dpi, forward=False)
+        self.agg = QuietCanvas(self.fig)
+        self.view = None
+        self.background = None
+
+    def close(self) -> None:
+        """The figure back on its own canvas, at its own resolution."""
+        self.fig.set_canvas(self.shown)
+        self.fig._set_dpi(self.shown_dpi, forward=False)
+        self.agg = None
+        self.background = None
+
+    def rgba(self) -> np.ndarray:
+        """The frame the figure holds, ``(height, width, 4)`` bytes."""
+        view = self.view_key()
+        if not self.layered() or view != self.view:
+            # A new view: a full draw, which also places its ticks
+            self.view = view
+            self.background = None
+            FigureCanvasAgg.draw(self.agg)
+            self.title_position = self.ax.title.get_position()
+        else:
+            if self.background is None or self.background[0] != view:
+                self.keep_background(view)
+            self.draw_over_background()
+
+        return np.asarray(self.agg.buffer_rgba())
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def view_key(self) -> tuple:
+        """What the background depends on: the limits and the axis labels."""
+        ax = self.ax
+        return (ax.get_xlim(), ax.get_ylim(), ax.get_xlabel(), ax.get_ylabel())
+
+    def layered(self) -> bool:
+        """True when the axes hold nothing but what the layers know how to order."""
+        ax = self.ax
+        known = {
+            *(id(artist) for artist in self.canvas.drawn_objects),
+            *(id(spine) for spine in ax.spines.values()),
+            id(ax.xaxis),
+            id(ax.yaxis),
+            id(ax.title),
+            id(ax.patch),
+        }
+        others = [
+            child
+            for child in ax.get_children()
+            if id(child) not in known and not is_empty_text(child)
+        ]
+        return not others and ax.axison and ax.get_frame_on()
+
+    def keep_background(self, view) -> None:
+        """Draw and keep what stays on this view: everything but the layers drawn per frame."""
+        # The ticks the last full draw placed on this view
+        ticks = {axis: axis._update_ticks() for axis in (self.ax.xaxis, self.ax.yaxis)}
+        over = self.layers_over(ticks)
+        was_visible = [artist.get_visible() for artist in over]
+        for artist in over:
+            artist.set_visible(False)
+        FigureCanvasAgg.draw(self.agg)
+        image_kept = self.agg.copy_from_bbox(self.fig.bbox)
+        for artist, visible in zip(over, was_visible):
+            artist.set_visible(visible)
+        self.background = (view, image_kept, ticks)
+
+    def layers_over(self, ticks) -> list:
+        """The artists drawn over the background, in the order a full draw gives them."""
+        ax = self.ax
+        children = [*self.canvas.drawn_objects, *ax.spines.values()]
+        children += [ax.xaxis, ax.yaxis, ax.title]
+        ordered = sorted(children, key=lambda artist: artist.zorder)
+        over = []
+        for artist in ordered:
+            if artist in ticks:
+                # an axis draws, tick by tick, its grid line then its tick lines;
+                # its labels are on the background
+                for tick in ticks[artist]:
+                    over += [tick.gridline, tick.tick1line, tick.tick2line]
+            else:
+                over.append(artist)
+
+        return over
+
+    def draw_over_background(self) -> None:
+        _, image_kept, ticks = self.background
+        renderer = self.agg.get_renderer()
+        self.agg.restore_region(image_kept)
+        # a draw of the axes places the title; the layers put it where the
+        # full draw of this view did
+        self.ax.title.set_position(self.title_position)
+        for artist in self.layers_over(ticks):
+            artist.draw(renderer)
+
+
+class QuietCanvas(FigureCanvasAgg):
+    """An image canvas that draws only when a frame is asked for, never on a redraw request."""
+
+    def draw_idle(self, *args, **kwargs):
+        pass
+
+
+def is_empty_text(artist) -> bool:
+    """True for a text artist with nothing to draw (the unused side titles of an axes)."""
+    return hasattr(artist, "get_text") and artist.get_text() == ""
+
+
+class LayeredFigure:
+    """Stands in for the figure in a movie writer: ``savefig`` writes the layered frame."""
+
+    def __init__(self, fig, layers):
+        self.fig = fig
+        self.layers = layers
+
+    def savefig(self, target, *, format, dpi, **savefig_kwargs):
+        rgba = self.layers.rgba()
+        if format == "png":
+            image.imsave(target, rgba, format="png", origin="upper", dpi=dpi)
+        else:
+            target.write(rgba.tobytes())
+
+    def __getattr__(self, name):
+        if name == "fig":
+            raise AttributeError(name)
+
+        return getattr(self.fig, name)
+
+
+class LayeredSaving:
+    """A movie writer whose frames come from :class:`LayeredFrames` (``png`` or raw ``rgba`` frames)."""
+
+    def __init__(self, layers, **kwargs):
+        super().__init__(**kwargs)
+        self.layers = layers
+
+    def setup(self, fig, outfile, dpi=None, **kwargs):
+        super().setup(fig, outfile, dpi=dpi, **kwargs)
+        self.layers.open(self.dpi)
+        self.fig = LayeredFigure(fig, self.layers)
+
+    def finish(self):
+        self.fig = self.fig.fig
+        self.layers.close()
+        super().finish()
+
+
+class LayeredHTMLWriter(LayeredSaving, animation.HTMLWriter):
+    """The HTML player, its frames drawn in layers."""
+
+
+class LayeredPillowWriter(LayeredSaving, animation.PillowWriter):
+    """The GIF writer, its frames drawn in layers."""
+
+
+class LayeredFFMpegWriter(LayeredSaving, animation.FFMpegWriter):
+    """The ffmpeg video writer, its frames drawn in layers."""
