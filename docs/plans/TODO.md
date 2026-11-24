@@ -565,8 +565,8 @@ wait for his pass over the demos and features (§1.12):
   (`phase_plane/phase_plane.py`). Done when both have a test.
 - [ ] **Plotly on a hand-built figure** (agent lane, plotting;
   `graphical/figure_renderers/plotly.py`; from the plotting contract's review): matplotlib
-  is the reference and Plotly draws as closely as it can (DESIGN §7), so these wait for the
-  maintainer's pass on whether Plotly stays: on a `FigureSpec` assembled by hand the colour
+  is the reference and Plotly draws as closely as it can (DESIGN §7); Plotly stays (the
+  maintainer, 2026-11-24), so these are open: on a `FigureSpec` assembled by hand the colour
   bars of a multi-panel grid overlap, `share_x` does not hold across columns, a 3-D panel
   ignores its limits, and a `Note` in a 3-D panel is not drawn.
 - [ ] **The plot builders written twice** (agent lane, plotting; behaviour-preserving, a
