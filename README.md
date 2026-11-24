@@ -225,7 +225,7 @@ starts = np.column_stack([np.linspace(-3.0, 3.0, 1000), np.zeros(1000)])
 t, swings = plant.rollout_batch(starts, tf=5.0, dt=0.005, backend="jax")  # 1000 runs × 1000 RK4 steps
 ```
 
-The batch runs in a few hundredths of a second on a laptop CPU.
+Each call compiles the batch first; for repeated batches, hold the compiled form, `ev = plant.compile(backend="jax")`, and call `ev.rollout_batch(starts, dt=0.005, n_steps=1000)`.
 
 ## The Minilink backbone
 

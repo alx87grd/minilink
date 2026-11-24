@@ -184,8 +184,8 @@ settlement (PR #139) left, four questions on the car ladder, four on the archite
 - **Positional against keyword-only:**
   7. `J.evaluate(params, key, n_trials, *, trajectories)` against
      `problem.evaluate(controller, dt, *, ..., n_trials, key)`; `J.program(wrt, bounds, key,
-     n_trials, *, params)`; `J.trajectory(key=None)` (the nominal run) against `J.evaluate()`
-     (the compile's `key`);
+     n_trials, *, params)`; `J.trajectory(key=None)` (the nominal run) against `J.evaluate()`,
+     `J(p)` and `J.program` (`key=None`: the compile's `key`), one keyword with two meanings;
   8. `solve` is keyword-only on `Optimizer` and `Planner`, positional on the compiled
      trajectory planner, which returns `(z, status)` and not a result object;
   9. `backend` defaults to `"numpy"` on `System.compile`, `None` on a planner's `compile`

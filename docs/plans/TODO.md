@@ -39,6 +39,8 @@ as the maintainer would and logged in the run's record.
 | The demo sweep to the flatness rule | D1.3 | standing (§3) | your review of each diff, the showcase notebook first |
 | The planning demos on the solution verbs | D1.4 | standing (§3) | `solution.plot_*` and `problem.compare(...)` in the demos your pass keeps; the Simulator's kept answers |
 | Two dead modules | D2 | standing (§3), after your pass | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
+| A single capital in a demo: a textbook symbol or a knob | — | v0.4 | `test_demo_knobs.py` counts a module-level `J` as a knob, so `digital_pid_tuning.py`, `native_mpc_tuning.py` and `pid_autotuning_native.py` keep `pe` for the compiled loop (`jax.grad(pe)(start)`); exempt single capitals (`J`, `Q`, `K`; ten other ceilings fall), or keep `pe` in those three ([problem-verbs-and-batch.md](problem-verbs-and-batch.md)) |
+| The RRT demo's run length | — | v0.4 | `rrt_holonomic_obstacles.py` computes `episode_length` from the longer plan to score both plans on a problem with no horizon; give the demo's problem a horizon, or a named knob; its table shows the RRT* plan, simulated, missing the goal its nominal trajectory reaches |
 | The compile-time flatten default | — | standing (§3) | after one benchmark: off, on, or always |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
 | The rest of the field object | A1 | v0.5 | tabular RL's `Q` on a `GridField`, `CallableField`, `LinearApproximator` as a field |

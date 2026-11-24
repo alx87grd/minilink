@@ -177,6 +177,11 @@ boat demo and the slide deck that still named the removed functions follow. Kept
 lazy-import comment form of the facade file ("a real cycle through minilink.core.system"), the
 one the file already used seven times.
 
+**The review's four asks:** README §5's timing sentence says the call compiles and how to
+hold the compiled form (the recommended option); the demo knobs and the RRT demo's run length
+wait in TODO's rows for the maintainer's go; `key=None`'s two meanings on `J` joined QUESTIONS'
+item 7.
+
 **For the maintainer after the merge:** `alx87grd/teaching` and `alx87grd/workbench` on `dev`
 call the removed names; search them for `evaluate(`, `compare(`, `.program(` on a problem,
 `pe.` and `evaluator.` on a compiled problem, and `rollout_batch(` on a NumPy evaluator.
