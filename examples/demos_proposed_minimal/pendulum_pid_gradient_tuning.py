@@ -34,25 +34,25 @@ diagram = pid % DT @ plant
 
 diagram.plot_diagram()
 
-pe = problem.compile(diagram, substeps=1)
+J = problem.compile(diagram, substeps=1)
 
 
-start = pe.params
+start = J.params
 start["r"] = np.array([R_REF])
-print(pe.evaluate(start))
-traj = pe.trajectory(start)
-pe.loop.plot_trajectory(traj)
-pe.loop.animate(traj)
+print(J.evaluate(start))
+traj = J.trajectory(start)
+J.loop.plot_trajectory(traj)
+J.loop.animate(traj)
 
 # The gradient: ∂J/∂(Kp, Ki, Kd) through the sampled loop, by reverse mode
 
-grad = jax.grad(lambda p: pe.evaluate(p).objective)(start)
+grad = jax.grad(J)(start)
 print(grad["controller"])
 
 # The tuning: min over (Kp, Ki, Kd) of J
 
 wrt = ["controller.Kp", "controller.Ki", "controller.Kd"]
-math_program = pe.program(wrt, params=start)
+math_program = J.program(wrt, params=start)
 
 
 best = Optimizer(math_program, method="auto").solve()
@@ -60,9 +60,9 @@ print(best)
 
 # The tuned loop, judged, drawn and played
 
-tuned = pe.unpack(best.z, wrt, params=start)
-print(pe.evaluate(tuned))
+tuned = J.unpack(best.z, wrt, params=start)
+print(J.evaluate(tuned))
 
-traj = pe.trajectory(tuned)
-pe.loop.plot_trajectory(traj)
-pe.loop.animate(traj)
+traj = J.trajectory(tuned)
+J.loop.plot_trajectory(traj)
+J.loop.animate(traj)

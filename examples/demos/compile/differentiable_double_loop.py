@@ -36,23 +36,23 @@ mpc.plot_diagram()
 
 # The double loop compiled once on JAX: J(p), the 2 s run's cost, a pure function
 problem = PlanningProblem(inner, cost=cost, x0=X0, horizon=2.0)
-pe = problem.compile(mpc % DT, backend="jax")
-loop = pe.loop
+J = problem.compile(mpc % DT, backend="jax")
+loop = J.loop
 loop.plot_diagram()
 
 # 1. One gradient through everything: a plant parameter, a network weight, an MPC weight
 wrt = ["plant.plant.m", "plant.controller.b1", "controller.solve.cost.R"]
-start = pe.params
-program = pe.program(wrt, params=start)
-z0 = pe.pack(start, wrt)
+start = J.params
+program = J.program(wrt, params=start)
+z0 = J.pack(start, wrt)
 
 # 2. Co-design: the three numbers optimized together
 best = Optimizer(program, method="adam", n_iterations=20).solve()
 print(best)
-tuned = pe.unpack(best.z, wrt, params=start)
+tuned = J.unpack(best.z, wrt, params=start)
 
 # 3. The whole closed loop linearized in z (network and solver included): its Bode
 # plot from the setpoint r to the angle, G(e^{jωΔ})
 loop.jacobian(of="controller__command:u", wrt="x")
 plot_bode(loop, of=("y", 0), wrt=("r", 0), method="jax", margins=False)
-plant.plot_trajectory(pe.trajectory(tuned).of("plant"))
+plant.plot_trajectory(J.trajectory(tuned).of("plant"))

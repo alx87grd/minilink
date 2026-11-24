@@ -11,7 +11,7 @@ from minilink import (
     Optimizer,
     System,
 )
-from minilink.core.backends import array_module
+from minilink.core import array_module
 
 
 # JAX-traceable blocks with proper params dicts

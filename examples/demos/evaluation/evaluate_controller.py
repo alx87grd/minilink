@@ -54,6 +54,6 @@ print(stochastic.compare(LQR=controller, stiff=stiff, n_trials=N_TRIALS))
 
 # The compiled evaluator: built once, scored again, its run drawn
 
-pe = problem.compile(controller)
-print(pe.evaluate())
-plant.plot_trajectory(pe.trajectory().of("plant"))
+J = problem.compile(controller)
+print(J.evaluate())
+plant.plot_trajectory(J.trajectory().of("plant"))

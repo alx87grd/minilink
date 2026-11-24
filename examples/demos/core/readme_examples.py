@@ -120,9 +120,7 @@ else:
     tuning = PlanningProblem(
         plant, x0=[1.0, 0.0], cost=QuadraticCost.from_system(plant), horizon=4.0
     )
-    pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
-    dJ = jax.grad(lambda p: pe.evaluate(p).objective)(
-        pe.params
-    )  # gradient w.r.t. every gain and plant param
-    program = pe.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
+    J = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
+    dJ = jax.grad(J)(J.params)  # gradient w.r.t. every gain and plant param
+    program = J.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
     result = Optimizer(program, method="auto").solve()  # L-BFGS on the closed-loop cost

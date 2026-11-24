@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink import StepSystem
-from minilink.core.backends import array_module
+from minilink.core import array_module
 
 
 class Fibonacci(StepSystem):

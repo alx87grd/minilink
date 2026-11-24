@@ -52,10 +52,10 @@ cost = QuadraticCost.from_system(
 problem = PlanningProblem(plant, cost=cost, horizon=n_steps * DT)
 
 # The run compiled once, and its program: z = (Kp, Ki, Kd), J(z) the run's cost
-pe = problem.compile(diagram, DT)
+J = problem.compile(diagram, DT)
 wrt = ["controller.Kp", "controller.Ki", "controller.Kd"]
-start = pe.unpack(np.array([1.0, 0.0, 1.0]), wrt)
-program = pe.program(wrt, params=start)
+start = J.unpack(np.array([1.0, 0.0, 1.0]), wrt)
+program = J.program(wrt, params=start)
 
 # 1. Native gradient descent with live closed-loop trajectory plot
 descent = Optimizer(
@@ -64,7 +64,7 @@ descent = Optimizer(
     max_iterations=n_learn_steps,
     learning_rate=lr,
 ).solve(
-    callback=pe.live_plot(
+    callback=J.live_plot(
         wrt,
         params=start,
         every=PLOT_EVERY,
@@ -78,9 +78,9 @@ best = Optimizer(program, method="auto").solve()
 print(best)
 
 # The tuned loop, judged and drawn by the problem's evaluator
-tuned = pe.unpack(best.z, wrt, start)
-print(pe.evaluate(tuned))
-# plant.plot_trajectory(pe.trajectory(tuned).of("plant"))
+tuned = J.unpack(best.z, wrt, start)
+print(J.evaluate(tuned))
+# plant.plot_trajectory(J.trajectory(tuned).of("plant"))
 
 diagram.params["controller"]["Kp"] = tuned["controller"]["Kp"]
 diagram.params["controller"]["Kd"] = tuned["controller"]["Kd"]

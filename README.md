@@ -161,15 +161,15 @@ mpc = ModelPredictiveController(mpc_planner) % 0.1
 ```
 
 The task description can be stochastic, with parameters drawn from a distribution.
-`compare` evaluates multiple controllers on the same task; if the problem is stochastic, the trials run in parallel with JAX (`jax.vmap`).
+`problem.compare` evaluates multiple controllers on the same task; if the problem is stochastic, the trials run in parallel with JAX (`jax.vmap`).
 
 $$\mathbb{E}_{p \sim \mathcal{P}}\big[J(p)\big]$$
 
 ```python
-from minilink import Uniform, compare
+from minilink import Uniform
 
 uncertain = swing_up.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
-comparison = compare(uncertain, VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=20)
+comparison = uncertain.compare(VI=vi, RRT=rrt, TrajOpt=opt, MPC=mpc, n_trials=20)
 comparison.plot_simulated_trajectory()
 ```
 
@@ -183,7 +183,7 @@ $$\dot{x} = f(x, u, t; p), \qquad u = -K_p\, \theta - K_d\, \dot{\theta}$$
 
 $$J(p) = \int_0^{t_f} \left(x^\top Q\, x + u^\top R\, u\right) dt$$
 
-With `backend="jax"`, the evaluator gives the expected cost and its gradient with respect to every parameter in the tree:
+Compiled on JAX, `J` is that function: `J(p)` is the expected cost over 20 draws of the mass, and `jax.grad` gives its gradient with respect to every parameter in the tree:
 
 $$\mathbb{E}_m\big[J(p)\big], \qquad \nabla_p\, \mathbb{E}_m\big[J(p)\big]$$
 
@@ -194,13 +194,9 @@ from minilink import Impedance
 rest_cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
 rest = PlanningProblem(plant, x0=[2.0, 0.0], horizon=5.0, cost=rest_cost)
 task = rest.replace(distributions={"plant": {"m": Uniform(0.8, 1.2)}})
-evaluator = task.compile(Impedance(Kp=1.0, Kd=1.0), backend="jax")
+J = task.compile(Impedance(Kp=1.0, Kd=1.0), n_trials=20, backend="jax")  # J(p) of the closed loop
 
-def expected_cost(params):
-    return evaluator.evaluate(params, n_trials=20).objective
-
-
-gradient = jax.grad(expected_cost)(evaluator.params)
+gradient = jax.grad(J)(J.params)
 ```
 
 The gains, named by their paths in the tree, become the decision variables $z = (K_p, K_d)$ of a program; an `Optimizer` solves it:
@@ -212,7 +208,7 @@ from minilink import Optimizer
 
 gains = ["controller.Kp", "controller.Kd"]
 bounds = {"controller.Kp": (0.0, 50.0), "controller.Kd": (0.0, 20.0)}
-program = evaluator.program(gains, bounds=bounds, n_trials=20)
+program = J.program(gains, bounds=bounds)
 best = Optimizer(program).solve()  # Kp = 0.78, Kd = 3.54; expected cost 19.3 → 11.0
 ```
 
@@ -222,12 +218,11 @@ $$\min_{z} \ J(z; p) \quad \text{s.t.} \quad h(z; p) = 0, \quad g(z; p) \ge 0, \
 
 ## 5. Compiled, differentiated, batched
 
-With `backend="jax"`, catalog plants—and any custom `f` written with `array_module(x, u)`—compile to pure JAX functions: `jax.jit`, `jax.grad`, and `jax.vmap` apply directly, and the tools above use them under the hood. A thousand pendulums, released from a thousand angles, in one call:
+With `backend="jax"`, catalog plants—and any custom `f` written with `array_module(x, u)` (`from minilink.core import array_module`)—compile to pure JAX functions: `jax.jit`, `jax.grad`, and `jax.vmap` apply directly, and the tools above use them under the hood. A thousand pendulums, released from a thousand angles, in one call:
 
 ```python
-evaluator = plant.compile(backend="jax")
 starts = np.column_stack([np.linspace(-3.0, 3.0, 1000), np.zeros(1000)])
-swings = evaluator.rollout_batch(starts, n_steps=1000, dt=0.005)  # 1000 runs × 1000 RK4 steps
+t, swings = plant.rollout_batch(starts, tf=5.0, dt=0.005, backend="jax")  # 1000 runs × 1000 RK4 steps
 ```
 
 The batch runs in a few hundredths of a second on a laptop CPU.

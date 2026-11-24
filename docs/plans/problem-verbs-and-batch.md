@@ -140,8 +140,8 @@ then this table.
 | `PV-2` the free functions and the names-only comparison | done |
 | `PV-3` `J` | done |
 | `PV-4` `problem.program` | done (the showcase with `PV-5`) |
-| `PV-5` README and showcase | open |
-| `PV-6` `array_module` | open |
+| `PV-5` README and showcase | done (notebook sweep pending) |
+| `PV-6` `array_module` | done |
 | `PV-7` the docs | open |
 
 **Decisions taken during the run:**
@@ -155,6 +155,12 @@ then this table.
   table shows the RRT* plan, simulated by the judge, missing the goal its nominal trajectory
   reaches (its steps are not uniform): reported to the maintainer, not changed.
 - README §3 still calls the free `compare` until `PV-5`.
+- `PV-5`: `core/07_program.ipynb` keeps its hand-written `def J(z)` objective (a later
+  cell, the program's own `J`), after the cells that use the problem's `J`. The tutorials and
+  demos that imported `array_module` from `minilink.core.backends` import it from
+  `minilink.core`; `examples/projects/` is left as it is. `system.rollout_batch` compiles at
+  each call (0.43 s for README §5's 1000 × 1000 batch on JAX, cloud CPU, median of 5, against
+  0.11 s for a held compiled evaluator): README §5's timing sentence waits for the maintainer.
 - `PV-3`: `J.evaluate`, `J.program` and `J(p)` take `key=None`, read as the compile's
   `key` (0 by default), so a call that names no key runs as before.
 

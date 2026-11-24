@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink import P, StepDiagramSystem, StepSystem
-from minilink.core.backends import array_module
+from minilink.core import array_module
 
 
 class DiscreteAccumulator(StepSystem):

@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink import Integrator, P, Step, StepSystem, closed_loop
-from minilink.core.backends import array_module
+from minilink.core import array_module
 
 DT_BASE = 0.01
 TF = 2.0

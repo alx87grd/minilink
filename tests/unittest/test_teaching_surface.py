@@ -81,6 +81,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "quadratic_excess",
         "inverse_barrier",
         "occupancy",
+        "array_module",
     ),
     "minilink.blocks": (
         "Integrator",

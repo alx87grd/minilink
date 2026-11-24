@@ -55,6 +55,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "quadratic_excess": ("minilink.core.shaping", "quadratic_excess"),
     "inverse_barrier": ("minilink.core.shaping", "inverse_barrier"),
     "occupancy": ("minilink.core.shaping", "occupancy"),
+    "array_module": ("minilink.core.backends", "array_module"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)
