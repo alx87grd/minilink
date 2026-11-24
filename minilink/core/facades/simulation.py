@@ -303,6 +303,7 @@ class DynamicSimulation:
             Sampled states, ``xs[member, sample, state]``; one run is
             :meth:`compute_trajectory`.
         """
+        # A real cycle through minilink.core.system
         from minilink.core.compile.compiler import build_on_auto
 
         t, dt_step, steps = batch_time_grid(self, tf, t0, dt, n_steps, u)
@@ -793,6 +794,7 @@ def plant_subsystem_layouts(plant_op, offset):
 
 def batch_time_grid(system, tf, t0, dt, n_steps, u):
     """Resolve ``(t, dt, n_steps)`` for :meth:`DynamicSimulation.rollout_batch`."""
+    # A real cycle through minilink.core.system
     from minilink.core.system import automatic_step_of
 
     if tf is not None and n_steps is not None:

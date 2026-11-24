@@ -1,11 +1,6 @@
 # This list only shrinks; see test_teaching_imports.py.
 # file  module — deep imports that predate the teaching-surface rule (S12).
-examples/demos/compile/params_gradient.py minilink.core.backends
 examples/demos/dynamics/offroad_car_3d.py minilink.dynamics.catalog.vehicles.terrain
-examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
-examples/demos/hybrid/step_accumulator.py minilink.core.backends
-examples/demos/hybrid/step_fibonacci.py minilink.core.backends
-examples/demos/hybrid/step_unity_feedback.py minilink.core.backends
 examples/demos/mpc/mpc_car_circuit.py minilink.core.shaping
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.collision
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.plotting
@@ -33,5 +28,3 @@ examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.s
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.track
 examples/demos/udes_racecar/mpc_racecar_dynamic.py minilink.graphical.catalog.racecar_skin
 examples/demos/udes_racecar/mpc_racecar_kinematic.py minilink.graphical.catalog.racecar_skin
-examples/tutorial/core/01_systems.ipynb minilink.core.backends
-examples/tutorial/core/04_costs.ipynb minilink.core.backends

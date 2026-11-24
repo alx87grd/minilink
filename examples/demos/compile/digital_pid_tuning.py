@@ -24,21 +24,21 @@ problem = PlanningProblem(plant, cost=cost, horizon=TF)
 
 # The digital PID: its difference equation on a 100 Hz clock, closed on the plant
 pid = PID(Kp=1.0, Ki=0.0, Kd=1.0)
-J = problem.compile(pid % DT, substeps=1)
-start = J.params
+pe = problem.compile(pid % DT, substeps=1)
+start = pe.params
 start["r"] = np.array([R_REF])
-print(J.evaluate(start))
+print(pe.evaluate(start))
 
 # Every gain's gradient through the sampled loop, by reverse mode
-grad = jax.grad(J)(start)
+grad = jax.grad(pe)(start)
 print(grad["controller"])
 
 # The tuning program over the three gains, solved by the class default (L-BFGS)
 wrt = ["controller.Kp", "controller.Ki", "controller.Kd"]
-best = Optimizer(J.program(wrt, params=start), method="auto").solve()
+best = Optimizer(pe.program(wrt, params=start), method="auto").solve()
 print(best)
 
 # The tuned loop, judged and drawn
-tuned = J.unpack(best.z, wrt, params=start)
-print(J.evaluate(tuned))
-J.loop.plot_trajectory(J.trajectory(tuned))
+tuned = pe.unpack(best.z, wrt, params=start)
+print(pe.evaluate(tuned))
+pe.loop.plot_trajectory(pe.trajectory(tuned))

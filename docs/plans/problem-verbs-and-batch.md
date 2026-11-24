@@ -140,9 +140,9 @@ then this table.
 | `PV-2` the free functions and the names-only comparison | done |
 | `PV-3` `J` | done |
 | `PV-4` `problem.program` | done (the showcase with `PV-5`) |
-| `PV-5` README and showcase | done (notebook sweep pending) |
+| `PV-5` README and showcase | done |
 | `PV-6` `array_module` | done |
-| `PV-7` the docs | open |
+| `PV-7` the docs | done; gates run |
 
 **Decisions taken during the run:**
 - `PV-1`: the jitted batch is cached per solver as well as per layout, so an Euler batch
@@ -161,6 +161,10 @@ then this table.
   `minilink.core`; `examples/projects/` is left as it is. `system.rollout_batch` compiles at
   each call (0.43 s for README §5's 1000 × 1000 batch on JAX, cloud CPU, median of 5, against
   0.11 s for a held compiled evaluator): README §5's timing sentence waits for the maintainer.
+- Gates: `tests/unittest/test_demo_knobs.py` counts every module-level capital name as a
+  knob, so a demo-level `J` counts as one: `digital_pid_tuning.py`, `native_mpc_tuning.py` and
+  `pid_autotuning_native.py` would pass their ceilings and keep `pe` until the maintainer
+  rules (single capitals as textbook symbols, not knobs, would lower ten other ceilings).
 - `PV-3`: `J.evaluate`, `J.program` and `J(p)` take `key=None`, read as the compile's
   `key` (0 by default), so a call that names no key runs as before.
 
