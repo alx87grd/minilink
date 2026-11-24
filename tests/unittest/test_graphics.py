@@ -2192,3 +2192,87 @@ def test_a_rendered_frame_is_on_its_figure_and_saves_as_an_image(tmp_path):
     assert ax.lines or ax.patches or ax.collections
     assert still.save(tmp_path / "still.png").stat().st_size > 0
     plt.close("all")
+
+
+class TestKinematicGeometryBuiltOnce(unittest.TestCase):
+    """A session builds each system's kinematic geometry once, a diagram's subsystems included."""
+
+    def test_a_diagram_subsystem_builds_its_skin_once_over_the_frames(self):
+        calls = []
+
+        def counted_skin(plant):
+            calls.append(plant)
+            return {"world": [Point()]}
+
+        plant = DynamicSystem(1, output_dim=1, expose_state=True)
+        plant.skin = counted_skin
+        diagram = DiagramSystem()
+        diagram.add_subsystem(plant, "plant")
+        animator = Animator(diagram)
+
+        frames = [
+            animator.resolve_frame(
+                np.array([float(k)]), np.zeros(diagram.m), 0.1 * k, kinematic={}
+            )
+            for k in range(5)
+        ]
+
+        self.assertEqual(len(calls), 1)
+        self.assertIs(frames[0]["primitives"][0], frames[4]["primitives"][0])
+        # The systems are left as they were: the hook is the class's again
+        self.assertNotIn("get_kinematic_geometry", vars(plant))
+        self.assertEqual(len(plant.get_kinematic_geometry()["world"]), 1)
+        self.assertEqual(len(calls), 2)
+
+
+@pytest.mark.optional
+@pytest.mark.visualization
+class TestMeshcatFastPaths(unittest.TestCase):
+    """The batched forms give what Meshcat's one-at-a-time forms give."""
+
+    def setUp(self):
+        if not _has_meshcat():
+            self.skipTest("meshcat not installed")
+
+    def poses(self):
+        import meshcat.transformations as tf
+
+        rng = np.random.default_rng(0)
+        poses = [np.eye(4), tf.rotation_matrix(np.pi, [0.0, 0.0, 1.0])]
+        for _ in range(20):
+            T = tf.random_rotation_matrix(rng.random(3))
+            T[:3, 3] = rng.normal(size=3)
+            poses.append(T)
+
+        return np.stack(poses)
+
+    def test_pose_quaternions_match_the_viewer_conversion(self):
+        from meshcat.animation import js_quaternion
+
+        from minilink.graphical.animation.renderers.meshcat_renderer import (
+            pose_quaternions,
+        )
+
+        poses = self.poses()
+        expected = np.array([js_quaternion(T) for T in poses])
+        np.testing.assert_array_equal(pose_quaternions(poses), expected)
+
+    def test_a_pose_command_packs_to_the_same_bytes(self):
+        import umsgpack
+        from meshcat.commands import SetTransform
+        from meshcat.path import Path
+
+        from minilink.graphical.animation.renderers.meshcat_renderer import (
+            PipelinedWindow,
+        )
+
+        window = PipelinedWindow.__new__(PipelinedWindow)
+        window.pack = umsgpack.packb
+        window.pose_heads = {}
+        for T in self.poses():
+            command = SetTransform(T, Path(("meshcat", "minilink_scene", "p3")))
+            data = command.lower()
+            kind, address, packed = window.pose_parts(command)
+            self.assertEqual(kind, data["type"].encode("utf-8"))
+            self.assertEqual(address, data["path"].encode("utf-8"))
+            self.assertEqual(packed, umsgpack.packb(data))
