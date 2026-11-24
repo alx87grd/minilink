@@ -176,6 +176,8 @@ class Animator:
         frame is presented non-blocking with no interval.
         """
         if kinematic is None:
+            # A new scene reads the system's kinematic geometry anew
+            self._kinematic = None
             kinematic = self.kinematic_geometry()
         frame = self.resolve_frame(x, u, t, kinematic=kinematic)
 
@@ -214,7 +216,7 @@ class Animator:
     ###########################################################################
 
     def kinematic_geometry(self):
-        """The system's kinematic geometry, built once for the session."""
+        """The system's kinematic geometry, built once for a clip or a live scene."""
         if self._kinematic is None:
             self._kinematic = self.sys.get_kinematic_geometry()
 

@@ -6,15 +6,11 @@ from itertools import product
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import matplotlib as mpl
 import matplotlib.animation as animation
-import matplotlib.colors as mcolors
-import matplotlib.image as image
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg
-from PIL import Image
 
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -28,6 +24,13 @@ from minilink.graphical.animation.primitives import (
     Sphere,
     TorqueArrow,
     world_to_camera,
+)
+from minilink.graphical.animation.renderers.matplotlib_frames import (
+    ClipPaletteWriter,
+    LayeredFFMpegWriter,
+    LayeredFrames,
+    LayeredHTMLWriter,
+    LayeredPillowWriter,
 )
 from minilink.graphical.animation.renderers.renderer import (
     AnimationRenderer,
@@ -408,7 +411,9 @@ class MatplotlibRenderer(AnimationRenderer):
         self.fig = None
         self.ax = None
         self.canvas = None
-        self.layers = None  # The frames drawn in layers, flat views only
+        # The frames drawn in layers, flat views only: a live scene's, and a clip's
+        self.layers = None
+        self.clip_layers = None
         self.window_shown = False  # A live scene's window has had its first draw
 
     def _apply_camera(self, ax, camera, is_3d):
@@ -498,7 +503,8 @@ class MatplotlibRenderer(AnimationRenderer):
             and self.layers is not None
             and isinstance(window, FigureCanvasAgg)
         ):
-            # The frame in layers, pushed to the window, then the window's events
+            # The frame in layers, pushed to the window, then the window's events.
+            # A frame on a new view is the window's own full draw.
             self.layers.draw_on(window)
             window.blit(self.fig.bbox)
             if interval_s is None:
@@ -565,7 +571,7 @@ class MatplotlibRenderer(AnimationRenderer):
 
         # The first frame is on the figure before the animation plays
         update(0)
-        self.layers = None if is_3d else LayeredFrames(fig, ax, canvas)
+        self.clip_layers = None if is_3d else LayeredFrames(fig, ax, canvas)
 
         return fig, ani
 
@@ -581,7 +587,11 @@ class MatplotlibRenderer(AnimationRenderer):
         """Play the clip inline (an HTML player) or in its window."""
         fig, ani = clip.built()
         show_matplotlib_clip(
-            fig, ani, place, layers=self.layers, fps=1000.0 / clip.schedule.interval_ms
+            fig,
+            ani,
+            place,
+            layers=self.clip_layers,
+            fps=1000.0 / clip.schedule.interval_ms,
         )
 
     def save_clip(self, clip, path):
@@ -600,7 +610,7 @@ class MatplotlibRenderer(AnimationRenderer):
             ani._draw_was_started = True
         else:
             written = save_matplotlib_clip(
-                ani, path, clip.schedule.target_fps, layers=self.layers
+                ani, path, clip.schedule.target_fps, layers=self.clip_layers
             )
 
         # A figure built for the file alone is not left for the notebook to show
@@ -691,311 +701,3 @@ def require_clip_suffix(path):
             "a matplotlib animation saves as a .gif or an .mp4 video, "
             f"got {path.name!r}; pass a file name ending in .gif or .mp4"
         )
-
-
-# Frames drawn in layers
-#
-# A full draw of a figure spends most of its time on what does not move: the tick
-# labels and their fonts, the axis labels, the figure itself. A clip's frames
-# share them while the view holds still, so they are drawn once and kept as an
-# image; a frame is that image with the rest drawn over it, in the order of a
-# full draw.
-
-
-class LayeredFrames:
-    """
-    The frames of a flat animation as images, each the same as a full draw of the figure.
-
-    ``rgba()`` gives the frame the figure holds. While the view (the axis
-    limits and labels) is the one of the frame before, the background is the
-    image kept for that view, and only the primitives' artists, the grid and
-    tick lines, the frame and the title are drawn over it. A frame on a new
-    view is a full draw.
-    """
-
-    def __init__(self, fig, ax, canvas):
-        self.fig = fig
-        self.ax = ax
-        self.canvas = canvas  # The MatplotlibCanvas: its drawn_objects are the frame's
-        self.shown = None  # The figure's own canvas and dpi, set back at close
-        self.shown_dpi = None
-        self.agg = None
-        self.view = None  # The view of the last frame
-        self.title_position = None  # Where a full draw of this view puts the title
-        self.background = None  # (view, image, ticks drawn) of the kept background
-
-    def open(self, dpi) -> None:
-        """Draw at ``dpi`` on a canvas of its own until :meth:`close`."""
-        self.shown = self.fig.canvas
-        self.shown_dpi = self.fig.dpi
-        # on the canvas of its own, the resolution changes no window's size
-        self.agg = QuietCanvas(self.fig)
-        self.fig.set_dpi(dpi)
-        self.view = None
-        self.background = None
-
-    def close(self) -> None:
-        """The figure back on its own canvas, at its own resolution."""
-        if self.shown is None:
-            return
-        self.fig.set_dpi(self.shown_dpi)
-        self.fig.set_canvas(self.shown)
-        self.shown = None
-        self.agg = None
-        self.background = None
-
-    def rgba(self) -> np.ndarray:
-        """The frame the figure holds, ``(height, width, 4)`` bytes."""
-        self.draw_on(self.agg)
-
-        return np.asarray(self.agg.buffer_rgba())
-
-    def draw_on(self, agg) -> None:
-        """Draw the frame the figure holds into the image of ``agg``, an Agg canvas of the figure."""
-        self.agg = agg
-        view = self.view_key()
-        if not self.layered() or view != self.view:
-            # A new view: a full draw, which also places its ticks
-            self.view = view
-            self.background = None
-            agg.draw()
-            self.title_position = self.ax.title.get_position()
-        else:
-            if self.background is None or self.background[0] != view:
-                self.keep_background(view)
-            self.draw_over_background()
-
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    def view_key(self) -> tuple:
-        """What the background depends on: the limits, the axis labels, the image's size."""
-        ax = self.ax
-        return (
-            ax.get_xlim(),
-            ax.get_ylim(),
-            ax.get_xlabel(),
-            ax.get_ylabel(),
-            self.agg.get_width_height(),
-            self.fig.dpi,
-        )
-
-    def layered(self) -> bool:
-        """True when the axes hold nothing but what the layers know how to order."""
-        ax = self.ax
-        known = {
-            *(id(artist) for artist in self.canvas.drawn_objects),
-            *(id(spine) for spine in ax.spines.values()),
-            id(ax.xaxis),
-            id(ax.yaxis),
-            id(ax.title),
-            id(ax.patch),
-        }
-        others = [
-            child
-            for child in ax.get_children()
-            if id(child) not in known and not is_empty_text(child)
-        ]
-        return not others and ax.axison and ax.get_frame_on()
-
-    def keep_background(self, view) -> None:
-        """Draw and keep what stays on this view: everything but the layers drawn per frame."""
-        # The ticks the last full draw placed on this view
-        ticks = {axis: axis._update_ticks() for axis in (self.ax.xaxis, self.ax.yaxis)}
-        over = self.layers_over(ticks)
-        was_visible = [artist.get_visible() for artist in over]
-        for artist in over:
-            artist.set_visible(False)
-        try:
-            # into the image only: a window is shown the finished frame
-            FigureCanvasAgg.draw(self.agg)
-            image_kept = self.agg.copy_from_bbox(self.fig.bbox)
-        finally:
-            for artist, visible in zip(over, was_visible):
-                artist.set_visible(visible)
-        self.background = (view, image_kept, ticks)
-
-    def layers_over(self, ticks) -> list:
-        """The artists drawn over the background, in the order a full draw gives them."""
-        ax = self.ax
-        children = [*self.canvas.drawn_objects, *ax.spines.values()]
-        children += [ax.xaxis, ax.yaxis, ax.title]
-        ordered = sorted(children, key=lambda artist: artist.zorder)
-        over = []
-        for artist in ordered:
-            if artist in ticks:
-                # an axis draws, tick by tick, its grid line then its tick lines;
-                # its labels are on the background
-                for tick in ticks[artist]:
-                    over += [tick.gridline, tick.tick1line, tick.tick2line]
-            else:
-                over.append(artist)
-
-        return over
-
-    def draw_over_background(self) -> None:
-        _, image_kept, ticks = self.background
-        renderer = self.agg.get_renderer()
-        self.agg.restore_region(image_kept)
-        # a draw of the axes places the title; the layers put it where the
-        # full draw of this view did
-        self.ax.title.set_position(self.title_position)
-        for artist in self.layers_over(ticks):
-            artist.draw(renderer)
-
-
-class QuietCanvas(FigureCanvasAgg):
-    """An image canvas that draws only when a frame is asked for, never on a redraw request."""
-
-    def draw_idle(self, *args, **kwargs):
-        pass
-
-
-def is_empty_text(artist) -> bool:
-    """True for a text artist with nothing to draw (the unused side titles of an axes)."""
-    return hasattr(artist, "get_text") and artist.get_text() == ""
-
-
-class LayeredFigure:
-    """Stands in for the figure in a movie writer: ``savefig`` writes the layered frame."""
-
-    def __init__(self, fig, layers):
-        self.fig = fig
-        self.layers = layers
-
-    def savefig(self, target, *, format, dpi, **savefig_kwargs):
-        if format not in ("png", "rgba") or not keeps_figure_colours(
-            self.fig, savefig_kwargs
-        ):
-            # a frame the layers do not write: the figure's own, a full draw
-            self.fig.savefig(target, format=format, dpi=dpi, **savefig_kwargs)
-            return
-        rgba = self.layers.rgba()
-        if format == "png":
-            image.imsave(target, rgba, format="png", origin="upper", dpi=dpi)
-        else:
-            target.write(rgba.tobytes())
-
-    def __getattr__(self, name):
-        if name == "fig":
-            raise AttributeError(name)
-
-        return getattr(self.fig, name)
-
-
-def keeps_figure_colours(fig, savefig_kwargs) -> bool:
-    """True when a save with these options paints the figure in its own face and edge colours."""
-    if savefig_kwargs.get("transparent", mpl.rcParams["savefig.transparent"]):
-        return False
-    for side, own in (
-        ("facecolor", fig.get_facecolor()),
-        ("edgecolor", fig.get_edgecolor()),
-    ):
-        colour = savefig_kwargs.get(side, mpl.rcParams[f"savefig.{side}"])
-        if isinstance(colour, str) and colour == "auto":
-            continue
-        if not mcolors.same_color(colour, own):
-            return False
-
-    return True
-
-
-class LayeredSaving:
-    """A movie writer whose frames come from :class:`LayeredFrames` (``png`` or raw ``rgba`` frames)."""
-
-    def __init__(self, layers, **kwargs):
-        super().__init__(**kwargs)
-        self.layers = layers
-
-    def setup(self, fig, outfile, dpi=None, **kwargs):
-        super().setup(fig, outfile, dpi=dpi, **kwargs)
-        self.layers.open(self.dpi)
-        self.fig = LayeredFigure(fig, self.layers)
-
-    def finish(self):
-        if isinstance(self.fig, LayeredFigure):
-            self.fig = self.fig.fig
-        self.layers.close()
-        super().finish()
-
-
-class LayeredHTMLWriter(LayeredSaving, animation.HTMLWriter):
-    """The HTML player, its frames drawn in layers."""
-
-
-class ClipPaletteWriter(animation.PillowWriter):
-    """
-    The GIF writer with one palette for the whole clip.
-
-    A GIF holds 256 colours. Reducing each frame to a palette of its own is
-    most of the time of a save; here the palette is reduced once, from frames
-    spread over the clip, and every frame's colours go to their nearest entry.
-    """
-
-    def finish(self):
-        frames = self._frames
-        if any(frame.mode != "RGB" for frame in frames):
-            # frames with transparency keep the writer's own reduction
-            super().finish()
-            return
-        indexed = frames_on_one_palette(frames)
-        indexed[0].save(
-            self.outfile,
-            save_all=True,
-            append_images=indexed[1:],
-            duration=int(1000 / self.fps),
-            loop=0,
-        )
-
-
-class LayeredPillowWriter(LayeredSaving, ClipPaletteWriter):
-    """The GIF writer, its frames drawn in layers."""
-
-
-class LayeredFFMpegWriter(LayeredSaving, animation.FFMpegWriter):
-    """The ffmpeg video writer, its frames drawn in layers."""
-
-
-# One palette for a clip
-
-# Frames, spread over the clip, the palette is reduced from
-_PALETTE_FRAMES = 6
-
-
-def frames_on_one_palette(frames) -> list:
-    """RGB ``frames`` as palette images sharing one palette of 256 colours."""
-    # The palette: the median cut of a mosaic of frames spread over the clip
-    picks = np.linspace(0, len(frames) - 1, min(_PALETTE_FRAMES, len(frames)))
-    picks = [frames[int(i)] for i in picks]
-    width, height = picks[0].size
-    mosaic = Image.new("RGB", (width, height * len(picks)))
-    for i, frame in enumerate(picks):
-        mosaic.paste(frame, (0, i * height))
-    reduced = mosaic.convert("P", palette=Image.Palette.ADAPTIVE)
-    flat = reduced.getpalette()
-    palette = np.array(flat, dtype=np.int32).reshape(-1, 3)
-
-    # Each colour of a frame to its nearest entry, found once per colour and
-    # kept in a table over the 2^24 colours
-    entry = np.zeros(1 << 24, dtype=np.uint8)
-    known = np.zeros(1 << 24, dtype=bool)
-    indexed = []
-    for frame in frames:
-        rgb = np.asarray(frame)
-        code = (
-            (rgb[..., 0].astype(np.uint32) << 16)
-            | (rgb[..., 1].astype(np.uint32) << 8)
-            | rgb[..., 2]
-        )
-        new = np.unique(code[~known[code]])
-        if len(new):
-            colours = np.stack([new >> 16, (new >> 8) & 255, new & 255], axis=1)
-            distance = (colours[:, None, :].astype(np.int32) - palette[None]) ** 2
-            entry[new] = np.argmin(distance.sum(axis=2), axis=1)
-            known[new] = True
-        image_p = Image.fromarray(entry[code], mode="P")
-        image_p.putpalette(flat)
-        indexed.append(image_p)
-
-    return indexed

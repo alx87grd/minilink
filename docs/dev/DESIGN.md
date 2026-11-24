@@ -419,7 +419,9 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   implicit** — the animator injects identity so world-fixed geometry can key to
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
   stays unprefixed (one shared root); articulated frames are namespaced
-  (``vehicle:body``). Controllers may own their own visualization frames the
+  (``vehicle:body``). A diagram's `get_kinematic_geometry` is its subsystems'
+  kinematic geometry and its `get_dynamic_geometry` their per-frame geometry, each
+  keyed under the subsystem's id. Controllers may own their own visualization frames the
   same way (e.g. optional `TaskImpedance` `task_force` → `controller:task_force`); the
   arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
   How each renderer plays and saves the frames: §7, "Animations".
@@ -2088,8 +2090,9 @@ and `animation` are properties of the clip: `figure` is matplotlib's or Plotly's
 Meshcat's viewer (`None` on pygame); `animation` matplotlib's `FuncAnimation` or Meshcat's
 `Animation` (`None` on Plotly, whose frames sit in its figure, and on pygame). The clip is
 built on first use, so a record made with `show=False` starts no Meshcat viewer until it is
-shown or saved. `.save` writes matplotlib's `.gif` (the default, one palette of 256 colours
-for the whole clip) or a video through ffmpeg
+shown or saved. `.save` writes matplotlib's `.gif` (the default; one palette of 256 colours
+for the whole clip when it holds the clip's colours, else one per frame) or a video through
+ffmpeg
 (`.mp4`), any other suffix refused by name, and Meshcat's and Plotly's self-contained
 `.html` page; a pygame record has nothing to save and refuses by name.
 
@@ -2101,11 +2104,9 @@ by a `visible` track. The clip, the saved page and the inline view are frame-acc
 size grows with the number of distinct geometries. In 3-D, polylines are thin ribbons
 (matplotlib dash and width), not 1-pixel WebGL lines.
 
-An animation or a live session builds the system's kinematic geometry once and draws the
-same primitives in every frame; `tf` and `get_dynamic_geometry` are read at each frame. A
-diagram's `get_kinematic_geometry` is its subsystems' kinematic geometry and its
-`get_dynamic_geometry` their per-frame geometry, each keyed under the subsystem's id. The
-kinematic geometry is drawn first, the per-frame geometry over it.
+An animation or a live scene builds the system's kinematic geometry once, when it opens,
+and draws the same primitives in every frame; `tf` and `get_dynamic_geometry` are read at
+each frame. The kinematic geometry is drawn first, the per-frame geometry over it.
 
 The live paths (`game`, `RealtimeSimulator`, the evaluator's `live_plot`, `LiveSearchPlot`,
 the trajectory-optimization live plot) are sessions, not records: they draw as they run and

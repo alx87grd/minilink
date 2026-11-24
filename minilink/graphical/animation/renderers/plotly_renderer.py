@@ -190,7 +190,7 @@ def _plane_vertices(primitive: Plane) -> np.ndarray:
 
 
 # A trace is the plain description Plotly reads, a dict: a clip holds one per
-# primitive per frame, and a figure checks the first frame's.
+# primitive per frame, and the figure checks each once, as it takes it.
 
 
 def _line_trace(*, x, y, z=None, color, width, dash, name, is_3d, opacity=1.0):
@@ -242,13 +242,24 @@ def _marker_trace(*, x, y, z=None, color, size, symbol, name, is_3d):
 
 
 def _empty_trace(*, is_3d, name="unsupported"):
-    kind = "scatter3d" if is_3d else "scatter"
-    trace = {"type": kind, "x": [], "y": [], "mode": "lines", "name": name}
     if is_3d:
-        trace["z"] = []
-    trace["showlegend"] = False
-
-    return trace
+        return {
+            "type": "scatter3d",
+            "x": [],
+            "y": [],
+            "z": [],
+            "mode": "lines",
+            "name": name,
+            "showlegend": False,
+        }
+    return {
+        "type": "scatter",
+        "x": [],
+        "y": [],
+        "mode": "lines",
+        "name": name,
+        "showlegend": False,
+    }
 
 
 class PlotlyRenderer(AnimationRenderer):

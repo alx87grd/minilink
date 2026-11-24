@@ -2275,7 +2275,7 @@ class TestMeshcatFastPaths(unittest.TestCase):
         for T in self.poses():
             command = SetTransform(T, Path(("meshcat", "minilink_scene", "p3")))
             data = command.lower()
-            kind, address, packed = pose_message(command, heads)
+            kind, address, packed = pose_message(command, heads, umsgpack.packb)
             self.assertEqual(kind, data["type"].encode("utf-8"))
             self.assertEqual(address, data["path"].encode("utf-8"))
             self.assertEqual(packed, umsgpack.packb(data))
@@ -2297,7 +2297,7 @@ class TestMatplotlibLayeredFrames(unittest.TestCase):
         fig, ani = result.clip.built()
         fps = 1000.0 / result.clip.schedule.interval_ms
         players = []
-        for layers in (None, result.clip.backend.layers):
+        for layers in (None, result.clip.backend.clip_layers):
             # the player names its page elements by a random id
             ids = (uuid.UUID(int=i) for i in itertools.count())
             with mock.patch("uuid.uuid4", lambda ids=ids: next(ids)):
@@ -2315,7 +2315,7 @@ class TestMatplotlibLayeredFrames(unittest.TestCase):
 
         full, layered = self.players_of(pendulum, traj)
 
-        self.assertEqual(full, layered)
+        self.assertTrue(full == layered)
 
     def test_the_player_is_the_same_when_the_view_moves(self):
         class Slider(DynamicSystem):
@@ -2342,14 +2342,14 @@ class TestMatplotlibLayeredFrames(unittest.TestCase):
 
         full, layered = self.players_of(slider, traj)
 
-        self.assertEqual(full, layered)
+        self.assertTrue(full == layered)
 
 
 class TestGifClipPalette(unittest.TestCase):
     def test_frames_share_one_palette_and_keep_their_few_colours(self):
         from PIL import Image
 
-        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+        from minilink.graphical.animation.renderers.matplotlib_frames import (
             frames_on_one_palette,
         )
 
@@ -2372,3 +2372,126 @@ class TestGifClipPalette(unittest.TestCase):
             np.testing.assert_array_equal(
                 np.asarray(image.convert("RGB")), np.asarray(frame)
             )
+
+    def test_a_colour_that_appears_mid_clip_keeps_its_place(self):
+        from PIL import Image
+
+        from minilink.graphical.animation.renderers.matplotlib_frames import (
+            frames_on_one_palette,
+        )
+
+        # More colours than a palette holds, and a disc of a new colour in one frame
+        rng = np.random.default_rng(0)
+        shades = rng.integers(100, 140, size=(40, 60, 3), dtype=np.uint8)
+        frames = []
+        for k in range(12):
+            pixels = shades.copy()
+            if k == 7:
+                pixels[5:25, 5:25] = (255, 165, 0)
+            frames.append(Image.fromarray(pixels, mode="RGB"))
+
+        indexed = frames_on_one_palette(frames)
+
+        disc = np.asarray(indexed[7].convert("RGB"))[5:25, 5:25].astype(int)
+        self.assertLessEqual(np.abs(disc - (255, 165, 0)).max(), 16)
+
+    def test_a_clip_of_too_many_colours_is_left_to_a_palette_per_frame(self):
+        from PIL import Image
+
+        from minilink.graphical.animation.renderers.matplotlib_frames import (
+            frames_on_one_palette,
+        )
+
+        rng = np.random.default_rng(0)
+        frames = [
+            Image.fromarray(
+                rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8), mode="RGB"
+            ).resize((512, 512), Image.NEAREST)
+            for _ in range(3)
+        ]
+
+        self.assertIsNone(frames_on_one_palette(frames))
+
+
+class TestMatplotlibLayeredPaths(unittest.TestCase):
+    """The other users of the layered frames: a figure with a layout, a live scene, a video."""
+
+    def pendulum_run(self, tf=0.3):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([2.0, 0.0])
+
+        return pendulum, pendulum.compute_trajectory(tf=tf)
+
+    def test_a_figure_with_a_layout_engine_is_drawn_in_full(self):
+        pendulum, traj = self.pendulum_run()
+        with matplotlib.rc_context({"figure.constrained_layout.use": True}):
+            result = pendulum.animate(traj, renderer="matplotlib", show=False)
+            fig, ani = result.clip.built()
+            layers = result.clip.backend.clip_layers
+            full, layered = [], []
+            for k in range(len(result.clip.frames)):
+                ani._func(k)
+                buffer = io.BytesIO()
+                fig.savefig(buffer, format="rgba", dpi=fig.dpi)
+                full.append(buffer.getvalue())
+            layers.open(fig.dpi)
+            for k in range(len(result.clip.frames)):
+                ani._func(k)
+                layered.append(layers.rgba().tobytes())
+            layers.close()
+            plt.close(fig)
+
+        self.assertTrue(full == layered)
+
+    def test_a_live_scene_shows_the_frame_a_full_draw_gives(self):
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+        from minilink.graphical.animation import make_renderer
+
+        pendulum, _ = self.pendulum_run()
+        animator = Animator(pendulum)
+        backend = make_renderer("matplotlib", animator)
+        u = np.zeros(pendulum.m)
+        animator.open_live_scene(backend, np.array([2.0, 0.0]), u, 0.0)
+        for k in range(1, 6):
+            animator.update_live_frame(
+                backend, np.array([2.0 + 0.1 * k, 0.0]), u, 0.1 * k
+            )
+
+        window = backend.fig.canvas
+        self.assertIsNotNone(backend.layers.background)
+        layered = np.asarray(window.buffer_rgba()).copy()
+        FigureCanvasAgg.draw(window)
+        full = np.asarray(window.buffer_rgba())
+        np.testing.assert_array_equal(layered, full)
+        backend.close_scene()
+
+    def test_a_video_is_the_same_file_with_and_without_layers(self):
+        import tempfile
+        from pathlib import Path
+
+        import matplotlib.animation as animation
+
+        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+            save_matplotlib_clip,
+        )
+
+        if not animation.writers.is_available("ffmpeg"):
+            self.skipTest("ffmpeg not installed")
+        pendulum, traj = self.pendulum_run()
+        result = pendulum.animate(traj, renderer="matplotlib", show=False)
+        fig, ani = result.clip.built()
+        with tempfile.TemporaryDirectory() as folder:
+            full = save_matplotlib_clip(ani, Path(folder, "full.mp4"), 30.0)
+            layered = save_matplotlib_clip(
+                ani,
+                Path(folder, "layered.mp4"),
+                30.0,
+                layers=result.clip.backend.clip_layers,
+            )
+            same = full.read_bytes() == layered.read_bytes()
+        plt.close(fig)
+
+        self.assertTrue(same)

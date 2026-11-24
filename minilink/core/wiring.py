@@ -432,7 +432,7 @@ class WiredDiagramMixin:
     # Graphics: every block's frames and geometry, under its id
 
     def get_kinematic_geometry(self):
-        """Every block's kinematic geometry, keyed under its id."""
+        """Every subsystem's kinematic geometry, keyed under its id."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.visualization import (
             merge_subsystem_geometry,
@@ -445,7 +445,7 @@ class WiredDiagramMixin:
         return merged
 
     def tf(self, x, u, t=0, params=None):
-        """Every block's frames ``T = tf(x, u, t)``, keyed under its id."""
+        """Every subsystem's frames ``T = tf(x, u, t)``, keyed under its id."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.visualization import (
             namespace_subsystem_frames,
@@ -464,7 +464,7 @@ class WiredDiagramMixin:
         return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        """Every block's per-frame geometry, keyed under its id."""
+        """Every subsystem's per-frame geometry, keyed under its id."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.visualization import (
             merge_subsystem_geometry,

@@ -433,12 +433,15 @@ class PipelinedWindow:
     """
     A Meshcat viewer window whose commands leave without waiting for each answer.
 
-    The window's own socket asks and waits, one command at a time, and the wait
-    is most of the cost of a frame. This one sends the commands back to back on
-    a socket of its own and reads the server's answers together, at ``flush``:
-    the server receives the same commands in the same order. Everything else
-    (the page, its address, the browser handshake) is the window's, asked once
-    the pipeline is empty.
+    The window's own socket asks and waits, one command at a time. This one
+    sends the commands back to back on a socket of its own and reads the
+    server's answers together, at ``flush``: the server receives the same
+    commands in the same order. Everything else (the page, its address, the
+    browser handshake) is the window's, asked once the pipeline is empty.
+
+    It speaks the server's protocol itself: a dealer socket, whose empty first
+    part is the envelope the server's reply socket expects, then the command's
+    type, its path and its packed body.
     """
 
     def __init__(self, window):
@@ -449,15 +452,15 @@ class PipelinedWindow:
 
         self.window = window
         self.pack = umsgpack.packb
-        self.pose_command = SetTransform
+        self.PoseCommand = SetTransform
         self.pose_heads = {}  # Each path's address and the packed bytes before its pose
         self.socket = window.context.socket(zmq.DEALER)
         self.socket.connect(window.zmq_url)
         self.pending = 0
 
     def send(self, command):
-        if type(command) is self.pose_command and is_float_pose(command.matrix):
-            parts = pose_message(command, self.pose_heads)
+        if type(command) is self.PoseCommand and is_float_pose(command.matrix):
+            parts = pose_message(command, self.pose_heads, self.pack)
         else:
             data = command.lower()
             parts = [
@@ -465,7 +468,6 @@ class PipelinedWindow:
                 data["path"].encode("utf-8"),
                 self.pack(data),
             ]
-        # the empty first part is the envelope the server's reply socket expects
         self.socket.send_multipart([b"", *parts])
         self.pending += 1
         if self.pending >= _PIPELINE_DEPTH:
@@ -507,28 +509,28 @@ def pipelined(vis):
     return vis
 
 
-def pose_message(command, heads) -> list:
+def pose_message(command, heads, packb) -> list:
     """
     The three parts of a pose command's message, its sixteen numbers written straight into the packed bytes.
 
-    A live frame is one pose per primitive: the bytes are those of the general
-    packing, without its walk over the command. ``heads`` keeps each path's
-    address and the packed bytes before its pose.
+    A live frame is one pose per primitive: the bytes are those ``packb``, the
+    general packer, gives the command's own description
+    (``test_a_pose_command_packs_to_the_same_bytes`` holds the two equal), a
+    map of the type, the path and the matrix as sixteen 64-bit floats, column
+    by column. ``heads`` keeps each path's address and the packed bytes before
+    its pose.
     """
-    # Lazy import: Meshcat's packer, loaded with the first viewer
-    from umsgpack import packb
-
     path = command.path
     if path not in heads:
         address = path.lower()
         head = (
-            b"\x83"  # a map of three entries
+            b"\x83"  # A map of three entries
             + packb("type")
             + packb("set_transform")
             + packb("path")
             + packb(address)
             + packb("matrix")
-            + b"\xdc\x00\x10"  # an array of sixteen
+            + b"\xdc\x00\x10"  # An array of sixteen
         )
         heads[path] = (address.encode("utf-8"), head)
     address, head = heads[path]
