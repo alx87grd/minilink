@@ -1,4 +1,4 @@
-"""Contract tests for PlanningProblem shortcuts (evaluate, compare, program) and DynamicSystem.rollout_batch."""
+"""Contract tests for the PlanningProblem shortcuts (evaluate, compare, program) and System.rollout_batch."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ class TestPlanningProblemShortcuts:
 
 
 class TestSystemRolloutBatch:
-    """DynamicSystem.rollout_batch works on NumPy and JAX and agrees across backends."""
+    """System.rollout_batch and the compiled rollout_batch: the same runs on NumPy and JAX."""
 
     def test_numpy_rollout_batch_matches_individual_rollouts(self):
         plant = Pendulum()
@@ -154,15 +154,23 @@ class TestSystemRolloutBatch:
         with pytest.raises(ValueError, match="shape"):
             plant.rollout_batch(np.zeros((2, 5)), tf=1.0, dt=0.1, backend="numpy")
 
-    def test_compiled_numpy_evaluator_rollout_batch_raises_type_error(self):
+    def test_compiled_numpy_evaluator_rollout_batch_loops(self):
         plant = Pendulum()
-        starts = np.zeros((2, 2))
-        with pytest.raises(TypeError, match="JAX evaluator"):
-            plant.compile(backend="numpy").rollout_batch(starts, n_steps=5, dt=0.01)
+        starts = np.array([[0.5, 0.0], [1.0, 0.0]])
+        ev = plant.compile(backend="numpy")
 
+        xs = ev.rollout_batch(starts, n_steps=5, dt=0.01, solver="euler")
+
+        assert xs.shape == (2, 6, 2)
+        for i, x0 in enumerate(starts):
+            single = ev.rollout(x0, None, 0.0, 0.01, solver="euler", n_steps=5)
+            assert np.allclose(xs[i], single)
+
+    def test_step_evaluator_rollout_batch_needs_jax(self):
+        plant = Pendulum()
         step_ev = plant.discretize(0.01).compile(backend="numpy")
         with pytest.raises(TypeError, match="JAX evaluator"):
-            step_ev.rollout_batch(starts, n_steps=5)
+            step_ev.rollout_batch(np.zeros((2, 2)), n_steps=5)
 
     @pytest.mark.jax
     @pytest.mark.skipif(not JAX_AVAILABLE, reason="JAX not installed")
@@ -186,3 +194,20 @@ class TestSystemRolloutBatch:
         assert np.allclose(xs_np, xs_jax, rtol=1e-12, atol=1e-12)
         assert np.allclose(t_np, t_auto)
         assert np.allclose(xs_np, xs_auto, rtol=1e-12, atol=1e-12)
+
+    @pytest.mark.jax
+    @pytest.mark.skipif(not JAX_AVAILABLE, reason="JAX not installed")
+    def test_jax_rollout_batch_reads_the_solver(self):
+        plant = Pendulum()
+        starts = np.array([[1.0, 0.0], [2.0, 0.0]])
+
+        _, rk4 = plant.rollout_batch(starts, n_steps=20, dt=0.05, backend="jax")
+        _, euler = plant.rollout_batch(
+            starts, n_steps=20, dt=0.05, solver="euler", backend="jax"
+        )
+        _, euler_np = plant.rollout_batch(
+            starts, n_steps=20, dt=0.05, solver="euler", backend="numpy"
+        )
+
+        assert not np.allclose(rk4, euler)
+        assert np.allclose(euler, euler_np, rtol=1e-12, atol=1e-12)

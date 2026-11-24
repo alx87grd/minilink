@@ -264,9 +264,9 @@ class DynamicSimulation:
         """
         Roll out a batch of trajectories from initial states ``x0`` (shape ``(B, n)``).
 
-        Uses ``jax.vmap`` via :meth:`compile` when JAX is available and the
-        system traces (``backend="auto"`` or ``"jax"``), and falls back to a
-        NumPy loop when ``backend="numpy"`` or JAX is unavailable.
+        One run per start, on the compiled form of the system: one ``jax.vmap``
+        on JAX, a loop on NumPy (``backend="auto"``: JAX when it imports and
+        the system traces).
 
         Parameters
         ----------
@@ -299,42 +299,19 @@ class DynamicSimulation:
         -------
         t : np.ndarray, shape ``(N + 1,)``
             Sample times from ``t0`` to ``t0 + N * dt``.
-        x : np.ndarray, shape ``(B, N + 1, n)``
-            Sampled states for every rollout in the batch.
+        xs : np.ndarray, shape ``(B, N + 1, n)``
+            Sampled states, ``xs[member, sample, state]``; one run is
+            :meth:`compute_trajectory`.
         """
-        from minilink.core.backends import BACKEND_JAX
         from minilink.core.compile.compiler import build_on_auto
 
         t, dt_step, steps = batch_time_grid(self, tf, t0, dt, n_steps, u)
-        chosen, ev = build_on_auto(
-            lambda b: self.compile(backend=b),
-            backend=backend,
+        _, ev = build_on_auto(lambda b: self.compile(backend=b), backend=backend)
+        xs = ev.rollout_batch(
+            x0, u, t0=t0, dt=dt_step, n_steps=steps, params=params, solver=solver
         )
-        if chosen == BACKEND_JAX:
-            xs = np.asarray(
-                ev.rollout_batch(
-                    x0,
-                    u,
-                    t0=t0,
-                    dt=dt_step,
-                    n_steps=steps,
-                    params=params,
-                    solver=solver,
-                )
-            )
-        else:
-            xs = numpy_rollout_batch(
-                ev,
-                x0,
-                u,
-                t0=t0,
-                dt=dt_step,
-                n_steps=steps,
-                params=params,
-                solver=solver,
-            )
 
-        return t, xs
+        return t, np.asarray(xs)
 
 
 class StepSimulation:
@@ -845,60 +822,3 @@ def batch_time_grid(system, tf, t0, dt, n_steps, u):
     t = np.linspace(t0, t0 + steps * dt_step, steps + 1)
 
     return t, dt_step, steps
-
-
-def take_batch_member(params, reference, index, batch):
-    """Slice one member ``index`` out of a batched parameter tree (leaves with leading axis ``batch``)."""
-    if isinstance(params, dict):
-        return {
-            key: take_batch_member(val, reference[key], index, batch)
-            for key, val in params.items()
-        }
-    arr = np.asarray(params)
-    ref_ndim = np.ndim(reference)
-    if arr.ndim == ref_ndim + 1:
-        if arr.shape[0] != batch:
-            raise ValueError(
-                f"batched parameter leaf has leading axis {arr.shape[0]}, expected {batch}"
-            )
-        return arr[index]
-
-    return params
-
-
-def numpy_rollout_batch(ev, x0s, u_sequences, *, t0, dt, n_steps, params, solver):
-    """NumPy fallback for :meth:`DynamicSimulation.rollout_batch`: one rollout per batch member."""
-    x0s = np.asarray(x0s, dtype=float)
-    if x0s.ndim != 2 or x0s.shape[1] != ev.n:
-        raise ValueError(f"x0 must have shape (B, {ev.n}); got {x0s.shape}")
-    batch = int(x0s.shape[0])
-
-    if u_sequences is None:
-        u_arr = None
-        per_member_u = False
-    else:
-        u_arr = np.asarray(u_sequences, dtype=float)
-        if u_arr.ndim == 2:
-            per_member_u = False
-        elif u_arr.ndim == 3 and u_arr.shape[0] == batch:
-            per_member_u = True
-        else:
-            raise ValueError(
-                f"u must have shape (N, {ev.m}) or ({batch}, N, {ev.m}); got {u_arr.shape}"
-            )
-        if u_arr.shape[-2] != n_steps:
-            raise ValueError("n_steps disagrees with u")
-
-    runs = []
-    for i in range(batch):
-        u_i = u_arr[i] if per_member_u else u_arr
-        p_i = (
-            None
-            if params is None
-            else take_batch_member(params, ev._frozen_params, i, batch)
-        )
-        runs.append(
-            ev.rollout(x0s[i], u_i, t0, dt, p_i, solver=solver, n_steps=n_steps)
-        )
-
-    return np.stack(runs, axis=0)

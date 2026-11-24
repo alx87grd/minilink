@@ -165,13 +165,14 @@ class Evaluator(JacobianMixin):
     # Internal machinery
     ###########################################################################
 
-    def batched_rollout(self, run, x0s, u_sequences, n_steps, params, *shared):
+    def batched_rollout(self, run, x0s, u_sequences, n_steps, params, *shared, tag=()):
         """``run(x0, u, p, *shared)`` over a family in one jitted ``jax.vmap`` (JAX).
 
         The family is the starts ``x0s`` ``(B, n)``, the inputs (the nominal one
         for ``n_steps``, one ``(N, m)`` sequence shared, or ``(B, N, m)``) and the
         parameter leaves with one more dimension than the compiled value; the
-        ``shared`` arguments are the same for every member.
+        ``shared`` arguments are the same for every member. ``tag`` names what
+        ``run`` closes over (a solver), so each keeps its own compiled form.
         """
         require_jax_evaluator(self, "rollout_batch")
         jax, jnp = self.jax, self.jnp
@@ -204,7 +205,7 @@ class Evaluator(JacobianMixin):
         # with the same shapes reuse the compiled rollout instead of re-tracing.
         cache = self.compiled_forms.setdefault("rollout_batch", {})
         if params is None:
-            key = (u_axis, None)
+            key = (tag, u_axis, None)
             fn = cache.get(key)
             if fn is None:
                 fn = jax.jit(
@@ -217,7 +218,7 @@ class Evaluator(JacobianMixin):
             return fn(x0s, u_seq, *shared)
         axes = self.params_batch_axes(params, batch)
         leaves, treedef = jax.tree_util.tree_flatten(axes, is_leaf=lambda a: a is None)
-        key = (u_axis, str(treedef), tuple(leaves))
+        key = (tag, u_axis, str(treedef), tuple(leaves))
         fn = cache.get(key)
         if fn is None:
             fn = jax.jit(
@@ -248,6 +249,49 @@ class Evaluator(JacobianMixin):
             return 0 if np.ndim(leaf) == ref_ndim + 1 else None
 
         return tree_util.tree_map_with_path(axis, params)
+
+    def looped_rollout(self, run, x0s, u_sequences, n_steps, params, *shared):
+        """``run(x0, u, p, *shared)`` over a family, one member after another (NumPy).
+
+        The family is the one :meth:`batched_rollout` maps: the starts ``x0s``
+        ``(B, n)``, the inputs (the nominal one for ``n_steps``, one ``(N, m)``
+        sequence shared, or ``(B, N, m)``) and the parameter leaves with one more
+        dimension than the compiled value. Returns ``(B, N + 1, n)``.
+        """
+        x0s = np.asarray(x0s, dtype=float)
+        if x0s.ndim != 2 or x0s.shape[1] != self.n:
+            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
+        batch = int(x0s.shape[0])
+
+        if u_sequences is None:
+            if n_steps is None:
+                raise ValueError("n_steps is required when u_sequences is None")
+            u_seqs = [None] * batch
+        else:
+            u_seq = np.asarray(u_sequences, dtype=float)
+            if u_seq.ndim == 2:
+                u_seqs = [u_seq] * batch
+            elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
+                u_seqs = list(u_seq)
+            else:
+                raise ValueError(
+                    f"u_sequences must have shape (N, {self.m}) or "
+                    f"({batch}, N, {self.m}); got {u_seq.shape}"
+                )
+            if n_steps is not None and u_seq.shape[-2] != int(n_steps):
+                raise ValueError("n_steps disagrees with u_sequences")
+
+        runs = [
+            run(
+                x0s[i],
+                u_seqs[i],
+                member_params(params, self._frozen_params, i),
+                *shared,
+            )
+            for i in range(batch)
+        ]
+
+        return np.stack(runs, axis=0)
 
 
 class ContinuousEvaluator(Evaluator):
@@ -340,9 +384,17 @@ class ContinuousEvaluator(Evaluator):
         )
 
     def rollout_batch(
-        self, x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None
+        self,
+        x0s,
+        u_sequences=None,
+        *,
+        t0=0.0,
+        dt,
+        n_steps=None,
+        params=None,
+        solver="rk4",
     ):
-        """Roll out a family of RK4 / ZOH trajectories in one ``jax.vmap`` call (JAX).
+        """Roll out a family of held-input trajectories: one ``jax.vmap`` on JAX, a loop on NumPy.
 
         Parameters
         ----------
@@ -360,24 +412,31 @@ class ContinuousEvaluator(Evaluator):
             ``None`` uses the compiled values. Otherwise a params pytree whose
             leaves are either shared by the batch or carry a leading axis of
             size ``B`` — a leaf with one more dimension than the compiled value
-            is a family (``{"l": jnp.linspace(0.5, 2.0, B)}`` sweeps a length).
+            is a family (``{"l": np.linspace(0.5, 2.0, B)}`` sweeps a length).
+        solver : {"rk4", "euler"}
+            Integration formula of one step.
 
         Returns
         -------
-        jax.Array, shape ``(B, N + 1, n)``
+        array, shape ``(B, N + 1, n)``
             Sampled states, ``x0`` first, for every member of the family.
         """
+
+        # The nominal input (u None, NumPy only) runs for n_steps periods
+        def run(x0, u, p, t0, dt):
+            steps = n_steps if u is None else None
+            return self.rollout(x0, u, t0, dt, p, solver=solver, n_steps=steps)
+
+        if self.backend != BACKEND_JAX:
+            return self.looped_rollout(
+                run, x0s, u_sequences, n_steps, params, float(t0), float(dt)
+            )
+
         t0 = self.jnp.asarray(t0, dtype=float)
         dt = self.jnp.asarray(dt, dtype=float)
 
         return self.batched_rollout(
-            lambda x0, u, p, t0, dt: self.rollout(x0, u, t0, dt, p),
-            x0s,
-            u_sequences,
-            n_steps,
-            params,
-            t0,
-            dt,
+            run, x0s, u_sequences, n_steps, params, t0, dt, tag=(solver,)
         )
 
     ###########################################################################
@@ -497,6 +556,21 @@ def added(xp, buffer, where, value):
         return buffer
 
     return buffer.at[where].add(value)
+
+
+def member_params(params, reference, index):
+    """Member ``index`` of a parameter family: each leaf with one more dimension than ``reference``'s is indexed, the others shared."""
+    if params is None:
+        return None
+    if isinstance(params, dict):
+        return {
+            key: member_params(value, reference.get(key), index)
+            for key, value in params.items()
+        }
+    if reference is not None and np.ndim(params) == np.ndim(reference) + 1:
+        return np.asarray(params)[index]
+
+    return params
 
 
 def require_jax_evaluator(evaluator, verb):

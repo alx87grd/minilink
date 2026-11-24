@@ -64,13 +64,6 @@ lands. Last checked against the code: 2026-11-18 (NumPy 2.5, JAX 0.12, a cloud m
 - **Workaround:** pass `params=ev.params` to `jacobian`, or compile again after changing a number.
 - **Fix:** none planned yet; found by the check of the core notebooks.
 
-### `rollout_batch` on a NumPy evaluator fails with an `AttributeError`
-- **Symptom:** `plant.compile(backend="numpy").rollout_batch(starts, n_steps=5, dt=0.01)` raises
-  `AttributeError: 'NoneType' object has no attribute 'asarray'`, not a message saying the
-  batch needs the JAX backend. Reproduced 2026-11-12.
-- **Workaround:** `plant.compile(backend="jax")` for a batch.
-- **Fix:** none planned yet; a refusal that names the backend to use.
-
 ### An evaluation's rates are float32 beside float64 costs
 - **Symptom:** on the JAX backend `evaluation.feasibility_rate`, `reachability_rate` and
   `success_rate` are float32 (a mean of booleans), while `mean`, `std` and `worst` are

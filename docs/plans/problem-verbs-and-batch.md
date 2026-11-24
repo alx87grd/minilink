@@ -136,7 +136,7 @@ then this table.
 
 | Step | State |
 | --- | --- |
-| `PV-1` the batch rollout | open |
+| `PV-1` the batch rollout | done |
 | `PV-2` the free functions and the names-only comparison | open |
 | `PV-3` `J` | open |
 | `PV-4` `problem.program` | open |
@@ -144,7 +144,10 @@ then this table.
 | `PV-6` `array_module` | open |
 | `PV-7` the docs | open |
 
-**Decisions taken during the run:** none yet.
+**Decisions taken during the run:**
+- `PV-1`: the jitted batch is cached per solver as well as per layout, so an Euler batch
+  never reuses an RK4 one; the NumPy loop lives on the base evaluator (`looped_rollout`)
+  beside the `vmap` (`batched_rollout`), the family split by the same rule.
 
 **For the maintainer after the merge:** `alx87grd/teaching` and `alx87grd/workbench` on `dev`
 call the removed names; search them for `evaluate(`, `compare(`, `.program(` on a problem,
