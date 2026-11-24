@@ -410,9 +410,13 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   tabular RL, the policy evaluation and `Comparison` (`jmax` on the DP plots, `vmax` on the
   grid's and the animations' today), with the clipping it implies (scan: planning#3,
   examples#5); the operators' named forms exported together (scan: core#9).
-- [ ] **Profile the animation frames** (any time, agent): `Animator.build_frames` takes 22 s on
-  the Stanley lap, 40 s on the kinematic MPC racecar and 120 s on MPPI (335 frames, this
-  container, 2026-11-18), before either playback; find where it goes and cut it.
+- [ ] **Profile the animation frames** (any time, agent; in review on `dev-faster-meshcat`):
+  `Animator.build_frames` took 22 s on the Stanley lap, 40 s on the kinematic MPC racecar and
+  120 s on MPPI (335 frames, a cloud container, 2026-11-18), before either playback. A diagram
+  rebuilt every subsystem's skin on each frame; it now gives its subsystems' kinematic
+  geometry once (`get_kinematic_geometry`) and their per-frame geometry alone
+  (`get_dynamic_geometry`): 0.7 s, 0.3 s and 3 s on the same three (a cloud container,
+  2026-11-24, one run each).
 
 ### Wave B — GRO501, the carry-over (0.2.0 shipped)
 
