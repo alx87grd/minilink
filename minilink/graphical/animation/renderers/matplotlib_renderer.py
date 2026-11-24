@@ -12,6 +12,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg
+from PIL import Image
 
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -644,12 +645,18 @@ def save_matplotlib_clip(ani, path, fps, *, layers=None):
     if not path.suffix:
         path = path.with_suffix(".gif")
     is_gif = path.suffix.lower() == ".gif"
-    if layers is None or not (is_gif or animation.writers.is_available("ffmpeg")):
-        writer = "pillow" if is_gif else "ffmpeg"
-        ani.save(str(path), writer=writer, fps=fps, dpi=DPI_EXPORT)
+    if is_gif:
+        writer = (
+            ClipPaletteWriter(fps=fps)
+            if layers is None
+            else LayeredPillowWriter(layers, fps=fps)
+        )
+        ani.save(str(path), writer=writer, dpi=DPI_EXPORT)
+    elif layers is None or not animation.writers.is_available("ffmpeg"):
+        ani.save(str(path), writer="ffmpeg", fps=fps, dpi=DPI_EXPORT)
     else:
-        writer_of = LayeredPillowWriter if is_gif else LayeredFFMpegWriter
-        ani.save(str(path), writer=writer_of(layers, fps=fps), dpi=DPI_EXPORT)
+        writer = LayeredFFMpegWriter(layers, fps=fps)
+        ani.save(str(path), writer=writer, dpi=DPI_EXPORT)
 
     return path
 
@@ -852,9 +859,78 @@ class LayeredHTMLWriter(LayeredSaving, animation.HTMLWriter):
     """The HTML player, its frames drawn in layers."""
 
 
-class LayeredPillowWriter(LayeredSaving, animation.PillowWriter):
+class ClipPaletteWriter(animation.PillowWriter):
+    """
+    The GIF writer with one palette for the whole clip.
+
+    A GIF holds 256 colours. Reducing each frame to a palette of its own is
+    most of the time of a save; here the palette is reduced once, from frames
+    spread over the clip, and every frame's colours go to their nearest entry.
+    """
+
+    def finish(self):
+        frames = self._frames
+        if any(frame.mode != "RGB" for frame in frames):
+            # frames with transparency keep the writer's own reduction
+            super().finish()
+            return
+        indexed = frames_on_one_palette(frames)
+        indexed[0].save(
+            self.outfile,
+            save_all=True,
+            append_images=indexed[1:],
+            duration=int(1000 / self.fps),
+            loop=0,
+        )
+
+
+class LayeredPillowWriter(LayeredSaving, ClipPaletteWriter):
     """The GIF writer, its frames drawn in layers."""
 
 
 class LayeredFFMpegWriter(LayeredSaving, animation.FFMpegWriter):
     """The ffmpeg video writer, its frames drawn in layers."""
+
+
+# One palette for a clip
+
+# Frames, spread over the clip, the palette is reduced from
+_PALETTE_FRAMES = 6
+
+
+def frames_on_one_palette(frames) -> list:
+    """RGB ``frames`` as palette images sharing one palette of 256 colours."""
+    # The palette: the median cut of a mosaic of frames spread over the clip
+    picks = np.linspace(0, len(frames) - 1, min(_PALETTE_FRAMES, len(frames)))
+    picks = [frames[int(i)] for i in picks]
+    width, height = picks[0].size
+    mosaic = Image.new("RGB", (width, height * len(picks)))
+    for i, frame in enumerate(picks):
+        mosaic.paste(frame, (0, i * height))
+    reduced = mosaic.convert("P", palette=Image.Palette.ADAPTIVE)
+    flat = reduced.getpalette()
+    palette = np.array(flat, dtype=np.int32).reshape(-1, 3)
+
+    # Each colour of a frame to its nearest entry, found once per colour and
+    # kept in a table over the 2^24 colours
+    entry = np.zeros(1 << 24, dtype=np.uint8)
+    known = np.zeros(1 << 24, dtype=bool)
+    indexed = []
+    for frame in frames:
+        rgb = np.asarray(frame)
+        code = (
+            (rgb[..., 0].astype(np.uint32) << 16)
+            | (rgb[..., 1].astype(np.uint32) << 8)
+            | rgb[..., 2]
+        )
+        new = np.unique(code[~known[code]])
+        if len(new):
+            colours = np.stack([new >> 16, (new >> 8) & 255, new & 255], axis=1)
+            distance = (colours[:, None, :].astype(np.int32) - palette[None]) ** 2
+            entry[new] = np.argmin(distance.sum(axis=2), axis=1)
+            known[new] = True
+        image_p = Image.fromarray(entry[code], mode="P")
+        image_p.putpalette(flat)
+        indexed.append(image_p)
+
+    return indexed
