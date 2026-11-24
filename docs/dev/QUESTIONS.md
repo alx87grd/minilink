@@ -246,6 +246,9 @@ settlement (PR #139) left, four questions on the car ladder, four on the archite
      plant's parameters).
 - **Recommendation:** none yet; reopen when a second tool needs the read-back of 1 (a
   collocation program decodes `z` into a trajectory inside its planner today).
+- **Reopened (2026-11-24):** the maintainer's diagnosis is the shape of the compiled object,
+  not its name; a full redesign of the layer, with its six decisions, waits for review in
+  [problem-compile-layer.md](../plans/problem-compile-layer.md).
 - **Blocks:** nothing.
 - **Answer:**
 
