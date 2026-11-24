@@ -177,6 +177,10 @@ class Sys2Gym(gym.Env):
         self.u = self.sys.u_nominal
         self.t = self.t0
 
+        # An episode draws the system as it is now: its look is read again
+        if self._animator is not None:
+            self._animator.forget_kinematic_geometry()
+
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
         )

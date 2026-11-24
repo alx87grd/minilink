@@ -2105,8 +2105,8 @@ by a `visible` track. The clip, the saved page and the inline view are frame-acc
 size grows with the number of distinct geometries. In 3-D, polylines are thin ribbons
 (matplotlib dash and width), not 1-pixel WebGL lines.
 
-An animation or a live scene builds the system's kinematic geometry once, when it opens,
-and draws the same primitives in every frame; `tf` and `get_dynamic_geometry` are read at
+An animation or a live scene builds the system's kinematic geometry once, when it opens
+(a Gym environment again at each `reset`), and draws the same primitives in every frame; `tf` and `get_dynamic_geometry` are read at
 each frame. The kinematic geometry is drawn first, the per-frame geometry over it.
 In a flat matplotlib view the grid and the ticks lie under every shape.
 

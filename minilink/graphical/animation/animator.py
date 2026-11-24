@@ -177,7 +177,7 @@ class Animator:
         """
         if kinematic is None:
             # A new scene reads the system's kinematic geometry anew
-            self._kinematic = None
+            self.forget_kinematic_geometry()
             kinematic = self.kinematic_geometry()
         frame = self.resolve_frame(x, u, t, kinematic=kinematic)
 
@@ -214,6 +214,10 @@ class Animator:
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def forget_kinematic_geometry(self) -> None:
+        """Read the system's kinematic geometry anew at the next frame (a changed skin, new parameters)."""
+        self._kinematic = None
 
     def kinematic_geometry(self):
         """The system's kinematic geometry, built once for a clip or a live scene."""
