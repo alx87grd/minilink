@@ -2495,3 +2495,98 @@ class TestMatplotlibLayeredPaths(unittest.TestCase):
         plt.close(fig)
 
         self.assertTrue(same)
+
+
+def _page_commands(html) -> list:
+    """The commands a Meshcat page replays: what its server held, in order."""
+    import base64
+    import re
+
+    import umsgpack
+
+    packed = re.findall(r"data:application/octet-binary;base64,([A-Za-z0-9+/=]+)", html)
+
+    return [umsgpack.unpackb(base64.b64decode(command)) for command in packed]
+
+
+@pytest.mark.optional
+@pytest.mark.visualization
+class TestMeshcatServer(unittest.TestCase):
+    """The renderer's commands reach a Meshcat server, the page it gives back holds them."""
+
+    def setUp(self):
+        if not _has_meshcat():
+            self.skipTest("meshcat not installed")
+
+    def pendulum(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([2.0, 0.0])
+
+        return pendulum
+
+    def test_a_clip_reaches_the_server_and_saves_its_page(self):
+        import tempfile
+        from pathlib import Path
+
+        pendulum = self.pendulum()
+        traj = pendulum.compute_trajectory(tf=0.3)
+        result = pendulum.animate(traj, renderer="meshcat", show=False)
+        with tempfile.TemporaryDirectory() as folder:
+            page = result.save(Path(folder, "pendulum.html")).read_text()
+
+        commands = _page_commands(page)
+        kinds = [command["type"] for command in commands]
+        objects = [c["path"] for c in commands if c["type"] == "set_object"]
+        # The kinematic geometry, the first slots, each has its object
+        n_kinematic = sum(len(p) for p in pendulum.get_kinematic_geometry().values())
+        self.assertGreater(n_kinematic, 0)
+        for i in range(n_kinematic):
+            self.assertIn(f"/meshcat/minilink_scene/p{i}", objects)
+        self.assertEqual(kinds.count("set_animation"), 1)
+        animation = commands[kinds.index("set_animation")]
+        self.assertGreater(len(animation["animations"]), 0)
+
+    def test_live_frames_reach_the_server_in_order(self):
+        from unittest import mock
+
+        import meshcat
+
+        from minilink.graphical.animation import make_renderer
+
+        pendulum = self.pendulum()
+        animator = Animator(pendulum)
+        backend = make_renderer("meshcat", animator)
+        u = np.zeros(pendulum.m)
+        with (
+            mock.patch.object(meshcat.Visualizer, "open", lambda self: self),
+            mock.patch.object(meshcat.Visualizer, "wait", lambda self: None),
+        ):
+            animator.open_live_scene(backend, np.array([2.0, 0.0]), u, 0.0)
+            # more commands than the pipeline holds before it reads the answers
+            for k in range(1, 121):
+                animator.update_live_frame(
+                    backend, np.array([2.0 + 0.01 * k, 0.0]), u, 0.01 * k
+                )
+            frame = animator.resolve_frame(
+                np.array([3.2, 0.0]), u, 1.2, kinematic=animator.kinematic_geometry()
+            )
+            page = backend.vis.static_html()
+            backend.close_scene()
+
+        # The scene the server holds is the last frame's: each slot at its last pose
+        poses = {
+            c["path"]: np.array(c["matrix"]).reshape(4, 4).T
+            for c in _page_commands(page)
+            if c["type"] == "set_transform"
+        }
+        rod = next(
+            i for i, p in enumerate(frame["primitives"]) if type(p).__name__ == "Rod"
+        )
+        expected = frame["transforms"][rod].copy()
+        np.testing.assert_allclose(
+            poses[f"/meshcat/minilink_scene/p{rod}"][:3, :3],
+            expected[:3, :3],
+            atol=1e-12,
+        )
