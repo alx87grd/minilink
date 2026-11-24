@@ -697,45 +697,6 @@ class PlanningProblem:
             **entries,
         )
 
-    def program(
-        self,
-        controller,
-        wrt,
-        *,
-        bounds=None,
-        n_trials=None,
-        key=0,
-        dt=None,
-        solver="rk4",
-        substeps=None,
-        backend="auto",
-        episode_length=None,
-        params=None,
-    ):
-        """
-        Export the parameter-optimization :class:`~minilink.optimization.mathematical_program.MathematicalProgram` over ``wrt``.
-
-        Delegates to ``self.compile(controller, ...).program(wrt, ...)`` so the
-        loop is compiled, evaluated over the problem's draws, and lowered to an
-        NLP in one call.
-        """
-        pe = self.compile(
-            controller,
-            dt,
-            solver=solver,
-            substeps=substeps,
-            backend=backend,
-            episode_length=episode_length,
-        )
-
-        return pe.program(
-            wrt,
-            bounds=bounds,
-            key=key,
-            n_trials=n_trials,
-            params=params,
-        )
-
     def compile(
         self,
         controller,

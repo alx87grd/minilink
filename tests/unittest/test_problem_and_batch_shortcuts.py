@@ -57,27 +57,38 @@ class TestPlanningProblemShortcuts:
             alone = problem.evaluate(ctrl, dt=0.05, n_trials=4, backend="numpy")
             assert np.allclose(comparison.evaluations[name].J, alone.J)
 
-    def test_program_matches_compiled_evaluator_and_solves(self):
+    def test_the_tuning_program_of_J_solves(self):
         plant = Pendulum()
         cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
         problem = PlanningProblem(plant, x0=[1.0, 0.0], horizon=2.0, cost=cost)
-        ctrl = Impedance(Kp=1.0, Kd=1.0)
+        J = problem.compile(Impedance(Kp=1.0, Kd=1.0), dt=0.05, backend="numpy")
         wrt = ["controller.Kp", "controller.Kd"]
         bounds = {"controller.Kp": (0.0, 30.0), "controller.Kd": (0.0, 15.0)}
 
-        prog_method = problem.program(
-            ctrl, wrt, bounds=bounds, dt=0.05, backend="numpy"
-        )
-        prog_compiled = problem.compile(ctrl, dt=0.05, backend="numpy").program(
-            wrt, bounds=bounds
-        )
+        program = J.program(wrt, bounds=bounds)
+        best = Optimizer(program, method="slsqp").solve()
 
-        z0 = np.array([1.0, 1.0])
-        assert np.isclose(prog_method.J(z0), prog_compiled.J(z0))
+        assert best.success and best.J < program.J(program.z0)
+        assert np.isclose(program.J(best.z), J(J.unpack(best.z, wrt)))
 
-        best = Optimizer(prog_method, method="slsqp").solve()
-        assert best.success
-        assert best.J < prog_method.J(z0)
+    def test_the_shortcuts_forward_every_keyword_of_compile_and_evaluate(self):
+        import inspect
+
+        from minilink.planning.evaluator import ProblemEvaluator
+
+        def keywords(function):
+            return {
+                name: p.default
+                for name, p in inspect.signature(function).parameters.items()
+                if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
+                and name not in ("self", "controller", "params", "n_trials", "key")
+            }
+
+        compile_keywords = keywords(PlanningProblem.compile)
+        for shortcut in (PlanningProblem.evaluate, PlanningProblem.compare):
+            assert compile_keywords.items() <= keywords(shortcut).items()
+        evaluate_keywords = set(keywords(ProblemEvaluator.evaluate))
+        assert evaluate_keywords <= set(keywords(PlanningProblem.evaluate))
 
 
 class TestSystemRolloutBatch:

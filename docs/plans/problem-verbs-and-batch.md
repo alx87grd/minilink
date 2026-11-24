@@ -139,7 +139,7 @@ then this table.
 | `PV-1` the batch rollout | done |
 | `PV-2` the free functions and the names-only comparison | done |
 | `PV-3` `J` | done |
-| `PV-4` `problem.program` | open |
+| `PV-4` `problem.program` | done (the showcase with `PV-5`) |
 | `PV-5` README and showcase | open |
 | `PV-6` `array_module` | open |
 | `PV-7` the docs | open |
