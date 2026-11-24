@@ -2107,6 +2107,7 @@ size grows with the number of distinct geometries. In 3-D, polylines are thin ri
 An animation or a live scene builds the system's kinematic geometry once, when it opens,
 and draws the same primitives in every frame; `tf` and `get_dynamic_geometry` are read at
 each frame. The kinematic geometry is drawn first, the per-frame geometry over it.
+In a flat matplotlib view the grid and the ticks lie under every shape.
 
 The live paths (`game`, `RealtimeSimulator`, the evaluator's `live_plot`, `LiveSearchPlot`,
 the trajectory-optimization live plot) are sessions, not records: they draw as they run and

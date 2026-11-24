@@ -20,12 +20,12 @@ class LayeredFrames:
     """
     The frames of a flat animation as images, each the same as a full draw of the figure.
 
-    A full draw of a figure redraws what does not move: the tick labels and
-    their fonts, the axis labels, the figure itself. While the view (the axis
-    limits and labels) is the one of the frame before, those come from an
-    image kept for that view, and only the primitives' artists, the grid and
-    tick lines, the frame and the title are drawn over it, in the order of a
-    full draw. A frame on a new view is a full draw.
+    A full draw of a figure redraws what does not move: the axes with their
+    grid, ticks and labels, the figure itself. The animation's axes lie under
+    every shape, so while the view (the axis limits and labels) is the one of
+    the frame before, they come from an image kept for that view, and only the
+    primitives' artists, the frame and the title are drawn over it, in the
+    order of a full draw. A frame on a new view is a full draw.
 
     ``rgba()`` gives the frame the figure holds, between :meth:`open` and
     :meth:`close`; ``draw_on`` draws it into a canvas the figure is shown on.
@@ -40,7 +40,7 @@ class LayeredFrames:
         self.agg = None  # The canvas drawn into
         self.view = None  # The view of the last frame
         self.title_position = None  # Where a full draw of this view puts the title
-        self.background = None  # (image, ticks drawn) kept for this view
+        self.background = None  # The image kept for this view
 
     def open(self, dpi) -> None:
         """Draw at ``dpi`` on a canvas of its own until :meth:`close`."""
@@ -100,8 +100,11 @@ class LayeredFrames:
         )
 
     def can_layer(self) -> bool:
-        """True when a full draw only draws what the layers order: no layout to redo, no other artist."""
+        """True when a full draw only draws what the layers order: axes under the shapes, no layout to redo, no other artist."""
         ax = self.ax
+        if ax.get_axisbelow() is not True:
+            # A grid over some of the shapes belongs between them, not on the background
+            return False
         engine = self.fig.get_layout_engine()
         if engine is not None and not isinstance(engine, PlaceHolderLayoutEngine):
             # A layout engine places the axes from everything drawn, the title included
@@ -123,11 +126,7 @@ class LayeredFrames:
 
     def keep_background(self) -> None:
         """Draw and keep what stays on this view: everything but the layers drawn per frame."""
-        # The ticks the last full draw placed on this view. ``_update_ticks`` is
-        # matplotlib's own name for it, with no public twin; the layered-frame
-        # tests of test_graphics.py fail if it moves.
-        ticks = {axis: axis._update_ticks() for axis in (self.ax.xaxis, self.ax.yaxis)}
-        over = self.layers_over(ticks)
+        over = self.layers_over()
         was_visible = [artist.get_visible() for artist in over]
         for artist in over:
             artist.set_visible(False)
@@ -138,34 +137,22 @@ class LayeredFrames:
         finally:
             for artist, visible in zip(over, was_visible):
                 artist.set_visible(visible)
-        self.background = (image_kept, ticks)
+        self.background = image_kept
 
-    def layers_over(self, ticks) -> list:
+    def layers_over(self) -> list:
         """The artists drawn over the background, in the order a full draw gives them."""
         ax = self.ax
-        children = [*self.primitives.drawn_objects, *ax.spines.values()]
-        children += [ax.xaxis, ax.yaxis, ax.title]
-        ordered = sorted(children, key=lambda artist: artist.zorder)
-        over = []
-        for artist in ordered:
-            if artist in ticks:
-                # An axis draws, tick by tick, its grid line then its tick lines;
-                # its labels are on the background
-                for tick in ticks[artist]:
-                    over += [tick.gridline, tick.tick1line, tick.tick2line]
-            else:
-                over.append(artist)
+        children = [*self.primitives.drawn_objects, *ax.spines.values(), ax.title]
 
-        return over
+        return sorted(children, key=lambda artist: artist.zorder)
 
     def draw_over_background(self) -> None:
-        image_kept, ticks = self.background
         renderer = self.agg.get_renderer()
-        self.agg.restore_region(image_kept)
+        self.agg.restore_region(self.background)
         # A draw of the axes places the title; the layers put it where the
         # full draw of this view did
         self.ax.title.set_position(self.title_position)
-        for artist in self.layers_over(ticks):
+        for artist in self.layers_over():
             artist.draw(renderer)
 
 

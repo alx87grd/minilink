@@ -64,6 +64,9 @@ def style_animation_axes(ax, *, is_3d: bool) -> None:
     """Tick labels, grid, and axis label sizes for animation/static kinematic views."""
     ax.tick_params(axis="both", which="both", labelsize=FONT_SIZE)
     ax.grid(True)
+    if not is_3d:
+        # The grid and the ticks under every shape, filled ones included
+        ax.set_axisbelow(True)
     ax.xaxis.label.set_fontsize(FONT_SIZE)
     ax.yaxis.label.set_fontsize(FONT_SIZE)
     if is_3d:
