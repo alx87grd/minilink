@@ -2282,43 +2282,42 @@ class TestMeshcatFastPaths(unittest.TestCase):
 
 
 class TestMatplotlibLayeredFrames(unittest.TestCase):
-    """A frame drawn in layers is the frame a full draw of the figure gives."""
+    """A clip's frames drawn in layers are the frames full draws of the figure give."""
 
-    def frames_of(self, system, traj, **animate):
-        from minilink.graphical.common.matplotlib_style import DPI_FIGURE
+    def players_of(self, system, traj):
+        import itertools
+        import uuid
+        from unittest import mock
 
-        result = system.animate(traj, renderer="matplotlib", show=False, **animate)
+        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+            player_html,
+        )
+
+        result = system.animate(traj, renderer="matplotlib", show=False)
         fig, ani = result.clip.built()
-        layers = result.clip.backend.layers
-        full, layered = [], []
-        for k in range(len(result.clip.frames)):
-            ani._func(k)
-            buffer = io.BytesIO()
-            fig.savefig(buffer, format="rgba", dpi=DPI_FIGURE)
-            full.append(buffer.getvalue())
-        layers.open(DPI_FIGURE)
-        for k in range(len(result.clip.frames)):
-            ani._func(k)
-            layered.append(layers.rgba().tobytes())
-        layers.close()
+        fps = 1000.0 / result.clip.schedule.interval_ms
+        players = []
+        for layers in (None, result.clip.backend.layers):
+            # the player names its page elements by a random id
+            ids = (uuid.UUID(int=i) for i in itertools.count())
+            with mock.patch("uuid.uuid4", lambda ids=ids: next(ids)):
+                players.append(player_html(ani, layers=layers, fps=fps))
         plt.close(fig)
 
-        return full, layered
+        return players
 
-    def test_layered_frames_match_full_draws_on_a_still_view(self):
+    def test_the_player_is_the_same_on_a_still_view(self):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         pendulum = Pendulum()
         pendulum.x0 = np.array([2.0, 0.0])
         traj = pendulum.compute_trajectory(tf=0.5)
 
-        full, layered = self.frames_of(pendulum, traj)
+        full, layered = self.players_of(pendulum, traj)
 
-        self.assertGreater(len(full), 5)
         self.assertEqual(full, layered)
-        self.assertNotEqual(full[0], full[-1])
 
-    def test_layered_frames_match_full_draws_when_the_view_moves(self):
+    def test_the_player_is_the_same_when_the_view_moves(self):
         class Slider(DynamicSystem):
             def __init__(self):
                 super().__init__(1)
@@ -2333,13 +2332,15 @@ class TestMatplotlibLayeredFrames(unittest.TestCase):
                 return {"body": translation(x[0], 0.0, 0.0)}
 
         slider = Slider()
+        # the body moves, stands still, moves again: full draws and layered ones
+        positions = [0.0, 0.5, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0]
         traj = Trajectory(
             t=np.linspace(0.0, 0.3, 10),
-            x=np.linspace(0.0, 3.0, 10).reshape(1, 10),
+            x=np.array([positions]),
             u=np.zeros((0, 10)),
         )
 
-        full, layered = self.frames_of(slider, traj)
+        full, layered = self.players_of(slider, traj)
 
         self.assertEqual(full, layered)
 

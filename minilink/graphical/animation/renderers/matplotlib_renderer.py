@@ -6,7 +6,9 @@ from itertools import product
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import matplotlib as mpl
 import matplotlib.animation as animation
+import matplotlib.colors as mcolors
 import matplotlib.image as image
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -519,6 +521,8 @@ class MatplotlibRenderer(AnimationRenderer):
         self.fig = None
         self.ax = None
         self.canvas = None
+        self.layers = None
+        self.window_shown = False
 
     def _build_animation(
         self,
@@ -724,16 +728,19 @@ class LayeredFrames:
         """Draw at ``dpi`` on a canvas of its own until :meth:`close`."""
         self.shown = self.fig.canvas
         self.shown_dpi = self.fig.dpi
-        # the resolution without resizing a window that shows the figure
-        self.fig._set_dpi(dpi, forward=False)
+        # on the canvas of its own, the resolution changes no window's size
         self.agg = QuietCanvas(self.fig)
+        self.fig.set_dpi(dpi)
         self.view = None
         self.background = None
 
     def close(self) -> None:
         """The figure back on its own canvas, at its own resolution."""
+        if self.shown is None:
+            return
+        self.fig.set_dpi(self.shown_dpi)
         self.fig.set_canvas(self.shown)
-        self.fig._set_dpi(self.shown_dpi, forward=False)
+        self.shown = None
         self.agg = None
         self.background = None
 
@@ -751,7 +758,7 @@ class LayeredFrames:
             # A new view: a full draw, which also places its ticks
             self.view = view
             self.background = None
-            FigureCanvasAgg.draw(agg)
+            agg.draw()
             self.title_position = self.ax.title.get_position()
         else:
             if self.background is None or self.background[0] != view:
@@ -800,10 +807,13 @@ class LayeredFrames:
         was_visible = [artist.get_visible() for artist in over]
         for artist in over:
             artist.set_visible(False)
-        FigureCanvasAgg.draw(self.agg)
-        image_kept = self.agg.copy_from_bbox(self.fig.bbox)
-        for artist, visible in zip(over, was_visible):
-            artist.set_visible(visible)
+        try:
+            # into the image only: a window is shown the finished frame
+            FigureCanvasAgg.draw(self.agg)
+            image_kept = self.agg.copy_from_bbox(self.fig.bbox)
+        finally:
+            for artist, visible in zip(over, was_visible):
+                artist.set_visible(visible)
         self.background = (view, image_kept, ticks)
 
     def layers_over(self, ticks) -> list:
@@ -855,6 +865,12 @@ class LayeredFigure:
         self.layers = layers
 
     def savefig(self, target, *, format, dpi, **savefig_kwargs):
+        if format not in ("png", "rgba") or not keeps_figure_colours(
+            self.fig, savefig_kwargs
+        ):
+            # a frame the layers do not write: the figure's own, a full draw
+            self.fig.savefig(target, format=format, dpi=dpi, **savefig_kwargs)
+            return
         rgba = self.layers.rgba()
         if format == "png":
             image.imsave(target, rgba, format="png", origin="upper", dpi=dpi)
@@ -866,6 +882,23 @@ class LayeredFigure:
             raise AttributeError(name)
 
         return getattr(self.fig, name)
+
+
+def keeps_figure_colours(fig, savefig_kwargs) -> bool:
+    """True when a save with these options paints the figure in its own face and edge colours."""
+    if savefig_kwargs.get("transparent", mpl.rcParams["savefig.transparent"]):
+        return False
+    for side, own in (
+        ("facecolor", fig.get_facecolor()),
+        ("edgecolor", fig.get_edgecolor()),
+    ):
+        colour = savefig_kwargs.get(side, mpl.rcParams[f"savefig.{side}"])
+        if isinstance(colour, str) and colour == "auto":
+            continue
+        if not mcolors.same_color(colour, own):
+            return False
+
+    return True
 
 
 class LayeredSaving:
@@ -881,7 +914,8 @@ class LayeredSaving:
         self.fig = LayeredFigure(fig, self.layers)
 
     def finish(self):
-        self.fig = self.fig.fig
+        if isinstance(self.fig, LayeredFigure):
+            self.fig = self.fig.fig
         self.layers.close()
         super().finish()
 
