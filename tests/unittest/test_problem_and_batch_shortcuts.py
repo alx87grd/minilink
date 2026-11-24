@@ -1,7 +1,8 @@
-"""Contract tests for the PlanningProblem shortcuts (evaluate, compare, program) and System.rollout_batch."""
+"""Contract tests for the PlanningProblem shortcuts (evaluate, compare), the compiled objective J, and System.rollout_batch."""
 
 from __future__ import annotations
 
+import inspect
 from importlib.util import find_spec
 
 import numpy as np
@@ -15,12 +16,13 @@ from minilink import (
     QuadraticCost,
     Uniform,
 )
+from minilink.planning import ProblemEvaluator
 
 JAX_AVAILABLE = find_spec("jax") is not None
 
 
 class TestPlanningProblemShortcuts:
-    """PlanningProblem.evaluate, .compare, and .program match their standalone/evaluator twins."""
+    """PlanningProblem.evaluate and .compare score as the compiled loop J does."""
 
     def test_evaluate_is_the_compiled_evaluation(self):
         plant = Pendulum()
@@ -72,10 +74,6 @@ class TestPlanningProblemShortcuts:
         assert np.isclose(program.J(best.z), J(J.unpack(best.z, wrt)))
 
     def test_the_shortcuts_forward_every_keyword_of_compile_and_evaluate(self):
-        import inspect
-
-        from minilink.planning.evaluator import ProblemEvaluator
-
         def keywords(function):
             return {
                 name: p.default
@@ -161,6 +159,20 @@ class TestSystemRolloutBatch:
         for i, x0 in enumerate(starts):
             single = ev.rollout(x0, None, 0.0, 0.01, solver="euler", n_steps=5)
             assert np.allclose(xs[i], single)
+
+    def test_a_family_of_the_wrong_size_is_refused_on_numpy(self):
+        plant = Pendulum()
+        starts = np.zeros((3, 2))
+        lengths = np.array([0.5, 1.0, 1.5, 2.0])
+
+        with pytest.raises(ValueError, match="leading axis 4; the batch has 3"):
+            plant.rollout_batch(
+                starts,
+                n_steps=5,
+                dt=0.05,
+                params=dict(plant.params, l=lengths),
+                backend="numpy",
+            )
 
     def test_step_evaluator_rollout_batch_needs_jax(self):
         plant = Pendulum()

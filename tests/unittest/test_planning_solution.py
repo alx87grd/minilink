@@ -255,7 +255,7 @@ def test_grid_laws_are_scored_and_drawn_as_handed_out(make):
 
 
 def test_value_iteration_scores_the_law_it_hands_out_continuously():
-    """solve(evaluate=True), problem.evaluate(controller, dt) and dt.compare() agree: the planner's dt, no hold."""
+    """solve(evaluate=True), problem.evaluate(controller, dt) and problem.compare(..., dt=) agree: the planner's dt, no hold."""
 
     problem = pendulum_problem().replace(Xf=None)
     vi = DynamicProgrammingPlanner(problem, x_grid=(41, 41), u_grid=(5,), dt=0.1)
@@ -473,8 +473,7 @@ def test_compare_reads_the_solutions_side_by_side():
     assert [trace.name for trace in runs.figure.data[:2]] == ["VI", "LQR"]
 
     # one evaluation scores every policy on the same draws; a solution stands for its policy
-    scored = problem.compare(VI=vi, LQR=lqr, dt=0.1, backend="numpy")
-    assert list(scored) == ["VI", "LQR"] and scored["LQR"] is lqr
+    scored = race
     J_lqr = problem.evaluate(lqr.controller, dt=0.1, backend="numpy").J
     np.testing.assert_array_equal(scored.evaluations["LQR"].J, J_lqr)
     assert f"{float(J_lqr[0]):.4g}" in str(scored) and scored.problem is problem

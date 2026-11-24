@@ -39,8 +39,8 @@ Nominal good and simulation bad reads "the plan is right; run it with feedback"
   spread is the same problem with its distributions, every simulation drawn.
 - **R5.** A nominal trajectory longer than the horizon is scored on the horizon: cut at
   `t0 + T`, the state at that instant interpolated.
-- **R6.** `Comparison.problem` is the judged problem, `None` for a comparison by names only;
-  the nominal scores, the goal and the constraints read it.
+- **R6.** `Comparison.problem` is the judged problem, always present (a comparison scores on
+  its problem, `problem.compare(...)`); the nominal scores, the goal and the constraints read it.
 - **R7.** On a figure matplotlib draws itself whose panels share the time axis, one legend
   sits beside the panels, gathered from every panel's labels; a figure drawn on given axes
   is left as it is. `Panel.legend` stays a bool.
@@ -52,14 +52,13 @@ Nominal good and simulation bad reads "the plan is right; run it with feedback"
   as the table (at least the report width, 60), the title, an `=` rule, the table, a closing
   `=` rule. The title names the judged system and its horizon, and on several draws the
   criterion and their number: `Comparison, Pendulum, horizon=5, criterion=expectation, 100
-  draws`; by names only, `Comparison of 2 solutions, each scored on its own problem`.
+  draws`.
 - **R11.** On several draws the simulation half shows `E[J]`, `σ(J)` and `max J` from the
   evaluation (`mean`, `std`, `worst`). A criterion other than the expectation comes first,
   its own column (`CVaR_α(J)`), and a statistic is shown once: the worst-case criterion is
   `max J` itself. σ, not the variance: it reads in the units of J, beside the mean. The
   criterion is the judged problem's, read on every row's `J` whatever criterion an
-  `Evaluation` entry was made with (by names only, the first evaluation's over several
-  draws). Entries with different numbers of draws title a range (`5–10 draws`); one run
+  `Evaluation` entry was made with. Entries with different numbers of draws title a range (`5–10 draws`); one run
   among several draws shows its `J` in the first column and `-` in the others.
 - An answer's lines all carry its name: each label once in the legend, and on Plotly a
   click on the key shows or hides every line of that answer. The first row and the rows
@@ -100,8 +99,7 @@ goal and the constraints in words.
   the order of the entries.
 - `plot_simulated_trajectory`: per answer, the judge's simulations from its evaluation (the
   plant's part of each): one solid, several thin and faint (width 0.6, alpha 0.12). An
-  `Evaluation` entry is drawn when it keeps its trajectories; by names only, the controller
-  run once from its problem's start (`controller_run_of`). Title `simulation`.
+  `Evaluation` entry is drawn when it keeps its trajectories. Title `simulation`.
 - `plot_nominal_trajectory`: per answer with one, the nominal trajectory, solid and drawn
   whole (past the horizon when it is longer). Answers without one are left out; none at all
   is refused. Title `nominal trajectory`.

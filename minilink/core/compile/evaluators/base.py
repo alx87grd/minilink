@@ -175,30 +175,10 @@ class Evaluator(JacobianMixin):
         ``run`` closes over (a solver), so each keeps its own compiled form.
         """
         require_jax_evaluator(self, "rollout_batch")
-        jax, jnp = self.jax, self.jnp
-        x0s = jnp.asarray(x0s, dtype=float)
-        if x0s.ndim != 2 or x0s.shape[1] != self.n:
-            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
-        batch = int(x0s.shape[0])
-
-        if u_sequences is None:
-            if n_steps is None:
-                raise ValueError("n_steps is required when u_sequences is None")
-            u_seq = jnp.broadcast_to(self._u_nominal, (int(n_steps), self.m))
-            u_axis = None
-        else:
-            u_seq = jnp.asarray(u_sequences, dtype=float)
-            if u_seq.ndim == 2:
-                u_axis = None
-            elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
-                u_axis = 0
-            else:
-                raise ValueError(
-                    f"u_sequences must have shape (N, {self.m}) or "
-                    f"({batch}, N, {self.m}); got {u_seq.shape}"
-                )
-            if n_steps is not None and u_seq.shape[-2] != int(n_steps):
-                raise ValueError("n_steps disagrees with u_sequences")
+        jax = self.jax
+        x0s, batch, u_seq, u_axis = self.family_inputs_of(
+            self.jnp, x0s, u_sequences, n_steps
+        )
         shared_axes = (None,) * len(shared)
 
         # One jitted vmap per (input layout, family layout): repeated sweeps
@@ -253,38 +233,15 @@ class Evaluator(JacobianMixin):
     def looped_rollout(self, run, x0s, u_sequences, n_steps, params, *shared):
         """``run(x0, u, p, *shared)`` over a family, one member after another (NumPy).
 
-        The family is the one :meth:`batched_rollout` maps: the starts ``x0s``
-        ``(B, n)``, the inputs (the nominal one for ``n_steps``, one ``(N, m)``
-        sequence shared, or ``(B, N, m)``) and the parameter leaves with one more
-        dimension than the compiled value. Returns ``(B, N + 1, n)``.
+        The family is the one :meth:`batched_rollout` maps; returns ``(B, N + 1, n)``.
         """
-        x0s = np.asarray(x0s, dtype=float)
-        if x0s.ndim != 2 or x0s.shape[1] != self.n:
-            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
-        batch = int(x0s.shape[0])
-
-        if u_sequences is None:
-            if n_steps is None:
-                raise ValueError("n_steps is required when u_sequences is None")
-            u_seqs = [None] * batch
-        else:
-            u_seq = np.asarray(u_sequences, dtype=float)
-            if u_seq.ndim == 2:
-                u_seqs = [u_seq] * batch
-            elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
-                u_seqs = list(u_seq)
-            else:
-                raise ValueError(
-                    f"u_sequences must have shape (N, {self.m}) or "
-                    f"({batch}, N, {self.m}); got {u_seq.shape}"
-                )
-            if n_steps is not None and u_seq.shape[-2] != int(n_steps):
-                raise ValueError("n_steps disagrees with u_sequences")
+        x0s, batch, u_seq, u_axis = self.family_inputs_of(np, x0s, u_sequences, n_steps)
+        require_family_size(params, self._frozen_params, batch)
 
         runs = [
             run(
                 x0s[i],
-                u_seqs[i],
+                u_seq if u_axis is None else u_seq[i],
                 member_params(params, self._frozen_params, i),
                 *shared,
             )
@@ -292,6 +249,36 @@ class Evaluator(JacobianMixin):
         ]
 
         return np.stack(runs, axis=0)
+
+    def family_inputs_of(self, xp, x0s, u_sequences, n_steps):
+        """``(x0s, B, u_seq, u_axis)``: the starts, their number, the inputs (the nominal one held for ``n_steps``) and the axis that carries one sequence per member (``None``: shared)."""
+        x0s = xp.asarray(x0s, dtype=float)
+        if x0s.ndim != 2 or x0s.shape[1] != self.n:
+            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
+        batch = int(x0s.shape[0])
+
+        if u_sequences is None:
+            if n_steps is None:
+                raise ValueError("n_steps is required when u_sequences is None")
+            u_seq = xp.broadcast_to(
+                xp.asarray(self._u_nominal, dtype=float), (int(n_steps), self.m)
+            )
+            return x0s, batch, u_seq, None
+
+        u_seq = xp.asarray(u_sequences, dtype=float)
+        if u_seq.ndim == 2:
+            u_axis = None
+        elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
+            u_axis = 0
+        else:
+            raise ValueError(
+                f"u_sequences must have shape (N, {self.m}) or "
+                f"({batch}, N, {self.m}); got {u_seq.shape}"
+            )
+        if n_steps is not None and u_seq.shape[-2] != int(n_steps):
+            raise ValueError("n_steps disagrees with u_sequences")
+
+        return x0s, batch, u_seq, u_axis
 
 
 class ContinuousEvaluator(Evaluator):
@@ -422,10 +409,8 @@ class ContinuousEvaluator(Evaluator):
             Sampled states, ``x0`` first, for every member of the family.
         """
 
-        # The nominal input (u None, NumPy only) runs for n_steps periods
         def run(x0, u, p, t0, dt):
-            steps = n_steps if u is None else None
-            return self.rollout(x0, u, t0, dt, p, solver=solver, n_steps=steps)
+            return self.rollout(x0, u, t0, dt, p, solver=solver)
 
         if self.backend != BACKEND_JAX:
             return self.looped_rollout(
@@ -571,6 +556,20 @@ def member_params(params, reference, index):
         return np.asarray(params)[index]
 
     return params
+
+
+def require_family_size(params, reference, batch):
+    """Refuse a parameter family whose leading axis is not the batch's size ``B``."""
+    if isinstance(params, dict):
+        for key, value in params.items():
+            require_family_size(value, (reference or {}).get(key), batch)
+        return
+    if reference is not None and np.ndim(params) == np.ndim(reference) + 1:
+        size = np.shape(params)[0]
+        if size != batch:
+            raise ValueError(
+                f"a parameter family has leading axis {size}; the batch has {batch} starts"
+            )
 
 
 def require_jax_evaluator(evaluator, verb):

@@ -168,6 +168,15 @@ then this table.
 - `PV-3`: `J.evaluate`, `J.program` and `J(p)` take `key=None`, read as the compile's
   `key` (0 by default), so a call that names no key runs as before.
 
+**Review pass** (two independent reviewers, correctness and architecture, then the fixes):
+the NumPy batch refuses a family whose leading axis is not `B` again (the JAX path refuses it
+through `vmap`); the batch's input checks live once (`family_inputs_of`), the outputs
+byte-identical to the run's first state on both backends and both solvers; the comparison
+lost its last names-only branch; RULES 2.7 records `J`; the docs, notebooks, the experimental
+boat demo and the slide deck that still named the removed functions follow. Kept as it is: the
+lazy-import comment form of the facade file ("a real cycle through minilink.core.system"), the
+one the file already used seven times.
+
 **For the maintainer after the merge:** `alx87grd/teaching` and `alx87grd/workbench` on `dev`
 call the removed names; search them for `evaluate(`, `compare(`, `.program(` on a problem,
 `pe.` and `evaluator.` on a compiled problem, and `rollout_batch(` on a NumPy evaluator.

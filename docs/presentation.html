@@ -772,8 +772,8 @@ S  = plant.<span class="token-fn">jacobian</span>(<span class="token-str">"f"</s
 xs = ev.<span class="token-fn">rollout_batch</span>(x0s, n_steps=<span class="token-num">1000</span>, dt=<span class="token-num">0.005</span>, params=p_batch)
 
 <span class="token-com"># Closed-loop gradient descent on gains and physical parameters</span>
-dJ = jax.<span class="token-fn">grad</span>(<span class="token-kw">lambda</span> p: pe.<span class="token-fn">evaluate</span>(p).objective)(pe.params)
-best = <span class="token-cls">Optimizer</span>(pe.<span class="token-fn">program</span>(wrt=[<span class="token-str">"controller.Kp"</span>, <span class="token-str">"plant.m"</span>])).<span class="token-fn">solve</span>()</div>
+dJ = jax.<span class="token-fn">grad</span>(J)(J.params)
+best = <span class="token-cls">Optimizer</span>(J.<span class="token-fn">program</span>(wrt=[<span class="token-str">"controller.Kp"</span>, <span class="token-str">"plant.m"</span>])).<span class="token-fn">solve</span>()</div>
         </div>
       </div>
     </div>
@@ -813,8 +813,8 @@ best = <span class="token-cls">Optimizer</span>(pe.<span class="token-fn">progra
           <div class="code-body"><span class="token-kw">from</span> minilink <span class="token-kw">import</span> <span class="token-cls">Optimizer</span>
 
 <span class="token-com"># Any problem lowers to a MathematicalProgram</span>
-pe = problem.<span class="token-fn">compile</span>(ctrl)
-program = pe.<span class="token-fn">program</span>(wrt=[<span class="token-str">"controller.Kp"</span>, <span class="token-str">"controller.Kd"</span>])
+J = problem.<span class="token-fn">compile</span>(ctrl)
+program = J.<span class="token-fn">program</span>(wrt=[<span class="token-str">"controller.Kp"</span>, <span class="token-str">"controller.Kd"</span>])
 
 <span class="token-com"># Switch solvers with a single keyword:</span>
 <span class="token-com"># "auto", "adam", "l-bfgs", "slsqp", "ipopt"</span>
@@ -846,7 +846,7 @@ print(result.success, result.z, result.J)</div>
             <ul class="bullet-list" style="gap: 5px; font-size: 0.83rem; line-height: 1.38;">
               <li><strong>Unified Formulation:</strong> DP, Trajectory Optimization, RRT, and Deep RL solve the exact same mathematical problem.</li>
               <li><strong>Neural Policies as Systems:</strong> A trained neural network policy (<code>NeuralPolicy</code> / MLP) is a standard <code>System</code>: <code>loop = controller @ plant</code>.</li>
-              <li><strong>Objective Benchmarking:</strong> Single <code>compare()</code> function evaluates open-loop trajectories, state-feedback, and neural policies on the identical task.</li>
+              <li><strong>Objective Benchmarking:</strong> One <code>problem.compare()</code> evaluates open-loop trajectories, state-feedback, and neural policies on the identical task.</li>
             </ul>
           </div>
         </div>

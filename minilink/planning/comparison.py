@@ -121,8 +121,8 @@ class Comparison:
     horizon and, on several draws, the criterion and their number: each
     answer read twice (``J``, goal, constraints), its nominal trajectory, the
     planner's own, cut at the horizon ``t0 + T`` and scored on the problem
-    without simulation (``-`` for an answer without one), beside its simulation, the block it hands out
-    simulated by the judge (on several draws, the judged criterion first when
+    without simulation (``-`` for an answer without one), beside its
+    simulation, the block it hands out simulated by the judge (on several draws, the judged criterion first when
     it is not the expectation, then ``E[J]``, ``σ(J)`` and ``max J``, and the
     counts). ``print(comparison[name])`` shows a planner's record. Each
     ``plot_*`` draws the solutions on one figure with one scale, and
@@ -490,7 +490,7 @@ def deadline_marks_of(problem, signal, k) -> tuple:
     On every row the horizon ``t0 + T``, a dotted grey vertical; on a row of
     ``x`` also the goal's extent there, a dark grey segment
     (``Xf.bounding_box()``; none for a set without one). None without a
-    problem or a finite horizon.
+    finite horizon.
     """
     if problem.horizon_kind() != "finite":
         return ()
@@ -540,7 +540,7 @@ def comparison_text(comparison) -> str:
     # The numbers: each nominal trajectory's score; the draws, the judged criterion and
     # the statistics the simulations show
     nominals = {name: nominal_score_of(comparison, name) for name in names}
-    several = [e for e in runs.values() if e is not None and e.n_trials > 1]
+    several = [e for e in runs.values() if e.n_trials > 1]
     criterion = comparison.problem.criterion
     statistics = statistics_of(criterion, several)
 

@@ -15,7 +15,6 @@ from minilink import (
     PlanningProblem,
     ReinforcementLearningPlanner,
     Uniform,
-    evaluate,
 )
 
 TRAINING_TIMESTEPS = 2_000_000  # about six minutes on a laptop CPU
@@ -65,7 +64,7 @@ np.savez(
 )  # parking_compare.py rebuilds the law from these
 ppo_ctl.plot_control_law(x_axis=0, y_axis=1, u_axis=0)  # surge thrust vs (x, y)
 
-report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
+report = problem.evaluate(ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 boat.x0 = X_START.copy()

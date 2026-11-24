@@ -115,7 +115,8 @@ concrete formatting, ordered by the cost of being wrong:
   `cost_to_go` is the function `J(x, t)` (a `Field`; `J*` or `J_π` by its source, not its
   name; a value-iteration record's `.J` is the DP table, by node). A quantity that is neither keeps a name of its own
   (`raw_cost`, `path_cost`, `cost_to_come`, `mean_episode_cost`). Recorded exception:
-  `Manipulator.J(q)` is the Jacobian, the robotics textbook's letter.
+  `Manipulator.J(q)` is the Jacobian, the robotics textbook's letter; the compiled closed loop
+  `J = problem.compile(controller)` is that scalar as a function of the parameter tree, `J(p)`.
   The whole vocabulary, one word per idea and one idea per word
   (`tests/unittest/test_vocabulary.py` refuses the retired words on the public surface):
 
