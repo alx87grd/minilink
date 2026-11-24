@@ -449,15 +449,15 @@ class PipelinedWindow:
 
         self.window = window
         self.pack = umsgpack.packb
-        self.SetTransform = SetTransform
+        self.pose_command = SetTransform
         self.pose_heads = {}  # Each path's address and the packed bytes before its pose
         self.socket = window.context.socket(zmq.DEALER)
         self.socket.connect(window.zmq_url)
         self.pending = 0
 
     def send(self, command):
-        if type(command) is self.SetTransform and is_float_pose(command.matrix):
-            parts = self.pose_parts(command)
+        if type(command) is self.pose_command and is_float_pose(command.matrix):
+            parts = pose_message(command, self.pose_heads)
         else:
             data = command.lower()
             parts = [
@@ -470,33 +470,6 @@ class PipelinedWindow:
         self.pending += 1
         if self.pending >= _PIPELINE_DEPTH:
             self.flush()
-
-    def pose_parts(self, command) -> list:
-        """
-        The message of a pose command, its sixteen numbers written straight into the packed bytes.
-
-        A live frame is one pose per primitive: the bytes are those of the
-        general packing, without its walk over the command.
-        """
-        path = command.path
-        if path not in self.pose_heads:
-            address = path.lower()
-            head = (
-                b"\x83"  # a map of three entries
-                + self.pack("type")
-                + self.pack("set_transform")
-                + self.pack("path")
-                + self.pack(address)
-                + self.pack("matrix")
-                + b"\xdc\x00\x10"  # an array of sixteen
-            )
-            self.pose_heads[path] = (address.encode("utf-8"), head)
-        address, head = self.pose_heads[path]
-        numbers = np.empty(16, dtype=_PACKED_FLOAT)
-        numbers["tag"] = 0xCB
-        numbers["value"] = command.matrix.T.reshape(-1)
-
-        return [b"set_transform", address, head + numbers.tobytes()]
 
     def flush(self):
         """Wait until the server has answered every command sent."""
@@ -517,6 +490,9 @@ class PipelinedWindow:
         return self.window.get_image()
 
     def __getattr__(self, name):
+        if name == "window":
+            raise AttributeError(name)
+
         return getattr(self.window, name)
 
 
@@ -529,6 +505,38 @@ def pipelined(vis):
         vis.window = PipelinedWindow(vis.window)
 
     return vis
+
+
+def pose_message(command, heads) -> list:
+    """
+    The three parts of a pose command's message, its sixteen numbers written straight into the packed bytes.
+
+    A live frame is one pose per primitive: the bytes are those of the general
+    packing, without its walk over the command. ``heads`` keeps each path's
+    address and the packed bytes before its pose.
+    """
+    # Lazy import: Meshcat's packer, loaded with the first viewer
+    from umsgpack import packb
+
+    path = command.path
+    if path not in heads:
+        address = path.lower()
+        head = (
+            b"\x83"  # a map of three entries
+            + packb("type")
+            + packb("set_transform")
+            + packb("path")
+            + packb(address)
+            + packb("matrix")
+            + b"\xdc\x00\x10"  # an array of sixteen
+        )
+        heads[path] = (address.encode("utf-8"), head)
+    address, head = heads[path]
+    numbers = np.empty(16, dtype=_PACKED_FLOAT)
+    numbers["tag"] = 0xCB
+    numbers["value"] = command.matrix.T.reshape(-1)
+
+    return [b"set_transform", address, head + numbers.tobytes()]
 
 
 def is_float_pose(matrix) -> bool:
@@ -573,6 +581,8 @@ def pose_quaternions(poses) -> np.ndarray:
     K[:, 3, 2] = m10 - m01
     K[:, 3, 3] = m00 + m11 + m22
     K /= 3.0
+
+    # K q = λ q, q the eigenvector of the largest λ, its sign the one with w ≥ 0
     eigenvalues, eigenvectors = np.linalg.eigh(K)
     largest = np.argmax(eigenvalues, axis=1)
     q = eigenvectors[np.arange(len(poses)), :, largest]
@@ -1072,6 +1082,7 @@ class MeshcatRenderer(AnimationRenderer):
             time.sleep(interval_s)
 
     def close_scene(self) -> None:
+        flush_commands(self.vis)
         self.canvas = None
         self.vis = None
 
@@ -1196,7 +1207,7 @@ class MeshcatRenderer(AnimationRenderer):
         poses = np.stack(poses)
         path = self.canvas._base_path(i)
         path.set_transform(poses[0])
-        if np.all(np.abs(poses - poses[0]) <= 1e-12):
+        if np.allclose(poses, poses[0], rtol=0.0, atol=1e-12):
             return
         # One track of positions and one of rotations, a key per frame
         positions = poses[:, :3, 3].tolist()

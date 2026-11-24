@@ -114,7 +114,7 @@ class Animator:
         frames = self.build_frames(
             traj,
             schedule,
-            kinematic=self.sys.get_kinematic_geometry(),
+            kinematic=self.kinematic_geometry(),
             camera_override=camera,
             overlays=overlays,
         )
@@ -147,7 +147,7 @@ class Animator:
             x,
             u,
             t,
-            kinematic=self.sys.get_kinematic_geometry(),
+            kinematic=self.kinematic_geometry(),
             camera_override=camera,
             overlays=overlays,
         )
@@ -401,7 +401,9 @@ def systems_inside(sys) -> list:
         if id(system) in systems:
             continue
         systems[id(system)] = system
-        stack.extend(getattr(system, "subsystems", {}).values())
+        subsystems = getattr(system, "subsystems", None)
+        if isinstance(subsystems, dict):
+            stack.extend(subsystems.values())
         source = getattr(system, "source", None)
         if hasattr(source, "get_kinematic_geometry"):
             stack.append(source)

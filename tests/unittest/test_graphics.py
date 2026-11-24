@@ -2263,16 +2263,14 @@ class TestMeshcatFastPaths(unittest.TestCase):
         from meshcat.path import Path
 
         from minilink.graphical.animation.renderers.meshcat_renderer import (
-            PipelinedWindow,
+            pose_message,
         )
 
-        window = PipelinedWindow.__new__(PipelinedWindow)
-        window.pack = umsgpack.packb
-        window.pose_heads = {}
+        heads = {}
         for T in self.poses():
             command = SetTransform(T, Path(("meshcat", "minilink_scene", "p3")))
             data = command.lower()
-            kind, address, packed = window.pose_parts(command)
+            kind, address, packed = pose_message(command, heads)
             self.assertEqual(kind, data["type"].encode("utf-8"))
             self.assertEqual(address, data["path"].encode("utf-8"))
             self.assertEqual(packed, umsgpack.packb(data))
