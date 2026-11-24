@@ -8,7 +8,7 @@ from minilink.core.exports import lazy_facade
 #
 #     from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 #     from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner, LQRPlanner
-#     from minilink.planning import compare
+#     from minilink.planning import Uniform, Evaluation
 #     from minilink.planning import QuadraticFeatures, LinearApproximator
 #
 # The defining modules stay importable (``minilink.planning.problems``, ...). Each
@@ -21,7 +21,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "Particles": ("minilink.core.distributions", "Particles"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
-    "compare": ("minilink.planning.comparison", "compare"),
     "Comparison": ("minilink.planning.comparison", "Comparison"),
     # Linear-quadratic regulator
     "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
@@ -66,7 +65,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "LinearApproximator",
     ),
     # Evaluation: a controller on a problem, one run or the problem's draws
-    "evaluate": ("minilink.planning.evaluator", "evaluate"),
     "evaluate_trajectory": ("minilink.planning.evaluation", "evaluate_trajectory"),
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     "ProblemEvaluator": ("minilink.planning.evaluator", "ProblemEvaluator"),

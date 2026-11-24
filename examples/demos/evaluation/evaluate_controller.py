@@ -7,8 +7,6 @@ from minilink import (
     PlanningProblem,
     QuadraticCost,
     Uniform,
-    compare,
-    evaluate,
     lqr,
 )
 
@@ -36,23 +34,23 @@ stiff = lqr(plant, 10 * np.eye(2), np.eye(1), x_bar=x_up)
 
 # One run: the controller closed on the plant from the problem's start, scored by its cost
 
-print(evaluate(problem, controller))
-print(evaluate(problem, stiff))
+print(problem.evaluate(controller))
+print(problem.evaluate(stiff))
 
 # A digital controller runs on its own clock: the same law held at 20 Hz
 
-print(evaluate(problem, controller % 0.05))
+print(problem.evaluate(controller % 0.05))
 
 # A random problem: the start drawn from a box around the upright, scored over its draws
 
 stochastic = problem.replace(
     x0=Uniform(np.array([np.pi - 0.5, -0.5]), np.array([np.pi + 0.5, 0.5]))
 )
-print(evaluate(stochastic, controller, n_trials=N_TRIALS, key=0))
+print(stochastic.evaluate(controller, n_trials=N_TRIALS, key=0))
 
 # The two controllers side by side, on the same draws
 
-print(compare(stochastic, LQR=controller, stiff=stiff, n_trials=N_TRIALS))
+print(stochastic.compare(LQR=controller, stiff=stiff, n_trials=N_TRIALS))
 
 # The compiled evaluator: built once, scored again, its run drawn
 

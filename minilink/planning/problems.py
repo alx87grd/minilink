@@ -632,23 +632,26 @@ class PlanningProblem:
         episode_length=None,
     ):
         """
-        Score ``controller`` on this problem: delegates to :func:`~minilink.planning.evaluator.evaluate`.
-        """
-        # Lazy import: the evaluator imports this module
-        from minilink.planning.evaluator import evaluate as evaluate_problem
+        The :class:`~minilink.planning.evaluation.Evaluation` of ``controller`` on this problem.
 
-        return evaluate_problem(
-            self,
+        One run for a deterministic problem, ``n_trials`` draws for a stochastic
+        one; :meth:`compile` holds the loop, the run and the score. A sampled
+        controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
+        continuous controller runs on ``dt``, the period its loop is integrated
+        and recorded on, and with ``dt`` omitted on its automatic step.
+        ``trajectories=True`` keeps the runs in
+        :attr:`~minilink.planning.evaluation.Evaluation.trajectories`.
+        """
+        J = self.compile(
             controller,
             dt,
             solver=solver,
             substeps=substeps,
-            n_trials=n_trials,
-            key=key,
-            trajectories=trajectories,
             backend=backend,
             episode_length=episode_length,
         )
+
+        return J.evaluate(key=key, n_trials=n_trials, trajectories=trajectories)
 
     def compare(
         self,
@@ -663,7 +666,20 @@ class PlanningProblem:
         **entries,
     ):
         """
-        Score and compare several controllers on this problem: delegates to :func:`~minilink.planning.comparison.compare`.
+        Name the answers to this problem side by side, and score them with one evaluation: a :class:`~minilink.planning.comparison.Comparison`.
+
+        ``problem.compare(PID=pid, VI=vi, dt=0.01)`` (or
+        ``problem.compare({"PID": pid, "VI": vi}, dt=0.01)``) scores every entry
+        by :meth:`evaluate` on the same draws (one ``key``, one backend for all,
+        so the trials are paired): an entry is a
+        :class:`~minilink.planning.results.PlanningSolution`, a controller block,
+        or an :class:`~minilink.planning.evaluation.Evaluation` already computed.
+        ``dt`` follows :meth:`evaluate`: a sampled controller (``pid % 0.01``)
+        runs on its own clock, ``dt`` omitted; a continuous one runs on ``dt``,
+        and with ``dt`` omitted on the evaluator's automatic step. The judge's
+        runs are kept, one per trial, so memory grows with ``n_trials`` (a
+        pendulum's loop runs with their recorded signals, 5 s at ``dt = 0.01``:
+        17 MB for 4 answers × 100 draws).
         """
         # Lazy import: the comparison module imports this module
         from minilink.planning.comparison import compare as compare_problem

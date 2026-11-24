@@ -379,7 +379,6 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
     from minilink.control import StateFeedback
     from minilink.core.backends import array_module
     from minilink.core.sets import Set
-    from minilink.planning import evaluate
 
     class Band(Set):
         """|z_i| <= r - 0.2 t: a band narrowing from its half-width r."""
@@ -410,7 +409,7 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
             failure_cost=1.0,
         )
         reports = {
-            run: evaluate(problem, ctl, dt=0.01, backend=run[0], solver=run[1])
+            run: problem.evaluate(ctl, dt=0.01, backend=run[0], solver=run[1])
             for run in runs
         }
         assert all(bool(report.failed[0]) == leaves for report in reports.values())
@@ -427,7 +426,6 @@ def test_the_backends_share_the_score_on_identical_starts():
     pytest.importorskip("jax")
     from minilink.control import NeuralPolicy
     from minilink.core.distributions import Particles
-    from minilink.planning import evaluate
 
     plant = pendulum()
     plant.inputs["u"].lower = np.array([-4.0])
@@ -454,9 +452,9 @@ def test_the_backends_share_the_score_on_identical_starts():
             **kwargs,
         )
         settings = dict(dt=0.05, n_trials=3, episode_length=1.0)
-        on_jax = evaluate(problem, ctl, backend="jax", **settings)
-        on_numpy = evaluate(problem, ctl, backend="numpy", **settings)
-        adaptive = evaluate(problem, ctl, solver="scipy", **settings)
+        on_jax = problem.evaluate(ctl, backend="jax", **settings)
+        on_numpy = problem.evaluate(ctl, backend="numpy", **settings)
+        adaptive = problem.evaluate(ctl, solver="scipy", **settings)
         np.testing.assert_allclose(on_jax.J, on_numpy.J, rtol=1e-6)
         np.testing.assert_allclose(adaptive.J, on_numpy.J, rtol=1e-2)
         assert float(on_jax.worst) == float(np.max(on_jax.J))
@@ -469,7 +467,6 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
     pytest.importorskip("jax")
     from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
-    from minilink.planning import evaluate
 
     plant = pendulum()
     plant.inputs["u"].lower = np.array([-0.5])
@@ -491,8 +488,8 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
         U=plant.input_box,
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=1.0)
-    on_jax = evaluate(problem, ctl, backend="jax", **settings)
-    on_numpy = evaluate(problem, ctl, backend="numpy", **settings)
+    on_jax = problem.evaluate(ctl, backend="jax", **settings)
+    on_numpy = problem.evaluate(ctl, backend="numpy", **settings)
     saturated_bound = 0.5**2 * 1.0
     assert on_numpy.J[0] > 10 * saturated_bound and on_numpy.failed[0]
     np.testing.assert_allclose(on_jax.J, on_numpy.J, rtol=1e-6)
@@ -500,7 +497,6 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
 
 def test_an_exiting_run_scores_alike_on_the_step_and_the_adaptive_solver():
     from minilink.control import StateFeedback
-    from minilink.planning import evaluate
 
     plant = pendulum()
     problem = PlanningProblem(
@@ -512,8 +508,8 @@ def test_an_exiting_run_scores_alike_on_the_step_and_the_adaptive_solver():
     )
     ctl = StateFeedback(K=[[0.0, 0.0]])
     settings = dict(dt=0.01, n_trials=1, episode_length=1.0, backend="numpy")
-    step = evaluate(problem, ctl, **settings)
-    adaptive = evaluate(problem, ctl, solver="scipy", **settings)
+    step = problem.evaluate(ctl, **settings)
+    adaptive = problem.evaluate(ctl, solver="scipy", **settings)
     assert step.failed[0] and adaptive.failed[0]
     assert np.isfinite(step.J[0])  # the switch off: the plain cost, failure reported
     np.testing.assert_allclose(adaptive.J, step.J, rtol=1e-3)
@@ -524,7 +520,6 @@ def test_a_controller_with_internal_state_scores_like_its_static_twin():
     from minilink import PID, SingleMass
     from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
-    from minilink.planning import evaluate
 
     mass = SingleMass()
     problem = PlanningProblem(
@@ -534,8 +529,8 @@ def test_a_controller_with_internal_state_scores_like_its_static_twin():
         x0=Particles([[0.5, 0.0]]),
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=2.0, backend="numpy")
-    J_pid = evaluate(problem, PID(Kp=4.0), **settings).J  # with filter states
-    J_static = evaluate(problem, StateFeedback(K=[[4.0, 0.0]]), **settings).J
+    J_pid = problem.evaluate(PID(Kp=4.0), **settings).J  # with filter states
+    J_static = problem.evaluate(StateFeedback(K=[[4.0, 0.0]]), **settings).J
     np.testing.assert_allclose(J_pid, J_static, rtol=0.05)
 
 
@@ -545,7 +540,6 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     pytest.importorskip("jax")
     from minilink.control import NeuralPolicy
     from minilink.core.distributions import Particles
-    from minilink.planning import evaluate
 
     plant = pendulum()
     plant.inputs["u"].lower = np.array([-4.0])
@@ -560,8 +554,8 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     settings = dict(dt=0.05, n_trials=1, episode_length=1.0)
     J_heavy = {}
     for backend in ("jax", "numpy"):
-        J_heavy[backend] = evaluate(heavy, ctl, backend=backend, **settings).J[0]
-        J_nominal = evaluate(nominal, ctl, backend=backend, **settings).J[0]
+        J_heavy[backend] = heavy.evaluate(ctl, backend=backend, **settings).J[0]
+        J_nominal = nominal.evaluate(ctl, backend=backend, **settings).J[0]
         assert not np.isclose(J_heavy[backend], J_nominal)
     np.testing.assert_allclose(J_heavy["numpy"], J_heavy["jax"], rtol=1e-6)
     assert plant.params["m"] == 1.0  # the draw never touched the nominal plant
@@ -745,7 +739,7 @@ def test_gymnasium_view_of_a_stochastic_problem():
 
 def test_the_evaluation_of_one_trajectory_prints_a_single_cost():
     from minilink.control import StateFeedback
-    from minilink.planning import evaluate, evaluate_trajectory
+    from minilink.planning import evaluate_trajectory
 
     plant = pendulum()
     problem = PlanningProblem(plant, cost=quadratic(plant), horizon=1.0)
@@ -757,13 +751,13 @@ def test_the_evaluation_of_one_trajectory_prints_a_single_cost():
 
     # a deterministic problem is one run for the evaluation as well
     law = StateFeedback(K=[[1.0, 0.5]], x_bar=[0.0, 0.0])
-    report = evaluate(problem, law, dt=0.1, backend="numpy")
+    report = problem.evaluate(law, dt=0.1, backend="numpy")
     assert report.n_trials == 1 and np.all(report.x0[0] == problem.x0)
 
 
 def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     from minilink.blocks import TrajectorySource
-    from minilink.planning import evaluate, evaluate_trajectory
+    from minilink.planning import evaluate_trajectory
 
     plant = pendulum()
     problem = PlanningProblem(plant, x0=[0.3, 0.0], cost=quadratic(plant), horizon=1.0)
@@ -797,7 +791,7 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     runs = [("numpy", "rk4"), ("numpy", "scipy")]
     runs += [("jax", "rk4")] if jax_available() else []
     reports = {
-        run: evaluate(problem, source, dt=dt, backend=run[0], solver=run[1])
+        run: problem.evaluate(source, dt=dt, backend=run[0], solver=run[1])
         for run in runs
     }
     np.testing.assert_allclose(reports["numpy", "rk4"].J, J_hand, rtol=1e-10)
@@ -823,7 +817,6 @@ def jax_available():
 def test_a_time_varying_law_scores_alike_on_every_backend():
     pytest.importorskip("jax")
     from minilink.control.state import TimeVaryingFeedback
-    from minilink.planning import evaluate
 
     t = np.linspace(0.0, 1.0, 5)
     K = np.stack([np.array([[1.0 + 10.0 * k, 0.5]]) for k in range(5)])
@@ -835,9 +828,9 @@ def test_a_time_varying_law_scores_alike_on_every_backend():
         horizon=1.0,
     )
     settings = dict(dt=0.01, n_trials=1)
-    on_jax = evaluate(problem, ctl, backend="jax", **settings)
-    on_numpy = evaluate(problem, ctl, backend="numpy", **settings)
-    adaptive = evaluate(problem, ctl, solver="scipy", **settings)
+    on_jax = problem.evaluate(ctl, backend="jax", **settings)
+    on_numpy = problem.evaluate(ctl, backend="numpy", **settings)
+    adaptive = problem.evaluate(ctl, solver="scipy", **settings)
     np.testing.assert_allclose(on_jax.J, on_numpy.J, rtol=1e-6)
     np.testing.assert_allclose(adaptive.J, on_numpy.J, rtol=1e-2)
 
@@ -946,7 +939,6 @@ def test_a_problem_without_a_cost_is_judged_on_its_sets_only():
     # A feasibility question: does the loop reach Xf from each start? Every run
     # costs 0, and the reached flags are those of the same problem with a cost
     from minilink import BallSet, lqr
-    from minilink.planning.evaluator import evaluate
 
     plant = pendulum()
     x_up = np.array([np.pi, 0.0])
@@ -954,9 +946,9 @@ def test_a_problem_without_a_cost_is_judged_on_its_sets_only():
     starts = Uniform(x_up - [0.5, 1.0], x_up + [0.5, 1.0])
     problem = PlanningProblem(plant, x0=starts, Xf=BallSet(x_up, 0.05), horizon=8.0)
 
-    judged = evaluate(problem, ctl, n_trials=50, backend="numpy")
-    with_cost = evaluate(
-        problem.replace(cost=quadratic(plant)), ctl, n_trials=50, backend="numpy"
+    judged = problem.evaluate(ctl, n_trials=50, backend="numpy")
+    with_cost = problem.replace(cost=quadratic(plant)).evaluate(
+        ctl, n_trials=50, backend="numpy"
     )
 
     np.testing.assert_array_equal(judged.raw_cost, 0.0)
@@ -965,5 +957,5 @@ def test_a_problem_without_a_cost_is_judged_on_its_sets_only():
 
     # A failure is charged only the failure cost the problem is given
     charged = problem.replace(penalize_failure=True, failure_cost=7.0)
-    J = evaluate(charged, ctl, n_trials=50, backend="numpy").J
+    J = charged.evaluate(ctl, n_trials=50, backend="numpy").J
     np.testing.assert_array_equal(J, np.where(judged.reached, 0.0, 7.0))

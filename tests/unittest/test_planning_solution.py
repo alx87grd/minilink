@@ -12,7 +12,6 @@ from minilink.learning.reinforcement_learning import TabularLearningPlanner
 from minilink.planning import (
     PlanningSolution,
     Uniform,
-    evaluate,
 )
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTPlanner
@@ -239,7 +238,7 @@ def test_grid_laws_are_scored_and_drawn_as_handed_out(make):
 
     # The score is the controller's continuous loop integrated on the planner's dt
     assert planner.dt == 0.2
-    alone = evaluate(problem, solution.controller, dt=planner.dt)
+    alone = problem.evaluate(solution.controller, dt=planner.dt)
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
 
     # The views draw that loop's run from the start, the plant's own run: on dt
@@ -256,8 +255,7 @@ def test_grid_laws_are_scored_and_drawn_as_handed_out(make):
 
 
 def test_value_iteration_scores_the_law_it_hands_out_continuously():
-    """solve(evaluate=True), evaluate(problem, controller, dt) and compare(dt) agree: the planner's dt, no hold."""
-    from minilink.planning import compare
+    """solve(evaluate=True), problem.evaluate(controller, dt) and dt.compare() agree: the planner's dt, no hold."""
 
     problem = pendulum_problem().replace(Xf=None)
     vi = DynamicProgrammingPlanner(problem, x_grid=(41, 41), u_grid=(5,), dt=0.1)
@@ -266,16 +264,16 @@ def test_value_iteration_scores_the_law_it_hands_out_continuously():
     # The three scores of the law handed out, integrated on the planner's dt, are one
     # number
     assert vi.dt == 0.1
-    alone = evaluate(problem, solution.controller, dt=vi.dt)
-    raced = compare(problem, VI=solution, dt=vi.dt).evaluations["VI"]
+    alone = problem.evaluate(solution.controller, dt=vi.dt)
+    raced = problem.compare(VI=solution, dt=vi.dt).evaluations["VI"]
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
     np.testing.assert_array_equal(solution.evaluation.J, raced.J)
 
     # The continuous law integrated on the grid's dt (ruled 2026-11-08), not the
     # law held over each period of the grid, a different controller with its own
     # score, nor the law on the automatic step (dt = 2 / 45 s here)
-    held = evaluate(problem, solution.controller % 0.1)
-    automatic = evaluate(problem, solution.controller)
+    held = problem.evaluate(solution.controller % 0.1)
+    automatic = problem.evaluate(solution.controller)
     np.testing.assert_allclose(solution.evaluation.J, [23.38524887320534], rtol=1e-9)
     np.testing.assert_allclose(held.J, [23.36262222847119], rtol=1e-9)
     np.testing.assert_allclose(automatic.J, [23.37795258655731], rtol=1e-9)
@@ -289,7 +287,7 @@ def test_one_evaluation_scores_an_open_loop_and_a_feedback_law_on_the_same_draws
         problem.nominal(), x_grid=(21, 21), u_grid=(3,), dt=0.1, gamma=0.95, tol=0.1
     ).solve()
     scored = [
-        evaluate(problem, s, dt=0.1, n_trials=4, backend="numpy", key=3)
+        problem.evaluate(s, dt=0.1, n_trials=4, backend="numpy", key=3)
         for s in (open_loop, feedback)
     ]
     np.testing.assert_array_equal(scored[0].x0, scored[1].x0)
@@ -329,8 +327,7 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
     # A feedback law: no plan; its score is the continuous loop of the copy handed
     # out, integrated on the planner's dt
     assert solution.trajectory is None and solution.evaluation.n_trials == 3
-    alone = evaluate(
-        problem,
+    alone = problem.evaluate(
         solution.controller,
         dt=planner.dt,
         n_trials=3,
@@ -450,19 +447,15 @@ def test_value_iteration_plots_its_own_tables_under_the_solution_names():
 
 
 def test_compare_reads_the_solutions_side_by_side():
-    from minilink.planning import compare
 
     problem, vi, lqr = solved_pendulum()
-    race = compare(VI=vi, LQR=lqr)
+    race = problem.compare(VI=vi, LQR=lqr, dt=0.1, backend="numpy")
     assert len(race) == 2 and race["LQR"] is lqr and list(race) == ["VI", "LQR"]
     table = str(race)
-    assert table.splitlines()[1] == (
-        "Comparison of 2 solutions, each scored on its own problem"
-    )
+    assert table.splitlines()[1].startswith("Comparison, ")
     titles = [half.strip() for half in table.splitlines()[3].split("│")]
     assert titles == ["", "nominal trajectory", "simulation"]
     assert "converged" not in table and "converged" in str(race["VI"])
-    assert f"{float(vi.evaluation.J[0]):.4g}" in table
 
     axes = race.plot_control_law(show=False).axes
     assert [ax.get_title() for ax in axes] == ["VI", "LQR"]
@@ -480,9 +473,9 @@ def test_compare_reads_the_solutions_side_by_side():
     assert [trace.name for trace in runs.figure.data[:2]] == ["VI", "LQR"]
 
     # one evaluation scores every policy on the same draws; a solution stands for its policy
-    scored = compare(problem, VI=vi, LQR=lqr, dt=0.1, backend="numpy")
+    scored = problem.compare(VI=vi, LQR=lqr, dt=0.1, backend="numpy")
     assert list(scored) == ["VI", "LQR"] and scored["LQR"] is lqr
-    J_lqr = evaluate(problem, lqr.controller, dt=0.1, backend="numpy").J
+    J_lqr = problem.evaluate(lqr.controller, dt=0.1, backend="numpy").J
     np.testing.assert_array_equal(scored.evaluations["LQR"].J, J_lqr)
     assert f"{float(J_lqr[0]):.4g}" in str(scored) and scored.problem is problem
     np.testing.assert_array_equal(
@@ -491,23 +484,23 @@ def test_compare_reads_the_solutions_side_by_side():
     )
 
     # a bare controller and an evaluation already computed take part too
-    mixed = compare(problem, LQR=lqr.controller, VI=scored.evaluations["VI"], dt=0.1)
+    mixed = problem.compare(LQR=lqr.controller, VI=scored.evaluations["VI"], dt=0.1)
     assert list(mixed) == ["LQR"] and str(mixed["LQR"].record) == "given"
     assert [line.split()[0] for line in str(mixed).splitlines()[6:-1]] == ["LQR", "VI"]
     on_grid = DynamicProgrammingPlanner(problem, x_grid=(11, 11), u_grid=(3,), dt=0.2)
     assert np.all(np.isfinite(on_grid.evaluate_policy(lqr).params["values"]))
 
-    with pytest.raises(TypeError):
-        compare(VI=vi.controller)
-    with pytest.raises(ValueError):
-        compare()
+    with pytest.raises(TypeError, match="named entries"):
+        problem.compare(vi, dt=0.1)
+    with pytest.raises(ValueError, match="at least one entry"):
+        problem.compare(dt=0.1)
 
 
 @pytest.mark.optional
 @pytest.mark.jax
 def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
     """The default backend is chosen once per race: NumPy for all when one law does not trace."""
-    from minilink.planning import ProblemEvaluator, compare
+    from minilink.planning import ProblemEvaluator
 
     problem, vi, lqr = solved_pendulum()
     spread = PlanningProblem(
@@ -524,22 +517,22 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
 
     # a law that runs on NumPy only puts the LQR law there too, on the same draws
     assert ProblemEvaluator(spread, numpy_only_law(lqr), 0.1).backend == "numpy"
-    scored = compare(spread, NumPy=numpy_only_law(lqr), LQR=lqr, **settings)
+    scored = spread.compare(NumPy=numpy_only_law(lqr), LQR=lqr, **settings)
     np.testing.assert_array_equal(
         scored.evaluations["NumPy"].x0, scored.evaluations["LQR"].x0
     )
-    on_numpy = evaluate(spread, lqr, backend="numpy", **settings)
+    on_numpy = spread.evaluate(lqr, backend="numpy", **settings)
     np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_numpy.J)
 
     # the value-iteration law traces: scored beside LQR on JAX, the same draws
-    scored = compare(spread, VI=vi, LQR=lqr, **settings)
+    scored = spread.compare(VI=vi, LQR=lqr, **settings)
     np.testing.assert_array_equal(
         scored.evaluations["VI"].x0, scored.evaluations["LQR"].x0
     )
 
     # laws that all trace keep the JAX backend and its numbers
-    scored = compare(spread, LQR=lqr, **settings)
-    on_jax = evaluate(spread, lqr, backend="jax", **settings)
+    scored = spread.compare(LQR=lqr, **settings)
+    on_jax = spread.evaluate(lqr, backend="jax", **settings)
     np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_jax.J)
 
 
@@ -565,30 +558,29 @@ def numpy_only_law(solution):
 def test_compare_reads_dt_as_evaluate_does():
     """A sampled controller runs on its own clock, dt omitted; a continuous one on dt, else its automatic step."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
 
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
     problem = PlanningProblem(plant, x0=np.array([0.3, 0.0]), cost=cost, horizon=2.0)
     law = lqr_design(plant, np.eye(2), np.eye(1))
 
-    on_clock = compare(problem, LQR=law % 0.1, backend="numpy").evaluations["LQR"]
-    alone = evaluate(problem, law % 0.1, backend="numpy")
+    on_clock = problem.compare(LQR=law % 0.1, backend="numpy").evaluations["LQR"]
+    alone = problem.evaluate(law % 0.1, backend="numpy")
     np.testing.assert_array_equal(on_clock.J, alone.J)
 
-    continuous = compare(problem, LQR=law, backend="numpy").evaluations["LQR"]
+    continuous = problem.compare(LQR=law, backend="numpy").evaluations["LQR"]
     np.testing.assert_array_equal(
-        continuous.J, evaluate(problem, law, backend="numpy").J
+        continuous.J, problem.evaluate(law, backend="numpy").J
     )
     with pytest.raises(ValueError, match="own clock"):
-        compare(problem, LQR=law % 0.1, dt=0.05, backend="numpy")
+        problem.compare(LQR=law % 0.1, dt=0.05, backend="numpy")
 
 
 def test_compare_returns_a_comparison_of_the_solutions_and_their_scores():
-    from minilink.planning import Comparison, compare
+    from minilink.planning import Comparison
 
     problem, vi, lqr = solved_pendulum()
-    race = compare(problem, VI=vi, LQR=lqr, dt=0.1, backend="numpy")
+    race = problem.compare(VI=vi, LQR=lqr, dt=0.1, backend="numpy")
 
     # The named solutions, in order, and one evaluation each on the same draws
     assert isinstance(race, Comparison)
@@ -602,15 +594,14 @@ def test_compare_returns_a_comparison_of_the_solutions_and_their_scores():
 def test_compare_scores_a_sampled_loop_as_evaluate_does():
     """The plant inside a clocked law keeps its own integration steps in both."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
 
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
     problem = PlanningProblem(plant, x0=np.array([0.3, 0.0]), cost=cost, horizon=5.0)
     law = lqr_design(plant, np.eye(2), np.eye(1)) % 0.2
 
-    alone = evaluate(problem, law, dt=0.2)
-    compared = compare(problem, LQR=law, dt=0.2).evaluations["LQR"]
+    alone = problem.evaluate(law, dt=0.2)
+    compared = problem.compare(LQR=law, dt=0.2).evaluations["LQR"]
 
     np.testing.assert_allclose(compared.J, alone.J)
 
@@ -671,13 +662,12 @@ def halves_of(table, name):
 def test_the_table_scores_the_nominal_trajectory_cut_at_the_horizon_beside_the_simulation():
     """A plan of 2.5 s on a 2 s horizon is scored on [t0, t0 + 2], the state at t0 + 2 interpolated."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
     from minilink.planning.evaluation import evaluate_trajectory
 
     problem = judged_move()
     plan = hand_plan(problem)
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    comparison = compare(problem, Law=law, Plan=plan, dt=0.05, backend="numpy")
+    comparison = problem.compare(Law=law, Plan=plan, dt=0.05, backend="numpy")
     table = str(comparison)
 
     # The plan scored on its first 2 s, the state at t = 2 a sample of the plan
@@ -708,11 +698,10 @@ def test_the_table_scores_the_nominal_trajectory_cut_at_the_horizon_beside_the_s
 
 def test_a_plan_that_starts_after_the_deadline_says_so_and_the_table_prints():
     """A plan beginning at t0 + T or later has nothing on the horizon: its plan half says so, its run is still judged."""
-    from minilink.planning import compare
 
     problem = judged_move()
     late = hand_plan(judged_move(t0=5.0))
-    table = str(compare(problem, Plan=late, dt=0.05))
+    table = str(problem.compare(Plan=late, dt=0.05))
 
     plan_half, run_half = halves_of(table, "Plan")
     assert plan_half == "starts after the deadline"
@@ -721,14 +710,12 @@ def test_a_plan_that_starts_after_the_deadline_says_so_and_the_table_prints():
 
 def test_the_table_and_the_figure_keep_the_order_the_entries_were_given():
     """An entry given as an evaluation keeps its place: the rows and the colours follow the call."""
-    from minilink import evaluate
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
 
     problem = judged_move()
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    scored = evaluate(problem, law, dt=0.05, trajectories=True)
-    comparison = compare(problem, Scored=scored, Plan=hand_plan(problem), dt=0.05)
+    scored = problem.evaluate(law, dt=0.05, trajectories=True)
+    comparison = problem.compare(Scored=scored, Plan=hand_plan(problem), dt=0.05)
 
     rows = [line.split()[0] for line in str(comparison).splitlines()[6:8]]
     assert rows == ["Scored", "Plan"]
@@ -747,12 +734,11 @@ def test_the_table_and_the_figure_keep_the_order_the_entries_were_given():
 def test_a_run_that_reaches_the_goal_outside_the_constraints_reads_both():
     """The table states the numbers and ranks nothing: no star, no footnote."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
 
     problem = judged_move(radius=0.5)
     soft = lqr_design(problem.sys, np.eye(2), 1.0 * np.eye(1))
     optimal = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    table = str(compare(problem, Soft=soft, Optimal=optimal, dt=0.05))
+    table = str(problem.compare(Soft=soft, Optimal=optimal, dt=0.05))
 
     # The cost's own LQR law costs less but leaves the input limits
     assert halves_of(table, "Optimal")[1].split()[1:] == ["reached", "violated"]
@@ -770,13 +756,12 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
     from dataclasses import replace
 
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
     from minilink.planning.evaluation import evaluate_trajectory
 
     # Several draws of the start
     problem = judged_move(x0=Uniform([0.8, -0.2], [1.2, 0.2]))
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    comparison = compare(problem, Law=law, dt=0.05, n_trials=5, backend="numpy")
+    comparison = problem.compare(Law=law, dt=0.05, n_trials=5, backend="numpy")
     table = str(comparison)
     assert table.splitlines()[1].endswith("criterion=expectation, 5 draws")
     header = table.splitlines()[4].split("│")[2].split()
@@ -796,7 +781,7 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
         ("worst_case", ["max", "J", "E[J]", "σ(J)"]),
     ):
         judged = problem.replace(criterion=criterion)
-        table = str(compare(judged, Law=law, dt=0.05, n_trials=5, backend="numpy"))
+        table = str(judged.compare(Law=law, dt=0.05, n_trials=5, backend="numpy"))
         header = table.splitlines()[4].split("│")[2].split()
         assert header == [*labels, "goal", "constraints"]
 
@@ -807,8 +792,8 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
     diverged = evaluate_trajectory(
         judged_move(), Trajectory(t, x, np.zeros((1, t.size)))
     )
-    mixed = compare(
-        judged_move(), Law=law, Diverged=replace(diverged, trajectories=None), dt=0.05
+    mixed = judged_move().compare(
+        Law=law, Diverged=replace(diverged, trajectories=None), dt=0.05
     )
     plan_half, run_half = halves_of(str(mixed), "Diverged")
     assert plan_half == "-"
@@ -818,7 +803,6 @@ def test_the_table_reads_several_draws_an_evaluation_and_a_diverged_run():
 def test_the_judged_criterion_heads_the_table_whatever_the_entries_carry():
     """An evaluation made under another criterion is read under the judged one; draws that differ read as a range; one run among draws has no spread."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
     from minilink.planning.evaluation import reduce_criterion
 
     problem = judged_move(x0=Uniform([0.8, -0.2], [1.2, 0.2]))
@@ -826,10 +810,8 @@ def test_the_judged_criterion_heads_the_table_whatever_the_entries_carry():
     soft = lqr_design(problem.sys, np.eye(2), 1.0 * np.eye(1))
 
     # Judged in expectation: a CVaR evaluation given first does not set the columns
-    given = evaluate(
-        problem.replace(criterion=("cvar", 0.4)), soft, dt=0.05, n_trials=5
-    )
-    table = str(compare(problem, Given=given, Law=law, dt=0.05, n_trials=5))
+    given = problem.replace(criterion=("cvar", 0.4)).evaluate(soft, dt=0.05, n_trials=5)
+    table = str(problem.compare(Given=given, Law=law, dt=0.05, n_trials=5))
     assert table.splitlines()[1].endswith("criterion=expectation, 5 draws")
     header = table.splitlines()[4].split("│")[2].split()
     assert header[:3] == ["E[J]", "σ(J)", "max"]
@@ -837,8 +819,8 @@ def test_the_judged_criterion_heads_the_table_whatever_the_entries_carry():
 
     # Judged under a CVaR: every row's first column is that CVaR of its own J
     judged = problem.replace(criterion=("cvar", 0.4))
-    given = evaluate(problem, soft, dt=0.05, n_trials=5)
-    comparison = compare(judged, Given=given, Law=law, dt=0.05, n_trials=5)
+    given = problem.evaluate(soft, dt=0.05, n_trials=5)
+    comparison = judged.compare(Given=given, Law=law, dt=0.05, n_trials=5)
     table = str(comparison)
     assert "criterion=cvar, alpha=0.4" in table.splitlines()[1]
     for name, evaluation in (("Given", given), ("Law", comparison.evaluations["Law"])):
@@ -846,9 +828,9 @@ def test_the_judged_criterion_heads_the_table_whatever_the_entries_carry():
         assert halves_of(table, name)[1].split()[0] == f"{cvar:.4g}"
 
     # Ten draws beside five: a range; one run beside them: its J, no spread
-    ten = evaluate(problem, soft, dt=0.05, n_trials=10)
-    one = evaluate(judged_move(), soft, dt=0.05)
-    table = str(compare(problem, Ten=ten, One=one, Law=law, dt=0.05, n_trials=5))
+    ten = problem.evaluate(soft, dt=0.05, n_trials=10)
+    one = judged_move().evaluate(soft, dt=0.05)
+    table = str(problem.compare(Ten=ten, One=one, Law=law, dt=0.05, n_trials=5))
     assert table.splitlines()[1].endswith("5–10 draws")
     J, *spread = halves_of(table, "One")[1].split()[:3]
     assert J == f"{float(one.J[0]):.4g}" and spread == ["-", "-"]
@@ -857,7 +839,6 @@ def test_the_judged_criterion_heads_the_table_whatever_the_entries_carry():
 def test_the_plan_is_scored_on_the_judged_problem_whatever_the_entries_order():
     """The judged problem scores the plan and marks the figure, not the first entry's own."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
     from minilink.planning.evaluation import evaluate_trajectory
 
     own = judged_move(horizon=2.5, radius=1.0)
@@ -866,7 +847,7 @@ def test_the_plan_is_scored_on_the_judged_problem_whatever_the_entries_order():
     law = lqr_design(judged.sys, np.eye(2), 0.1 * np.eye(1))
 
     for entries in ({"Plan": plan, "Law": law}, {"Law": law, "Plan": plan}):
-        comparison = compare(judged, **entries, dt=0.05, backend="numpy")
+        comparison = judged.compare(**entries, dt=0.05, backend="numpy")
         assert comparison.problem is judged
 
         # Scored on the judged problem, whole: the plan's [0, 2.5] ends before the judged
@@ -893,12 +874,11 @@ def test_the_plan_is_scored_on_the_judged_problem_whatever_the_entries_order():
 def test_the_figures_marks_follow_each_rows_signal():
     """The goal's extent on the x rows at t0 + T, the input limits on the u rows, the horizon on every row."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
     from minilink.planning.comparison import GOAL_COLOR, LIMIT_COLOR
 
     problem = judged_move(t0=1.0)
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    comparison = compare(problem, Law=law, Plan=hand_plan(problem), dt=0.05)
+    comparison = problem.compare(Law=law, Plan=hand_plan(problem), dt=0.05)
 
     def marks(ax, color):
         return [
@@ -930,11 +910,10 @@ def test_the_legend_sits_beside_the_panels_and_given_axes_are_left_as_they_are()
     import matplotlib.pyplot as plt
 
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
 
     problem = judged_move()
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    comparison = compare(problem, Law=law, Plan=hand_plan(problem), dt=0.05)
+    comparison = problem.compare(Law=law, Plan=hand_plan(problem), dt=0.05)
 
     result = comparison.plot_simulated_trajectory(show=False)
     (legend,) = result.figure.legends
@@ -955,22 +934,21 @@ def test_the_legend_sits_beside_the_panels_and_given_axes_are_left_as_they_are()
 def test_an_evaluation_entry_is_drawn_when_it_keeps_its_runs():
     """Kept runs are drawn; without them it is left out; alone without them, the figure is refused."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
 
     problem = judged_move()
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
-    scored = evaluate(problem, law, dt=0.05)
-    kept = evaluate(problem, law, dt=0.05, trajectories=True)
+    scored = problem.evaluate(law, dt=0.05)
+    kept = problem.evaluate(law, dt=0.05, trajectories=True)
 
     def labels(comparison):
         axes = comparison.plot_simulated_trajectory(show=False).axes
         return [line.get_label() for line in axes[0].get_lines()]
 
-    assert "B" in labels(compare(problem, A=scored, B=law, dt=0.05))
-    assert "A" not in labels(compare(problem, A=scored, B=law, dt=0.05))
-    assert "A" in labels(compare(problem, A=kept, dt=0.05))
+    assert "B" in labels(problem.compare(A=scored, B=law, dt=0.05))
+    assert "A" not in labels(problem.compare(A=scored, B=law, dt=0.05))
+    assert "A" in labels(problem.compare(A=kept, dt=0.05))
     with pytest.raises(ValueError, match="not drawn"):
-        compare(problem, A=scored).plot_simulated_trajectory(show=False)
+        problem.compare(A=scored).plot_simulated_trajectory(show=False)
 
 
 def plant_part(run):
@@ -981,14 +959,13 @@ def plant_part(run):
 def test_the_evaluations_keep_the_judges_runs_and_the_simulated_figure_draws_them():
     """One run per trial in each evaluation; one run is the solid line, several are faint lines; no nominal trajectory among them."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
     from minilink.planning.comparison import FAINT_ALPHA, FAINT_WIDTH
 
     law = lqr_design(DoubleIntegrator(), np.eye(2), 0.1 * np.eye(1))
 
     # Without draws: one run, the line on every row is that run
     problem = judged_move()
-    comparison = compare(problem, Law=law, Plan=hand_plan(problem), dt=0.05)
+    comparison = problem.compare(Law=law, Plan=hand_plan(problem), dt=0.05)
     for evaluation in comparison.evaluations.values():
         assert len(evaluation.trajectories) == 1
     axes = comparison.plot_simulated_trajectory(show=False).axes
@@ -1002,7 +979,7 @@ def test_the_evaluations_keep_the_judges_runs_and_the_simulated_figure_draws_the
     # Five draws: five faint lines per answer, and nothing else of theirs
     stochastic = judged_move(x0=Uniform([0.8, -0.2], [1.2, 0.2]))
     entries = dict(Law=law, Plan=hand_plan(stochastic))
-    comparison = compare(stochastic, **entries, dt=0.05, n_trials=5)
+    comparison = stochastic.compare(**entries, dt=0.05, n_trials=5)
     for evaluation in comparison.evaluations.values():
         assert len(evaluation.trajectories) == 5
     result = comparison.plot_simulated_trajectory(show=False)
@@ -1027,25 +1004,15 @@ def test_the_evaluations_keep_the_judges_runs_and_the_simulated_figure_draws_the
         faint = [trace for trace in group if trace.opacity == FAINT_ALPHA]
         assert len(faint) == 5 * 3
 
-    # By names only: the controller run once, as before
-    names_only = compare(Plan=hand_plan(problem))
-    (line,) = [
-        line
-        for line in names_only.plot_simulated_trajectory(show=False).axes[0].get_lines()
-        if line.get_label() == "Plan"
-    ]
-    assert line.get_alpha() in (None, 1.0)
-
 
 def test_the_nominal_figure_draws_the_answers_that_carry_one_in_their_colour():
     """The plan whole and solid, in the colour the simulated figure gives it; a feedback law left out; none at all is refused."""
     from minilink.control import lqr as lqr_design
-    from minilink.planning import compare
 
     problem = judged_move()
     law = lqr_design(problem.sys, np.eye(2), 0.1 * np.eye(1))
     plan = hand_plan(problem)
-    comparison = compare(problem, Law=law, Plan=plan, dt=0.05)
+    comparison = problem.compare(Law=law, Plan=plan, dt=0.05)
 
     def answer_lines(result):
         return {
@@ -1064,7 +1031,7 @@ def test_the_nominal_figure_draws_the_answers_that_carry_one_in_their_colour():
     assert line.get_color() == simulated["Plan"].get_color()
 
     with pytest.raises(ValueError, match="no answer carries a nominal trajectory"):
-        compare(problem, Law=law, dt=0.05).plot_nominal_trajectory(show=False)
+        problem.compare(Law=law, dt=0.05).plot_nominal_trajectory(show=False)
 
 
 # --- the controller is the block handed out; the function is the compiled face's ---

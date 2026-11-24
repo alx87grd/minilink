@@ -41,7 +41,7 @@ class PlanningSolution:
     own claim under its own model — the plan, the table on its grid, the
     Riccati form on the linear model, the critic's fit. A measurement of the
     controller comes from the evaluators
-    (:func:`~minilink.planning.evaluator.evaluate`, value iteration's
+    (:meth:`~minilink.planning.problems.PlanningProblem.evaluate`, value iteration's
     ``evaluate_policy``) as its
     own object.
 

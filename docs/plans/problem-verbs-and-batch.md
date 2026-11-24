@@ -137,7 +137,7 @@ then this table.
 | Step | State |
 | --- | --- |
 | `PV-1` the batch rollout | done |
-| `PV-2` the free functions and the names-only comparison | open |
+| `PV-2` the free functions and the names-only comparison | done |
 | `PV-3` `J` | open |
 | `PV-4` `problem.program` | open |
 | `PV-5` README and showcase | open |
@@ -148,6 +148,13 @@ then this table.
 - `PV-1`: the jitted batch is cached per solver as well as per layout, so an Euler batch
   never reuses an RK4 one; the NumPy loop lives on the base evaluator (`looped_rollout`)
   beside the `vmap` (`batched_rollout`), the family split by the same rule.
+- `PV-2`: the free `evaluate` is deleted, its body and docstring on `problem.evaluate`
+  (`self.compile(...)` then `J.evaluate`); `comparison.compare(problem, ...)` stays the
+  module function `problem.compare` calls, off `__all__`. The RRT demo scores the two plans
+  over the longer plan's duration (`episode_length=`), the problem having no horizon; its
+  table shows the RRT* plan, simulated by the judge, missing the goal its nominal trajectory
+  reaches (its steps are not uniform): reported to the maintainer, not changed.
+- README §3 still calls the free `compare` until `PV-5`.
 
 **For the maintainer after the merge:** `alx87grd/teaching` and `alx87grd/workbench` on `dev`
 call the removed names; search them for `evaluate(`, `compare(`, `.program(` on a problem,

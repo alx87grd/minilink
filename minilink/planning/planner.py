@@ -13,7 +13,6 @@ from minilink.blocks.sources import TrajectorySource
 from minilink.core.params import checked, flatten, lookup, merge_known, with_leaf
 from minilink.core.roles import command_port
 from minilink.planning.evaluation import Evaluation
-from minilink.planning.evaluator import evaluate
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import (
     PlanningSolution,
@@ -325,7 +324,7 @@ def planner_evidence(
     """
     The evidence a planner's ``solve(evaluate=True)`` records: its controller, as it is, scored on the real plant.
 
-    The :func:`~minilink.planning.evaluator.evaluate` of ``controller`` on the
+    The :meth:`~minilink.planning.problems.PlanningProblem.evaluate` of ``controller`` on the
     planner's problem (or ``problem``): one run when nothing is random,
     ``n_trials`` draws from key 0 otherwise; ``None`` when the problem declares
     no cost (a search without one). A continuous controller runs on ``dt``, the
@@ -351,8 +350,7 @@ def planner_evidence(
             problem, controller, trials, episode_length=episode_length
         )
 
-    return evaluate(
-        problem,
+    return problem.evaluate(
         controller,
         dt=dt,
         n_trials=trials,

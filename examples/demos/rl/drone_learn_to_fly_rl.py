@@ -8,7 +8,6 @@ from minilink import (
     Gaussian,
     PlanningProblem,
     ReinforcementLearningPlanner,
-    evaluate,
 )
 
 TRAINING_TIMESTEPS = 150_000  # a few seconds on a laptop CPU
@@ -81,7 +80,7 @@ planner.plot_learning_curve()
 ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=2, y_axis=5, u_axis=0)  # T1 vs (theta, omega)
 
-report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
+report = problem.evaluate(ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 plant.x0 = np.array([-1.0, -2.0, 1.0, 0.0, 0.0, 0.0])

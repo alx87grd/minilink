@@ -37,7 +37,6 @@ from minilink.planning.problems import (
 )
 from minilink.planning.results import (
     PlanningSolution,
-    controller_run_of,
     plain_plant_run_of,
     require_cost_to_go,
 )
@@ -64,6 +63,7 @@ FAINT_ALPHA = 0.12
 
 
 def compare(
+    problem,
     *args,
     dt=None,
     n_trials=None,
@@ -74,31 +74,8 @@ def compare(
     episode_length=None,
     **entries,
 ) -> Comparison:
-    """
-    Name the solutions of one problem side by side, and score them with one evaluation.
-
-    ``compare(VI=vi, LQR=lqr)`` (or ``compare({"VI": vi, "LQR": lqr})``) names
-    solutions for the table and the overlays. With the problem first,
-    ``compare(problem, PID=pid, VI=vi, dt=0.01)`` also scores every entry by
-    :func:`~minilink.planning.evaluator.evaluate` on the same draws (one ``key``,
-    one backend for all, so the trials are paired): an entry is a
-    :class:`~minilink.planning.results.PlanningSolution`, a controller block, or
-    an :class:`~minilink.planning.evaluation.Evaluation` already computed.
-    ``dt`` follows :func:`~minilink.planning.evaluator.evaluate`: a sampled
-    controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
-    continuous one runs on ``dt``, the period its loop is integrated on, and
-    with ``dt`` omitted on the evaluator's automatic step. The judge's runs
-    are kept, one per trial, so memory grows with ``n_trials`` (a pendulum's
-    loop runs with their recorded signals, 5 s at ``dt = 0.01``: 17 MB for 4
-    answers × 100 draws).
-    """
-    problem, named = split_entries(args, entries)
-
-    # Names only: the solutions, read as they are
-    if problem is None:
-        require_no_scoring(dt, n_trials)
-        require_solutions(named)
-        return Comparison(named)
+    """The :class:`Comparison` of :meth:`PlanningProblem.compare`: every entry scored on the same draws."""
+    named = entries_of(args, entries)
 
     # Every entry scored on the same draws, its runs kept, its solution kept for the
     # table and the overlays (each loop's period as evaluate reads it: a sampled
@@ -131,34 +108,31 @@ class Comparison:
     Named solutions of one problem, their scores, and the overlays that read them together.
 
     ``solutions`` maps a name to a :class:`~minilink.planning.results.PlanningSolution`
-    (a controller entry is wrapped as one); ``evaluations`` maps every scored
-    name to its :class:`~minilink.planning.evaluation.Evaluation` (``None`` when
-    :func:`compare` was given no problem); ``problem`` is the judged problem,
-    ``None`` for a comparison by names only: the nominal trajectories are
-    scored on it and the figures draw its goal and limits. Each evaluation
-    :func:`compare` makes keeps the judge's runs, one per trial, in its
-    ``trajectories``: the one home of the simulations the figure draws.
-    One run each on the deterministic problem reads the answers' behaviour;
-    the same problem with its distributions reads their spread, every run
-    drawn.
+    (a controller entry is wrapped as one); ``evaluations`` maps every name to
+    its :class:`~minilink.planning.evaluation.Evaluation`; ``problem`` is the
+    judged problem: the nominal trajectories are scored on it and the figures
+    draw its goal and limits. Each evaluation :meth:`PlanningProblem.compare`
+    makes keeps the judge's runs, one per trial, in its ``trajectories``: the
+    one home of the simulations the figure draws. One run each on the
+    deterministic problem reads the answers' behaviour; the same problem with
+    its distributions reads their spread, every run drawn.
 
     ``print`` is the table, a framed panel titled by the judged system, its
     horizon and, on several draws, the criterion and their number: each
     answer read twice (``J``, goal, constraints), its nominal trajectory, the
     planner's own, cut at the horizon ``t0 + T`` and scored on the problem
-    without simulation (by names only, on its own problem; ``-`` for an
-    answer without one), beside its simulation, the block it hands out
+    without simulation (``-`` for an answer without one), beside its simulation, the block it hands out
     simulated by the judge (on several draws, the judged criterion first when
     it is not the expectation, then ``E[J]``, ``σ(J)`` and ``max J``, and the
     counts). ``print(comparison[name])`` shows a planner's record. Each
     ``plot_*`` draws the solutions on one figure with one scale, and
     :meth:`difference` reads the paired trials. The judged problem's system
-    labels the axes, else the first solution's.
+    labels the axes.
     """
 
     solutions: dict
-    evaluations: dict | None = None
-    problem: PlanningProblem | None = None
+    evaluations: dict
+    problem: PlanningProblem
 
     # The named solutions, read as a mapping
 
@@ -178,7 +152,6 @@ class Comparison:
 
     def difference(self, a, b):
         """The paired differences ``J_a − J_b``, one per trial (the same draws for both)."""
-        require_scores(self.evaluations, (a, b))
         J_a = np.asarray(self.evaluations[a].J)
         J_b = np.asarray(self.evaluations[b].J)
         require_paired(J_a, J_b, (a, b))
@@ -323,8 +296,7 @@ class Comparison:
 
         The simulations are the judge's, kept in the answer's evaluation (the
         plant's part of each): one simulation is a solid line, several (one
-        per draw) thin faint lines; by names only, the controller run once
-        from its problem's start. On a judged problem, each row of ``x`` marks
+        per draw) thin faint lines. Each row of ``x`` marks
         the goal's extent at the deadline ``t0 + T``, each row of ``u`` the
         input limits, and every row the horizon. The legend holds the answers'
         names and the limits. An
@@ -391,23 +363,19 @@ class GivenController:
         return "given"
 
 
-def split_entries(args, entries):
-    """``(problem or None, named entries)`` from ``compare``'s positional and keyword arguments."""
-    args = list(args)
-    problem = args.pop(0) if args and isinstance(args[0], PlanningProblem) else None
+def entries_of(args, entries) -> dict:
+    """The named entries of ``problem.compare``: a dict passed positionally, then the keyword entries over it."""
     if len(args) > 1 or (args and not isinstance(args[0], dict)):
         raise TypeError(
-            "compare takes named entries, after the problem when they are scored: "
-            "compare(VI=vi, LQR=lqr), compare(problem, PID=pid, VI=vi, dt=0.01)"
+            "compare takes named entries: problem.compare(PID=pid, VI=vi, dt=0.01) "
+            'or problem.compare({"PID": pid, "VI": vi}, dt=0.01)'
         )
-
-    # The dict passed positionally, then the keyword entries over it
     named = dict(args[0]) if args else {}
     named.update(entries)
     if not named:
         raise ValueError("compare needs at least one entry")
 
-    return problem, named
+    return named
 
 
 def score_entries(problem, named, settings, n_trials, key):
@@ -448,7 +416,7 @@ def solution_of(problem, entry):
 
 def colors_of(comparison) -> dict:
     """One colour per answer, in the order the entries were given: the same in both trajectory figures."""
-    names = list(comparison.evaluations or comparison.solutions)
+    names = list(comparison.evaluations)
     colors = {
         name: SOLUTION_COLORS[m % len(SOLUTION_COLORS)] for m, name in enumerate(names)
     }
@@ -461,10 +429,10 @@ def trajectory_figure(comparison, lines, signals, title) -> FigureSpec:
     The figure of ``lines``, ``(name, color, width, alpha, trajectory)`` each: one row per component of each signal, the judged problem's marks read from the row's signal.
 
     The answers' names label the first row; the judged problem's system
-    labels the axes, else the first solution's.
+    labels the axes.
     """
     problem = comparison.problem
-    sys = (problem or next(iter(comparison.solutions.values())).problem).sys
+    sys = problem.sys
     times = [np.asarray(trajectory.t, dtype=float) for *_, trajectory in lines]
     span = (min(t[0] for t in times), max(t[-1] for t in times))
 
@@ -509,12 +477,10 @@ def trajectory_figure(comparison, lines, signals, title) -> FigureSpec:
 
 
 def drawn_runs_of(comparison, name) -> list:
-    """The plant runs the simulated figure draws for an answer: its evaluation's, else (by names only) its controller run once; none for an evaluation that keeps no run."""
-    evaluation = (comparison.evaluations or {}).get(name)
-    if evaluation is not None:
-        return [plain_plant_run_of(run) for run in evaluation.trajectories or ()]
+    """The plant runs the simulated figure draws for an answer: its evaluation's; none for an evaluation that keeps no run."""
+    evaluation = comparison.evaluations[name]
 
-    return [controller_run_of(comparison.solutions[name])]
+    return [plain_plant_run_of(run) for run in evaluation.trajectories or ()]
 
 
 def deadline_marks_of(problem, signal, k) -> tuple:
@@ -526,7 +492,7 @@ def deadline_marks_of(problem, signal, k) -> tuple:
     (``Xf.bounding_box()``; none for a set without one). None without a
     problem or a finite horizon.
     """
-    if problem is None or problem.horizon_kind() != "finite":
+    if problem.horizon_kind() != "finite":
         return ()
     t_end = float(problem.t0) + float(problem.horizon)
     goal = None if problem.Xf is None else problem.Xf.bounding_box()
@@ -541,7 +507,7 @@ def deadline_marks_of(problem, signal, k) -> tuple:
 
 def limit_marks_of(problem, signal, k, span) -> tuple:
     """The judged problem's input limits on the row of component ``k`` of ``u``: dotted grey lines over ``span`` (``U.bounding_box()``), each finite bound; none on another row."""
-    if problem is None or problem.U is None or signal != "u":
+    if problem.U is None or signal != "u":
         return ()
     limits = problem.U.bounding_box()
     if limits is None:
@@ -568,19 +534,14 @@ ONE_RUN = (("J", "objective"),)
 
 def comparison_text(comparison) -> str:
     """The print text: a framed panel, its title, then one line per answer, its nominal trajectory beside its simulation."""
-    scores = comparison.evaluations or {}
-    solutions = comparison.solutions
-    names = list(scores) or list(solutions)
-    runs = {
-        name: scores.get(name, getattr(solutions.get(name), "evaluation", None))
-        for name in names
-    }
+    runs = comparison.evaluations
+    names = list(runs)
 
     # The numbers: each nominal trajectory's score; the draws, the judged criterion and
     # the statistics the simulations show
     nominals = {name: nominal_score_of(comparison, name) for name in names}
     several = [e for e in runs.values() if e is not None and e.n_trials > 1]
-    criterion = criterion_of(comparison, several)
+    criterion = comparison.problem.criterion
     statistics = statistics_of(criterion, several)
 
     # Formatted last: each half's cells, or the words that span it
@@ -589,10 +550,7 @@ def comparison_text(comparison) -> str:
         for name, nominal in nominals.items()
     }
     simulation_halves = {
-        name: "not scored"
-        if runs[name] is None
-        else cells(runs[name], statistics, criterion)
-        for name in names
+        name: cells(runs[name], statistics, criterion) for name in names
     }
     headers = (
         (*(label for label, _ in ONE_RUN), *COLUMNS),
@@ -610,11 +568,11 @@ def comparison_text(comparison) -> str:
 
 
 def nominal_score_of(comparison, name):
-    """The evaluation of an answer's nominal trajectory on the judged problem (by names only, its own), or the words of its half."""
+    """The evaluation of an answer's nominal trajectory on the judged problem, or the words of its half."""
     solution = comparison.solutions.get(name)
     if solution is None or solution.trajectory is None:
         return "-"
-    problem = solution.problem if comparison.problem is None else comparison.problem
+    problem = comparison.problem
     if not is_continuous(problem):
         return "not scored"
     if starts_after_deadline(solution.trajectory, problem):
@@ -658,16 +616,6 @@ def nominal_on_horizon(nominal, problem) -> Trajectory:
     )
 
     return cut
-
-
-def criterion_of(comparison, several):
-    """The criterion the table reads: the judged problem's; by names only, the first evaluation's over several draws, else the expectation."""
-    if comparison.problem is not None:
-        return comparison.problem.criterion
-    if several:
-        return several[0].criterion
-
-    return "expectation"
 
 
 def statistics_of(criterion, several) -> tuple:
@@ -775,11 +723,8 @@ def half_text(half, widths) -> str:
 
 
 def title_of(comparison, criterion, several) -> str:
-    """The panel's title: the judged system and its horizon, and on several draws the criterion and their number; by names only, how many solutions."""
+    """The panel's title: the judged system and its horizon, and on several draws the criterion and their number."""
     problem = comparison.problem
-    if problem is None:
-        n = len(comparison.solutions)
-        return f"Comparison of {n} solutions, each scored on its own problem"
     title = (
         f"Comparison, {problem.sys.name}, "
         f"horizon={planning_horizon_text(problem.horizon)}"
@@ -794,23 +739,6 @@ def title_of(comparison, criterion, several) -> str:
     return title
 
 
-def require_no_scoring(dt, n_trials):
-    """Refuse scoring settings without a problem to score on."""
-    if dt is not None or n_trials is not None:
-        raise TypeError(
-            "compare scores its entries only on a problem: compare(problem, ...)"
-        )
-
-
-def require_scores(evaluations, names):
-    """Refuse a difference of entries that were not scored."""
-    missing = [name for name in names if not evaluations or name not in evaluations]
-    if missing:
-        raise ValueError(
-            f"{missing} carry no evaluation: compare(problem, ...) scores them"
-        )
-
-
 def require_paired(J_a, J_b, names):
     """Refuse a difference of two evaluations that do not hold the same trials."""
     if J_a.shape != J_b.shape:
@@ -820,23 +748,13 @@ def require_paired(J_a, J_b, names):
         )
 
 
-def require_solutions(named):
-    """Refuse a named entry that is not a ``PlanningSolution``."""
-    for name, solution in named.items():
-        if not isinstance(solution, PlanningSolution):
-            raise TypeError(
-                f"{name!r} is not a PlanningSolution: to score a controller, pass the "
-                "problem first, compare(problem, name=controller, ...)"
-            )
-
-
 def require_some_simulation(lines):
     """Refuse a figure of simulations when no answer carries one: every entry an evaluation that keeps no run."""
     if not lines:
         raise ValueError(
             "no entry carries a run to draw: an Evaluation that keeps no trajectories "
             "is scored, not drawn; pass a solution, a controller, or "
-            "evaluate(..., trajectories=True)"
+            "problem.evaluate(..., trajectories=True)"
         )
 
 
@@ -856,6 +774,5 @@ def require_some_cost_to_go(fields):
 
 
 __all__ = [
-    "compare",
     "Comparison",
 ]

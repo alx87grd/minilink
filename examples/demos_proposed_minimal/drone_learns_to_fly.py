@@ -8,7 +8,6 @@ from minilink import (
     Gaussian,
     PlanningProblem,
     ReinforcementLearningPlanner,
-    evaluate,
 )
 
 TRAINING_TIMESTEPS = 600_000  # about 40 s on a laptop CPU
@@ -95,7 +94,7 @@ planner.plot_learning_curve()
 # then flown from one of them
 
 controller = planner.controller
-print(evaluate(problem, controller, dt=0.05, n_trials=100, episode_length=10.0, key=1))
+print(problem.evaluate(controller, dt=0.05, n_trials=100, episode_length=10.0, key=1))
 
 plant.x0 = np.array([-1.0, -2.0, 1.0, 0.0, 0.0, 0.0])
 closed_loop = controller @ plant

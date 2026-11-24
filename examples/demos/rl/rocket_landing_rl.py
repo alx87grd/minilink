@@ -8,7 +8,6 @@ from minilink import (
     PlanningProblem,
     ReinforcementLearningPlanner,
     Rocket,
-    evaluate,
 )
 
 TRAINING_TIMESTEPS = 4_000_000  # about 80 s on a laptop CPU
@@ -81,7 +80,7 @@ planner.plot_learning_curve()
 ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=1, y_axis=4, u_axis=0)  # thrust vs (altitude, vy)
 
-report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
+report = problem.evaluate(ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 plant.x0 = np.array([10.0, 30.0, 0.0, 0.0, 0.0, 0.0])

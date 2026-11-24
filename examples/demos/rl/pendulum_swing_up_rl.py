@@ -9,7 +9,6 @@ from minilink import (
     PlanningProblem,
     ReinforcementLearningPlanner,
     Uniform,
-    evaluate,
 )
 
 TRAINING_TIMESTEPS = 120_000  # swing-up learned by ~65k steps; margin to settle
@@ -73,7 +72,7 @@ planner.plot_learning_curve()
 ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=0, y_axis=1, u_axis=0)  # torque vs (theta, dtheta)
 
-report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
+report = problem.evaluate(ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 plant.x0 = np.array([0.05, 0.0])  # hanging, a tiny tip to break the symmetry

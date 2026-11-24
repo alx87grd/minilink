@@ -26,7 +26,6 @@ from minilink.learning.reinforcement_learning import (  # noqa: E402
     ReinforcementLearningPlanner,
     RolloutEnvironment,
 )
-from minilink.planning import evaluate  # noqa: E402
 
 pytestmark = [pytest.mark.optional, pytest.mark.jax]
 
@@ -400,8 +399,7 @@ def test_solve_with_evaluate_scores_the_law_it_hands_out():
     assert solution.evaluation.J.shape == (4,)
     assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
     assert solution.trajectory is None
-    alone = evaluate(
-        planner.problem,
+    alone = planner.problem.evaluate(
         solution.controller,
         dt=planner.dt,
         n_trials=4,
@@ -441,8 +439,8 @@ def test_the_backends_score_a_fixed_law_on_their_own_draws():
 
     ctl = NeuralPolicy(plant, hidden=(8,), seed=3)  # any fixed static law
     settings = dict(dt=0.05, n_trials=6, episode_length=1.0, key=0)
-    report_jax = evaluate(prob, ctl, backend="jax", **settings)
-    report_np = evaluate(prob, ctl, backend="numpy", **settings)
+    report_jax = prob.evaluate(ctl, backend="jax", **settings)
+    report_np = prob.evaluate(ctl, backend="numpy", **settings)
     assert report_jax.J.shape == (6,) and report_np.J.shape == (6,)
     assert report_jax.feasibility_rate == 1.0 and report_np.feasibility_rate == 1.0
     # different draws (JAX vs NumPy streams), same order of magnitude
@@ -456,7 +454,7 @@ def test_the_evaluation_refuses_a_period_that_does_not_divide_the_horizon():
     ctl = NeuralPolicy(prob.sys, hidden=(8,), seed=3)
     for backend in ("numpy", "jax"):
         with pytest.raises(ValueError, match="divide"):
-            evaluate(prob, ctl, dt=0.1, n_trials=2, backend=backend)
+            prob.evaluate(ctl, dt=0.1, n_trials=2, backend=backend)
 
 
 # --- the off-policy family through the same planner ---
@@ -682,7 +680,7 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
     ctl = planner.actor
     u = ctl.action(np.zeros(2))
     assert u.shape == (2,) and -1.0 <= u[0] <= 1.0 and -2.0 <= u[1] <= 2.0
-    report = evaluate(prob, ctl, dt=0.1, n_trials=3, episode_length=0.5)
+    report = prob.evaluate(ctl, dt=0.1, n_trials=3, episode_length=0.5)
     assert np.all(np.isfinite(report.J))
 
 

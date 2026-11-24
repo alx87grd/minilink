@@ -8,7 +8,6 @@ from minilink import (
     PlanningProblem,
     RRTPlanner,
     RRTStarPlanner,
-    compare,
 )
 from minilink.core.geometry import Sphere
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
@@ -153,9 +152,9 @@ def run_rrt_vs_rrt_star():
         convergence_patience=CONVERGENCE_PATIENCE,
     )
     sol_rrt_star = rrt_star.solve()
-    print(
-        compare({"RRT": sol_rrt, "RRT*": sol_rrt_star})
-    )  # the two search records side by side
+    plans = {"RRT": sol_rrt, "RRT*": sol_rrt_star}
+    run_length = max(float(sol.trajectory.t[-1]) for sol in plans.values())
+    print(problem.compare(plans, episode_length=run_length))
 
     fig, axes = plt.subplots(1, 2, figsize=(12.0, 5.5), sharex=True, sharey=True)
     planners = (("RRT", rrt), ("RRT*", rrt_star))

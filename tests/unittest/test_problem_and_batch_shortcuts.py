@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 from importlib.util import find_spec
 
 import numpy as np
@@ -15,8 +14,6 @@ from minilink import (
     PlanningProblem,
     QuadraticCost,
     Uniform,
-    compare,
-    evaluate,
 )
 
 JAX_AVAILABLE = find_spec("jax") is not None
@@ -25,27 +22,19 @@ JAX_AVAILABLE = find_spec("jax") is not None
 class TestPlanningProblemShortcuts:
     """PlanningProblem.evaluate, .compare, and .program match their standalone/evaluator twins."""
 
-    def test_evaluate_signature_matches_standalone(self):
-        fn_params = list(inspect.signature(evaluate).parameters.values())[1:]
-        method_params = list(
-            inspect.signature(PlanningProblem.evaluate).parameters.values()
-        )[1:]
-        assert [p.name for p in method_params] == [p.name for p in fn_params]
-        assert [p.default for p in method_params] == [p.default for p in fn_params]
-
-    def test_evaluate_matches_standalone_result(self):
+    def test_evaluate_is_the_compiled_evaluation(self):
         plant = Pendulum()
         cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
         problem = PlanningProblem(plant, x0=[1.0, 0.0], horizon=2.0, cost=cost)
         ctrl = Impedance(Kp=5.0, Kd=2.0)
 
         via_method = problem.evaluate(ctrl, dt=0.05, backend="numpy")
-        via_fn = evaluate(problem, ctrl, dt=0.05, backend="numpy")
+        via_compile = problem.compile(ctrl, dt=0.05, backend="numpy").evaluate()
 
-        assert np.isclose(via_method.objective, via_fn.objective)
-        assert np.allclose(via_method.J, via_fn.J)
+        assert np.isclose(via_method.objective, via_compile.objective)
+        assert np.allclose(via_method.J, via_compile.J)
 
-    def test_compare_matches_standalone(self):
+    def test_compare_scores_each_entry_as_evaluate_does(self):
         plant = Pendulum()
         cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
         problem = PlanningProblem(
@@ -55,22 +44,18 @@ class TestPlanningProblemShortcuts:
             cost=cost,
             distributions={"plant": {"m": Uniform(0.9, 1.1)}},
         )
-        soft = Impedance(Kp=2.0, Kd=1.0)
-        stiff = Impedance(Kp=10.0, Kd=3.0)
+        entries = {
+            "Soft": Impedance(Kp=2.0, Kd=1.0),
+            "Stiff": Impedance(Kp=10.0, Kd=3.0),
+        }
 
-        via_method = problem.compare(
-            Soft=soft, Stiff=stiff, dt=0.05, n_trials=4, backend="numpy"
-        )
-        via_fn = compare(
-            problem, Soft=soft, Stiff=stiff, dt=0.05, n_trials=4, backend="numpy"
-        )
+        comparison = problem.compare(dt=0.05, n_trials=4, backend="numpy", **entries)
 
-        assert list(via_method.evaluations) == list(via_fn.evaluations)
-        for name in via_fn.evaluations:
-            assert np.isclose(
-                via_method.evaluations[name].objective,
-                via_fn.evaluations[name].objective,
-            )
+        assert list(comparison.evaluations) == ["Soft", "Stiff"]
+        assert comparison.problem is problem
+        for name, ctrl in entries.items():
+            alone = problem.evaluate(ctrl, dt=0.05, n_trials=4, backend="numpy")
+            assert np.allclose(comparison.evaluations[name].J, alone.J)
 
     def test_program_matches_compiled_evaluator_and_solves(self):
         plant = Pendulum()

@@ -13,7 +13,6 @@ from minilink import (
     RRTPlanner,
     TrajectoryOptimizationPlanner,
     Uniform,
-    compare,
     lqr_trajectory,
 )
 
@@ -75,8 +74,8 @@ rrt = RRTPlanner(
 # A fifth: the optimized plan tracked, u = u_d(t) − K(t) (x − x_d(t))
 tracked = lqr_trajectory(plant, trajopt.trajectory, Q=np.diag([10.0, 1.0]), R=np.eye(1))
 
-comparison = compare(
-    problem, LQR=lqr, VI=vi, TrajOpt=trajopt, RRT=rrt, TrajOpt_tracked=tracked, dt=0.01
+comparison = problem.compare(
+    LQR=lqr, VI=vi, TrajOpt=trajopt, RRT=rrt, TrajOpt_tracked=tracked, dt=0.01
 )
 print(comparison)
 comparison.plot_nominal_trajectory()
@@ -86,8 +85,7 @@ comparison.plot_simulated_trajectory()
 
 problem_x0 = problem.replace(x0=Uniform([-0.2, -0.5], [0.2, 0.5]))
 
-comparison_x0 = compare(
-    problem_x0,
+comparison_x0 = problem_x0.compare(
     LQR=lqr,
     VI=vi,
     TrajOpt=trajopt,

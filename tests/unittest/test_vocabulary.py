@@ -546,7 +546,7 @@ LEADING_POSITIONALS = {
     "minilink.core.discrete.sampled_system.NativeSampledSystem.__init__": (
         "state_dim",
     ),
-    "minilink.planning.evaluator.evaluate": ("problem", "controller", "dt"),
+    "minilink.planning.problems.PlanningProblem.evaluate": ("controller", "dt"),
     "minilink.planning.problems.PlanningProblem.compile": ("controller", "dt"),
     # The impedance laws take the PID family's signature: the gains first, dim a keyword
     # (the maintainer's ruling 9 of 2026-11-10)

@@ -59,7 +59,6 @@ from minilink import (  # noqa: E402
     QuadraticCost,
     RRTPlanner,
     TrajectoryOptimizationPlanner,
-    compare,
 )
 
 plant = Pendulum()
@@ -89,7 +88,7 @@ rrt_sol = rrt.solve()  # kinodynamic tree search, bang-bang inputs
 opt_sol = opt.solve()  # direct collocation
 
 loop = vi_sol.controller @ plant  # the script closes the loop
-print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
+print(problem.compare(VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 loop.compute_trajectory(tf=10.0)
 loop.plot_trajectory()
 rrt.plot_tree(x_axis=0, y_axis=1)

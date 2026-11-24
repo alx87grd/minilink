@@ -11,7 +11,7 @@ from minilink.core.distributions import Gaussian, Uniform
 from minilink.core.sets import BallSet, BoxSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
-from minilink.planning.evaluator import closed_loop_of, evaluate
+from minilink.planning.evaluator import closed_loop_of
 from minilink.planning.problems import PlanningProblem
 from tests.unittest.planning_helpers import edited
 
@@ -258,7 +258,7 @@ def test_a_stochastic_problem_draws_its_trials(backend):
 
 
 def test_the_facade_is_compile_then_evaluate():
-    report = evaluate(stochastic_problem(), pid(), dt=0.01, n_trials=4, backend="numpy")
+    report = stochastic_problem().evaluate(pid(), dt=0.01, n_trials=4, backend="numpy")
     assert isinstance(report, Evaluation) and report.n_trials == 4
 
 
@@ -268,7 +268,7 @@ def test_the_facade_reads_a_sampled_controllers_clock_and_a_continuous_ones_auto
     problem = upright_problem()
 
     # A sampled controller runs on its own clock
-    on_clock = evaluate(problem, pid() % 0.01, backend="numpy")
+    on_clock = problem.evaluate(pid() % 0.01, backend="numpy")
     assert isinstance(on_clock, Evaluation)
     assert on_clock.trajectories is None
 
@@ -278,8 +278,8 @@ def test_the_facade_reads_a_sampled_controllers_clock_and_a_continuous_ones_auto
     step = automatic_step_of(pe.loop.solver_info)
     assert pe.dt <= step and pe.n_steps == int(np.ceil(pe.horizon / step - 1e-9))
     np.testing.assert_allclose(pe.n_steps * pe.dt, pe.horizon, rtol=1e-12)
-    automatic = evaluate(problem, pid(), backend="numpy")
-    stated = evaluate(problem, pid(), dt=pe.dt, backend="numpy")
+    automatic = problem.evaluate(pid(), backend="numpy")
+    stated = problem.evaluate(pid(), dt=pe.dt, backend="numpy")
     np.testing.assert_array_equal(automatic.J, stated.J)
 
 
@@ -902,14 +902,14 @@ def test_a_held_plan_is_scored_as_planned():
 
     # The plan's own length and step: the evidence reproduces the plan
     over_plan = problem.replace(horizon=float(plan.tf))
-    report = evaluate(over_plan, solution.controller, dt=dt, trajectories=True)
+    report = over_plan.evaluate(solution.controller, dt=dt, trajectories=True)
     run = report.trajectories[0].of("plant")
     np.testing.assert_allclose(run.x, plan.x, atol=1e-9)
     np.testing.assert_allclose(run.u[:, :-1], plan.u[:, :-1], atol=0.0)
     assert bool(report.reached[0])
 
     # A finer step holds each sample over its own interval: the goal still reached
-    assert bool(evaluate(over_plan, solution.controller, dt=0.01).reached[0])
+    assert bool(over_plan.evaluate(solution.controller, dt=0.01).reached[0])
 
     # The block handed out is unchanged: read at a step's end, it gives the next sample
     no_signal = np.zeros(0)
@@ -927,7 +927,7 @@ def test_a_plan_is_scored_over_the_problems_horizon():
     assert plan.tf < problem.horizon
 
     evidence = swing_up_evidence(problem)
-    report = evaluate(problem, solution.controller, dt=dt, backend="numpy")
+    report = problem.evaluate(solution.controller, dt=dt, backend="numpy")
 
     np.testing.assert_array_equal(evidence.J, report.J)
     assert solution.record.success and not bool(evidence.reached[0])
@@ -949,7 +949,7 @@ def test_a_held_plan_scores_alike_on_jax():
     dt = float(np.median(np.diff(plan.t)))
 
     reports = [
-        evaluate(over_plan, solution.controller, dt=dt, backend=backend)
+        over_plan.evaluate(solution.controller, dt=dt, backend=backend)
         for backend in ("numpy", "jax")
     ]
 
@@ -1138,13 +1138,11 @@ def test_scoring_a_problem_with_no_horizon_announces_the_length_it_runs():
     """A default that sets what is scored is announced, and silent once the caller names it."""
     import warnings
 
-    from minilink.planning.evaluator import evaluate
-
     problem = upright_problem(horizon=None)
 
     with pytest.warns(UserWarning, match="scored over 10 s"):
-        evaluate(problem, pid(), dt=0.05)
+        problem.evaluate(pid(), dt=0.05)
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        evaluate(problem, pid(), dt=0.05, episode_length=2.0)
+        problem.evaluate(pid(), dt=0.05, episode_length=2.0)

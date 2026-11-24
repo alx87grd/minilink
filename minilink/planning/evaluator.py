@@ -742,42 +742,6 @@ class ProblemEvaluator:
         return stacked, (trajs if trajectories else None)
 
 
-def evaluate(
-    problem,
-    controller,
-    dt=None,
-    *,
-    solver="rk4",
-    substeps=None,
-    n_trials=None,
-    key=0,
-    trajectories=False,
-    backend="auto",
-    episode_length=None,
-) -> Evaluation:
-    """
-    The :class:`Evaluation` of a controller on a problem: ``problem.compile(...).evaluate(...)``.
-
-    One run for a deterministic problem, ``n_trials`` draws for a stochastic one;
-    see :class:`ProblemEvaluator` for the loop, the run and the score. A sampled
-    controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
-    continuous controller runs on ``dt``, the period its loop is integrated and
-    recorded on, and with ``dt`` omitted on its automatic step.
-    ``trajectories=True`` keeps the runs in :attr:`Evaluation.trajectories`.
-    """
-    pe = ProblemEvaluator(
-        problem,
-        controller,
-        dt,
-        solver=solver,
-        substeps=substeps,
-        backend=backend,
-        episode_length=episode_length,
-    )
-
-    return pe.evaluate(key=key, n_trials=n_trials, trajectories=trajectories)
-
-
 def controller_of(controller):
     """The block itself, or the controller of a :class:`~minilink.planning.results.PlanningSolution`."""
     # A real cycle: results imports Evaluation from this module

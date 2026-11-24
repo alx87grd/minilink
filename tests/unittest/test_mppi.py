@@ -21,7 +21,7 @@ from minilink.control import ModelPredictiveController  # noqa: E402
 from minilink.dynamics.catalog.equations.integrators import (  # noqa: E402
     DoubleIntegrator,
 )
-from minilink.planning import MPPIPlanner, MPPIRecord, evaluate  # noqa: E402
+from minilink.planning import MPPIPlanner, MPPIRecord  # noqa: E402
 
 DT = 0.05
 
@@ -280,7 +280,7 @@ def test_the_evidence_of_a_solve_at_params_scores_the_edited_problem():
     planner = double_integrator_planner()
     tree = edited(planner.params, {"x0": np.array([0.5, 0.0])})
     solution = planner.solve(params=tree, evaluate=True)
-    expected = evaluate(solution.problem, solution.controller, dt=DT)
+    expected = solution.problem.evaluate(solution.controller, dt=DT)
     np.testing.assert_allclose(solution.evaluation.J, expected.J)
     np.testing.assert_allclose(solution.evaluation.x0, [[0.5, 0.0]])
 
