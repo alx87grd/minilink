@@ -425,6 +425,8 @@ def _rotation_from_a_to_b(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 # Commands sent before the server's answers are read (a frame's poses, a clip's pages)
 _PIPELINE_DEPTH = 256
+# A packed 64-bit float: its type byte, then the number, big-endian
+_PACKED_FLOAT = np.dtype([("tag", "u1"), ("value", ">f8")])
 
 
 class PipelinedWindow:
@@ -443,27 +445,58 @@ class PipelinedWindow:
         # Lazy imports: Meshcat's own dependencies, loaded with the first viewer
         import umsgpack
         import zmq
+        from meshcat.commands import SetTransform
 
         self.window = window
         self.pack = umsgpack.packb
+        self.SetTransform = SetTransform
+        self.pose_heads = {}  # Each path's address and the packed bytes before its pose
         self.socket = window.context.socket(zmq.DEALER)
         self.socket.connect(window.zmq_url)
         self.pending = 0
 
     def send(self, command):
-        data = command.lower()
-        # the empty first part is the envelope the server's reply socket expects
-        self.socket.send_multipart(
-            [
-                b"",
+        if type(command) is self.SetTransform and is_float_pose(command.matrix):
+            parts = self.pose_parts(command)
+        else:
+            data = command.lower()
+            parts = [
                 data["type"].encode("utf-8"),
                 data["path"].encode("utf-8"),
                 self.pack(data),
             ]
-        )
+        # the empty first part is the envelope the server's reply socket expects
+        self.socket.send_multipart([b"", *parts])
         self.pending += 1
         if self.pending >= _PIPELINE_DEPTH:
             self.flush()
+
+    def pose_parts(self, command) -> list:
+        """
+        The message of a pose command, its sixteen numbers written straight into the packed bytes.
+
+        A live frame is one pose per primitive: the bytes are those of the
+        general packing, without its walk over the command.
+        """
+        path = command.path
+        if path not in self.pose_heads:
+            address = path.lower()
+            head = (
+                b"\x83"  # a map of three entries
+                + self.pack("type")
+                + self.pack("set_transform")
+                + self.pack("path")
+                + self.pack(address)
+                + self.pack("matrix")
+                + b"\xdc\x00\x10"  # an array of sixteen
+            )
+            self.pose_heads[path] = (address.encode("utf-8"), head)
+        address, head = self.pose_heads[path]
+        numbers = np.empty(16, dtype=_PACKED_FLOAT)
+        numbers["tag"] = 0xCB
+        numbers["value"] = command.matrix.T.reshape(-1)
+
+        return [b"set_transform", address, head + numbers.tobytes()]
 
     def flush(self):
         """Wait until the server has answered every command sent."""
@@ -496,6 +529,15 @@ def pipelined(vis):
         vis.window = PipelinedWindow(vis.window)
 
     return vis
+
+
+def is_float_pose(matrix) -> bool:
+    """True for a 4x4 array of 64-bit floats, the pose every primitive is placed with."""
+    return (
+        isinstance(matrix, np.ndarray)
+        and matrix.shape == (4, 4)
+        and matrix.dtype == np.float64
+    )
 
 
 def flush_commands(vis):
@@ -965,6 +1007,10 @@ class MeshcatRenderer(AnimationRenderer):
         # transform. One scene-level slide sent after the primitives would let the
         # browser render in between: a followed body would show at its new pose
         # in the old view, then snap back, and flicker between the two.
+        # The server has taken the previous frame before this one is sent: it
+        # works through a frame while the caller computes the next, and never
+        # falls more than one frame behind
+        flush_commands(self.vis)
         shift = self.canvas._tf.translation_matrix(camera_world_shift(camera))
         self.canvas.reserve_slots(len(primitives))
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
@@ -973,8 +1019,6 @@ class MeshcatRenderer(AnimationRenderer):
             self.canvas.ensure_object(i, prim)
             self.canvas.update_primitive(i, prim, shift @ np.asarray(T, dtype=float))
         self._slide_furniture(camera)
-        # the frame is drawn when the server has taken all of it
-        flush_commands(self.vis)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
