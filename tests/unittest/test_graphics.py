@@ -309,7 +309,7 @@ class TestDiagramSharedWorld(unittest.TestCase):
     def test_subsystem_world_geometry_merges_under_shared_world(self):
         diagram = DiagramSystem()
         diagram.add_subsystem(WorldOnlyPlant(), "marker")
-        geom = diagram.get_dynamic_geometry(np.zeros(diagram.n), np.zeros(diagram.m))
+        geom = diagram.get_kinematic_geometry()
         self.assertIn("world", geom)
         self.assertNotIn("marker:world", geom)
         self.assertEqual(len(geom["world"]), 1)
@@ -351,7 +351,7 @@ class TestDiagramSharedWorld(unittest.TestCase):
         diagram = DiagramSystem()
         diagram.add_subsystem(WorldLineA(), "a")
         diagram.add_subsystem(WorldLineB(), "b")
-        geom = diagram.get_dynamic_geometry(np.zeros(diagram.n), np.zeros(diagram.m))
+        geom = diagram.get_kinematic_geometry()
         self.assertEqual(len(geom["world"]), 2)
         frame = resolve_draw_frame(diagram, np.zeros(diagram.n), np.zeros(diagram.m))
         self.assertEqual(len(frame["primitives"]), 2)
@@ -2195,7 +2195,7 @@ def test_a_rendered_frame_is_on_its_figure_and_saves_as_an_image(tmp_path):
 
 
 class TestKinematicGeometryBuiltOnce(unittest.TestCase):
-    """A session builds each system's kinematic geometry once, a diagram's subsystems included."""
+    """A session builds kinematic geometry once, a diagram's subsystems included."""
 
     def test_a_diagram_subsystem_builds_its_skin_once_over_the_frames(self):
         calls = []
@@ -2210,19 +2210,24 @@ class TestKinematicGeometryBuiltOnce(unittest.TestCase):
         diagram.add_subsystem(plant, "plant")
         animator = Animator(diagram)
 
+        # The diagram's per-frame geometry holds no kinematic geometry
+        dynamic = diagram.get_dynamic_geometry(np.zeros(1), np.zeros(diagram.m))
+        self.assertEqual(dynamic, {})
+        self.assertEqual(len(calls), 0)
+
         frames = [
             animator.resolve_frame(
-                np.array([float(k)]), np.zeros(diagram.m), 0.1 * k, kinematic={}
+                np.array([float(k)]),
+                np.zeros(diagram.m),
+                0.1 * k,
+                kinematic=animator.kinematic_geometry(),
             )
             for k in range(5)
         ]
 
         self.assertEqual(len(calls), 1)
+        self.assertEqual(len(frames[0]["primitives"]), 1)
         self.assertIs(frames[0]["primitives"][0], frames[4]["primitives"][0])
-        # The systems are left as they were: the hook is the class's again
-        self.assertNotIn("get_kinematic_geometry", vars(plant))
-        self.assertEqual(len(plant.get_kinematic_geometry()["world"]), 1)
-        self.assertEqual(len(calls), 2)
 
 
 @pytest.mark.optional

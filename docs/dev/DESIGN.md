@@ -2100,9 +2100,11 @@ by a `visible` track. The clip, the saved page and the inline view are frame-acc
 size grows with the number of distinct geometries. In 3-D, polylines are thin ribbons
 (matplotlib dash and width), not 1-pixel WebGL lines.
 
-An animation or a live session builds each system's kinematic geometry once, a diagram's
-subsystems included, and draws the same primitives in every frame; `tf` and
-`get_dynamic_geometry` are read at each frame.
+An animation or a live session builds the system's kinematic geometry once and draws the
+same primitives in every frame; `tf` and `get_dynamic_geometry` are read at each frame. A
+diagram's `get_kinematic_geometry` is its subsystems' kinematic geometry and its
+`get_dynamic_geometry` their per-frame geometry, each keyed under the subsystem's id. The
+kinematic geometry is drawn first, the per-frame geometry over it.
 
 The live paths (`game`, `RealtimeSimulator`, the evaluator's `live_plot`, `LiveSearchPlot`,
 the trajectory-optimization live plot) are sessions, not records: they draw as they run and
