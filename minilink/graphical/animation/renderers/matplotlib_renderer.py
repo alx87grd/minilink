@@ -406,7 +406,8 @@ class MatplotlibRenderer(AnimationRenderer):
         self.fig = None
         self.ax = None
         self.canvas = None
-        self.layers = None  # The clip's frames drawn in layers, flat views only
+        self.layers = None  # The frames drawn in layers, flat views only
+        self.window_shown = False  # A live scene's window has had its first draw
 
     def _apply_camera(self, ax, camera, is_3d):
         """Apply view limits, labels, and (3D) view orientation from *camera*."""
@@ -456,6 +457,8 @@ class MatplotlibRenderer(AnimationRenderer):
     ) -> None:
         self.fig, self.ax = self._create_figure_and_ax(is_3d, camera)
         self.canvas = MatplotlibCanvas(self.ax, is_3d=is_3d)
+        self.layers = None if is_3d else LayeredFrames(self.fig, self.ax, self.canvas)
+        self.window_shown = False
         if title:
             self.ax.set_title(title, fontsize=FONT_SIZE)
 
@@ -487,7 +490,23 @@ class MatplotlibRenderer(AnimationRenderer):
             if is_blocking_needed():
                 plt.show(block=True)
             return
+        window = self.fig.canvas
+        if (
+            self.window_shown
+            and self.layers is not None
+            and isinstance(window, FigureCanvasAgg)
+        ):
+            # The frame in layers, pushed to the window, then the window's events
+            self.layers.draw_on(window)
+            window.blit(self.fig.bbox)
+            if interval_s is None:
+                window.flush_events()
+            else:
+                window.start_event_loop(interval_s)
+            return
+        # The first frame opens the window, with a full draw
         plt.pause(0.001 if interval_s is None else interval_s)
+        self.window_shown = True
 
     def poll_events(self) -> dict[str, bool]:
         if self.fig is None:
@@ -720,28 +739,40 @@ class LayeredFrames:
 
     def rgba(self) -> np.ndarray:
         """The frame the figure holds, ``(height, width, 4)`` bytes."""
+        self.draw_on(self.agg)
+
+        return np.asarray(self.agg.buffer_rgba())
+
+    def draw_on(self, agg) -> None:
+        """Draw the frame the figure holds into the image of ``agg``, an Agg canvas of the figure."""
+        self.agg = agg
         view = self.view_key()
         if not self.layered() or view != self.view:
             # A new view: a full draw, which also places its ticks
             self.view = view
             self.background = None
-            FigureCanvasAgg.draw(self.agg)
+            FigureCanvasAgg.draw(agg)
             self.title_position = self.ax.title.get_position()
         else:
             if self.background is None or self.background[0] != view:
                 self.keep_background(view)
             self.draw_over_background()
 
-        return np.asarray(self.agg.buffer_rgba())
-
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
     def view_key(self) -> tuple:
-        """What the background depends on: the limits and the axis labels."""
+        """What the background depends on: the limits, the axis labels, the image's size."""
         ax = self.ax
-        return (ax.get_xlim(), ax.get_ylim(), ax.get_xlabel(), ax.get_ylabel())
+        return (
+            ax.get_xlim(),
+            ax.get_ylim(),
+            ax.get_xlabel(),
+            ax.get_ylabel(),
+            self.agg.get_width_height(),
+            self.fig.dpi,
+        )
 
     def layered(self) -> bool:
         """True when the axes hold nothing but what the layers know how to order."""

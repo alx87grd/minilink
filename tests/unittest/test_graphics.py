@@ -2279,3 +2279,95 @@ class TestMeshcatFastPaths(unittest.TestCase):
             self.assertEqual(kind, data["type"].encode("utf-8"))
             self.assertEqual(address, data["path"].encode("utf-8"))
             self.assertEqual(packed, umsgpack.packb(data))
+
+
+class TestMatplotlibLayeredFrames(unittest.TestCase):
+    """A frame drawn in layers is the frame a full draw of the figure gives."""
+
+    def frames_of(self, system, traj, **animate):
+        from minilink.graphical.common.matplotlib_style import DPI_FIGURE
+
+        result = system.animate(traj, renderer="matplotlib", show=False, **animate)
+        fig, ani = result.clip.built()
+        layers = result.clip.backend.layers
+        full, layered = [], []
+        for k in range(len(result.clip.frames)):
+            ani._func(k)
+            buffer = io.BytesIO()
+            fig.savefig(buffer, format="rgba", dpi=DPI_FIGURE)
+            full.append(buffer.getvalue())
+        layers.open(DPI_FIGURE)
+        for k in range(len(result.clip.frames)):
+            ani._func(k)
+            layered.append(layers.rgba().tobytes())
+        layers.close()
+        plt.close(fig)
+
+        return full, layered
+
+    def test_layered_frames_match_full_draws_on_a_still_view(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([2.0, 0.0])
+        traj = pendulum.compute_trajectory(tf=0.5)
+
+        full, layered = self.frames_of(pendulum, traj)
+
+        self.assertGreater(len(full), 5)
+        self.assertEqual(full, layered)
+        self.assertNotEqual(full[0], full[-1])
+
+    def test_layered_frames_match_full_draws_when_the_view_moves(self):
+        class Slider(DynamicSystem):
+            def __init__(self):
+                super().__init__(1)
+                self.skin = debug_state_skin
+                self.camera_scale = 2.0
+                self.camera_follow_frame = "body"
+
+            def f(self, x, u, t=0, params=None):
+                return np.ones(1)
+
+            def tf(self, x, u, t=0, params=None):
+                return {"body": translation(x[0], 0.0, 0.0)}
+
+        slider = Slider()
+        traj = Trajectory(
+            t=np.linspace(0.0, 0.3, 10),
+            x=np.linspace(0.0, 3.0, 10).reshape(1, 10),
+            u=np.zeros((0, 10)),
+        )
+
+        full, layered = self.frames_of(slider, traj)
+
+        self.assertEqual(full, layered)
+
+
+class TestGifClipPalette(unittest.TestCase):
+    def test_frames_share_one_palette_and_keep_their_few_colours(self):
+        from PIL import Image
+
+        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+            frames_on_one_palette,
+        )
+
+        colours = [(255, 255, 255), (0, 0, 0), (200, 30, 30), (30, 60, 200)]
+        frames = []
+        for k in range(8):
+            pixels = np.zeros((6, 8, 3), dtype=np.uint8)
+            pixels[:] = colours[0]
+            pixels[k % 6, :] = colours[1 + k % 3]
+            frames.append(Image.fromarray(pixels, mode="RGB"))
+
+        indexed = frames_on_one_palette(frames)
+
+        self.assertEqual(len(indexed), len(frames))
+        self.assertTrue(all(image.mode == "P" for image in indexed))
+        self.assertTrue(
+            all(image.getpalette() == indexed[0].getpalette() for image in indexed)
+        )
+        for frame, image in zip(frames, indexed):
+            np.testing.assert_array_equal(
+                np.asarray(image.convert("RGB")), np.asarray(frame)
+            )

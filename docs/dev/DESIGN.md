@@ -2088,7 +2088,8 @@ and `animation` are properties of the clip: `figure` is matplotlib's or Plotly's
 Meshcat's viewer (`None` on pygame); `animation` matplotlib's `FuncAnimation` or Meshcat's
 `Animation` (`None` on Plotly, whose frames sit in its figure, and on pygame). The clip is
 built on first use, so a record made with `show=False` starts no Meshcat viewer until it is
-shown or saved. `.save` writes matplotlib's `.gif` (the default) or a video through ffmpeg
+shown or saved. `.save` writes matplotlib's `.gif` (the default, one palette of 256 colours
+for the whole clip) or a video through ffmpeg
 (`.mp4`), any other suffix refused by name, and Meshcat's and Plotly's self-contained
 `.html` page; a pygame record has nothing to save and refuses by name.
 
