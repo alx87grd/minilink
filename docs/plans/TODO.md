@@ -37,7 +37,7 @@ as the maintainer would and logged in the run's record.
 | The root list regenerated from the kept demos | — | v0.4 (end, with K8-1) | your review of the drafted list (§1.13) |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades (§1.2) |
 | The demo sweep to the flatness rule | D1.3 | standing (§3) | your review of each diff, the showcase notebook first |
-| The planning demos on the solution verbs | D1.4 | standing (§3) | `solution.plot_*` and `compare(...)` in the demos your pass keeps; the Simulator's kept answers |
+| The planning demos on the solution verbs | D1.4 | standing (§3) | `solution.plot_*` and `problem.compare(...)` in the demos your pass keeps; the Simulator's kept answers |
 | Two dead modules | D2 | standing (§3), after your pass | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
 | The compile-time flatten default | — | standing (§3) | after one benchmark: off, on, or always |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
@@ -493,8 +493,8 @@ maintainer's pass keeps (§1.12), and to the tutorial notebooks.
   Also: the facade gaps the import allowlist records closed
   (`tests/unittest/teaching_import_allowlist.txt`; scan: examples#13).
 - [ ] **The planning demos on the solution verbs** (D1.4) **[ask]**: the planning demos the
-  pass keeps run on `compare(...)` and the solution's plots (as
-  `demos_proposed_minimal/pendulum_every_planner.py` does), their hand-rolled comparisons replaced by `solution.plot_*` and `compare(...)`.
+  pass keeps run on `problem.compare(...)` and the solution's plots (as
+  `demos_proposed_minimal/pendulum_every_planner.py` does), their hand-rolled comparisons replaced by `solution.plot_*` and `problem.compare(...)`.
   Also: the Simulator under RULES 2.4, which keeps `last_traj` and `last_solve_time_s`
   besides the `sys.traj` shortcut (the maintainer held it, 2026-11-04); its `last_debug`
   stays a diagnostic.
@@ -618,7 +618,7 @@ pillar names it.
 
 - [ ] **Identification and generation** (C4) (its design states which fitting route it takes and
   flags it for the behavior-cloning decision): identification is V1's program export
-  (`pe.program(wrt=["plant.…"])` and the `Optimizer`) with a data-mismatch cost (`identification/fitting.py` on `rollout_batch`; physical params and NN
+  (`J.program(wrt=["plant.…"])` and the `Optimizer`) with a data-mismatch cost (`identification/fitting.py` on `rollout_batch`; physical params and NN
   weights are one verb), its first data consumer; `trajectory_generation/` port (polynomial,
   min-snap); SMC trajectory-following demo; trajectory post-filter; experiment-design
   helpers (the PRBS / chirp inputs live in `blocks/sources`).

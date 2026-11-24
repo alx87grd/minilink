@@ -18,7 +18,7 @@ examples") are decided here.
 4. **One problem, every planner.** Value iteration, RRT, trajectory optimization, RL, and MPC (a
    planner on a clock is a controller), each answer a controller closed on the plant. MPC stays in
    the README too, its name changed with GMC714's pins (G3) if they move it.
-5. **One judge.** `compare` and `evaluate` right after the planners: the same model, cost, sets
+5. **One judge.** `problem.compare` and `problem.evaluate` right after the planners: the same model, cost, sets
    and draws for every approach, the draws over the start and one uncertain parameter
    (`distributions=`), a noise block on a port optional.
 6. **One optimization boundary.** Tune through the whole loop by parameter paths, gains and one

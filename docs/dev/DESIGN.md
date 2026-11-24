@@ -246,7 +246,7 @@ A
 periods (on a nanosecond grid); a block of divisor `d > 1` fires on `k mod d = 0`, its held
 outputs state slots after the blocks' states (`hold_index`, labelled `controller:u (memory)`:
 the memory of the last firing, one period behind the signal a run records at the same tick),
-their start `hold_x0` a leaf of the evaluator's tree (`pe.params["hold_x0"]`, differentiable
+their start `hold_x0` a leaf of the evaluator's tree (`J.params["hold_x0"]`, differentiable
 like every `x0`; a layout change under a start that is not zero is refused); its compiled plan
 (`build_sampled_execution_plan`, nested boxes inlined into one flat schedule) forms
 `t_k = t0 + k·Δ` once per tick and hands it to every block whose equations are in seconds
@@ -377,7 +377,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   on a real computer), `False` applies it at once (the textbook MPC). A failed solve (a
   non-finite cost or plan) keeps the last plan. `P_k` is the planner's tree (the solve block's
   `params`: the one tuning path is `controller.solve.cost.R`,
-  `pe.params["controller"]["solve"]["cost"]["R"]`) with each leaf named in `inputs` read from
+  `J.params["controller"]["solve"]["cost"]["R"]`) with each leaf named in `inputs` read from
   its port (default `{"x0": "y"}`) and `t0` the tick's time. Delay compensation is
   the user's predictor block on the port that binds `x0`, on the face verb
   `pv.predict_start(x, u, t, Δ, params)` (the planner's model, the command held). The face's
@@ -487,7 +487,7 @@ One model for every object, in seven rules:
 4. **A `params` argument is `None` or the whole tree**, the same shape as `.params`: on an
    equation method (`f h tf g margin value sdf sample step`, which read it as given, no
    merge, no check) and on every tool verb (`Simulator.solve`, `ev.f/step/rollout/
-   rollout_batch`, `pe.trajectory/evaluate/program`, `planner.solve`, `pv.solve/solution/
+   rollout_batch`, `J.trajectory/evaluate/program`, `planner.solve`, `pv.solve/solution/
    initial`, `Optimizer.solve`). Nothing merges anywhere. A one-off
    tree is the tool's own, edited: a held tool's `params` is a copy (`p = sim.params;
    p["m"] = 2.0; sim.solve(params=p)`); a planner's is live on its problem's parts, so a solve
@@ -1017,11 +1017,14 @@ backend (`backend` picked at construction; JAX imported only by a JAX evaluator)
   diagram → `SampledDiagramEvaluator` (`evaluators/discrete.py`): `step`, `outputs`,
   state-only `rollout`; no `f`
 
-On JAX a continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0,
-dt, n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
+A continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0,
+dt, n_steps, params=None, solver="rk4")` — the held-input rollout over a family of
 initial states, input sequences, and params (a params leaf with one more
-dimension than the compiled value is swept); the research facade for
-parameter-family experiments.
+dimension than the compiled value is swept): one `vmap` on JAX, a loop on NumPy. Its
+shortcut is `system.rollout_batch(x0s, tf=None, u=None, *, t0=0.0, dt=None, n_steps=None,
+params=None, solver="rk4", backend="auto")`, which resolves the time grid, compiles and
+returns `(t, xs)`, `xs[member, sample, state]` of shape `(B, N + 1, n)`; one run is
+`compute_trajectory`. A step evaluator's `rollout_batch` is JAX only.
 
 Leaf `compile` accepts `numpy` or `jax` only (`auto` / `direct` are simulator /
 transcription concepts — see :mod:`minilink.core.backends`). Every automatic backend
@@ -1065,7 +1068,7 @@ subsystem):
     ev.outputs(x, u, t=0.0, params=None)                                      # the boundary ports
     ev.step(x, u, t, params=None, *, dt, solver="rk4", substeps=1)            # x_{k+1}, u held
     ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
-    ev.rollout_batch(x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None)   # JAX: a family, one vmap
+    ev.rollout_batch(x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None, solver="rk4")   # a family: one vmap on JAX, a loop on NumPy
 
 A step evaluator has `step(x, u, k=0, params=None, *, t0=0.0)` (the system's own map on
 the integer tick, no knobs), `outputs` and
@@ -1097,7 +1100,7 @@ held tool compiles the parametric form once (`sim.solve(params=p)`). A tool buil
 planner's solve reads the problem's numbers at that solve (`evaluator.call_params()`, once per
 solve, never per call). A convenience call (`compute_trajectory`, `problem.compile`,
 `closed_loop`) compiles each time, so it sees every edit; speed is a tool held by the user
-(`Simulator(sys, backend="jax")`, `pe = problem.compile(ctl)`, `planner.compile()`), built
+(`Simulator(sys, backend="jax")`, `J = problem.compile(ctl)`, `planner.compile()`), built
 once and run many times (no cache, no hidden registry). The `jit` sits at the outermost pure
 computation of each pipeline: the rollout (not `f`), the problem's trial function, the
 fixed-count solve and the fused first-order step, the RL rollout; a host loop (SciPy, a
@@ -1282,10 +1285,10 @@ solved for many values without a recompile; a program without `params` keeps cal
 body serves both: it holds the bound tree, the JAX one passes it as a traced argument and
 differentiates in `z`. **The stochastic program is the seed case**: every program is
 deterministic given its parameters, the seed one of them, an integer leaf found by the key
-`seed` and never a decision (`pe.program` refuses a seed in `wrt`); complete trees inside, one
+`seed` and never a decision (`J.program` refuses a seed in `wrt`); complete trees inside, one
 merge at the boundary; sizes structural (the knots `N`, the iterations `K`, a batch size are
 constructor arguments, never parameters); the warm start an argument of the solve (`z0=`). The
-core's sample-average export is `pe.program(wrt, key=, n_trials=)`: the draws realized once
+core's sample-average export is `J.program(wrt, key=, n_trials=)`: the draws realized once
 from `key`, so `J` is deterministic and any method solves it. **The native
 methods** `gd` and `adam` are pure laws on the array module of their input
 (`optimizers/first_order.py`: `law.init(z0) -> state`, `law.update(grad, state) -> state`, the
@@ -1387,24 +1390,24 @@ each: a planner computes a **plan**; the `(t, x, u)` that plan predicts, `soluti
 is its **nominal trajectory**, the reference a tracking law follows; the judge's run of the
 block handed out is its **simulation**. **Nominal** means the reference without
 uncertainty, as in the nominal state `x̄` and the deterministic `problem.nominal()`.
-`compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
-side by side: `plot_control_law` / `plot_cost_to_go` are the overlays on one scale;
-`compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores every
-entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
-and one backend (NumPy for all when one entry does not trace), its `dt` as `evaluate` reads
-it (a sampled controller on its own clock, `dt` only for a continuous one), keeps that
-problem as `Comparison.problem` (`None` by names only) and the judge's runs in each
+`problem.compare(VI=..., PID=pid, dt=, n_trials=, key=)` → `Comparison` (or the entries as
+one dict) names the answers side by side and scores every entry (a solution, a controller,
+or a given `Evaluation`) by `problem.evaluate` on the same draws and one backend (NumPy for
+all when one entry does not trace), its `dt` as `evaluate` reads it (a sampled controller on
+its own clock, `dt` only for a continuous one); a comparison always holds its problem
+(`Comparison.problem`), every entry's evaluation and the judge's runs in each
 evaluation (`trajectories`, one per trial: memory grows with `n_trials`);
+`plot_control_law` / `plot_cost_to_go` are the overlays on one scale;
 `difference(a, b)` is the paired `J_a − J_b`. `print` is the table, a framed panel titled by
 the judged system, its horizon and, on several draws, the criterion and their number: each
 answer read twice (`J`, goal, constraints), its nominal trajectory, cut at `t0 + T` and
-scored on the judged problem by `evaluate_trajectory` without simulation (by names only, on
-its own problem; `-` for an answer without one), beside its simulation, the block it hands
+scored on the judged problem by `evaluate_trajectory` without simulation (`-` for an
+answer without one), beside its simulation, the block it hands
 out simulated by the judge (on several draws, the judged problem's criterion first when it
 is not the expectation, then `E[J]`, `σ(J)` and `max J`, and the counts).
 `plot_nominal_trajectory` draws each answer's nominal trajectory (the answers without one
 left out); `plot_simulated_trajectory` draws each answer's simulations from its evaluation
-(one solid, several thin and faint; by names only, the controller run once). Both use one
+(one solid, several thin and faint). Both use one
 colour per answer and mark the judged problem by each row's signal: the horizon on every
 row, the goal's extent at `t0 + T` (`Xf.bounding_box()`) on the rows of `x`, the input
 limits (`U.bounding_box()`) on the rows of `u`. `LQRPlanner
@@ -1532,7 +1535,7 @@ from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's `Distribution`.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
-`pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto", episode_length=None)` closes
+`J = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto", episode_length=None, n_trials=None, key=0)` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
 loop is taken when its block `plant` is the problem's system) and compiles it once. A held
 open-loop plan (a `TrajectorySource` with `hold="zoh"`, the controller of RRT, RRT* and MPPI)
@@ -1546,30 +1549,33 @@ grid of `dt` (omitted: the loop's automatic step, below); a sampled controller (
 refused, naming the period, `solver` and `substeps` its plant's integration per base period (`None`, the
 automatic step; a continuous loop's `substeps` is 1 by default); a tick law (an MPC box among
 them) with no clock is refused, naming the clock.
-`pe.params` is the run's tree: the loop's subsystems by id (a stateful subsystem other than the
+`J.params` is the run's tree: the loop's subsystems by id (a stateful subsystem other than the
 plant with its `"x0"` leaf), the problem's own leaves (`"cost"`,
 the sets' parameters, `"x0"`, `"discount_rate"`) and each free input at its nominal
-value. `pe.trajectory(params)` is one run to the horizon on the step model, every block
+value. `J.trajectory(params)` is one run to the horizon on the step model, every block
 output recorded (`"id:port"`, the plant's input `"plant:u"`, the role `plant`);
-`pe.evaluate(params, key, n_trials)` the `Evaluation` (a pytree record, one row per run:
+`J.evaluate(params, key, n_trials)` the `Evaluation` (a pytree record, one row per run:
 `raw_cost`, `J` (the raw cost plus the failure cost of a failed or missed run), the margins,
 `failed`, `reached`, `x0`; `objective` the criterion over `J`,
 `mean` / `std` / `worst` / `cvar(alpha)` and the three rates), the draws of a stochastic
-problem `vmap`ped on JAX, so `jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)`
+problem `vmap`ped on JAX. `J(p)` is that objective, `J.evaluate(p).objective`, so the
+instance reads as the closed loop's performance index and `jax.grad(J)(J.params)`
 reaches every gain, plant parameter, cost weight and the start; a tree holding an integer leaf (a
 noise block's `seed`) is differentiated with `jax.grad(..., allow_int=True)`, the integer leaves
 getting a zero (`float0`) gradient; that reads a gradient, since `float0` leaves refuse
-the next tree arithmetic, and tuning goes through `pe.program(wrt)`, which never sees an
+the next tree arithmetic, and tuning goes through `J.program(wrt)`, which never sees an
 integer leaf. `solver="scipy*"` is the
 adaptive integral on NumPy, `dt` its reporting grid; `"auto"` falls back to NumPy when the
-loop, the cost or a set does not trace. `pe.program(wrt, bounds, key, n_trials,
+loop, the cost or a set does not trace. `J.program(wrt, bounds, key, n_trials,
 params=)` exports the tuning `MathematicalProgram` over the leaves `wrt` (dotted paths,
-`"controller.Kp"`): the objective `pe.evaluate(...).objective`, its reverse-mode gradient on
+`"controller.Kp"`): the objective `J(p)`, its reverse-mode gradient on
 JAX, the per-trial feasibility margin as a row when `X` or `U` is bounded and the
-reachability margin when `Xf` is set; `pe.pack` / `pe.unpack` move between the tree and
-`z`; `pe.live_plot(wrt, *, params=, signals=, every=, pause=, renderer=)` is a progress
+reachability margin when `Xf` is set; `J.pack` / `J.unpack` move between the tree and
+`z`; `J.live_plot(wrt, *, params=, signals=, every=, pause=, renderer=)` is a progress
 callback `callback(z, J, t)` for `Optimizer.solve(callback=)`, the closed loop at the iterate
-`z` redrawn on one live figure. `evaluate(problem, controller, dt=None, ...)` is the facade: a sampled controller runs on
+`z` redrawn on one live figure. `n_trials` and `key` of the compile are the draws `J(p)`,
+`J.evaluate` and `J.program` read when a call names none. `problem.evaluate(controller,
+dt=None, ...)` is the facade, `problem.compile(...)` then `J.evaluate(...)`: a sampled controller runs on
 its clock with `dt` omitted, a continuous one on `dt`, and with `dt` omitted on the
 loop's automatic step, the continuous simulator's `Δt = 0.1 τ_min` (§5) shortened to
 divide the run, `dt = tf / ⌈tf / Δt⌉`. No backend clips the law:
@@ -1581,11 +1587,11 @@ backends for an integer key, while a deterministic problem runs each block's own
 with no gradient, and a non-finite objective at `z0` warns once. A planner's
 evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
 `planning/planner.py`, an internal helper the planners' `solve()` call) is one
-`evaluate(problem, controller, dt=..., ...)` of the controller as it is handed out, on the
+`problem.evaluate(controller, dt=..., ...)` of the controller as it is handed out, on the
 real plant. The planner's `dt` is the integration step of its evidence, for every planner: a continuous law integrated on it, still continuous, no hold (value
 iteration and tabular learning on their grid's `dt`, deep learning on its environment's,
 the LQR on its reporting grid `dt`, an open-loop plan on its own grid, the interpolation
-its planner states), so `sol.evaluation` equals `evaluate(problem, sol.controller, dt=)`
+its planner states), so `sol.evaluation` equals `problem.evaluate(sol.controller, dt=)`
 on that step; every planner is scored over the problem's horizon, one judge (an open-loop
 plan shorter than it holds its last input after it ends; an infinite horizon over the
 evaluator's default run, 10 s with its warning (rounded up to whole periods of a `dt` that does
@@ -1599,7 +1605,7 @@ of its grid is another controller, `law % dt`, scored as such:
 `problem.compile(law % dt).evaluate()`, `substeps=` for the planner's own physics.
 
 **What the gradient path is not.** Three limits of the differentiable evaluation:
-- **Single shooting is not collocation.** `pe.program(wrt)` differentiates one forward run
+- **Single shooting is not collocation.** `J.program(wrt)` differentiates one forward run
   of the loop, single shooting (an open-loop source's leaves, a held input): through an unstable plant over a long horizon its gradients
   explode or vanish and the landscape is nonconvex. `ShootingTranscription` and
   `DirectCollocationTranscription` stay the trajectory-optimization path; the export is an
@@ -1644,13 +1650,13 @@ evidence read, built once per tool by `step_model_of(problem, dt)`; a continuous
 model at `dt` (`StepModel(problem, dt=)`) equals its discretization's to the bit.
 
 The pipeline (its map: [docs/pipelines.md](../pipelines.md)). Every object carries its own
-parameters `p`, and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
+parameters `p`, and they form one tree `θ = J.params`, a branch per object under its key; the plant,
 cost, sets and start (or, on a stochastic problem, the distributions) belong to the problem,
 and the controller closes the loop on the problem's plant at compile. The problem evaluator
 is its own object: it simulates the closed loop (integrated forward from `x₀` to `tf`),
 scores its `Trajectory` (the cost `J`, and the margin `m` of the run to the sets, negative
-when it leaves one), and returns the objective with its `Evaluation`; `pe.evaluate(θ)` alone
-evaluates a solution. Tuning is an optional export: `pe.program(wrt)` minimizes the objective
+when it leaves one), and returns the objective with its `Evaluation`; `J.evaluate(θ)` alone
+evaluates a solution. Tuning is an optional export: `J.program(wrt)` minimizes the objective
 over the chosen leaves of `θ` (dotted paths such as `"controller.Kp"`) with `m ≥ 0` as its
 rows, and the optimizer writes the tuned leaves back into `θ`. On a stochastic problem the
 noise's seed is a leaf of `θ` like any other, and so are the distributions' own parameters;
@@ -1684,7 +1690,7 @@ control periods of `n_rollouts` parallel rollouts: `solve(n_timesteps=)` → `Pl
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
 map); the learned law's runs with draws are
-`evaluate(problem, solution.controller, trajectories=True)`. The block being trained (given as `actor=`, else built
+`problem.evaluate(solution.controller, trajectories=True)`. The block being trained (given as `actor=`, else built
 from `hidden=` and `features=`), updated in place every learning iteration, is `planner.actor`; the plant steps trained so far,
 `planner.n_timesteps`. `solve` is the one verb: each call continues the training where the last
 one stopped and hands out a copy of the law at its weights (no `learn`); the law is read as

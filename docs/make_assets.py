@@ -347,7 +347,6 @@ def tool_planning() -> None:
         PlanningProblem,
         ReinforcementLearningPlanner,
         Uniform,
-        compare,
     )
 
     guess, history = swing_up_iterates()
@@ -383,7 +382,7 @@ def tool_planning() -> None:
 
     mass = Uniform(0.8, 1.2)
     uncertain = problem.replace(distributions={"plant": {"m": mass}})
-    comparison = compare(uncertain, n_trials=20, **answers)
+    comparison = uncertain.compare(n_trials=20, **answers)
     source = comparison.plot_simulated_trajectory(show=False).figure.axes[1]
 
     plt.rcParams.update(style_rc())

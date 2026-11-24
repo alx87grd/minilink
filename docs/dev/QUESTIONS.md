@@ -10,7 +10,7 @@ A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO 
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
 file. The core's architecture is of record: the v0.3 rulings and the v0.4 rulings of
 2026-11-04 to 2026-11-11 live in DESIGN and RULES. Open here: three small names the API
-settlement (PR #139) left, four questions on the car ladder, two on the architecture, and one on the vision.
+settlement (PR #139) left, four questions on the car ladder, four on the architecture, and one on the vision.
 
 ## The API
 
@@ -182,9 +182,10 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
   6. the default time is `t=0` on `System.f`, `h`, `tf` and `t=0.0` on the catalog plants, the
      sets, the costs and the fields.
 - **Positional against keyword-only:**
-  7. `pe.evaluate(params, key, n_trials, *, trajectories)` against
-     `evaluate(problem, controller, dt, *, ..., n_trials, key)`; `pe.program(wrt, bounds, key,
-     n_trials, *, params)`; `pe.trajectory(key=None)` against `pe.evaluate(key=0)`;
+  7. `J.evaluate(params, key, n_trials, *, trajectories)` against
+     `problem.evaluate(controller, dt, *, ..., n_trials, key)`; `J.program(wrt, bounds, key,
+     n_trials, *, params)`; `J.trajectory(key=None)` (the nominal run) against `J.evaluate()`
+     (the compile's `key`);
   8. `solve` is keyword-only on `Optimizer` and `Planner`, positional on the compiled
      trajectory planner, which returns `(z, status)` and not a result object;
   9. `backend` defaults to `"numpy"` on `System.compile`, `None` on a planner's `compile`
@@ -220,6 +221,45 @@ settlement (PR #139) left, four questions on the car ladder, two on the architec
   beside the code; or rule a few now.
 - **Recommendation:** the naming items 1, 5 and 7 to 9 first: they are what a reader of the
   core notebooks meets on every page.
+- **Blocks:** nothing.
+- **Answer:**
+
+### Tuning passes through the compiled object `J`
+- **Context:** the main story is verbs on nouns: `plant.compute_trajectory()`,
+  `problem.evaluate(controller)`, `problem.compare(...)`, `Optimizer(program).solve()`, with
+  each tool's compiled form (`plant.compile()`, `planner.compile()`) underneath for research.
+  Tuning breaks that layering: the program comes from `J = problem.compile(controller)`, and
+  reading the answer back (`J.unpack(best.z, wrt)`) and running the tuned loop
+  (`J.trajectory(...)`) need `J` too. The review of the README pass kept `J`, named it after
+  the performance index it is (`J(p)`, `jax.grad(J)(J.params)`), and removed the
+  `problem.program` shortcut, which built a `J` and threw it away
+  ([problem-verbs-and-batch.md](../plans/problem-verbs-and-batch.md)).
+- **Ideas weighed, none taken:**
+  1. the program maps `z` back itself (`program.unpack(best.z)`, the tuned tree), and the
+     problem's verbs take `params=` (the constitution's explicit override), so tuning reads
+     `task.program(c, wrt)` → `Optimizer` → `task.evaluate(c, params=program.unpack(z))`
+     without `J`; it changes `MathematicalProgram`, a core object, and the verbs;
+  2. a domain verb for `compile` on the problem (`objective`, `with_controller`); it breaks
+     `compile`'s one meaning across the system, the planner and the problem;
+  3. a `problem.tune(...)` verb returning a `PlanningSolution`: rejected, it hides the
+     explicit program and optimizer step, and tuning is not planning (`wrt` may name the
+     plant's parameters).
+- **Recommendation:** none yet; reopen when a second tool needs the read-back of 1 (a
+  collocation program decodes `z` into a trajectory inside its planner today).
+- **Blocks:** nothing.
+- **Answer:**
+
+### A batch of runs as one `Trajectory`
+- **Context:** `t, xs = system.rollout_batch(...)` returns arrays, `xs[member, sample,
+  state]`, while one run is a `Trajectory` whose `x` is `(n, N)`: the index order differs
+  between the two. `Evaluation.trajectories` is a list of `Trajectory`, one per trial, split
+  from one batched pytree. Measured on a cloud CPU (warm, median of 7): building 1000
+  `Trajectory` objects from a 1000 × 1001 batch costs 22 ms beside the 112 ms rollout.
+- **Options:** keep the arrays (ruled for now); a list of `Trajectory`; one batched
+  `Trajectory` (`x` of shape `(B, n, N)`, `t` shared), which the plots and `with_cost` would
+  learn to read.
+- **Recommendation:** reopen when a second tool needs batched runs; then the batched
+  `Trajectory` for both `rollout_batch` and `Evaluation.trajectories`.
 - **Blocks:** nothing.
 - **Answer:**
 

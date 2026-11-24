@@ -54,7 +54,7 @@ drawn.show()
 4. **Colours are a plot's own.** Two plots of one kind on shared axes share their colours
    (two trajectories, two Bode plots, two phase-plane runs). No recolouring and no `color=`
    keyword: no course overlays two plots of one kind (41 `plot_trajectory` calls in the
-   teaching notebooks, none on shared axes). Answers are compared with `compare(...)`,
+   teaching notebooks, none on shared axes). Answers are compared with `problem.compare(...)`,
    which draws each in its own colour, or with the caller's own lines on `result.axes`. If
    a course overlays two plots of one kind, a `label=` keyword on the plots that fix a
    colour would be the remedy (it names the curve in the legend and frees its colour); no

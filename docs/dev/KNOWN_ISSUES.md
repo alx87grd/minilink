@@ -36,7 +36,7 @@ lands. Last checked against the code: 2026-11-18 (NumPy 2.5, JAX 0.12, a cloud m
   positive, got nan" after NumPy's "Mean of empty slice" warning: no extension improved on the
   root, so the best-effort path is the root alone, a plan of one sample with no step to read,
   and `Tree.extract_trajectory` builds its input with no channel (`u` of shape `(0, 1)`),
-  which the controller's `TrajectorySource` carries; `evaluate(problem, solution.controller)`
+  which the controller's `TrajectorySource` carries; `problem.evaluate(solution.controller)`
   then raises "u_seq must have shape (N, 1), got (222, 0)" (found 2026-11-11; the messages as
   of 2026-11-18).
 - **Workaround:** more iterations (`max_iterations=`), or `solve()` without `evaluate` and a
