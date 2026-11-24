@@ -336,7 +336,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   orchestrator. Per frame it polls a `RealtimeInput` (`u`, `should_stop`; the nominal `u`
   when none), advances the plant by ZOH integration, draws live through the `Animator`
   and publishes to an optional `RealtimeOutput` (a `LiveSignalPlotOutput` beside it when
-  `plot=True` or `plot=(signals)`, drawn by `plot_renderer`). Two clocks: `frame_dt` (wall period per
+  `plot=True` or `plot=(signals)`, drawn by `plot_renderer`; `sys.game` draws it with Plotly
+  when Plotly is installed, a browser page that redraws itself, else with matplotlib). Two clocks: `frame_dt` (wall period per
   frame) and `sim_dt` (the integration step, auto-calibrated at `run` unless given);
   `sync="locked"` advances `frame_dt` of sim time per frame, `sync="realtime"` the measured
   wall time. The run returns a `Trajectory` (one sample per frame), cached on `self.traj`

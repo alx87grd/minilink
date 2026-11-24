@@ -1044,6 +1044,19 @@ class TestRealtimeSimulator(unittest.TestCase):
             )
 
 
+def test_the_game_signal_plot_is_plotly_when_installed_else_matplotlib():
+    from unittest import mock
+
+    from minilink.core.facades import animation
+
+    assert animation.live_plot_renderer_of("matplotlib") == "matplotlib"
+    assert animation.live_plot_renderer_of("plotly") == "plotly"
+    with mock.patch.object(animation, "find_spec", lambda name: object()):
+        assert animation.live_plot_renderer_of(None) == "plotly"
+    with mock.patch.object(animation, "find_spec", lambda name: None):
+        assert animation.live_plot_renderer_of(None) == "matplotlib"
+
+
 class DeclaredPendulum(Pendulum):
     """A pendulum whose time constant is given: ``τ = tau``, read live."""
 
