@@ -251,20 +251,6 @@ def _empty_trace(go, *, is_3d, name="unsupported"):
     return trace
 
 
-def set_frames(fig, frames) -> None:
-    """
-    Give ``fig`` its animation frames, taken as they are.
-
-    The frames hold the same kind of traces as the figure's own, checked when
-    the figure was built from the first of them; checking every trace of every
-    frame again is most of the time of building a clip.
-    """
-    if hasattr(fig, "_frame_objs"):
-        fig._frame_objs = tuple(frames)
-    else:
-        fig.frames = tuple(frames)
-
-
 class PlotlyRenderer(AnimationRenderer):
     """
     Notebook-friendly Plotly renderer.
@@ -354,7 +340,6 @@ class PlotlyRenderer(AnimationRenderer):
         return path
 
     def _build_animation_figure(self, primitives, frames, schedule):
-        go = _import_plotly()
         if not frames:
             raise ValueError("Cannot animate an empty frame list.")
 
@@ -380,10 +365,11 @@ class PlotlyRenderer(AnimationRenderer):
         plotly_frames = []
         for i, traces in enumerate(frame_traces):
             layout = self._xy_layout(frames[i]["camera"]) if dynamic_xy_layout else None
-            plotly_frames.append(
-                go.Frame(data=traces, layout=layout, name=str(i), _validate=False)
-            )
-        set_frames(fig, plotly_frames)
+            frame = {"data": traces, "name": str(i)}
+            if layout is not None:
+                frame["layout"] = layout
+            plotly_frames.append(frame)
+        fig.frames = plotly_frames
 
         frame_duration = max(1, int(round(schedule.interval_ms)))
         # Plotly HTML autoplay calls Plotly.animate(gd, null, opts). Without opts,
