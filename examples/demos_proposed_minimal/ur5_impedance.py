@@ -4,8 +4,10 @@ import numpy as np
 
 from minilink import TaskImpedance, TrajectorySource, UR5Manipulator
 
-# The hand's target: it glides from one waypoint to the next in 1.5 s and holds 0.5 s
-# at each
+HOLD = 1.0  # [s] at each waypoint before the hand moves on
+DT = 3.0  # [s] to glide from one waypoint to the next
+
+# The hand's target: hold at each point, then glide along straight segments
 
 waypoints = np.array(
     [
@@ -13,15 +15,20 @@ waypoints = np.array(
         [0.0, 0.5, 0.5],
         [-0.3, 0.3, 0.2],
         [-0.5, -0.3, 0.4],
-        [-0.5, 0.0, 0.5],
+        [0.5, -0.0, 0.5],
     ]
 )  # [m]
 
 t_knots = [0.0]
 p_knots = [waypoints[0]]
+t = 0.0
 for p_from, p_to in zip(waypoints[:-1], waypoints[1:]):
-    t_knots += [t_knots[-1] + 0.5, t_knots[-1] + 2.0]
-    p_knots += [p_from, p_to]
+    t += HOLD
+    t_knots.append(t)
+    p_knots.append(p_from)
+    t += DT
+    t_knots.append(t)
+    p_knots.append(p_to)
 
 target = TrajectorySource(t_knots, np.array(p_knots).T)
 
@@ -50,6 +57,6 @@ closed_loop.plot_diagram()
 
 # The run: the hand against its target, then the arm in 3-D
 
-traj = closed_loop.compute_trajectory(tf=t_knots[-1] + 0.5, n_samples=260)
+traj = closed_loop.compute_trajectory(tf=t_knots[-1] + HOLD, n_samples=260)
 closed_loop.plot_trajectory(signals=((target, "y"), (arm, "p")))
 closed_loop.animate(traj, renderer="meshcat", is_3d=True)
