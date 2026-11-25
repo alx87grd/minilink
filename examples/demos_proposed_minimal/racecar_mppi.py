@@ -1,6 +1,5 @@
 """Racecar MPPI: a plan sampled on the kinematic model drives the dynamic car through an inner speed loop."""
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink import (
@@ -25,9 +24,11 @@ from minilink.planning import (
     point_probe,
     quadratic_hinge,
 )
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
 V_CRUISE = 3.0  # [m/s] the speed the plan asks for
 TF = 8.0  # [s] a little more than one lap
+N_FUTURES = 32  # sampled futures drawn at each MPPI tick in the animation
 
 # The circuit: a rounded rectangle 18 m round, a lane 0.6 m either side of its line,
 # and one cone on the far straight
@@ -109,22 +110,24 @@ inner_loop.connect("speed_loop", "u", "car", "P_cmd")
 inner_loop.connect("commands", "u[1]", "car", "delta_cmd")
 inner_loop.connect("car", "y", "pose", "u")
 inner_loop.connect_new_output_port("pose", "y", "y")
-inner_loop.plot_diagram()
+# inner_loop.plot_diagram()
 
 # The whole loop: the plan on its 10 Hz clock, closed on the inner loop
 
 closed_loop = (mpc % 0.1) @ inner_loop
+closed_loop.plot_diagram()
+
 traj = closed_loop.compute_trajectory(tf=TF, dt=0.01)
 
-# The lap: the car's path in its lane and round the cone, then the car itself
-
 lap = traj.of("plant")
-bounds = ((-4.5, 4.5), (-3.5, 3.5))
+inner_loop.plot_trajectory(lap)
 
-ax = track.plot(bounds=bounds, show_waypoints=False, show=False).axes
-scene.plot(bounds=bounds, ax=ax, show=False)
-ax.plot(lap.x[0], lap.x[1], label="the car")
-ax.legend()
-plt.show()
-
-inner_loop.animate(lap, renderer="meshcat")
+overlays = mpc_animation_overlays(
+    traj,
+    mpc,
+    loop=closed_loop,
+    scene=scene,
+    track=track,
+    samples=N_FUTURES,
+)
+inner_loop.animate(lap, overlays=overlays, renderer="meshcat")
