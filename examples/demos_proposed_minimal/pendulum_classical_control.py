@@ -25,10 +25,11 @@ TORQUE = 10.0  # [Nm]
 plant = InvertedPendulum()
 plant.x0 = np.array([0.0, 0.0])
 x_up = plant.x0.copy()
+x_down = np.array([np.pi, 0.0])
 
 # Equilibrium: f(x, u) = 0 at the nominal upright
 
-x_eq = plant.find_equilibrium(x_guess=x_up)
+x_eq = plant.find_equilibrium(x_guess=x_down)
 
 # Linear model at the equilibrium: ẋ = A (x − x̄) + B u
 
@@ -44,7 +45,7 @@ plant.plot_pzmap(x_bar=x_eq)
 # Classical design: lead compensator, root locus of L = C G
 
 C = Lead(K=1.0, z=2.0, p=20.0)
-L = C >> plant
+L = C >> G
 L.plot_root_locus()
 root_locus(L)
 
@@ -57,7 +58,7 @@ print(n_ctrb, n_obsv)
 # State feedback: u = −K (x − x̄)
 
 Q = np.diag([1.0, 0.01])
-R = np.eye(1)
+R = np.diag([0.01])
 controller = lqr(plant, Q=Q, R=R, x_bar=x_eq)
 closed_loop = controller @ plant
 closed_loop.plot_diagram()
@@ -88,16 +89,9 @@ loop.add_subsystem(plant, "plant")
 loop.connect("plant", "y", "controller", "x")
 loop.connect("controller", "u", "limit", "u")
 loop.connect("limit", "y", "plant", "u")
+loop.plot_diagram()
 
 region = region_of_attraction(loop, x_eq)
 print(region)
-simulated = region_of_attraction(loop, x_eq, method="simulation")
-print(simulated)
 
 plot_region_of_attraction(loop, region)
-plot_region_of_attraction(
-    loop,
-    {"Lyapunov": region, "simulation": simulated},
-    basin=True,
-    trajectories=[x_eq + [0.4, 0.0]],
-)

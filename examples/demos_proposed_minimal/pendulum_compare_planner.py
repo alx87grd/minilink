@@ -62,6 +62,19 @@ trajopt = TrajectoryOptimizationPlanner(
     problem, n_steps=25, transcription="direct_collocation"
 ).solve()
 
+# MPC
+
+# from minilink.control import ModelPredictiveController
+
+# mpc_problem = problem.replace(horizon=2.0, Xf=None)
+# mpc_planner = TrajectoryOptimizationPlanner(
+#     problem, n_steps=20, transcription="direct_collocation"
+# )
+# mpc = ModelPredictiveController(mpc_planner, delay=False) % 0.05
+
+# mpc_pendulum = mpc @ plant
+# mpc_pendulum.plot_trajectory()
+
 # RRT: a tree of short constant-torque rollouts, grown until a branch enters the goal
 torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]
 rrt = RRTPlanner(
@@ -75,7 +88,12 @@ rrt = RRTPlanner(
 tracked = lqr_trajectory(plant, trajopt.trajectory, Q=np.diag([10.0, 1.0]), R=np.eye(1))
 
 comparison = problem.compare(
-    LQR=lqr, VI=vi, TrajOpt=trajopt, RRT=rrt, TrajOpt_tracked=tracked, dt=0.01
+    LQR=lqr,
+    VI=vi,
+    TrajOpt=trajopt,
+    RRT=rrt,
+    TrajOpt_tracked=tracked,
+    # MPC=mpc,
 )
 print(comparison)
 comparison.plot_nominal_trajectory()
@@ -91,16 +109,9 @@ comparison_x0 = problem_x0.compare(
     TrajOpt=trajopt,
     RRT=rrt,
     TrajOpt_tracked=tracked,
-    dt=0.01,
+    # MPC=mpc,
+    # dt=0.01,
     n_trials=N_TRIALS,
 )
 print(comparison_x0)
 comparison_x0.plot_simulated_trajectory()
-
-# Paired on the same draws: J_VI − J_tracked, start by start
-dJ = comparison_x0.difference("VI", "TrajOpt_tracked")
-
-comparison.plot_cost_to_go()
-
-
-vi.animate()
