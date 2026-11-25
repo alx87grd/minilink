@@ -3,8 +3,16 @@
 from minilink import UdeSRacecarDyn
 from minilink.graphical.catalog import racecar_skin_3d
 
+########################################################
+### The car
+########################################################
+
 sys = UdeSRacecarDyn(wheel_angles=True)
 sys.skin = racecar_skin_3d
+
+########################################################
+### Real-time game
+########################################################
 
 sys.game(
     renderer="meshcat",

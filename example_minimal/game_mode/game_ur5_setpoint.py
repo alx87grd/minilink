@@ -1,21 +1,24 @@
 """Steer a UR5 tool setpoint with the keyboard — real-time game mode in 3D."""
 
-# UP/DOWN    -> r[0]  (tool x)
-# RIGHT/LEFT -> r[1]  (tool y)
-# W/S        -> r[2]  (tool z)
-# 3D view in meshcat; keep the pygame window focused for key events, ESC stops
-
 import numpy as np
 
 from minilink import TaskImpedance, UR5Manipulator
 from minilink.simulation import RealtimeSimulator
 from minilink.simulation.realtime import PygameInput
 
+########################################################
+### Tunables
+########################################################
+
 # GRAVITY_COMP = False
 GRAVITY = True
 
 p0 = np.array([-0.5, -0.0, 0.5])
 q_guess = np.array([0.0, -1.0, 1.2, -1.4, 0.0, 0.0])
+
+########################################################
+### Arm and task impedance
+########################################################
 
 arm = UR5Manipulator()
 
@@ -34,11 +37,13 @@ ctl = TaskImpedance(
     task_force_scale=0.05,
 )
 
-diagram = ctl @ arm  # boundary input r = desired tool position
+diagram = ctl @ arm
 diagram.plot_diagram()
-diagram.inputs["r"].nominal_value = np.array(
-    p0, dtype=float
-)  # rate-mode setpoint starts at the tool
+diagram.inputs["r"].nominal_value = np.array(p0, dtype=float)
+
+########################################################
+### Real-time game
+########################################################
 
 rt_sim = RealtimeSimulator(
     diagram,
@@ -49,7 +54,7 @@ rt_sim = RealtimeSimulator(
     verbose=True,
     input=PygameInput(
         mode="rate",
-        rate=0.3,  # setpoint slew in m/s while a key is held
+        rate=0.3,
         key_axes=[("up", "down"), ("right", "left"), ("w", "s")],
     ),
 )

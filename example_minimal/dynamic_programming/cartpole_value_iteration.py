@@ -11,7 +11,15 @@ from minilink import (
     StateSpaceGrid,
 )
 
-N_STEPS = 1000  # backward sweeps
+########################################################
+### Tunables
+########################################################
+
+N_STEPS = 1000
+
+########################################################
+### The plant
+########################################################
 
 plant = CartPole()
 plant.inputs["u"].lower[0] = -10.0
@@ -34,9 +42,15 @@ class SwingUpCost(CostFunction):
         return 0.0
 
 
+########################################################
+### The task
+########################################################
+
 problem = PlanningProblem(plant, cost=SwingUpCost(), horizon=np.inf, U=plant.input_box)
 
-# Value iteration: J(x) = min_u [ g(x, u) dt + J(x + f(x, u) dt) ]
+########################################################
+### Value iteration on a grid
+########################################################
 
 grid = StateSpaceGrid(
     problem, x_grid=(31, 51, 31, 51), u_grid=(5,), dt=0.02, precompute=False
@@ -54,6 +68,10 @@ solution = planner.solve_steps(N_STEPS)
 
 planner.plot_cost_to_go(x_axis=1, y_axis=3)
 planner.plot_control_law(x_axis=1, y_axis=3)
+
+########################################################
+### Closed-loop rollout
+########################################################
 
 plant.x0 = np.array([0.0, 0.05, 0.0, 0.0])
 

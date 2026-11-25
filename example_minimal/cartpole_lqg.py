@@ -13,19 +13,25 @@ from minilink import (
 )
 from minilink.control import lqg
 
-TF = 8.0  # [s]
-N_TRIALS = 200  # runs of the Monte Carlo
+########################################################
+### Tunables
+########################################################
 
-# The plant: a cart-pole with a disturbance force d on the cart and a noise n on each
-# of its four measurements, started 0.5 m and 0.2 rad off its upright
+TF = 8.0  # [s]
+N_TRIALS = 200
 
 x_up = np.array([0.0, np.pi, 0.0, 0.0])
+
+########################################################
+### The plant
+########################################################
 
 plant = NoisyCartPole()
 plant.x0 = np.array([-0.5, np.pi + 0.2, 0.0, 0.0])
 
-# The noise: white, of intensity w on the force and v on each measurement; the filter
-# is designed for it, Q_n = B_w w B_wᵀ with B_w = ∂f/∂d, and R_n = v I
+########################################################
+### Noise model for the filter design
+########################################################
 
 w = 1e-2  # [N^2 s]
 v = 1e-4
@@ -34,7 +40,9 @@ B_w = plant.jacobian("f", "d", x_up)
 Q_n = w * B_w @ B_w.T + 1e-9 * np.eye(4)
 R_n = v * np.eye(4)
 
-# The two designs on the linear model at the upright: the gain and the filter
+########################################################
+### LQR gain and Kalman filter at the upright
+########################################################
 
 Q = np.diag([1.0, 10.0, 1.0, 1.0])
 R = np.array([[0.1]])
@@ -42,7 +50,9 @@ R = np.array([[0.1]])
 gain = lqr(plant, Q, R, x_bar=x_up)
 observer = kalman(plant, Q_n, R_n, x_bar=x_up)
 
-# One run: the loop by role, a noise source on each of the plant's two noise ports
+########################################################
+### One stochastic closed-loop run
+########################################################
 
 loop = closed_loop(
     gain,
@@ -57,8 +67,9 @@ loop.compute_trajectory(tf=TF)
 loop.plot_trajectory()
 loop.animate()
 
-# Many runs: the same task as a problem, the two noises its disturbances, each drawn
-# anew at every trial; the compensator is the gain on the filter's estimate, one block
+########################################################
+### Monte Carlo score over many draws
+########################################################
 
 cost = QuadraticCost.from_system(
     plant, Q=Q, R=np.diag([0.1, 0.0, 0.0, 0.0, 0.0, 0.0]), x_bar=x_up

@@ -10,10 +10,15 @@ from minilink import (
     ReinforcementLearningPlanner,
 )
 
-TRAINING_TIMESTEPS = 600_000  # about 40 s on a laptop CPU
+########################################################
+### Tunables
+########################################################
 
-# The plant: the planar drone, its two thrusts normalized so that u = 0 hovers and
-# u = ±1 is the least and the most each thruster gives, 1.2 times its share of the weight
+TRAINING_TIMESTEPS = 600_000
+
+########################################################
+### The plant
+########################################################
 
 
 class NormalizedDrone(Drone2D):
@@ -50,7 +55,9 @@ class NormalizedDrone(Drone2D):
 
 plant = NormalizedDrone()
 
-# The cost: quadratic about the hover at the origin, the tilt weighed most
+########################################################
+### The task
+########################################################
 
 
 class HoverCost(CostFunction):
@@ -66,8 +73,6 @@ class HoverCost(CostFunction):
         return 0.0
 
 
-# The task: a start drawn up to several metres away, tilted and moving
-
 problem = PlanningProblem(
     plant,
     cost=HoverCost(),
@@ -76,7 +81,9 @@ problem = PlanningProblem(
     horizon=np.inf,
 )
 
-# The learner: PPO on a small network that reads the state and commands the thrusts
+########################################################
+### Reinforcement learning
+########################################################
 
 planner = ReinforcementLearningPlanner(
     problem,
@@ -90,8 +97,9 @@ planner = ReinforcementLearningPlanner(
 planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 planner.plot_learning_curve()
 
-# The learned law is a controller block: scored on 100 starts drawn from the problem,
-# then flown from one of them
+########################################################
+### Score the learned law and fly one start
+########################################################
 
 controller = planner.controller
 print(problem.evaluate(controller, dt=0.05, n_trials=100, episode_length=10.0, key=1))

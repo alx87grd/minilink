@@ -13,6 +13,12 @@ from minilink import (
 )
 
 ########################################################
+### Tunables
+########################################################
+
+TF = 4.0  # [s]
+
+########################################################
 ### The plant
 ########################################################
 
@@ -26,8 +32,6 @@ plant.inputs["u"].upper[0] = 10.0
 
 x_start = np.array([0.0, 0.0, 0.0, 0.0])
 x_goal = np.array([0.0, np.pi, 0.0, 0.0])
-
-TF = 4.0  # [s] time allowed for the swing-up
 
 cost = QuadraticCost.from_system(
     plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), x_bar=x_goal
@@ -52,12 +56,11 @@ planner = TrajectoryOptimizationPlanner(
 plan = planner.solve().trajectory
 planner.plot_trajectory()
 
-plant.x0 = x_start + np.array([0.5, 0.3, 0.0, 0.0])
-
-
 ########################################################
 ### Open-loop replay
 ########################################################
+
+plant.x0 = x_start + np.array([0.5, 0.3, 0.0, 0.0])
 
 open_loop = TrajectorySource(plan.t, plan.u) >> plant
 open_loop.plot_diagram()

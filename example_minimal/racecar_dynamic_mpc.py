@@ -22,20 +22,25 @@ from minilink.planning import (
 )
 from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
-V_TARGET = 5.5  # [m/s] asked for everywhere: more than the corners allow
-TF = 8.0  # [s] a lap and a half
+########################################################
+### Tunables
+########################################################
 
-# The circuit: a rounded rectangle 18 m round, its corners of 1 m radius, and a lane
-# 0.6 m either side of its line. The plan keeps a margin: it is given a lane of 0.4 m
+V_TARGET = 5.5  # [m/s]
+TF = 8.0  # [s]
+
+########################################################
+### Track, scene, and planning corridor
+########################################################
 
 path = circuit_waypoints(length=6.0, width=4.0, radius=1.0)
 track = ReferenceTrack(from_waypoints(path), half_width=0.6)
 planned_track = ReferenceTrack(from_waypoints(path), half_width=0.4)
 scene = Scene(obstacles=[Sphere((0.0, 2.0), 0.15)])
 
-# The model the plan runs on: the dynamic racecar itself, nine states, with its tires,
-# its drivetrain and its steering servo, so the plan knows what a corner costs. Its
-# wheel rate, steering and power are kept within what the car has
+########################################################
+### Dynamic model for planning
+########################################################
 
 model = UdeSRacecarDyn()
 r_r = model.params["r_r"]
@@ -44,9 +49,11 @@ P_max = model.params["P_max"]
 model.state.lower[6:9] = [0.0, -delta_max, -P_max]
 model.state.upper[6:9] = [3.0 * V_TARGET / r_r, delta_max, P_max]
 
-# The cost: hold V_TARGET with little sideslip and little steering, and stay in the lane
+########################################################
+### Cost and initial state
+########################################################
 
-p_cruise = 15.0  # [W] about what holds the speed on a straight
+p_cruise = 15.0  # [W]
 
 centre = mount(point_probe(), on=model)
 
@@ -66,8 +73,6 @@ cost = QuadraticCost.from_system(
     weight=400.0, shaping=quadratic_hinge()
 )
 
-# The start: on the near straight at 3 m/s, 0.1 m beside the line
-
 v_0 = 0.0  # [m/s]
 
 heading = np.arctan2(path[1, 1] - path[0, 1], path[1, 0] - path[0, 0])
@@ -81,8 +86,9 @@ x0[3] = v_0
 x0[6] = v_0 / r_r
 x0[8] = p_cruise
 
-# The law: a plan 1.2 s ahead on 12 intervals, solved by SQP with exact derivatives,
-# again every 0.1 s from the measured state, each solve starting from the last plan
+########################################################
+### MPC on the dynamic model
+########################################################
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
@@ -95,8 +101,6 @@ planner = TrajectoryOptimizationPlanner(
 )
 mpc = ModelPredictiveController(planner, delay=False)
 
-# The loop: the law on its clock, closed on the car
-
 car = UdeSRacecarDyn()
 car.x0 = x0.copy()
 car.skin = racecar_skin_3d
@@ -106,7 +110,9 @@ closed_loop.plot_diagram()
 
 traj = closed_loop.compute_trajectory(tf=TF, dt=0.002)
 
-# The lap, coloured by the speed: slow into each corner, fast out of it
+########################################################
+### Lap replay
+########################################################
 
 lap = traj.of("plant")
 car.plot_trajectory(lap)

@@ -16,17 +16,24 @@ from minilink import (
     lqr_trajectory,
 )
 
-TF = 5.0  # [s]
-N_TRIALS = 100  # starts drawn for the second judgement
+########################################################
+### Tunables
+########################################################
 
-# The plant: theta = 0 hanging; leaving the state box is a failure
+TF = 5.0  # [s]
+N_TRIALS = 100
+
+########################################################
+### The plant
+########################################################
 
 plant = Pendulum()
 plant.state.lower = np.array([-2.0 * np.pi, -8.0])
 plant.state.upper = np.array([2.0 * np.pi, 8.0])
 
-# The problem: J = ∫ (x − x̄)ᵀ Q (x − x̄) + uᵀ R u dt, from rest hanging to a ball
-# around the upright at T, inside the state and input boxes
+########################################################
+### The task
+########################################################
 
 x_up = np.array([np.pi, 0.0])
 
@@ -41,12 +48,12 @@ problem = PlanningProblem(
     horizon=TF,
 )
 
-# Four answers: two feedback laws, two open-loop plans
+########################################################
+### Four planners and one tracked plan
+########################################################
 
-# LQR: u = −K (x − x̄), the gain of the model linearized at the upright
 lqr = LQRPlanner(problem).solve()
 
-# Value iteration: J(x) = min_u [ g(x, u) dt + J(x + f(x, u) dt) ], swept to convergence
 vi = DynamicProgrammingPlanner(
     problem.replace(horizon=None),
     x_grid=(101, 101),
@@ -57,7 +64,6 @@ vi = DynamicProgrammingPlanner(
     out_of_bound_cost=500.0,
 ).solve()
 
-# Trajectory optimization: min over x(t), u(t) of J, the dynamics as collocation constraints
 trajopt = TrajectoryOptimizationPlanner(
     problem, n_steps=25, transcription="direct_collocation"
 ).solve()
@@ -75,7 +81,6 @@ trajopt = TrajectoryOptimizationPlanner(
 # mpc_pendulum = mpc @ plant
 # mpc_pendulum.plot_trajectory()
 
-# RRT: a tree of short constant-torque rollouts, grown until a branch enters the goal
 torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]
 rrt = RRTPlanner(
     problem,
@@ -84,8 +89,11 @@ rrt = RRTPlanner(
     max_iterations=20000,
 ).solve()
 
-# A fifth: the optimized plan tracked, u = u_d(t) − K(t) (x − x_d(t))
 tracked = lqr_trajectory(plant, trajopt.trajectory, Q=np.diag([10.0, 1.0]), R=np.eye(1))
+
+########################################################
+### Nominal trajectories compared
+########################################################
 
 comparison = problem.compare(
     LQR=lqr,
@@ -99,7 +107,9 @@ print(comparison)
 comparison.plot_nominal_trajectory()
 comparison.plot_simulated_trajectory()
 
-# Many starts: x0 drawn uniformly around rest, J judged in expectation, E[J]
+########################################################
+### Monte Carlo comparison over random starts
+########################################################
 
 problem_x0 = problem.replace(x0=Uniform([-0.2, -0.5], [0.2, 0.5]))
 

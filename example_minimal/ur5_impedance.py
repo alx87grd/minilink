@@ -4,10 +4,16 @@ import numpy as np
 
 from minilink import TaskImpedance, TrajectorySource, UR5Manipulator
 
-HOLD = 1.0  # [s] at each waypoint before the hand moves on
-DT = 3.0  # [s] to glide from one waypoint to the next
+########################################################
+### Tunables
+########################################################
 
-# The hand's target: hold at each point, then glide along straight segments
+HOLD = 1.0  # [s]
+DT = 3.0  # [s]
+
+########################################################
+### Hand trajectory
+########################################################
 
 waypoints = np.array(
     [
@@ -32,16 +38,17 @@ for p_from, p_to in zip(waypoints[:-1], waypoints[1:]):
 
 target = TrajectorySource(t_knots, np.array(p_knots).T)
 
-# The arm: a UR5 with its rigid-body dynamics, started with its hand on the first
-# waypoint
+########################################################
+### Arm at the first waypoint
+########################################################
 
 arm = UR5Manipulator()
 q_start = arm.inverse_kinematics(waypoints[0], q_guess=[0.0, -1.0, 1.2, -1.4, 0.0, 0.0])
 arm.x0 = arm.q2x(q_start, np.zeros(6))
 
-# The law: a spring and a damper between the hand and its target, f = Kp (r − p) − Kd ṗ,
-# sent to the joints as τ = J(q)ᵀ f + g(q). The spring is soft, so the hand trails its
-# target and the force shows
+########################################################
+### Task impedance
+########################################################
 
 controller = TaskImpedance(
     arm,
@@ -55,7 +62,9 @@ controller = TaskImpedance(
 closed_loop = target >> controller @ arm
 closed_loop.plot_diagram()
 
-# The run: the hand against its target, then the arm in 3-D
+########################################################
+### Run and 3-D animation
+########################################################
 
 traj = closed_loop.compute_trajectory(tf=t_knots[-1] + HOLD, n_samples=260)
 closed_loop.plot_trajectory(signals=((target, "y"), (arm, "p")))

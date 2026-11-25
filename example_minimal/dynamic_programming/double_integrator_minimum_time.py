@@ -10,14 +10,26 @@ from minilink import (
     # QuadraticCost,
 )
 
+########################################################
+### Tunables
+########################################################
+
 INF = 10.0
 X0 = np.array([1.2, 0.0])
+
+########################################################
+### The plant
+########################################################
 
 plant = DoubleIntegrator()
 plant.state.lower[:] = [-2.0, -2.0]
 plant.state.upper[:] = [2.0, 2.0]
 plant.inputs["u"].lower = np.array([-1.0])
 plant.inputs["u"].upper = np.array([1.0])
+
+########################################################
+### Minimum-time task
+########################################################
 
 cost = TimeCost.from_system(plant, radius=1e-3)
 
@@ -26,6 +38,10 @@ cost = TimeCost.from_system(plant, radius=1e-3)
 # )
 
 problem = PlanningProblem(plant, cost=cost, U=plant.input_box)
+
+########################################################
+### Value iteration
+########################################################
 
 planner = DynamicProgrammingPlanner(
     problem,
@@ -47,8 +63,12 @@ planner.plot_cost_to_go(jmax=INF)
 planner.plot_cost_to_go(jmax=INF, is_3d=True)
 planner.plot_control_law()
 
+########################################################
+### Closed-loop rollout
+########################################################
+
 controller = planner.controller
-controller.plot_control_law()  # interpolated law next to the discrete policy table
+controller.plot_control_law()
 diagram = controller @ plant
 
 plant.x0 = X0
