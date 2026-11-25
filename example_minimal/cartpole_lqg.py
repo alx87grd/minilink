@@ -8,8 +8,10 @@ from minilink import (
     QuadraticCost,
     WhiteNoise,
     closed_loop,
+    controllability,
     kalman,
     lqr,
+    observability,
 )
 from minilink.control import lqg
 
@@ -28,6 +30,29 @@ x_up = np.array([0.0, np.pi, 0.0, 0.0])
 
 plant = NoisyCartPole()
 plant.x0 = np.array([-0.5, np.pi + 0.2, 0.0, 0.0])
+
+########################################################
+### Linear Analysis
+########################################################
+
+plant.animate_modal()
+
+A = plant.jacobian(of="f", wrt="x", x_bar=x_up)
+B = plant.jacobian(of="f", wrt="u", x_bar=x_up)
+
+ss = plant.linearize(x_up)
+
+A = ss.A()
+B = ss.B()
+
+ctrb, ctrb_rank = controllability(plant, x_up)
+obsv, obsv_rank = observability(plant, x_up)
+
+print("A =\n", A)
+print("B =\n", B)
+print(f"controllability matrix, rank {ctrb_rank} of {plant.n}:\n", ctrb)
+print(f"observability matrix, rank {obsv_rank} of {plant.n}:\n", obsv)
+
 
 ########################################################
 ### Noise model for the filter design
