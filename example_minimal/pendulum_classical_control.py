@@ -3,18 +3,18 @@
 import numpy as np
 
 from minilink import (
+    PID,
     DiagramSystem,
     InvertedPendulum,
-    Lead,
     Saturation,
     controllability,
     lqr,
+    margins,
     observability,
 )
 from minilink.analysis import (
     plot_region_of_attraction,
     region_of_attraction,
-    root_locus,
 )
 
 ########################################################
@@ -33,6 +33,8 @@ plant.x0 = np.array([0.0, 0.0])
 x_up = plant.x0.copy()
 x_down = np.array([np.pi, 0.0])
 
+plant.plot_phase_plane()
+
 ########################################################
 ### Equilibrium and linearization
 ########################################################
@@ -46,16 +48,27 @@ print(lin)
 ### Classical frequency design
 ########################################################
 
-G = plant.transfer_function(x_bar=x_eq)
-print(G)
-plant.plot_pzmap(x_bar=x_eq)
+H = plant.transfer_function(x_bar=x_eq)
+print(H)
+H.plot_pzmap()
+H.plot_bode()
+H.plot_step_response()
 
-C = Lead(K=1.0, z=2.0, p=20.0)
-L = C >> G
+C = PID(Kp=10.0, Ki=10.0, Kd=20.0, tau=0.2)
+L = C >> H
+print(L)
 L.plot_root_locus()
-root_locus(L)
+L.plot_bode()
 
-plant.plot_bode()
+gm, pm, w_pc, w_gc = margins(L)
+
+CL = C @ H
+
+CL.plot_diagram()
+CL.plot_pzmap()
+CL.plot_bode()
+CL.plot_step_response()
+
 
 ########################################################
 ### Controllability and observability
