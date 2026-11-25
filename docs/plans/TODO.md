@@ -532,12 +532,14 @@ wait for his pass over the demos and features (§1.12):
   (`Tree.extract_trajectory`'s `u` of shape `(0, 1)`), so `solve(evaluate=True)` raises: the
   root-only path holds the plant's nominal input (KNOWN_ISSUES, "A tree search that never
   leaves its root cannot be scored").
-- [ ] **The NumPy-against-JAX draw tests compare to the last digit** (KNOWN_ISSUES, Tooling):
-  on NumPy 2.5 with JAX 0.12 the standard normal differs by one unit in the last place
-  (`log` and `cos` round differently), and three tests fail (`test_random.py`,
-  `test_stochastic_policy.py`, `test_blocks.py`'s white-noise test). Compare the normals to a
-  tolerance, keep the bits exact, and reword `standard_normal`'s "identical on NumPy and
-  JAX". Done when the suite is green on a fresh install.
+- [ ] **The NumPy-against-JAX draw tests compare to the last digit** (in review on
+  `dev-faster-meshcat`): on NumPy 2.5 with JAX 0.12 the standard normal differs by one unit
+  in the last place (`log` and `cos` round differently). The three tests compare the normals
+  to `rtol=1e-14`, the bits stay exact, and `standard_normal` and `CounterKey` say so.
+- [ ] **The basin plot on NumPy** (KNOWN_ISSUES, Tooling; agent lane): without JAX,
+  `plot_region_of_attraction(..., basin=True)` runs 40 401 simulations state by state, about
+  ten minutes. A coarser plane on NumPy, or one vectorized NumPy rollout over the plane. Its
+  test draws a 15 × 15 plane meanwhile.
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;

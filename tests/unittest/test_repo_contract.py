@@ -117,7 +117,8 @@ class Collection:
         self.skipped_modules, self.broken_modules, self.jax_tests_left = [], [], []
 
     def pytest_collectreport(self, report):
-        if report.skipped:
+        # a module skipped for another optional library is not JAX's
+        if report.skipped and "jax" in str(report.longrepr):
             self.skipped_modules.append(report.nodeid)
         if report.failed:
             self.broken_modules.append(report.nodeid)

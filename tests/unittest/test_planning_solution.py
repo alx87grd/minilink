@@ -466,6 +466,7 @@ def test_compare_reads_the_solutions_side_by_side():
     assert len(axes) == 3 and len(axes[0].get_lines()) == 2
 
     # The same panels with Plotly, titled above them
+    pytest.importorskip("plotly")
     laws = race.plot_control_law(title="laws", renderer="plotly", show=False)
     assert [type(trace).__name__ for trace in laws.figure.data] == ["Heatmap"] * 2
     assert laws.figure.layout.title.text == "laws"
@@ -991,6 +992,7 @@ def test_the_evaluations_keep_the_judges_runs_and_the_simulated_figure_draws_the
     # The legend's keys at full opacity, on matplotlib and on Plotly
     (legend,) = result.figure.legends
     assert all(handle.get_alpha() == 1.0 for handle in legend.legend_handles)
+    pytest.importorskip("plotly")
     figure = comparison.plot_simulated_trajectory(renderer="plotly", show=False).figure
     assert figure.layout.legend.x > 1.0 and figure.layout.legend.xanchor == "left"
     keys = [trace for trace in figure.data if trace.showlegend]
@@ -1265,6 +1267,7 @@ def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
 
 
 def test_the_planning_plots_draw_with_plotly_and_take_a_run_over_them():
+    pytest.importorskip("plotly")
     problem, vi, lqr = solved_pendulum()
     loop = lqr.controller @ problem.sys
     traj = loop.compute_trajectory(tf=1.0, verbose=False).of("plant")

@@ -426,7 +426,8 @@ class TestWhiteNoiseSource(unittest.TestCase):
         times = np.linspace(0.0, 1.0, 40)
         on_numpy = self.signal(noise, times)
         on_jax = np.array([noise.h(empty, empty, jnp.asarray(t)) for t in times])
-        np.testing.assert_array_equal(on_numpy, on_jax)
+        # The same draws, to the rounding of each library's log and cos
+        np.testing.assert_allclose(on_numpy, on_jax, rtol=1e-14)
 
         jitted = jax.jit(lambda t, params: noise.h(empty, empty, t, params))
         np.testing.assert_allclose(

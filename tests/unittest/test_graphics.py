@@ -1789,6 +1789,7 @@ class TestPlotInputOutputMap(unittest.TestCase):
         plt.close(res.figure)
 
     def test_plotly_draws_the_line_the_heatmap_and_the_surface(self):
+        pytest.importorskip("plotly")
         sat = Saturation(-1.0, 1.0)
         line = sat.plot_input_output_map(renderer="plotly", show=False)
         self.assertEqual([type(t).__name__ for t in line.figure.data], ["Scatter"])
