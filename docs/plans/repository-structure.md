@@ -16,7 +16,7 @@ tree is decided with the maintainer's pass over the demos
 | Repository | Visibility | Holds | Rule |
 | --- | --- | --- | --- |
 | `minilink` | public | the library, the tutorials, the curated demos, tests, docs | depends on nothing else of the maintainer's; every file is one to show a stranger |
-| `alx87grd/teaching` | public | the course and topic notebooks, sorted by topic; mostly on minilink but not limited to it | a course is a list, `courses/<course>.md`, linking the notebooks its notes cite in the notes' order; a notebook on an active course's list is not renamed or moved during its term |
+| `alx87grd/teaching` | public | the course and topic notebooks, sorted by topic, and the advanced examples, as notebooks; mostly on minilink but not limited to it | a course is a list, `courses/<course>.md`, linking the notebooks its notes cite in the notes' order; a notebook on an active course's list is not renamed or moved during its term |
 | `alx87grd/workbench` | private | the maintainer's log, reference, prototypes and private course material; old demos worth a second look | nothing imports from it; its branches and pins follow §3: prototypes and course material on `main` and `dev`, the log frozen, each entry pinned by commit |
 | a research repository (name not chosen; created when a student needs it) | private | research projects, one folder each; the experimental package | each project pins a tag or a commit; a feature that matures is rewritten into `minilink`, never imported from there |
 
@@ -189,13 +189,6 @@ examples/                              scripts only
     game_udes_racecar.py
     game_ur5_setpoint.py
     offroad_car_game.py
-  advanced/                            a handful of deeper scripts, flat
-    pendulum_pid_gradient_tuning.py
-    racecar_dynamic_mpc.py
-    racecar_kinematic_mppi.py
-    cartpole_value_iteration.py
-    double_integrator_minimum_time.py
-    signal_blocks.py
 
 benchmarks/
   automatic/                           run by CI: the regression gate
@@ -221,8 +214,9 @@ tests/
 docs/
 ```
 
-The script names are today's, in `example_minimal/`; the split between the showcase,
-`games/` and `advanced/` is a proposal (§4.4).
+The script names are today's, in `example_minimal/`; which of them are the showcase and
+which games stay is open (§4.4). minilink has no `advanced/` folder (ruled 2026-11-26): a
+deeper example is a notebook in the teaching repository (§4.3).
 
 ### 4.2 The rules the tree carries
 
@@ -236,21 +230,28 @@ The script names are today's, in `example_minimal/`; the split between the showc
   construction.
 - **`games/` apart** because a game is a different kind of script: interactive, it needs a
   display or a gamepad and never ends on its own; CI gives it a short headless smoke run.
-- **`advanced/` is flat and small** (about ten scripts at most): how to use minilink for
-  something harder. A script that teaches nothing about the API is a benchmark or goes to
-  workbench.
+- **No second tier of examples in minilink** (ruled 2026-11-26). A second, less-tested tier
+  is how `examples/demos/` reached 71 scripts. An example that is not in the showcase is a
+  notebook in the teaching repository: public, run by that repository's CI, pinned to a
+  minilink release, so it breaks only when its pin moves. This is the split well-staffed
+  libraries make between a curated set in the library and a broad catalog beside it (a
+  course's notes, an examples or "zoo" repository); a catalog nobody runs is the one rule
+  they all avoid.
 - **A benchmark is a script that measures minilink; an example shows how to use it.** In
   `benchmarks/`, one folder per way of running (`automatic/` by CI, `manual/` by hand); the
   top level is what both import (two of the three manual studies use the gate's helpers and
   fixture systems).
 - **CI follows the tree:** the showcase on every pull request (it replaces the flagship
-  manifest), `advanced/` nightly, `games/` a headless smoke run, `tutorials/` the notebook job.
+  manifest), `games/` a headless smoke run, `tutorials/` the notebook job; the advanced
+  notebooks in the teaching repository's own CI.
 
 ### 4.3 What leaves
 
-- `example_minimal/` and `examples/demos/` fold into `examples/`. The 71 scripts still in
-  `examples/demos/` (2026-11-26) are each promoted to `advanced/`, moved to workbench, or
-  deleted; no `demos/` folder remains.
+- `example_minimal/` and `examples/demos/` fold into `examples/`. The scripts that are not
+  in the showcase, `example_minimal/`'s and the 71 still in `examples/demos/` (2026-11-26),
+  each go one of three ways: to the teaching repository as a notebook, under its topic
+  folder, when a course or a student uses it; to workbench, unsupported; or deleted. No
+  `demos/` folder remains.
 - `examples/tutorial/` becomes `tutorials/`.
 - `examples/projects/` and `experimental/` go to workbench (consolidation.md §7).
 - `benchmarks/public_names.py` moves beside the unit test that reads it: it is an inventory,
@@ -262,9 +263,8 @@ from `benchmarks`, all in one change; nothing in `minilink/` imports from these 
 
 ### 4.4 Still open
 
-- Which scripts are the showcase and which are `advanced/` (the split drawn in §4.1 is a
-  proposal from the 19 scripts of `example_minimal/`).
-- Whether `advanced/` stays in minilink, or "advanced" means workbench.
+- Which scripts are the showcase (the list drawn in §4.1 is a proposal from the 19 scripts of
+  `example_minimal/`), and which of the others go to the teaching repository.
 - Whether one game joins the showcase.
 - Which 6–8 notebooks remain in `tutorials/`, and whether they stay grouped by layer
   (basics, core, advanced) or become one numbered sequence as drawn.
@@ -279,7 +279,7 @@ from `benchmarks`, all in one change; nothing in `minilink/` imports from these 
   cost of a rename whenever the set changes; the tutorials carry the order.
 - **The tutorials inside `examples/`**: one fewer top-level folder, but it mixes two readers
   and two media, and puts the "start here" one click deeper.
-- **The manual benchmarks under `examples/advanced/`**: they import the gate's helpers and
+- **The manual benchmarks under an `examples/advanced/` folder**: they import the gate's helpers and
   teach nothing about the API.
 - **The tutorials under `docs/`**, rendered by the documentation site: worth a look once the
   notebooks are down to the ones that stay; it needs a notebook renderer in the docs build.
@@ -291,11 +291,11 @@ from `benchmarks`, all in one change; nothing in `minilink/` imports from these 
 
 ## 5. The asks
 
-1. **The split of the demo set** between the showcase, `games/` and `advanced/`, and the
-   notebooks that remain in `tutorials/` (§4.4). The tree itself is agreed (§4.1).
-2. **`advanced/`:** in minilink, or workbench.
-3. **`projects/`:** to workbench (consolidation.md §7), as §4.3 draws it.
-4. **The form of the pin** in the teaching repository: `pip install` at the release, with
+1. **The split of the demo set** between the showcase, `games/` and the teaching repository,
+   and the notebooks that remain in `tutorials/` (§4.4). The tree itself is agreed (§4.1);
+   `advanced/` is ruled out (2026-11-26).
+2. **`projects/`:** to workbench (consolidation.md §7), as §4.3 draws it.
+3. **The form of the pin** in the teaching repository: `pip install` at the release, with
    `git clone -b <tag>` kept for a notebook that needs the examples tree (§3.6).
 
 When the maintainer rules, the ruling updates this doc and the steps go to
