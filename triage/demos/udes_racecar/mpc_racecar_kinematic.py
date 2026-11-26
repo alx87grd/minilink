@@ -75,7 +75,7 @@ diagram = (mpc % MPC_DT) @ car
 
 # diagram.plot_diagram()
 result = diagram.compute_trajectory(tf=TF, dt=0.01)
-# diagram.plot_trajectory()
+diagram.plot_trajectory()
 
 # --- 3-D look: same lap ---
 car.camera_follow_frame = "body"

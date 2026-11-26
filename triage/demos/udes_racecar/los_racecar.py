@@ -82,9 +82,9 @@ closed_loop.connect("plant", "y", "guidance", "y")
 closed_loop.connect("guidance", "psi_ref", "controller", "r")
 closed_loop.connect("plant", "y", "controller", "y")
 closed_loop.connect("controller", "u", "plant", "delta_cmd")
-# closed_loop.plot_diagram()
+closed_loop.plot_diagram()
 result = closed_loop.compute_trajectory(tf=12.0, dt=0.002)  # a little more than one lap
-# closed_loop.plot_trajectory()
+closed_loop.plot_trajectory()
 
 
 # car.skin = racecar_skin_2d
