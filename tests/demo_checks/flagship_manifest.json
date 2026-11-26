@@ -1,7 +1,7 @@
 [
   {
     "id": "signal_blocks",
-    "path": "examples/demos/blocks/signal_blocks.py",
+    "path": "example_minimal/blocks/signal_blocks.py",
     "requires": []
   },
   {
@@ -23,7 +23,7 @@
   },
   {
     "id": "diagram_compiling",
-    "path": "examples/demos/compile/diagram_compiling.py",
+    "path": "benchmarks/manual/diagram_compiling.py",
     "requires": []
   },
   {

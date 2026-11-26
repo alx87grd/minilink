@@ -1,6 +1,8 @@
 # file  ceiling — demos with more than three knobs in capitals, predating RULES 6.16.
 # This list only shrinks, and a ceiling only falls; see test_demo_knobs.py.
-examples/demos/analysis/analysis_frequency.py 4
+example_minimal/cartpole_lqg.py 6
+example_minimal/pendulum_classical_control.py 8
+example_minimal/pendulum_pid_gradient_tuning.py 4
 examples/demos/compile/digital_pid_tuning.py 5
 examples/demos/compile/grid_world_step_problem.py 4
 examples/demos/compile/lqg_monte_carlo.py 15

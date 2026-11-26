@@ -2,7 +2,8 @@
 
 Executes each script's ``__main__`` unchanged (no demo hooks required).
 A live Meshcat viewer does not wait for a browser here (``headless/``).
-For the smaller flagship whitelist, prefer ``run_flagship_demos.py``.
+Discovers ``examples/demos/`` and ``example_minimal/``. For the smaller
+flagship whitelist, prefer ``run_flagship_demos.py``.
 
 Usage (from repo root)::
 
@@ -23,14 +24,16 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECKS_DIR = Path(__file__).resolve().parent
-SCRIPTS_ROOT = REPO_ROOT / "examples" / "demos"
+SCRIPT_ROOTS = (
+    REPO_ROOT / "examples" / "demos",
+    REPO_ROOT / "example_minimal",
+)
 FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
 # sitecustomize.py here turns a live Meshcat viewer's browser wait into a no-op.
 HEADLESS_DIR = CHECKS_DIR / "headless"
-
 # Live keyboard / wall-clock sessions hang until the user quits — not suitable
-# for an unattended subprocess sweep. Keep discoverable under examples/; skip here.
-INTERACTIVE_DEMO_PREFIXES = ("examples/demos/realtime/",)
+# for an unattended subprocess sweep.
+INTERACTIVE_DEMO_PREFIXES = ("example_minimal/game_mode/",)
 
 
 @dataclass(frozen=True)
@@ -46,7 +49,11 @@ def _is_interactive_demo(path: Path) -> bool:
 
 
 def _discover_scripts() -> list[Path]:
-    return sorted(path for path in SCRIPTS_ROOT.rglob("*.py") if path.is_file())
+    paths: list[Path] = []
+    for root in SCRIPT_ROOTS:
+        if root.is_dir():
+            paths.extend(path for path in root.rglob("*.py") if path.is_file())
+    return sorted(paths)
 
 
 def _flagship_paths() -> list[Path]:

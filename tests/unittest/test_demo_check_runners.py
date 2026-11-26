@@ -44,6 +44,7 @@ _FORBIDDEN_DEMO_HARNESS = re.compile(
 _DEMO_ROOTS = (
     REPO_ROOT / "examples" / "tutorial",
     REPO_ROOT / "examples" / "demos",
+    REPO_ROOT / "example_minimal",
 )
 
 
@@ -74,7 +75,7 @@ class TestDemoCheckRunners(unittest.TestCase):
                     hits.append(path.relative_to(REPO_ROOT).as_posix())
         if hits:
             self.fail(
-                "examples/tutorial and examples/demos must not "
+                "examples/tutorial, examples/demos and example_minimal must not "
                 "contain smoke/CI harness hooks (adapt in tests/demo_checks "
                 "instead):\n  " + "\n  ".join(hits)
             )

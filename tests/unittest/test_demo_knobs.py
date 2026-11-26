@@ -10,7 +10,7 @@ import pathlib
 import re
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-DEMOS = REPO / "examples" / "demos"
+DEMO_ROOTS = (REPO / "examples" / "demos", REPO / "example_minimal")
 ALLOWLIST = pathlib.Path(__file__).with_name("demo_knob_allowlist.txt")
 
 # The most knobs a demo keeps on top; more make it a research script
@@ -42,10 +42,13 @@ def knobs_of(path):
 
 def knob_counts():
     """``{relative path: count}`` for every demo script."""
-    return {
-        path.relative_to(REPO).as_posix(): len(knobs_of(path))
-        for path in sorted(DEMOS.rglob("*.py"))
-    }
+    counts: dict[str, int] = {}
+    for root in DEMO_ROOTS:
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            counts[path.relative_to(REPO).as_posix()] = len(knobs_of(path))
+    return counts
 
 
 def load_allowlist():
