@@ -44,7 +44,7 @@ benchmarks/
   baselines/*.json          ← committed regression goldens
 ```
 
-Curated scripts live in `example_minimal/`; the broader set stays in `examples/demos/` for teaching. **Demo-check runners** in `tests/demo_checks/` execute both trees (and flagship paths in the manifest).
+Curated scripts live in `triage/example_minimal/`; the broader set stays in `triage/demos/` for teaching. **Demo-check runners** in `tests/demo_checks/` execute both trees (and flagship paths in the manifest).
 
 ### Human (IDE — open script, click **Run**)
 
@@ -165,8 +165,8 @@ job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated
 throw, and the ``laptops`` job runs the same smoke on the Basic tier under Windows and macOS.
 
 Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
-only sets headless display knobs. A contract test scans ``examples/tutorial/``
-``examples/demos/``, and ``example_minimal/`` for forbidden harness names (see
+only sets headless display knobs. A contract test scans ``triage/tutorial/``
+``triage/demos/``, and ``triage/example_minimal/`` for forbidden harness names (see
 ``test_examples_have_no_smoke_env_hooks``).
 
 The demo and notebook runners are the "Demo-check change" and "Notebook change" rows of the

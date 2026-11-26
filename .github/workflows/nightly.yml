@@ -53,7 +53,7 @@ jobs:
         SDL_VIDEODRIVER: dummy
       run: pytest tests/experimental
 
-    - name: All example scripts (examples/demos and example_minimal)
+    - name: All example scripts (triage/demos and triage/example_minimal)
       if: ${{ !cancelled() }}
       env:
         PYTHONPATH: ${{ github.workspace }}

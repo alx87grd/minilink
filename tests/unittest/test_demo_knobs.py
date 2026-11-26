@@ -10,7 +10,11 @@ import pathlib
 import re
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-DEMO_ROOTS = (REPO / "examples" / "demos", REPO / "example_minimal")
+DEMO_ROOTS = (
+    REPO / "examples",
+    REPO / "triage" / "demos",
+    REPO / "triage" / "example_minimal",
+)
 ALLOWLIST = pathlib.Path(__file__).with_name("demo_knob_allowlist.txt")
 
 # The most knobs a demo keeps on top; more make it a research script

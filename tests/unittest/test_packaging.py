@@ -18,7 +18,7 @@ class TestWheelConfig(unittest.TestCase):
         self.assertIn('"minilink/experimental/**"', text)
         self.assertIn('"/minilink/experimental"', text)
         self.assertIn('"/experimental"', text)
-        self.assertIn('"/examples/projects"', text)
+        self.assertIn('"/triage/projects"', text)
 
     def test_full_extra_is_declared(self):
         text = (REPO / "pyproject.toml").read_text(encoding="utf-8")

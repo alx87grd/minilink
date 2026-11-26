@@ -247,6 +247,15 @@ deeper example is a notebook in the teaching repository (§4.3).
 
 ### 4.3 What leaves
 
+**The triage (2026-11-26).** The sort starts from a holding folder: `example_minimal/`,
+`examples/demos/`, `examples/tutorial/` and `examples/projects/` moved under `triage/` with
+their names (`triage/example_minimal/`, `triage/demos/`, `triage/tutorial/`,
+`triage/projects/`), and the target folders exist empty beside it (`tutorials/`,
+`examples/`, `examples/games/`). CI runs every file from its triage path (the demo checks,
+the notebook job, the import and knob allowlists), so nothing rots while it waits; a file
+leaves triage for its place in the target tree, the teaching repository, workbench, or
+deletion, and `triage/` goes when it is empty.
+
 - `example_minimal/` and `examples/demos/` fold into `examples/`. The scripts that are not
   in the showcase, `example_minimal/`'s and the 71 still in `examples/demos/` (2026-11-26),
   each go one of three ways: to the teaching repository as a notebook, under its topic

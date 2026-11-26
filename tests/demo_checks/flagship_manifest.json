@@ -1,22 +1,22 @@
 [
   {
     "id": "signal_blocks",
-    "path": "example_minimal/blocks/signal_blocks.py",
+    "path": "triage/example_minimal/blocks/signal_blocks.py",
     "requires": []
   },
   {
     "id": "computed_torque_pendulum",
-    "path": "examples/demos/control/computed_torque_pendulum.py",
+    "path": "triage/demos/control/computed_torque_pendulum.py",
     "requires": []
   },
   {
     "id": "diagram_closed_loop",
-    "path": "examples/demos/core/diagram_closed_loop.py",
+    "path": "triage/demos/core/diagram_closed_loop.py",
     "requires": []
   },
   {
     "id": "plot_readme",
-    "path": "examples/demos/core/readme_examples.py",
+    "path": "triage/demos/core/readme_examples.py",
     "requires": [
       "jax"
     ]
@@ -28,12 +28,12 @@
   },
   {
     "id": "rrt_holonomic_obstacles",
-    "path": "examples/demos/rrt/rrt_holonomic_obstacles.py",
+    "path": "triage/demos/rrt/rrt_holonomic_obstacles.py",
     "requires": []
   },
   {
     "id": "animation_renderers",
-    "path": "examples/demos/graphical/animation_renderers.py",
+    "path": "triage/demos/graphical/animation_renderers.py",
     "requires": [
       "plotly",
       "meshcat"
@@ -42,14 +42,14 @@
   },
   {
     "id": "mpc_integrator_numpy",
-    "path": "examples/demos/mpc/mpc_integrator_numpy.py",
+    "path": "triage/demos/mpc/mpc_integrator_numpy.py",
     "requires": [
       "graphviz"
     ]
   },
   {
     "id": "trajopt_cartpole_jax",
-    "path": "examples/demos/trajopt/trajopt_cartpole_collocation_jax.py",
+    "path": "triage/demos/trajopt/trajopt_cartpole_collocation_jax.py",
     "requires": [
       "jax",
       "cyipopt"
@@ -57,7 +57,7 @@
   },
   {
     "id": "mpc_car_minimal",
-    "path": "examples/demos/mpc/mpc_car_minimal.py",
+    "path": "triage/demos/mpc/mpc_car_minimal.py",
     "requires": [
       "jax",
       "graphviz"
@@ -79,45 +79,45 @@
   },
   {
     "id": "digital_pid_tuning",
-    "path": "examples/demos/compile/digital_pid_tuning.py",
+    "path": "triage/demos/compile/digital_pid_tuning.py",
     "requires": [
       "jax"
     ]
   },
   {
     "id": "native_mpc_tuning",
-    "path": "examples/demos/compile/native_mpc_tuning.py",
+    "path": "triage/demos/compile/native_mpc_tuning.py",
     "requires": [
       "jax"
     ]
   },
   {
     "id": "differentiable_double_loop",
-    "path": "examples/demos/compile/differentiable_double_loop.py",
+    "path": "triage/demos/compile/differentiable_double_loop.py",
     "requires": [
       "jax"
     ]
   },
   {
     "id": "terminal_field_mpc",
-    "path": "examples/demos/compile/terminal_field_mpc.py",
+    "path": "triage/demos/compile/terminal_field_mpc.py",
     "requires": [
       "jax"
     ]
   },
   {
     "id": "grid_world_step_problem",
-    "path": "examples/demos/compile/grid_world_step_problem.py",
+    "path": "triage/demos/compile/grid_world_step_problem.py",
     "requires": []
   },
   {
     "id": "multi_rate_computer",
-    "path": "examples/demos/compile/multi_rate_computer.py",
+    "path": "triage/demos/compile/multi_rate_computer.py",
     "requires": []
   },
   {
     "id": "lqg_monte_carlo",
-    "path": "examples/demos/compile/lqg_monte_carlo.py",
+    "path": "triage/demos/compile/lqg_monte_carlo.py",
     "requires": [
       "jax"
     ]

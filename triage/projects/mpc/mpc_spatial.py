@@ -1,0 +1,258 @@
+"""Assemble-only spatial MPC problem (wide circuit). No solve.
+
+Walks the ``planning/spatial`` pipeline: track + obstacles → fields → costs →
+``PlanningProblem`` + ``TrajectoryOptimizationPlanner`` (not solved).
+
+Full NLP + hybrid MPC: ``triage/projects/mpc/mpc_spatial_stack.ipynb``.
+Closed-loop hybrid script: ``triage/demos/mpc/mpc_car_circuit.py``.
+
+Set ``SHOW_PLOTS = False`` for a headless walkthrough.
+
+Run from repo root::
+
+    python triage/projects/mpc/mpc_spatial.py
+"""
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from minilink import BicycleDynRate
+from minilink.core.backends import configure_jax
+from minilink.core.costs import QuadraticCost
+from minilink.core.geometry import Sphere
+from minilink.core.geometry.paths import from_waypoints
+from minilink.core.shaping import (
+    inverse_barrier,
+    quadratic_excess,
+    quadratic_hinge,
+)
+from minilink.planning.problems import PlanningProblem
+from minilink.planning.spatial.collision import car_outline, mount, point_probe
+from minilink.planning.spatial.grid import pad_bounds
+from minilink.planning.spatial.plotting import (
+    plot_cost_field,
+)
+from minilink.planning.spatial.scene import Scene
+from minilink.planning.spatial.track import ReferenceTrack
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationPlanner,
+)
+
+configure_jax(enable_x64=True)
+
+SHOW_PLOTS = True
+U_TARGET = 20.0
+VX0 = 5.0
+MPC_HORIZON = 2.0
+MPC_STEPS = 10
+CIRCUIT_WIDTH = 34.0
+CIRCUIT_HEIGHT = 20.0
+RADIUS_FAST = 5.0
+RADIUS_SLOW = 3.5
+CORRIDOR_HALF_WIDTH = 2.5
+PATH_COST_WEIGHT = 40.0
+CORRIDOR_COST_WEIGHT = 25.0
+OBSTACLE_RADIUS = 0.25
+OBSTACLE_MARGIN = 0.2
+OBSTACLE_CENTERS = (
+    (-10.0, -9.5),
+    (-2.5, -11.5),
+    (-2.5, -12.5),
+    (-2.5, -13.5),
+    (-2.5, -14.5),
+    (8.0, -10.5),
+    (14.0, 0.0),
+    (5.0, 10.5),
+    (-6.0, 9.5),
+    (-14.0, 2.0),
+    (-6.0, -5.0),
+    (-6.0, -6.0),
+    (-6.0, -7.0),
+    (-6.0, -8.0),
+    (-6.0, -9.0),
+)
+OBSTACLE_REPULSION_WEIGHT = 35.0
+OBSTACLE_REPULSION_EPS = 0.08
+PLOT_MARGIN = 3.0
+
+
+def _quarter_arc(cx, cy, radius, angle_start, n=10):
+    angles = np.linspace(angle_start, angle_start + np.pi / 2, n)
+    return np.column_stack([cx + radius * np.cos(angles), cy + radius * np.sin(angles)])
+
+
+def _join(*parts):
+    out = np.asarray(parts[0], dtype=float)
+    for part in parts[1:]:
+        seg = np.asarray(part, dtype=float)
+        if seg.size == 0:
+            continue
+        out = np.vstack([out, seg[1:]])
+    return out
+
+
+def wide_circuit_waypoints(
+    *, cx=0.0, cy=0.0, width=34.0, height=20.0, r_fast=5.0, r_slow=3.5
+):
+    w2, h2 = width / 2.0, height / 2.0
+    y_bot, y_top = cy - h2, cy + h2
+    x_left, x_right = cx - w2, cx + w2
+    r_br = r_tr = r_bl = r_fast
+    r_tl = r_slow
+    hx_br = x_right - r_br
+    hx_tl = x_left + r_tl
+    start = np.array([[x_left + 3.0, y_bot]])
+    launch = np.linspace(start[0], [x_left + 10.0, y_bot], 4)[1:]
+    chicane = np.array(
+        [
+            [x_left + 12.0, y_bot],
+            [x_left + 14.0, y_bot + 1.8],
+            [x_left + 16.0, y_bot],
+            [hx_br - 1.5, y_bot],
+        ]
+    )
+    arc_br = _quarter_arc(hx_br, y_bot + r_br, r_br, -np.pi / 2)[1:]
+    right = np.linspace([x_right, y_bot + r_br], [x_right, y_top - r_tr], 5)[1:-1]
+    arc_tr = _quarter_arc(hx_br, y_top - r_tr, r_tr, 0.0)[1:]
+    top = np.linspace([hx_br, y_top], [hx_tl + 3.0, y_top], 5)[1:-1]
+    arc_tl = _quarter_arc(hx_tl, y_top - r_tl, r_tl, np.pi / 2)[1:]
+    left = np.linspace([x_left, y_top - r_tl], [x_left, y_bot + r_bl], 5)[1:-1]
+    arc_bl = _quarter_arc(x_left + r_bl, y_bot + r_bl, r_bl, np.pi)[1:]
+    return _join(
+        start, launch, chicane, arc_br, right, arc_tr, top, arc_tl, left, arc_bl, start
+    )
+
+
+loop_xy = wide_circuit_waypoints(
+    width=CIRCUIT_WIDTH,
+    height=CIRCUIT_HEIGHT,
+    r_fast=RADIUS_FAST,
+    r_slow=RADIUS_SLOW,
+)
+track = ReferenceTrack(from_waypoints(loop_xy), half_width=CORRIDOR_HALF_WIDTH)
+keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
+scene = Scene(obstacles=[Sphere(c, keepout_radius) for c in OBSTACLE_CENTERS])
+start_xy = loop_xy[0].copy()
+plot_bounds = (
+    (loop_xy[:, 0].min() - PLOT_MARGIN, loop_xy[:, 0].max() + PLOT_MARGIN),
+    (loop_xy[:, 1].min() - PLOT_MARGIN, loop_xy[:, 1].max() + PLOT_MARGIN),
+)
+
+print(f"lap length = {track.path.total_length:.2f} m")
+
+sys_mpc = BicycleDynRate(named_ports=True)
+sys_mpc.state.lower[6] = 0.0
+sys_mpc.state.upper[6] = 90.0
+sys_mpc.state.lower[7] = -0.55
+sys_mpc.state.upper[7] = 0.55
+sys_mpc.inputs["w_rear_dot"].lower[0] = -80.0
+sys_mpc.inputs["w_rear_dot"].upper[0] = 80.0
+sys_mpc.inputs["delta_dot"].lower[0] = -2.0
+sys_mpc.inputs["delta_dot"].upper[0] = 2.0
+
+probe = mount(point_probe(), on=sys_mpc)
+body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
+r_r = sys_mpc.params["r_r"]
+x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
+s_start, _ = track.path.project(start_xy)
+tangent = track.path.tangent(s_start)
+theta0 = float(np.arctan2(tangent[1], tangent[0]))
+if abs(np.cos(2.0 * theta0)) > 1.0 - 1e-9:
+    theta0 += 1e-4
+x0 = np.array([start_xy[0], start_xy[1], theta0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
+
+path_cost = track.distance_field(body).as_cost(
+    weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
+)
+corridor_cost = track.corridor_field(body).as_cost(
+    weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
+)
+obstacle_cost = scene.clearance_field(body).as_cost(
+    weight=OBSTACLE_REPULSION_WEIGHT,
+    shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
+)
+cost = (
+    QuadraticCost.from_system(
+        sys_mpc,
+        Q=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
+        R=np.diag([1.0, 22.0]),
+        S=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
+        x_bar=x_cruise,
+        u_bar=np.zeros(2),
+    )
+    + path_cost
+    + corridor_cost
+    + obstacle_cost
+)
+
+X = (
+    sys_mpc.state.box
+    & scene.clearance_field(body).as_set(lower=0.0)
+    & track.corridor_field(body).as_set(lower=0.0)
+)
+problem = PlanningProblem(
+    sys=sys_mpc, x0=x0, X=X, cost=cost, horizon=MPC_HORIZON, U=sys_mpc.input_box
+)
+planner = TrajectoryOptimizationPlanner(
+    problem,
+    n_steps=MPC_STEPS,
+    transcription="direct_collocation",
+    backend="jax",
+    method="slsqp",
+    options={"maxiter": 150, "ftol": 0.1},
+)
+print(f"planner ready (not solved): horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
+print(
+    "Next: projects/mpc/mpc_spatial_stack.ipynb (full stack) or demos/mpc/mpc_car_circuit.py"
+)
+
+if SHOW_PLOTS:
+    path_viz = track.distance_field(probe).as_cost(
+        weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
+    )
+    corridor_viz = track.corridor_field(probe).as_cost(
+        weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
+    )
+    obstacle_viz = scene.clearance_field(probe).as_cost(
+        weight=OBSTACLE_REPULSION_WEIGHT,
+        shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
+    )
+    cost_bounds = pad_bounds(plot_bounds, 3.0)
+    layers = {
+        "Path": [path_viz],
+        "Corridor": [corridor_viz],
+        "Obstacle": [obstacle_viz],
+        "Combined": [path_viz, corridor_viz, obstacle_viz],
+    }
+    ax = scene.plot(show=False, bounds=plot_bounds, title="", show_density=False).axes
+    track.plot(show=False, ax=ax, bounds=plot_bounds, title="")
+    ax.set_title("Wide circuit + keepouts")
+    plt.tight_layout()
+    plt.show()
+    # Each cost layer: its heatmap under the track and the obstacles, then its surface
+    for name, costs in layers.items():
+        drawn = plot_cost_field(
+            costs,
+            bounds=cost_bounds,
+            state_dim=sys_mpc.n,
+            grid_shape=(120, 120),
+            log_scale=True,
+            title=f"{name} cost (2D)",
+            figsize=(9.0, 7.0),
+            show=False,
+        )
+        track.plot(ax=drawn.axes, bounds=plot_bounds, title="")
+        scene.plot(ax=drawn.axes, bounds=plot_bounds, show_density=False, title="")
+        drawn.axes.set_xlim(plot_bounds[0])
+        drawn.axes.set_ylim(plot_bounds[1])
+        drawn.show()
+        plot_cost_field(
+            costs,
+            bounds=cost_bounds,
+            state_dim=sys_mpc.n,
+            grid_shape=(120, 120),
+            log_scale=True,
+            is_3d=True,
+            title=f"{name} cost (3D)",
+            figsize=(9.0, 7.0),
+        )

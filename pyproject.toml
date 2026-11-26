@@ -144,7 +144,7 @@ git_describe_command = "git describe --dirty --tags --long --match '0.*'"
 exclude = [
     "/minilink/experimental",
     "/experimental",
-    "/examples/projects",
+    "/triage/projects",
     "/docs/_static/showcase",
 ]
 

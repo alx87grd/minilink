@@ -287,7 +287,7 @@ serial arms, read straight by the robotic laws (`ctl @ plant` on `y = [q; dq]`).
 inputs are named ports with concrete allocation hooks, never inheritance branches. The
 vehicle ladder (from the point to the 3-D car on its suspension, dual-backend) is in the
 catalog; its research rungs and
-the named car profiles live with their scenarios in `examples/projects/car_trajopt/`.
+the named car profiles live with their scenarios in `triage/projects/car_trajopt/`.
 
 ## 4. Core Object Contracts
 
@@ -585,7 +585,7 @@ The car models form a ladder (`dynamics/catalog/vehicles/`):
   The evaluator's `params` is that snapshot; `params=None` reads it (rule 6). On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
-  w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
+  w.r.t. parameters (see `triage/demos/compile/params_gradient.py`).
   `evaluator.jacobian(of, wrt, x, u, t, params)` returns the array at the point on every
   evaluator (`t` the tick `k` on a step evaluator; `jax.jacfwd` eagerly on JAX, central
   differences on NumPy), as `sys.jacobian` does: a derivative is a matrix at a point, and its
@@ -1263,7 +1263,7 @@ cancel, and the adaptive SciPy solvers may stall near the switching surface; the
 `Trajectory` records the output grid only, so a reconstructed `controller:u` at grid states
 is the start-of-interval map, not the effective dynamics over the step. Digital sliding mode
 is a sampled loop: `(ctl % dt) @ plant` holds the torque between ticks, the intended semantics
-(`examples/demos/hybrid/sampled_smc_pendulum.py`).
+(`triage/demos/hybrid/sampled_smc_pendulum.py`).
 
 ## 6. Optimization And Planning
 
@@ -1738,9 +1738,9 @@ box or blows up (non-finite state) ends the episode. The learned law is a `Syste
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
 through the network, and the step model (`ev.step(x, u, t, params, dt=…)` with
 `params={"controller": ..., "plant": ...}`) gives gradients of a rollout with respect
-to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
+to the policy weights. Official demos: `triage/demos/rl/` (pendulum swing-up, cart-pole,
 drone, rocket); the tutorial chapter is
-`examples/tutorial/advanced/04_reinforcement_learning.ipynb`. The
+`triage/tutorial/advanced/04_reinforcement_learning.ipynb`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `mount`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos

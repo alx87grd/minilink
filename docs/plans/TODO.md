@@ -773,7 +773,8 @@ terms; the v1.0 rows after two cohorts.
   The target tree is agreed (repository-structure.md §4.1, 2026-11-26): `tutorials/` at the
   top level, `examples/` the showcase plus `games/`, `benchmarks/` split into
   `automatic/` and `manual/`. No `advanced/` folder: the examples outside the showcase go to the
-  teaching repository as notebooks (ruled 2026-11-26). Open: the split of the demo set, the
+  teaching repository as notebooks (ruled 2026-11-26). The material waits in `triage/` (§4.3
+  there), the target folders empty beside it. Open: the split of the demo set, the
   notebooks that remain (§4.4 there). The course material is ruled and moved (§1 there:
   the `alx87grd/teaching` repository, by topic, one list per course). Done when the tree is
   in place and the open points are ruled.

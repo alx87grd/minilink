@@ -212,7 +212,7 @@ concrete formatting, ordered by the cost of being wrong:
   `examples/README.md`, `tests/README.md`) stay the maps; leaf demo folders do not get
   a second copy. Do not add new markdown guides unless the maintainer asks.
 - **3.7 Intro surfaces stay canonical.** README.md, the showcase notebook, and
-  `examples/tutorial/` present the main core tools: `System`, diagrams, simulate,
+  `triage/tutorial/` present the main core tools: `System`, diagrams, simulate,
   compile, analysis, planning trajopt, the sampled step path (`StepSystem`,
   `StepDiagramSystem`, `SampledSystem`, `SampledDiagramSystem`), and MPC as its exemplar.
   Do not update them to track every new demo, compare script, or research-lane
@@ -568,7 +568,7 @@ concrete formatting, ordered by the cost of being wrong:
   missing `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.
 - **6.2 No test harness code in demos:** Never add test environment branches (`if CI: ...`),
   smoke env vars (`MINILINK_NOTEBOOK_SMOKE`), mock flags, or headless switches inside
-  `examples/demos/` or `examples/tutorial/`. Test runners adapt
+  `triage/demos/` or `triage/tutorial/`. Test runners adapt
   from the outside (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Falling back when
   an optional package is missing (Ipopt → SciPy) is user UX, not a test hook.
 - **6.3 Tests only when justified.** Write tests for stable public APIs, TRL milestones,
@@ -639,7 +639,7 @@ concrete formatting, ordered by the cost of being wrong:
   out in a few lines, then shows the one-line tool doing the same and agreeing with it; every other
   demo and notebook uses the tool. One place per mechanism, named in the doc that owns the tool
   (the closing PID example,
-  `examples/demos/compile/pid_autotuning_jax.py`, for gradient descent).
+  `triage/demos/compile/pid_autotuning_jax.py`, for gradient descent).
 - **6.16 A demo's numbers: a few knobs on top, the rest where the story needs them.** A demo
   reads like a worked example: sections in the order a textbook builds it (the world, the
   plant, its start, the law, the loop, the run, the look), each a title comment (a sentence
@@ -670,7 +670,7 @@ concrete formatting, ordered by the cost of being wrong:
   CORRIDOR_HALF_WIDTH = 0.6
   ```
 
-  Research scripts (`examples/projects/`, benchmarks) keep whatever settings block they
+  Research scripts (`triage/projects/`, benchmarks) keep whatever settings block they
   need. A demo over three knobs is listed in `tests/unittest/demo_knob_allowlist.txt`, which
   only shrinks (6.12).
 - **6.17 A system is named by the dynamics it is.** A variable holding a system, in a demo,

@@ -66,7 +66,7 @@ Short teaching list, like `minilink.catalog` for plants. No `Course` DTO: `track
 | --- | --- | --- |
 | `oval_circuit(length, width, radius, half_width=…)` | rounded-rectangle `Track` (wraps `circuit_waypoints`) | tests |
 | `racecar_circuit()` | 6×4 m oval, `half_width=0.6`, far-straight cones | the two UdeS racecar demos (`mpc_racecar_kinematic.py`, `mpc_racecar_dynamic.py`) |
-| `holonomic_forest()` | scatter of discs in `[-6, 6]²` | [`rrt_holonomic_obstacles.py`](../../examples/demos/rrt/rrt_holonomic_obstacles.py) |
+| `holonomic_forest()` | scatter of discs in `[-6, 6]²` | [`rrt_holonomic_obstacles.py`](../../triage/demos/rrt/rrt_holonomic_obstacles.py) |
 
 Leave in the owning demo until a second teaching script needs them: wide MPC circuit, slalom, U-turn corridor, car_trajopt corner. `circuit_waypoints` stays a thin alias during the split. A demo that needs extra cones passes them as arguments on `racecar_circuit`, not a second factory (no RL racecar demo exists today).
 

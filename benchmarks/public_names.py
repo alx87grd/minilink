@@ -63,9 +63,9 @@ SKIPPED = {"__pycache__", "_build", "build", "dist", "node_modules"}
 # Where a file sits, by its path under the repository root (first match wins)
 COLUMNS = (
     ("tests", "tests/"),
-    ("tutorial", "examples/tutorial/"),
-    ("demo", "examples/demos/"),
-    ("project", "examples/projects/"),
+    ("tutorial", "triage/tutorial/"),
+    ("demo", "triage/demos/"),
+    ("project", "triage/projects/"),
     ("experimental", "experimental/"),
     ("experimental", "minilink/experimental/"),
     ("benchmark", "benchmarks/"),

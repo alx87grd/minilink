@@ -1,6 +1,6 @@
 """Execute the tutorial notebooks via nbclient (demo-check layer).
 
-Auto-discovers ``.ipynb`` under ``examples/tutorial/``.
+Auto-discovers ``.ipynb`` under ``triage/tutorial/``.
 
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
 A cell that starts a live keyboard session (``.game(``) is left out: it runs
@@ -34,7 +34,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _CHECKS_DIR = Path(__file__).resolve().parent
 OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
-NOTEBOOK_ROOTS = (REPO_ROOT / "examples" / "tutorial",)
+NOTEBOOK_ROOTS = (REPO_ROOT / "tutorials", REPO_ROOT / "triage" / "tutorial")
 DEFAULT_TIMEOUT = 180.0
 # A live keyboard session hangs until the user quits; the cell calling it is not run.
 INTERACTIVE_CALL = re.compile(r"^[^#\n]*\.game\(", re.MULTILINE)
