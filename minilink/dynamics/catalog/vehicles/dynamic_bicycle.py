@@ -27,7 +27,7 @@ class DynamicBicycle(DynamicSystem):
     State ``x = [x, y, psi, vx, vy, yaw_rate]``: the world pose and the body-frame
     velocities. The two inputs come as one stacked ``u`` port, the convention of every
     bicycle rung, or as two named ports with ``named_ports=True``. The research rungs live in
-    ``examples/projects/car_trajopt/vehicles/ladder.py``.
+    ``triage/projects/car_trajopt/vehicles/ladder.py``.
 
     Tires
     -----

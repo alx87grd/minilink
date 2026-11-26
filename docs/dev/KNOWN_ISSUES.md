@@ -73,22 +73,11 @@ lands. Last checked against the code: 2026-11-18 (NumPy 2.5, JAX 0.12, a cloud m
 
 ## Tooling
 
-### Three NumPy-against-JAX tests fail in the last digit on NumPy 2.5 with JAX 0.12
-- **Symptom:** a normal draw is the same on both backends in its bits, not in its last
-  digit: `standard_normal` runs Box–Muller, `√(−2 ln u₁) cos(2π u₂)`, through each
-  library's own `log` and `cos`, which round differently on this pair of versions (one unit
-  in the last place: a fifth of the `log` values, one `cos` in a thousand, about one draw in
-  fifteen). Three tests compare with exact
-  equality and fail: `test_random.py::test_bits_and_normals_agree_on_numpy_and_jax`,
-  `test_stochastic_policy.py::test_a_policy_vmaps_over_seeds_on_both_backends` and
-  `test_blocks.py::TestWhiteNoiseSource::test_the_same_signal_on_numpy_and_jax_and_a_traced_params_family`.
-  The cipher's bits are identical; a seeded noise signal or a stochastic policy's draw
-  differs between `backend="numpy"` and `backend="jax"` by that last digit, where the
-  docstrings say "identical". No version is pinned (`numpy` and `jax>=0.4.28` in
-  `pyproject.toml`), so a fresh install or a CI run on these versions meets it. Reproduced
-  2026-11-18 (NumPy 2.5.3, JAX 0.12.1, Python 3.13).
-- **Workaround:** compare the two backends' draws to a tolerance (`rtol=1e-14`); deselect
-  the three tests on such an install.
-- **Fix:** the hardening row of TODO §3 ("The NumPy-against-JAX draw tests compare to the
-  last digit"): the three tests compare the normals to a tolerance, the bits staying exact,
-  and the docstrings say so.
+### The basin of a region of attraction takes minutes without JAX
+- **Symptom:** `plot_region_of_attraction(sys, region, basin=True)` simulates one run per
+  point of a 201 × 201 plane. With JAX the runs are one batched, compiled call; on NumPy
+  they run state by state, about ten minutes for the saturated pendulum loop (a cloud
+  machine, 2026-11-25), with nothing printed meanwhile.
+- **Workaround:** install JAX (`pip install "minilink[full]"`), or draw without `basin=True`.
+- **Fix:** the hardening row of TODO §3 ("The basin plot on NumPy"): a coarser plane on
+  NumPy, or one vectorized NumPy rollout over the plane.

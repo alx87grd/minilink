@@ -645,7 +645,7 @@ def racecar_mpc() -> None:
         plant_run,
     )
 
-    # examples/demos/udes_racecar/mpc_racecar_dynamic.py: a lap past two cones,
+    # triage/demos/udes_racecar/mpc_racecar_dynamic.py: a lap past two cones,
     # the plan believing in a little more grip than the floor gives. At 4.5 m/s
     # the car keeps clear of both cones and inside the lane the whole lap.
     LENGTH, WIDTH, RADIUS = 12.0, 8.0, 2.0  # [m]
@@ -773,7 +773,7 @@ def gif_rocket() -> None:
     )
     from minilink.graphical.catalog import camera_matrix
 
-    # examples/demos/rl/rocket_landing_rl.py: PPO learns to land from 20 m.
+    # triage/demos/rl/rocket_landing_rl.py: PPO learns to land from 20 m.
     TRAINING_TIMESTEPS = 4_000_000
     DT, TF = 0.05, 15.0  # [s]
     GIMBAL, THRUST_TO_WEIGHT = 0.05, 2.0  # [rad], [-]

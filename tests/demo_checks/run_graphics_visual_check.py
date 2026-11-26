@@ -30,11 +30,11 @@ CHECKS = (
     ),
     (
         "Matplotlib animate (computed torque pendulum)",
-        [sys.executable, "examples/demos/control/computed_torque_pendulum.py"],
+        [sys.executable, "triage/demos/control/computed_torque_pendulum.py"],
     ),
     (
         "Matplotlib hybrid MPC animate",
-        [sys.executable, "examples/demos/mpc/mpc_car_minimal.py"],
+        [sys.executable, "triage/demos/mpc/mpc_car_minimal.py"],
     ),
     (
         "Meshcat 3D (physics in diagram — optional meshcat extra)",
@@ -44,7 +44,7 @@ CHECKS = (
         "Cartpole trajopt animate (set LIVE_PLOT=True for Plotly iterates)",
         [
             sys.executable,
-            "examples/demos/trajopt/trajopt_cartpole_collocation_jax.py",
+            "triage/demos/trajopt/trajopt_cartpole_collocation_jax.py",
         ],
     ),
 )

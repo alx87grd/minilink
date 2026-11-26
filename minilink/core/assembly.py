@@ -505,7 +505,8 @@ def animated_geometry_source(obj):
     """First drawable in *obj* (or its subsystems) with static kinematic geometry."""
     if is_box(obj):
         for sub in obj.subsystems.values():
-            if sub.get_kinematic_geometry():
+            # A subsystem that is itself a diagram gives no camera
+            if not is_box(sub) and sub.get_kinematic_geometry():
                 return sub
         return None
 

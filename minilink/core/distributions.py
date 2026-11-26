@@ -264,8 +264,8 @@ class CounterKey:
     """The key of one counter-based draw: the stream's ``seed`` and the sample index ``k``.
 
     A law sampled with it draws by the library's cipher (:func:`standard_normal`,
-    :func:`standard_uniform`): a pure function of ``(seed, k)``, identical on NumPy
-    and JAX and traceable in both.
+    :func:`standard_uniform`): a pure function of ``(seed, k)``, the same on NumPy
+    and JAX (a normal to the rounding of its last digit) and traceable in both.
     """
 
     seed: object
@@ -393,7 +393,9 @@ def standard_normal(seed, k, p):
     """``p`` independent standard normal draws for sample ``k`` of the stream keyed by ``seed``.
 
     Box–Muller on the two words of the cipher block, so the draw is a pure function of
-    ``(seed, k)`` and identical on NumPy and JAX.
+    ``(seed, k)``. The cipher's bits are identical on NumPy and JAX; the normal
+    goes through each library's own ``log`` and ``cos``, so the two agree to
+    their rounding, the last digit.
     """
     xp = array_module(seed, k)
 

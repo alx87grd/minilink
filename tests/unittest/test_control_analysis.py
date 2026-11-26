@@ -1286,6 +1286,7 @@ class TestPhasePlane(unittest.TestCase):
         )
 
     def test_plotly_draws_the_field_and_the_trajectory(self):
+        pytest.importorskip("plotly")
         sys = PhasePlaneTestSystem()
         traj = Trajectory(
             t=np.array([0.0, 1.0, 2.0]),

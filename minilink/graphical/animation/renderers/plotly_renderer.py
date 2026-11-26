@@ -189,54 +189,77 @@ def _plane_vertices(primitive: Plane) -> np.ndarray:
     )
 
 
-def _line_trace(go, *, x, y, z=None, color, width, dash, name, is_3d, opacity=1.0):
+# A trace is the plain description Plotly reads, a dict: a clip holds one per
+# primitive per frame, and the figure checks each once, as it takes it.
+
+
+def _line_trace(*, x, y, z=None, color, width, dash, name, is_3d, opacity=1.0):
     if is_3d:
-        return go.Scatter3d(
-            x=x,
-            y=y,
-            z=z,
-            mode="lines",
-            line={"color": color, "width": width},
-            name=name,
-            showlegend=False,
-            opacity=opacity,
-        )
-    return go.Scatter(
-        x=x,
-        y=y,
-        mode="lines",
-        line={"color": color, "width": width, "dash": dash},
-        name=name,
-        showlegend=False,
-        opacity=opacity,
-    )
+        return {
+            "type": "scatter3d",
+            "x": x,
+            "y": y,
+            "z": z,
+            "mode": "lines",
+            "line": {"color": color, "width": width},
+            "name": name,
+            "showlegend": False,
+            "opacity": opacity,
+        }
+    return {
+        "type": "scatter",
+        "x": x,
+        "y": y,
+        "mode": "lines",
+        "line": {"color": color, "width": width, "dash": dash},
+        "name": name,
+        "showlegend": False,
+        "opacity": opacity,
+    }
 
 
-def _marker_trace(go, *, x, y, z=None, color, size, symbol, name, is_3d):
+def _marker_trace(*, x, y, z=None, color, size, symbol, name, is_3d):
     if is_3d:
-        return go.Scatter3d(
-            x=x,
-            y=y,
-            z=z,
-            mode="markers",
-            marker={"color": color, "size": size},
-            name=name,
-            showlegend=False,
-        )
-    return go.Scatter(
-        x=x,
-        y=y,
-        mode="markers",
-        marker={"color": color, "size": size, "symbol": symbol},
-        name=name,
-        showlegend=False,
-    )
+        return {
+            "type": "scatter3d",
+            "x": x,
+            "y": y,
+            "z": z,
+            "mode": "markers",
+            "marker": {"color": color, "size": size},
+            "name": name,
+            "showlegend": False,
+        }
+    return {
+        "type": "scatter",
+        "x": x,
+        "y": y,
+        "mode": "markers",
+        "marker": {"color": color, "size": size, "symbol": symbol},
+        "name": name,
+        "showlegend": False,
+    }
 
 
-def _empty_trace(go, *, is_3d, name="unsupported"):
+def _empty_trace(*, is_3d, name="unsupported"):
     if is_3d:
-        return go.Scatter3d(x=[], y=[], z=[], mode="lines", name=name, showlegend=False)
-    return go.Scatter(x=[], y=[], mode="lines", name=name, showlegend=False)
+        return {
+            "type": "scatter3d",
+            "x": [],
+            "y": [],
+            "z": [],
+            "mode": "lines",
+            "name": name,
+            "showlegend": False,
+        }
+    return {
+        "type": "scatter",
+        "x": [],
+        "y": [],
+        "mode": "lines",
+        "name": name,
+        "showlegend": False,
+    }
 
 
 class PlotlyRenderer(AnimationRenderer):
@@ -328,7 +351,6 @@ class PlotlyRenderer(AnimationRenderer):
         return path
 
     def _build_animation_figure(self, primitives, frames, schedule):
-        go = _import_plotly()
         if not frames:
             raise ValueError("Cannot animate an empty frame list.")
 
@@ -354,8 +376,11 @@ class PlotlyRenderer(AnimationRenderer):
         plotly_frames = []
         for i, traces in enumerate(frame_traces):
             layout = self._xy_layout(frames[i]["camera"]) if dynamic_xy_layout else None
-            plotly_frames.append(go.Frame(data=traces, layout=layout, name=str(i)))
-        fig.frames = tuple(plotly_frames)
+            frame = {"data": traces, "name": str(i)}
+            if layout is not None:
+                frame["layout"] = layout
+            plotly_frames.append(frame)
+        fig.frames = plotly_frames
 
         frame_duration = max(1, int(round(schedule.interval_ms)))
         # Plotly HTML autoplay calls Plotly.animate(gd, null, opts). Without opts,
@@ -538,18 +563,17 @@ class PlotlyRenderer(AnimationRenderer):
         }
 
     def _traces_for_frame(self, primitives, transforms, camera):
-        go = _import_plotly()
         if self.is_3d or camera_is_world_xy(camera):
             draw_transforms = transforms
         else:
             W = world_to_camera(camera)
             draw_transforms = [W @ T for T in transforms]
         return [
-            self._trace_for_primitive(go, prim, T, i)
+            self._trace_for_primitive(prim, T, i)
             for i, (prim, T) in enumerate(zip(primitives, draw_transforms))
         ]
 
-    def _trace_for_primitive(self, go, primitive, T, index: int):
+    def _trace_for_primitive(self, primitive, T, index: int):
         color = _plotly_color(getattr(primitive, "color", "black"))
         width = max(1.0, float(getattr(primitive, "linewidth", 1.0)))
         dash = _plotly_dash(getattr(primitive, "style", "-"))
@@ -558,7 +582,6 @@ class PlotlyRenderer(AnimationRenderer):
         if isinstance(primitive, Point):
             pts = _transform_points(primitive.pt, T)
             return _marker_trace(
-                go,
                 x=pts[:, 0],
                 y=pts[:, 1],
                 z=pts[:, 2] if self.is_3d else None,
@@ -572,7 +595,6 @@ class PlotlyRenderer(AnimationRenderer):
         if isinstance(primitive, (CustomLine, Arrow, TorqueArrow)):
             pts = _transform_points(primitive.pts, T)
             return _line_trace(
-                go,
                 x=pts[:, 0],
                 y=pts[:, 1],
                 z=pts[:, 2] if self.is_3d else None,
@@ -594,7 +616,6 @@ class PlotlyRenderer(AnimationRenderer):
                 center = _transform_points(primitive.center, T)[0]
                 pts = _circle_points(primitive.radius, center)
             trace = _line_trace(
-                go,
                 x=pts[:, 0],
                 y=pts[:, 1],
                 z=pts[:, 2] if self.is_3d else None,
@@ -605,15 +626,14 @@ class PlotlyRenderer(AnimationRenderer):
                 is_3d=self.is_3d,
             )
             if not self.is_3d and bool(primitive.fill):
-                trace.fill = "toself"
-                trace.fillcolor = color
+                trace["fill"] = "toself"
+                trace["fillcolor"] = color
             return trace
 
         if isinstance(primitive, Sphere):
             center = _transform_points(primitive.center, T)[0]
             if self.is_3d:
                 return _marker_trace(
-                    go,
                     x=[center[0]],
                     y=[center[1]],
                     z=[center[2]],
@@ -625,7 +645,6 @@ class PlotlyRenderer(AnimationRenderer):
                 )
             pts = _circle_points(primitive.radius, center)
             trace = _line_trace(
-                go,
                 x=pts[:, 0],
                 y=pts[:, 1],
                 color=color,
@@ -634,16 +653,15 @@ class PlotlyRenderer(AnimationRenderer):
                 name=name,
                 is_3d=False,
             )
-            trace.fill = "toself"
-            trace.fillcolor = color
-            trace.opacity = float(np.clip(primitive.opacity, 0.0, 1.0))
+            trace["fill"] = "toself"
+            trace["fillcolor"] = color
+            trace["opacity"] = float(np.clip(primitive.opacity, 0.0, 1.0))
             return trace
 
         if isinstance(primitive, Rod):
             local = np.array([[0.0, 0.0, 0.0], [0.0, -primitive.length, 0.0]])
             pts = _transform_points(local, T)
             return _line_trace(
-                go,
                 x=pts[:, 0],
                 y=pts[:, 1],
                 z=pts[:, 2] if self.is_3d else None,
@@ -660,7 +678,6 @@ class PlotlyRenderer(AnimationRenderer):
                 vertices, ((0, 1), (1, 3), (3, 2), (2, 0))
             )
             return _line_trace(
-                go,
                 x=x,
                 y=y,
                 z=z if self.is_3d else None,
@@ -675,7 +692,6 @@ class PlotlyRenderer(AnimationRenderer):
             vertices = _transform_points(_box_vertices(primitive), T)
             x, y, z = _line_arrays_from_edges(vertices, _BOX_EDGES)
             return _line_trace(
-                go,
                 x=x,
                 y=y,
                 z=z if self.is_3d else None,
@@ -690,7 +706,6 @@ class PlotlyRenderer(AnimationRenderer):
             vertices = _transform_points(primitive.vertices_local(), T)
             x, y, z = _line_arrays_from_edges(vertices, primitive.edges())
             return _line_trace(
-                go,
                 x=x,
                 y=y,
                 z=z if self.is_3d else None,
@@ -701,7 +716,7 @@ class PlotlyRenderer(AnimationRenderer):
                 is_3d=self.is_3d,
             )
 
-        return _empty_trace(go, is_3d=self.is_3d, name=name)
+        return _empty_trace(is_3d=self.is_3d, name=name)
 
 
 def inline_renderer_of(renderers):

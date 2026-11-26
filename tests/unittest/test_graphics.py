@@ -309,7 +309,7 @@ class TestDiagramSharedWorld(unittest.TestCase):
     def test_subsystem_world_geometry_merges_under_shared_world(self):
         diagram = DiagramSystem()
         diagram.add_subsystem(WorldOnlyPlant(), "marker")
-        geom = diagram.get_dynamic_geometry(np.zeros(diagram.n), np.zeros(diagram.m))
+        geom = diagram.get_kinematic_geometry()
         self.assertIn("world", geom)
         self.assertNotIn("marker:world", geom)
         self.assertEqual(len(geom["world"]), 1)
@@ -351,7 +351,7 @@ class TestDiagramSharedWorld(unittest.TestCase):
         diagram = DiagramSystem()
         diagram.add_subsystem(WorldLineA(), "a")
         diagram.add_subsystem(WorldLineB(), "b")
-        geom = diagram.get_dynamic_geometry(np.zeros(diagram.n), np.zeros(diagram.m))
+        geom = diagram.get_kinematic_geometry()
         self.assertEqual(len(geom["world"]), 2)
         frame = resolve_draw_frame(diagram, np.zeros(diagram.n), np.zeros(diagram.m))
         self.assertEqual(len(frame["primitives"]), 2)
@@ -1789,6 +1789,7 @@ class TestPlotInputOutputMap(unittest.TestCase):
         plt.close(res.figure)
 
     def test_plotly_draws_the_line_the_heatmap_and_the_surface(self):
+        pytest.importorskip("plotly")
         sat = Saturation(-1.0, 1.0)
         line = sat.plot_input_output_map(renderer="plotly", show=False)
         self.assertEqual([type(t).__name__ for t in line.figure.data], ["Scatter"])
@@ -2192,3 +2193,401 @@ def test_a_rendered_frame_is_on_its_figure_and_saves_as_an_image(tmp_path):
     assert ax.lines or ax.patches or ax.collections
     assert still.save(tmp_path / "still.png").stat().st_size > 0
     plt.close("all")
+
+
+class TestKinematicGeometryBuiltOnce(unittest.TestCase):
+    """A session builds kinematic geometry once, a diagram's subsystems included."""
+
+    def test_a_diagram_subsystem_builds_its_skin_once_over_the_frames(self):
+        calls = []
+
+        def counted_skin(plant):
+            calls.append(plant)
+            return {"world": [Point()]}
+
+        plant = DynamicSystem(1, output_dim=1, expose_state=True)
+        plant.skin = counted_skin
+        diagram = DiagramSystem()
+        diagram.add_subsystem(plant, "plant")
+        animator = Animator(diagram)
+
+        # The diagram's per-frame geometry holds no kinematic geometry
+        dynamic = diagram.get_dynamic_geometry(np.zeros(1), np.zeros(diagram.m))
+        self.assertEqual(dynamic, {})
+        self.assertEqual(len(calls), 0)
+
+        frames = [
+            animator.resolve_frame(
+                np.array([float(k)]),
+                np.zeros(diagram.m),
+                0.1 * k,
+                kinematic=animator.kinematic_geometry(),
+            )
+            for k in range(5)
+        ]
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(frames[0]["primitives"]), 1)
+        self.assertIs(frames[0]["primitives"][0], frames[4]["primitives"][0])
+
+
+@pytest.mark.optional
+@pytest.mark.visualization
+class TestMeshcatFastPaths(unittest.TestCase):
+    """The batched forms give what Meshcat's one-at-a-time forms give."""
+
+    def setUp(self):
+        if not _has_meshcat():
+            self.skipTest("meshcat not installed")
+
+    def poses(self):
+        import meshcat.transformations as tf
+
+        rng = np.random.default_rng(0)
+        poses = [np.eye(4), tf.rotation_matrix(np.pi, [0.0, 0.0, 1.0])]
+        for _ in range(20):
+            T = tf.random_rotation_matrix(rng.random(3))
+            T[:3, 3] = rng.normal(size=3)
+            poses.append(T)
+
+        return np.stack(poses)
+
+    def test_pose_quaternions_match_the_viewer_conversion(self):
+        from meshcat.animation import js_quaternion
+
+        from minilink.graphical.animation.renderers.meshcat_renderer import (
+            pose_quaternions,
+        )
+
+        poses = self.poses()
+        expected = np.array([js_quaternion(T) for T in poses])
+        np.testing.assert_array_equal(pose_quaternions(poses), expected)
+
+    def test_a_pose_command_packs_to_the_same_bytes(self):
+        import umsgpack
+        from meshcat.commands import SetTransform
+        from meshcat.path import Path
+
+        from minilink.graphical.animation.renderers.meshcat_renderer import (
+            pose_message,
+        )
+
+        heads = {}
+        for T in self.poses():
+            command = SetTransform(T, Path(("meshcat", "minilink_scene", "p3")))
+            data = command.lower()
+            kind, address, packed = pose_message(command, heads, umsgpack.packb)
+            self.assertEqual(kind, data["type"].encode("utf-8"))
+            self.assertEqual(address, data["path"].encode("utf-8"))
+            self.assertEqual(packed, umsgpack.packb(data))
+
+
+class TestMatplotlibLayeredFrames(unittest.TestCase):
+    """A clip's frames drawn in layers are the frames full draws of the figure give."""
+
+    def players_of(self, system, traj):
+        import itertools
+        import uuid
+        from unittest import mock
+
+        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+            player_html,
+        )
+
+        result = system.animate(traj, renderer="matplotlib", show=False)
+        fig, ani = result.clip.built()
+        fps = 1000.0 / result.clip.schedule.interval_ms
+        players = []
+        for layers in (None, result.clip.backend.clip_layers):
+            # the player names its page elements by a random id
+            ids = (uuid.UUID(int=i) for i in itertools.count())
+            with mock.patch("uuid.uuid4", lambda ids=ids: next(ids)):
+                players.append(player_html(ani, layers=layers, fps=fps))
+        plt.close(fig)
+
+        return players
+
+    def test_the_player_is_the_same_on_a_still_view(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([2.0, 0.0])
+        traj = pendulum.compute_trajectory(tf=0.5)
+
+        full, layered = self.players_of(pendulum, traj)
+
+        self.assertTrue(full == layered)
+
+    def test_the_player_is_the_same_when_the_view_moves(self):
+        class Slider(DynamicSystem):
+            def __init__(self):
+                super().__init__(1)
+                self.skin = debug_state_skin
+                self.camera_scale = 2.0
+                self.camera_follow_frame = "body"
+
+            def f(self, x, u, t=0, params=None):
+                return np.ones(1)
+
+            def tf(self, x, u, t=0, params=None):
+                return {"body": translation(x[0], 0.0, 0.0)}
+
+        slider = Slider()
+        # the body moves, stands still, moves again: full draws and layered ones
+        positions = [0.0, 0.5, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0]
+        traj = Trajectory(
+            t=np.linspace(0.0, 0.3, 10),
+            x=np.array([positions]),
+            u=np.zeros((0, 10)),
+        )
+
+        full, layered = self.players_of(slider, traj)
+
+        self.assertTrue(full == layered)
+
+
+class TestGifClipPalette(unittest.TestCase):
+    def test_frames_share_one_palette_and_keep_their_few_colours(self):
+        from PIL import Image
+
+        from minilink.graphical.animation.renderers.matplotlib_frames import (
+            frames_on_one_palette,
+        )
+
+        colours = [(255, 255, 255), (0, 0, 0), (200, 30, 30), (30, 60, 200)]
+        frames = []
+        for k in range(8):
+            pixels = np.zeros((6, 8, 3), dtype=np.uint8)
+            pixels[:] = colours[0]
+            pixels[k % 6, :] = colours[1 + k % 3]
+            frames.append(Image.fromarray(pixels, mode="RGB"))
+
+        indexed = frames_on_one_palette(frames)
+
+        self.assertEqual(len(indexed), len(frames))
+        self.assertTrue(all(image.mode == "P" for image in indexed))
+        self.assertTrue(
+            all(image.getpalette() == indexed[0].getpalette() for image in indexed)
+        )
+        for frame, image in zip(frames, indexed):
+            np.testing.assert_array_equal(
+                np.asarray(image.convert("RGB")), np.asarray(frame)
+            )
+
+    def test_a_colour_that_appears_mid_clip_keeps_its_place(self):
+        from PIL import Image
+
+        from minilink.graphical.animation.renderers.matplotlib_frames import (
+            frames_on_one_palette,
+        )
+
+        # More colours than a palette holds, and a disc of a new colour in one frame
+        rng = np.random.default_rng(0)
+        shades = rng.integers(100, 140, size=(40, 60, 3), dtype=np.uint8)
+        frames = []
+        for k in range(12):
+            pixels = shades.copy()
+            if k == 7:
+                pixels[5:25, 5:25] = (255, 165, 0)
+            frames.append(Image.fromarray(pixels, mode="RGB"))
+
+        indexed = frames_on_one_palette(frames)
+
+        disc = np.asarray(indexed[7].convert("RGB"))[5:25, 5:25].astype(int)
+        self.assertLessEqual(np.abs(disc - (255, 165, 0)).max(), 16)
+
+    def test_a_clip_of_too_many_colours_is_left_to_a_palette_per_frame(self):
+        from PIL import Image
+
+        from minilink.graphical.animation.renderers.matplotlib_frames import (
+            frames_on_one_palette,
+        )
+
+        rng = np.random.default_rng(0)
+        frames = [
+            Image.fromarray(
+                rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8), mode="RGB"
+            ).resize((512, 512), Image.NEAREST)
+            for _ in range(3)
+        ]
+
+        self.assertIsNone(frames_on_one_palette(frames))
+
+
+class TestMatplotlibLayeredPaths(unittest.TestCase):
+    """The other users of the layered frames: a figure with a layout, a live scene, a video."""
+
+    def pendulum_run(self, tf=0.3):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([2.0, 0.0])
+
+        return pendulum, pendulum.compute_trajectory(tf=tf)
+
+    def test_a_figure_with_a_layout_engine_is_drawn_in_full(self):
+        pendulum, traj = self.pendulum_run()
+        with matplotlib.rc_context({"figure.constrained_layout.use": True}):
+            result = pendulum.animate(traj, renderer="matplotlib", show=False)
+            fig, ani = result.clip.built()
+            layers = result.clip.backend.clip_layers
+            full, layered = [], []
+            for k in range(len(result.clip.frames)):
+                ani._func(k)
+                buffer = io.BytesIO()
+                fig.savefig(buffer, format="rgba", dpi=fig.dpi)
+                full.append(buffer.getvalue())
+            layers.open(fig.dpi)
+            for k in range(len(result.clip.frames)):
+                ani._func(k)
+                layered.append(layers.rgba().tobytes())
+            layers.close()
+            plt.close(fig)
+
+        self.assertTrue(full == layered)
+
+    def test_a_live_scene_shows_the_frame_a_full_draw_gives(self):
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+        from minilink.graphical.animation import make_renderer
+
+        pendulum, _ = self.pendulum_run()
+        animator = Animator(pendulum)
+        backend = make_renderer("matplotlib", animator)
+        u = np.zeros(pendulum.m)
+        animator.open_live_scene(backend, np.array([2.0, 0.0]), u, 0.0)
+        for k in range(1, 6):
+            animator.update_live_frame(
+                backend, np.array([2.0 + 0.1 * k, 0.0]), u, 0.1 * k
+            )
+
+        window = backend.fig.canvas
+        self.assertIsNotNone(backend.layers.background)
+        layered = np.asarray(window.buffer_rgba()).copy()
+        FigureCanvasAgg.draw(window)
+        full = np.asarray(window.buffer_rgba())
+        np.testing.assert_array_equal(layered, full)
+        backend.close_scene()
+
+    def test_a_video_is_the_same_file_with_and_without_layers(self):
+        import tempfile
+        from pathlib import Path
+
+        import matplotlib.animation as animation
+
+        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+            save_matplotlib_clip,
+        )
+
+        if not animation.writers.is_available("ffmpeg"):
+            self.skipTest("ffmpeg not installed")
+        pendulum, traj = self.pendulum_run()
+        result = pendulum.animate(traj, renderer="matplotlib", show=False)
+        fig, ani = result.clip.built()
+        with tempfile.TemporaryDirectory() as folder:
+            full = save_matplotlib_clip(ani, Path(folder, "full.mp4"), 30.0)
+            layered = save_matplotlib_clip(
+                ani,
+                Path(folder, "layered.mp4"),
+                30.0,
+                layers=result.clip.backend.clip_layers,
+            )
+            same = full.read_bytes() == layered.read_bytes()
+        plt.close(fig)
+
+        self.assertTrue(same)
+
+
+def _page_commands(html) -> list:
+    """The commands a Meshcat page replays: what its server held, in order."""
+    import base64
+    import re
+
+    import umsgpack
+
+    packed = re.findall(r"data:application/octet-binary;base64,([A-Za-z0-9+/=]+)", html)
+
+    return [umsgpack.unpackb(base64.b64decode(command)) for command in packed]
+
+
+@pytest.mark.optional
+@pytest.mark.visualization
+class TestMeshcatServer(unittest.TestCase):
+    """The renderer's commands reach a Meshcat server, the page it gives back holds them."""
+
+    def setUp(self):
+        if not _has_meshcat():
+            self.skipTest("meshcat not installed")
+
+    def pendulum(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([2.0, 0.0])
+
+        return pendulum
+
+    def test_a_clip_reaches_the_server_and_saves_its_page(self):
+        import tempfile
+        from pathlib import Path
+
+        pendulum = self.pendulum()
+        traj = pendulum.compute_trajectory(tf=0.3)
+        result = pendulum.animate(traj, renderer="meshcat", show=False)
+        with tempfile.TemporaryDirectory() as folder:
+            page = result.save(Path(folder, "pendulum.html")).read_text()
+
+        commands = _page_commands(page)
+        kinds = [command["type"] for command in commands]
+        objects = [c["path"] for c in commands if c["type"] == "set_object"]
+        # The kinematic geometry, the first slots, each has its object
+        n_kinematic = sum(len(p) for p in pendulum.get_kinematic_geometry().values())
+        self.assertGreater(n_kinematic, 0)
+        for i in range(n_kinematic):
+            self.assertIn(f"/meshcat/minilink_scene/p{i}", objects)
+        self.assertEqual(kinds.count("set_animation"), 1)
+        animation = commands[kinds.index("set_animation")]
+        self.assertGreater(len(animation["animations"]), 0)
+
+    def test_live_frames_reach_the_server_in_order(self):
+        from unittest import mock
+
+        import meshcat
+
+        from minilink.graphical.animation import make_renderer
+
+        pendulum = self.pendulum()
+        animator = Animator(pendulum)
+        backend = make_renderer("meshcat", animator)
+        u = np.zeros(pendulum.m)
+        with (
+            mock.patch.object(meshcat.Visualizer, "open", lambda self: self),
+            mock.patch.object(meshcat.Visualizer, "wait", lambda self: None),
+        ):
+            animator.open_live_scene(backend, np.array([2.0, 0.0]), u, 0.0)
+            # more commands than the pipeline holds before it reads the answers
+            for k in range(1, 121):
+                animator.update_live_frame(
+                    backend, np.array([2.0 + 0.01 * k, 0.0]), u, 0.01 * k
+                )
+            frame = animator.resolve_frame(
+                np.array([3.2, 0.0]), u, 1.2, kinematic=animator.kinematic_geometry()
+            )
+            page = backend.vis.static_html()
+            backend.close_scene()
+
+        # The scene the server holds is the last frame's: each slot at its last pose
+        poses = {
+            c["path"]: np.array(c["matrix"]).reshape(4, 4).T
+            for c in _page_commands(page)
+            if c["type"] == "set_transform"
+        }
+        rod = next(
+            i for i, p in enumerate(frame["primitives"]) if type(p).__name__ == "Rod"
+        )
+        expected = frame["transforms"][rod].copy()
+        np.testing.assert_allclose(
+            poses[f"/meshcat/minilink_scene/p{rod}"][:3, :3],
+            expected[:3, :3],
+            atol=1e-12,
+        )

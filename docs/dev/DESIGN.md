@@ -287,7 +287,7 @@ serial arms, read straight by the robotic laws (`ctl @ plant` on `y = [q; dq]`).
 inputs are named ports with concrete allocation hooks, never inheritance branches. The
 vehicle ladder (from the point to the 3-D car on its suspension, dual-backend) is in the
 catalog; its research rungs and
-the named car profiles live with their scenarios in `examples/projects/car_trajopt/`.
+the named car profiles live with their scenarios in `triage/projects/car_trajopt/`.
 
 ## 4. Core Object Contracts
 
@@ -336,7 +336,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   orchestrator. Per frame it polls a `RealtimeInput` (`u`, `should_stop`; the nominal `u`
   when none), advances the plant by ZOH integration, draws live through the `Animator`
   and publishes to an optional `RealtimeOutput` (a `LiveSignalPlotOutput` beside it when
-  `plot=True` or `plot=(signals)`, drawn by `plot_renderer`). Two clocks: `frame_dt` (wall period per
+  `plot=True` or `plot=(signals)`, drawn by `plot_renderer`; `sys.game` draws it with Plotly
+  when Plotly is installed, a browser page that redraws itself, else with matplotlib). Two clocks: `frame_dt` (wall period per
   frame) and `sim_dt` (the integration step, auto-calibrated at `run` unless given);
   `sync="locked"` advances `frame_dt` of sim time per frame, `sync="realtime"` the measured
   wall time. The run returns a `Trajectory` (one sample per frame), cached on `self.traj`
@@ -419,7 +420,9 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   implicit** — the animator injects identity so world-fixed geometry can key to
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
   stays unprefixed (one shared root); articulated frames are namespaced
-  (``vehicle:body``). Controllers may own their own visualization frames the
+  (``vehicle:body``). A diagram's `get_kinematic_geometry` is its subsystems'
+  kinematic geometry and its `get_dynamic_geometry` their per-frame geometry, each
+  keyed under the subsystem's id. Controllers may own their own visualization frames the
   same way (e.g. optional `TaskImpedance` `task_force` → `controller:task_force`); the
   arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
   How each renderer plays and saves the frames: §7, "Animations".
@@ -582,7 +585,7 @@ The car models form a ladder (`dynamics/catalog/vehicles/`):
   The evaluator's `params` is that snapshot; `params=None` reads it (rule 6). On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
-  w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
+  w.r.t. parameters (see `triage/demos/compile/params_gradient.py`).
   `evaluator.jacobian(of, wrt, x, u, t, params)` returns the array at the point on every
   evaluator (`t` the tick `k` on a step evaluator; `jax.jacfwd` eagerly on JAX, central
   differences on NumPy), as `sys.jacobian` does: a derivative is a matrix at a point, and its
@@ -1260,7 +1263,7 @@ cancel, and the adaptive SciPy solvers may stall near the switching surface; the
 `Trajectory` records the output grid only, so a reconstructed `controller:u` at grid states
 is the start-of-interval map, not the effective dynamics over the step. Digital sliding mode
 is a sampled loop: `(ctl % dt) @ plant` holds the torque between ticks, the intended semantics
-(`examples/demos/hybrid/sampled_smc_pendulum.py`).
+(`triage/demos/hybrid/sampled_smc_pendulum.py`).
 
 ## 6. Optimization And Planning
 
@@ -1735,9 +1738,9 @@ box or blows up (non-finite state) ends the episode. The learned law is a `Syste
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
 through the network, and the step model (`ev.step(x, u, t, params, dt=…)` with
 `params={"controller": ..., "plant": ...}`) gives gradients of a rollout with respect
-to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
+to the policy weights. Official demos: `triage/demos/rl/` (pendulum swing-up, cart-pole,
 drone, rocket); the tutorial chapter is
-`examples/tutorial/advanced/04_reinforcement_learning.ipynb`. The
+`triage/tutorial/advanced/04_reinforcement_learning.ipynb`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `mount`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos
@@ -2088,7 +2091,9 @@ and `animation` are properties of the clip: `figure` is matplotlib's or Plotly's
 Meshcat's viewer (`None` on pygame); `animation` matplotlib's `FuncAnimation` or Meshcat's
 `Animation` (`None` on Plotly, whose frames sit in its figure, and on pygame). The clip is
 built on first use, so a record made with `show=False` starts no Meshcat viewer until it is
-shown or saved. `.save` writes matplotlib's `.gif` (the default) or a video through ffmpeg
+shown or saved. `.save` writes matplotlib's `.gif` (the default; one palette of 256 colours
+for the whole clip when it holds the clip's colours, else one per frame) or a video through
+ffmpeg
 (`.mp4`), any other suffix refused by name, and Meshcat's and Plotly's self-contained
 `.html` page; a pygame record has nothing to save and refuses by name.
 
@@ -2099,6 +2104,11 @@ trajectories) into a flipbook: one page per run of frames with the same geometry
 by a `visible` track. The clip, the saved page and the inline view are frame-accurate; their
 size grows with the number of distinct geometries. In 3-D, polylines are thin ribbons
 (matplotlib dash and width), not 1-pixel WebGL lines.
+
+An animation or a live scene builds the system's kinematic geometry once, when it opens
+(a Gym environment again at each `reset`), and draws the same primitives in every frame; `tf` and `get_dynamic_geometry` are read at
+each frame. The kinematic geometry is drawn first, the per-frame geometry over it.
+In a flat matplotlib view the grid and the ticks lie under every shape.
 
 The live paths (`game`, `RealtimeSimulator`, the evaluator's `live_plot`, `LiveSearchPlot`,
 the trajectory-optimization live plot) are sessions, not records: they draw as they run and

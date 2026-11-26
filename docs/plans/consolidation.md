@@ -494,7 +494,7 @@ question for each is trust and size, not use.
 | Real time and games (`simulation/realtime/`, the pygame renderer) | 1 700 | not measured | keep, and fix the two-window bug first | 2 | M | Games are the best first contact for a student. The Matplotlib-plus-pygame bug you named decides whether it deserves its place. |
 | Animation core (animator, camera, primitives, drawables, the Matplotlib renderer, the records) | 2 800 | 24–97 % | keep | 3 | H | Every `animate()`. |
 | MeshCat renderer | 1 080 (955 not blank) | not measured | keep | 3 | M | The 3-D view of the UR5 and the cars: the showcase and the plotting tutorial, five proposed demos and fourteen old demos select it. The largest renderer, untouched by the plotting contract; hangs without a browser (known issue). A candidate for a cleaning pass, not a removal (§8.3). |
-| Plotly: the animation renderer (730 lines), the figure renderer (470), the live signal plot (240) | 1 440 | not measured | your call on Colab | 1 | M | A second way to draw what Matplotlib draws, in three pieces of unequal use: the figure renderer draws every plot's description (`renderer="plotly"`: one tutorial, two old demos); the animation renderer plays `animate(renderer="plotly")` (two tutorials); the live signal plot is the `plot_renderer="plotly"` of the games (the proposed off-road game, two old ones). Each piece and what its removal costs: §8.3. |
+| Plotly: the animation renderer (730 lines), the figure renderer (470), the live signal plot (240) | 1 440 | not measured | keep (the maintainer, 2026-11-24) | 3 | M | Stays, all three pieces: the live signal plot is `game()`'s default when Plotly is installed (a browser page that redraws itself, where the Matplotlib live plot takes about 60 ms a redraw), the figure renderer draws every plot's description (`renderer="plotly"`) and the animation renderer plays `animate(renderer="plotly")`. Not a removal candidate. |
 | Skins (`racecar_skin.py` 1 330 lines, `car_skins_3d.py` 640, `skins.py`, `shapes.py`) | 2 660 | 11–83 % | clean | 3 | M | Drawing code, leaves, but the racecar skin alone is larger than half the vehicle ladder's dynamics, and the two car files are 1 660 lines not blank. Worth shrinking when touched, not before (§8.3). |
 | Mesh tools (`graphical/meshes.py`: STL and Collada loaders, weld, simplify, refine) | 610 | 45 % | minimize the surface | 3 | M | Needed for the UR5; the simplify and refine tools look like one-time build tools. |
 | The figure description and its Matplotlib renderer, diagram pictures, phase plane, port map, time signals | 4 100 | 45–97 % | keep | 3 | H | Used by all three courses. One description every plot builds (`graphical/figure.py`) and the renderer that draws it; `port_map.py` (660 lines) is the one to read with the notebooks open. |
@@ -578,24 +578,16 @@ row is that today nothing kept shows it.
 
 The plotting contract (one figure description, two renderers that draw it, one record) left
 the library the same size: net +207 lines on about 66 000 not blank. It removed the second
-copy of each plot's drawing, not the drawing code that is large on its own. Five pieces
-remain large and were not touched. Each is a candidate; the column says what a user loses.
+copy of each plot's drawing, not the drawing code that is large on its own. Three pieces
+remain large and are candidates; the column says what a user loses. Plotly, large too
+(1 240 lines not blank in three pieces), stays by the maintainer's ruling of 2026-11-24 and
+is not one.
 
 | Where | Lines (not blank) | Who uses it | What a removal would cost the user | Risk | Conf. |
 | --- | --- | --- | --- | --- | --- |
 | The MeshCat animation renderer (`graphical/animation/renderers/meshcat_renderer.py`) | 955 | the showcase and the plotting tutorial, five proposed demos, fourteen old demos | every 3-D animation in the browser: the UR5, the racecar and 3-D car skins, the saved `.html` clips. Matplotlib's 3-D view is the fallback, without meshes at a usable speed. A cleaning pass (22 underscore methods, the flipbook of changing geometry) is the realistic candidate, not a removal. | behaviour, for every 3-D demo | M |
-| The Plotly animation renderer (`renderers/plotly_renderer.py`) | 643 | two tutorials (`basics/01`, `core/09`); no demo | `animate(renderer="plotly")`: an interactive clip in a notebook with no viewer to start. Matplotlib's inline player and MeshCat's inline page cover Jupyter and Colab. | a renderer name refused | M |
-| The Plotly figure renderer (`graphical/figure_renderers/plotly.py`) | 405 | one tutorial (`core/09`), two old demos | `renderer="plotly"` on every plot: zoom, pan and hover. The description stays; only Matplotlib would draw it, and `renderer=` would have one value. | a keyword value on every `plot_*` | M |
-| The Plotly live signal plot (`graphical/signals/plotly_backend.py`: a polling HTTP server behind a browser tab) | 195 | the proposed off-road game and two old games, by `plot_renderer="plotly"` | live signals beside a pygame or MeshCat game without Matplotlib's window, the pairing that is not reliable today (the two-window bug). Fixing that bug removes the reason for this file. | one keyword of `game()` | M |
 | The port map and the block control-law plot (`graphical/port_map.py`: `plot_input_output_map`, `plot_control_law` on a block) | 569 | `plot_control_law`: three tutorials (on a controller, and behind `solution.plot_control_law` and `Comparison.plot_control_law`) and eleven old demos; `plot_input_output_map`: no example, one line of the systems notebook | the picture of a law `u(x)` on a plane, for any block, a neural policy included: a GRO860 and GMC714 picture. The candidate is its inside (the sweep axes and the error-space options: 360 of its lines are helpers under the two plots), read with the notebooks open; `plot_input_output_map` alone has no caller. | public methods | M |
 | The racecar skin and the 3-D car skins (`graphical/catalog/racecar_skin.py`, `car_skins_3d.py`) | 1 658 | the racecar skin: three proposed demos and seven old ones; the two 3-D car skins: the two presets | the look of the flagship platform and of the two 3-D presets; `car_skin_3d` (in `skins.py`) is the plain fallback. The racecar skin holds a scene (floor tiles, walls, painted lines), a 2-D top view, a lidar, a camera and a shadow: the candidate is those extras, each a few dozen lines. | looks only | M |
-
-If Plotly goes whole (its three pieces, 1 240 lines not blank), these go with it: the style
-table (`common/plotly_style.py`), the Plotly branch of the show step and of the two records,
-the renderer dispatch of the live signal plot and its handle base class with one subclass
-left, and the `"plotly"` value of `renderer=` and `plot_renderer=`. **What blocks it:** the
-proposed off-road game passes `plot_renderer="plotly"`, and two tutorials show
-`renderer="plotly"`. Your call on Colab.
 
 ### 8.4 Options and paths nobody uses
 
@@ -726,7 +718,7 @@ The slowest cases (`pytest --durations=40`) are flagged in the sort.
 | **Research repo** (private) | the three projects; the experimental package and its tests; the path-tracking laws | about 3 100, plus 7 900 of projects |
 | **Scratchpad** (personal) | the old demos worth a second look; boat, three-body, the 3-D plane; the extra benchmark scenarios | about 1 400 |
 | **Deleted** | the old demos the pass does not keep; the Gaussian policies and the host clock runner, if you say so | about 370 |
-| **Reduced in place** | the planner plots; fields, facades, inspection; the skins; Plotly, by your answer on Colab | about 3 000 to 4 000, an estimate, not a measure |
+| **Reduced in place** | the planner plots; fields, facades, inspection; the skins | about 1 800 to 2 800, an estimate, not a measure (the earlier 3 000 to 4 000 less Plotly's 1 240 lines, which stay) |
 | **Kept as is** | everything a course names, the planning framework, compile, the catalog's teaching plants | |
 
 The course and topic notebooks are in the teaching repository already
@@ -744,7 +736,7 @@ rewrote every plot onto one description and left the library the same size (net 
 | --- | --- | --- |
 | Twins | 1 150 | behaviour, for the two large ones |
 | Reporting extras | 1 500 | public methods and keywords |
-| The large drawing code | 3 800 not blank in all; 1 240 if Plotly goes whole, the rest by cleaning | a second renderer; looks |
+| The large drawing code | 2 560 not blank in all (Plotly's 1 240 lines stay and are not counted), by cleaning | looks |
 | Unused options and paths | 1 000 | public keywords |
 | Leftovers | 490 | nothing |
 
@@ -761,8 +753,8 @@ Each step waits for the maintainer's choice of its rows.
 2. **The demo pass:** which demos stay (§4), and with them which features.
 3. **Moves that touch no kept code** (priority 1, high confidence): the projects, the
    experimental package, the old demo folders the pass does not keep.
-4. **The small reductions** (priority 1): the path-tracking laws, Plotly by the answer on
-   Colab, value iteration on JAX under a kept demo.
+4. **The small reductions** (priority 1): the path-tracking laws, value iteration on JAX
+   under a kept demo.
 5. **The internals that move no public name:** the leftovers (§8.5) and the small exact
    twins; the seeded baselines stay byte-identical, one commit per file.
 6. **The reporting extras** (§8.2), once the maintainer says which pictures a course will
@@ -780,8 +772,6 @@ Each step waits for the maintainer's choice of its rows.
 - **The planes:** does "learning to fly" in GRO860 use `Plane2D` or the drone?
 - **Modal analysis:** will a course animate vibration modes?
 - **Path-tracking laws:** all to the research repo, or pure pursuit stays as a teaching law?
-- **Plotly:** do the Colab plots and animations of the courses rely on Plotly (the figure
-  renderer, the animation renderer, the live plot of the games)?
 - **Gaussian policies:** deleted, or kept as the notes' stochastic-policy object?
 - **Symbolic mechanics:** research repo, or a future GMC714 lab feature?
 - **The 3-D car:** stays in the catalog as a marked prototype, or moves with the research?

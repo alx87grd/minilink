@@ -1,67 +1,67 @@
 {
-  "examples/tutorial/showcase_minilink.ipynb": {
+  "triage/tutorial/showcase_minilink.ipynb": {
     "requires": [
       "jax",
       "meshcat"
     ],
     "timeout": 420
   },
-  "examples/tutorial/basics/01_minilink.ipynb": {
+  "triage/tutorial/basics/01_minilink.ipynb": {
     "requires": [
       "plotly"
     ]
   },
-  "examples/tutorial/basics/03_plan_and_sample.ipynb": {
+  "triage/tutorial/basics/03_plan_and_sample.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/core/02_parameters.ipynb": {
+  "triage/tutorial/core/02_parameters.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/core/04_costs.ipynb": {
+  "triage/tutorial/core/04_costs.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/core/05_problem.ipynb": {
+  "triage/tutorial/core/05_problem.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/core/06_compile_and_evaluate.ipynb": {
+  "triage/tutorial/core/06_compile_and_evaluate.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/core/07_program.ipynb": {
+  "triage/tutorial/core/07_program.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/core/08_planners.ipynb": {
+  "triage/tutorial/core/08_planners.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/advanced/02_optimal_control.ipynb": {
+  "triage/tutorial/advanced/02_optimal_control.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/advanced/03_mpc_and_mppi.ipynb": {
+  "triage/tutorial/advanced/03_mpc_and_mppi.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/advanced/04_reinforcement_learning.ipynb": {
+  "triage/tutorial/advanced/04_reinforcement_learning.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/advanced/05_differentiable.ipynb": {
+  "triage/tutorial/advanced/05_differentiable.ipynb": {
     "requires": [
       "jax"
     ]

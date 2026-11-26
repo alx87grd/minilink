@@ -432,11 +432,20 @@ class WiredDiagramMixin:
     # Graphics: every block's frames and geometry, under its id
 
     def get_kinematic_geometry(self):
-        """No geometry of its own: :meth:`get_dynamic_geometry` draws every block's."""
-        return {}
+        """Every subsystem's kinematic geometry, keyed under its id."""
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.graphical.animation.visualization import (
+            merge_subsystem_geometry,
+        )
+
+        merged: dict[str, list] = {}
+        for sys_id, subsystem in self.subsystems.items():
+            merge_subsystem_geometry(merged, subsystem.get_kinematic_geometry(), sys_id)
+
+        return merged
 
     def tf(self, x, u, t=0, params=None):
-        """Every block's frames ``T = tf(x, u, t)``, keyed under its id."""
+        """Every subsystem's frames ``T = tf(x, u, t)``, keyed under its id."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.visualization import (
             namespace_subsystem_frames,
@@ -455,10 +464,9 @@ class WiredDiagramMixin:
         return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        """Every block's geometry, static and moving, keyed under its id."""
+        """Every subsystem's per-frame geometry, keyed under its id."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.visualization import (
-            merge_geometry,
             merge_subsystem_geometry,
         )
 
@@ -469,17 +477,11 @@ class WiredDiagramMixin:
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id, params=params)
             local_params = self.subsystem_params(params, sys_id)
-            sub_kin: dict[str, list] = {}
-            sub_dyn: dict[str, list] = {}
             merge_subsystem_geometry(
-                sub_kin, subsystem.get_kinematic_geometry(), sys_id
-            )
-            merge_subsystem_geometry(
-                sub_dyn,
+                merged,
                 subsystem.get_dynamic_geometry(local_x, local_u, t, local_params),
                 sys_id,
             )
-            merged = merge_geometry(merged, sub_kin, sub_dyn)
 
         return merged
 

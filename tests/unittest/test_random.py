@@ -59,9 +59,11 @@ def test_bits_and_normals_agree_on_numpy_and_jax():
         bits_jx = random_bits(jnp.asarray(7), jnp.asarray(k), 5)
         np.testing.assert_array_equal(np.asarray(bits_jx[0]), bits_np[0])
         np.testing.assert_array_equal(np.asarray(bits_jx[1]), bits_np[1])
-        np.testing.assert_array_equal(
+        # The bits are identical; the normal goes through each library's log and cos
+        np.testing.assert_allclose(
             np.asarray(standard_normal(jnp.asarray(7), jnp.asarray(k), 5)),
             standard_normal(7, np.asarray(k), 5),
+            rtol=1e-14,
         )
 
 

@@ -86,7 +86,8 @@ def test_a_policy_vmaps_over_seeds_on_both_backends():
     on_jax = jax.vmap(
         lambda s: pi.h(jnp.zeros(0), jnp.asarray(x), 0.07, dict(pi.params, seed=s))
     )(jnp.asarray(seeds))
-    np.testing.assert_array_equal(np.asarray(on_jax), on_numpy)
+    # The same draws, to the rounding of each library's log and cos
+    np.testing.assert_allclose(np.asarray(on_jax), on_numpy, rtol=1e-14)
     assert len(set(on_numpy.ravel())) == 8
 
     # The pathwise gradient through the fixed ε reaches the mean's gain

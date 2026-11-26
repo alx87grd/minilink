@@ -475,7 +475,7 @@ DT_COARSE = 0.1
 
 
 def _build_smc_diagram():
-    """Match ``examples/demos/control/sliding_mode_pendulum.py`` setup."""
+    """Match ``triage/demos/control/sliding_mode_pendulum.py`` setup."""
     plant = Pendulum(length=1.0, mass=1.0)
     model = Pendulum(length=1.0, mass=0.5)
     plant.x0 = np.array([1.0, 0.0])
@@ -1042,6 +1042,19 @@ class TestRealtimeSimulator(unittest.TestCase):
             RealtimeSimulator(
                 sys, renderer=None, plot=("y",), plot_renderer="invalid_renderer"
             )
+
+
+def test_the_game_signal_plot_is_plotly_when_installed_else_matplotlib():
+    from unittest import mock
+
+    from minilink.core.facades import animation
+
+    assert animation.live_plot_renderer_of("matplotlib") == "matplotlib"
+    assert animation.live_plot_renderer_of("plotly") == "plotly"
+    with mock.patch.object(animation, "find_spec", lambda name: object()):
+        assert animation.live_plot_renderer_of(None) == "plotly"
+    with mock.patch.object(animation, "find_spec", lambda name: None):
+        assert animation.live_plot_renderer_of(None) == "matplotlib"
 
 
 class DeclaredPendulum(Pendulum):

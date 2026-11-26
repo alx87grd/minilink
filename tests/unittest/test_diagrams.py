@@ -1,4 +1,5 @@
 import os
+import shutil
 import unittest
 import pytest
 from minilink.blocks.basic import Integrator
@@ -11,6 +12,13 @@ from minilink.graphical.diagrams import (
     get_system_block_html,
     plot_diagram,
 )
+
+
+def require_dot():
+    """Skip a test that renders a diagram without Graphviz: its Python package and its ``dot`` program."""
+    pytest.importorskip("graphviz")
+    if shutil.which("dot") is None:
+        pytest.skip("the Graphviz program (dot) is not installed")
 
 
 class TestDiagrams(unittest.TestCase):
@@ -117,7 +125,7 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("Integrator", result.figure.source)
 
     def test_a_window_opens_the_vector_pdf_in_the_viewer(self):
-        pytest.importorskip("graphviz")
+        require_dot()
         from unittest import mock
 
         from minilink.graphical.common import environment
@@ -162,7 +170,7 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("Integrator", result.figure.source)
 
     def test_save_writes_the_format_of_the_extension(self):
-        pytest.importorskip("graphviz")
+        require_dot()
         import tempfile
         from pathlib import Path
 

@@ -235,10 +235,17 @@ def test_the_plot_draws_the_region_and_the_basin():
     import matplotlib
 
     matplotlib.use("Agg")
+    from unittest import mock
+
+    from minilink.analysis import lyapunov
+
     loop = saturated_loop()
     region = region_of_attraction(loop)
 
-    ax = plot_region_of_attraction(loop, region, basin=True, show=False).axes
+    # A coarse plane: the basin is one simulation per point, state by state on NumPy
+    with mock.patch.object(lyapunov, "PLOT_POINTS", 15):
+        result = plot_region_of_attraction(loop, region, basin=True, show=False)
+    ax = result.axes
     assert "region of attraction" in " ".join(ax.get_title().split())
     assert len(ax.collections) >= 2  # the shaded basin and the level set
     assert ax.get_xlabel() == loop.state.labels[0]

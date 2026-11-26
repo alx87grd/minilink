@@ -55,7 +55,7 @@ as the maintainer would and logged in the run's record.
 | Catalog hygiene | S64 | v0.5 | the per-plant clean-ups and the parameter keys |
 | Traceable linear analysis | S73 | v0.5 (any time) | `poles`, `frequency_response`, `margins` through the array module, and the sensitivity peaks |
 | Native solvers beyond the proof of concept | — | v0.5 | their shape (native-optimizers.md) |
-| The examples tree; where the projects live | K5 | v0.9 | repository-structure.md's options (§4 and §5 there; the course material is ruled) |
+| The examples tree; where the projects live | K5 | v0.4 | the target tree is agreed (repository-structure.md §4.1, 2026-11-26); no `advanced/`, the advanced examples to the teaching repository; the demo split is open (§4.4, §5) |
 | The teaching repository's switch to 0.4.0 | K6 | v0.4 (after the fall term) | pin every notebook on `0.4.0`, move the course notes' links |
 | The glyph rename | S30 | v0.9 | `SphereGlyph` / `BoxGlyph`, two public names |
 | The frozen surface | V3 | v0.9 | the names the v1.0 freeze covers |
@@ -410,9 +410,13 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   tabular RL, the policy evaluation and `Comparison` (`jmax` on the DP plots, `vmax` on the
   grid's and the animations' today), with the clipping it implies (scan: planning#3,
   examples#5); the operators' named forms exported together (scan: core#9).
-- [ ] **Profile the animation frames** (any time, agent): `Animator.build_frames` takes 22 s on
-  the Stanley lap, 40 s on the kinematic MPC racecar and 120 s on MPPI (335 frames, this
-  container, 2026-11-18), before either playback; find where it goes and cut it.
+- [ ] **Profile the animation frames** (any time, agent; in review on `dev-faster-meshcat`):
+  `Animator.build_frames` took 22 s on the Stanley lap, 40 s on the kinematic MPC racecar and
+  120 s on MPPI (335 frames, a cloud container, 2026-11-18), before either playback. A diagram
+  rebuilt every subsystem's skin on each frame; it now gives its subsystems' kinematic
+  geometry once (`get_kinematic_geometry`) and their per-frame geometry alone
+  (`get_dynamic_geometry`): 0.7 s, 0.3 s and 3 s on the same three (a cloud container,
+  2026-11-24, one run each).
 
 ### Wave B — GRO501, the carry-over (0.2.0 shipped)
 
@@ -528,12 +532,14 @@ wait for his pass over the demos and features (§1.12):
   (`Tree.extract_trajectory`'s `u` of shape `(0, 1)`), so `solve(evaluate=True)` raises: the
   root-only path holds the plant's nominal input (KNOWN_ISSUES, "A tree search that never
   leaves its root cannot be scored").
-- [ ] **The NumPy-against-JAX draw tests compare to the last digit** (KNOWN_ISSUES, Tooling):
-  on NumPy 2.5 with JAX 0.12 the standard normal differs by one unit in the last place
-  (`log` and `cos` round differently), and three tests fail (`test_random.py`,
-  `test_stochastic_policy.py`, `test_blocks.py`'s white-noise test). Compare the normals to a
-  tolerance, keep the bits exact, and reword `standard_normal`'s "identical on NumPy and
-  JAX". Done when the suite is green on a fresh install.
+- [ ] **The NumPy-against-JAX draw tests compare to the last digit** (in review on
+  `dev-faster-meshcat`): on NumPy 2.5 with JAX 0.12 the standard normal differs by one unit
+  in the last place (`log` and `cos` round differently). The three tests compare the normals
+  to `rtol=1e-14`, the bits stay exact, and `standard_normal` and `CounterKey` say so.
+- [ ] **The basin plot on NumPy** (KNOWN_ISSUES, Tooling; agent lane): without JAX,
+  `plot_region_of_attraction(..., basin=True)` runs 40 401 simulations state by state, about
+  ten minutes. A coarser plane on NumPy, or one vectorized NumPy rollout over the plane. Its
+  test draws a 15 × 15 plane meanwhile.
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;
@@ -561,8 +567,8 @@ wait for his pass over the demos and features (§1.12):
   (`phase_plane/phase_plane.py`). Done when both have a test.
 - [ ] **Plotly on a hand-built figure** (agent lane, plotting;
   `graphical/figure_renderers/plotly.py`; from the plotting contract's review): matplotlib
-  is the reference and Plotly draws as closely as it can (DESIGN §7), so these wait for the
-  maintainer's pass on whether Plotly stays: on a `FigureSpec` assembled by hand the colour
+  is the reference and Plotly draws as closely as it can (DESIGN §7); Plotly stays (the
+  maintainer, 2026-11-24), so these are open: on a `FigureSpec` assembled by hand the colour
   bars of a multi-panel grid overlap, `share_x` does not hold across columns, a 3-D panel
   ignores its limits, and a `Note` in a 3-D panel is not drawn.
 - [ ] **The plot builders written twice** (agent lane, plotting; behaviour-preserving, a
@@ -764,10 +770,14 @@ terms; the v1.0 rows after two cohorts.
 ### v0.9 — what could still break a name
 
 - [ ] **Where the projects live, and the examples tree** (K5) **[ask — student-facing]**
-  `examples/projects/` in its own repository or here, and the examples tree's layout
-  (repository-structure.md §4 and §5). The course material is ruled and moved (§1 there: the
-  `alx87grd/teaching` repository, by topic, one list per course). Done when the ruling is
-  recorded.
+  The target tree is agreed (repository-structure.md §4.1, 2026-11-26): `tutorials/` at the
+  top level, `examples/` the showcase plus `games/`, `benchmarks/` split into
+  `automatic/` and `manual/`. No `advanced/` folder: the examples outside the showcase go to the
+  teaching repository as notebooks (ruled 2026-11-26). The material waits in `triage/` (§4.3
+  there), the target folders empty beside it. Open: the split of the demo set, the
+  notebooks that remain (§4.4 there). The course material is ruled and moved (§1 there:
+  the `alx87grd/teaching` repository, by topic, one list per course). Done when the tree is
+  in place and the open points are ruled.
 - [ ] **The teaching repository's switch** (K6) **[maintainer]**, after the fall term, once
   `dev` is merged into `main` and `0.4.0` tagged: every notebook's install cell and
   `requirements.txt` pinned on `0.4.0`, the citing documents updated (the GRO860 notes and

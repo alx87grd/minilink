@@ -2,8 +2,8 @@
 
 **Write the equations once. Simulate, analyze, control, plan, optimize, learn.**
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
-[![Notebooks](https://img.shields.io/badge/notebooks-examples%2Ftutorial-F37626?logo=jupyter&logoColor=white)](https://github.com/alx87grd/minilink/tree/main/examples/tutorial)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/triage/tutorial/showcase_minilink.ipynb)
+[![Notebooks](https://img.shields.io/badge/notebooks-examples%2Ftutorial-F37626?logo=jupyter&logoColor=white)](https://github.com/alx87grd/minilink/tree/main/triage/tutorial)
 [![PyPI](https://img.shields.io/pypi/v/minilink)](https://pypi.org/project/minilink/)
 [![API](https://img.shields.io/badge/API-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](https://github.com/alx87grd/minilink/blob/main/LICENSE)
@@ -241,8 +241,8 @@ Three objects hold it together: the model (`System`), the task (`PlanningProblem
 
 ## Learn more
 
-- [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb): this page with its plots and animations.
-- [Tutorials](https://github.com/alx87grd/minilink/tree/main/examples/tutorial): `basics/`, `core/`, `advanced/`.
+- [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/triage/tutorial/showcase_minilink.ipynb): this page with its plots and animations.
+- [Tutorials](https://github.com/alx87grd/minilink/tree/main/triage/tutorial): `basics/`, `core/`, `advanced/`.
 - [Teaching notebooks](https://github.com/alx87grd/teaching): control, dynamic programming, LQR, MPC, reinforcement learning.
 - [Pitch deck](https://alx87grd.github.io/minilink/presentation.html) · [API reference](https://alx87grd.github.io/minilink/) · [Pipelines](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md)
 

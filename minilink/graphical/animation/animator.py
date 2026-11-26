@@ -70,6 +70,7 @@ class Animator:
 
         # Memory
         self._overlay_kinematics = {}  # Each overlay's kinematic geometry, by id
+        self._kinematic = None  # The system's kinematic geometry, built once
         # The auto-fit camera (``camera_scale is None``): fixed for the whole session
         # so live frames do not jitter; animations refit it over the trajectory
         self._auto_camera = None
@@ -109,7 +110,7 @@ class Animator:
         frames = self.build_frames(
             traj,
             schedule,
-            kinematic=self.sys.get_kinematic_geometry(),
+            kinematic=self.kinematic_geometry(),
             camera_override=camera,
             overlays=overlays,
         )
@@ -142,7 +143,7 @@ class Animator:
             x,
             u,
             t,
-            kinematic=self.sys.get_kinematic_geometry(),
+            kinematic=self.kinematic_geometry(),
             camera_override=camera,
             overlays=overlays,
         )
@@ -175,7 +176,9 @@ class Animator:
         frame is presented non-blocking with no interval.
         """
         if kinematic is None:
-            kinematic = self.sys.get_kinematic_geometry()
+            # A new scene reads the system's kinematic geometry anew
+            self.forget_kinematic_geometry()
+            kinematic = self.kinematic_geometry()
         frame = self.resolve_frame(x, u, t, kinematic=kinematic)
 
         backend.open_scene(
@@ -198,7 +201,7 @@ class Animator:
         hooks each call, so live sessions render the same visuals as playback.
         """
         if kinematic is None:
-            kinematic = self.sys.get_kinematic_geometry()
+            kinematic = self.kinematic_geometry()
         frame = self.resolve_frame(x, u, t, kinematic=kinematic)
 
         backend.draw_frame(
@@ -211,6 +214,17 @@ class Animator:
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def forget_kinematic_geometry(self) -> None:
+        """Read the system's kinematic geometry anew at the next frame (a changed skin, new parameters)."""
+        self._kinematic = None
+
+    def kinematic_geometry(self):
+        """The system's kinematic geometry, built once for a clip or a live scene."""
+        if self._kinematic is None:
+            self._kinematic = self.sys.get_kinematic_geometry()
+
+        return self._kinematic
 
     def build_frames(self, traj, schedule, *, kinematic, camera_override, overlays=()):
         """Resolve every frame of the playback schedule, the auto-fit camera refit over them all."""

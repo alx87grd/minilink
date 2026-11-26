@@ -112,6 +112,7 @@ ignore = ["E501", "E741"]
 "tests/unittest/test_planning.py" = ["E402", "F811", "I001"]
 "tests/unittest/test_simulation.py" = ["E402", "F811", "I001", "F401"]
 "tests/unittest/test_step_discrete.py" = ["E402", "F811", "I001", "F401"]
+"benchmarks/manual/*.py" = ["E402"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -143,7 +144,7 @@ git_describe_command = "git describe --dirty --tags --long --match '0.*'"
 exclude = [
     "/minilink/experimental",
     "/experimental",
-    "/examples/projects",
+    "/triage/projects",
     "/docs/_static/showcase",
 ]
 

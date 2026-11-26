@@ -13,6 +13,7 @@ public-name inventory in `test_public_names.py`).
 
 | Path | Role |
 | --- | --- |
+| [`manual/`](manual/) | Human-run studies only (solver tables, not gated): simulator matrix and trajopt preset sweep |
 | [`run_regression_check.py`](run_regression_check.py) | The one entry point: runs the suites, compares them with their baselines, prints the host context |
 | [`suites/`](suites/) | The gated suites: `core_perf`, `integration_check`, `solve_speed`, `dp_speed` |
 | [`scenarios/`](scenarios/) | Frozen scenario configs: double pendulum, showcase pendulum, cart-pole trajopt, the trajectory-optimization and MPC parity suites (`e4`, `f_mpc`) |
@@ -32,6 +33,9 @@ gracefully when missing). The CI and full-local commands are in the Agent table 
 [tests/README.md](../tests/README.md#entry-points); this is the CLI.
 
 ```bash
+python benchmarks/manual/simulator_speed_matrix.py   # simulator solver×backend table (exploration)
+python benchmarks/manual/trajopt_solver_presets.py # trajopt NLP preset table (exploration)
+
 python benchmarks/run_regression_check.py                      # core_perf baseline (default)
 python benchmarks/run_regression_check.py --suite integration  # trajectory + JAX trajopt gate
 python benchmarks/run_regression_check.py --suite solve_speed  # NLP + NumPy trajopt solve gates

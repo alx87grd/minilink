@@ -35,7 +35,7 @@ PROSE_FILES = (
     "README.md",
     "docs/index.rst",
 )
-PROSE_NOTEBOOKS = ("examples/tutorial/showcase_minilink.ipynb",)
+PROSE_NOTEBOOKS = ("triage/tutorial/showcase_minilink.ipynb",)
 
 # 7.6 — documents whose internal links must resolve.
 LINKED_DOCS = (
@@ -89,7 +89,13 @@ NAMED_CLASS_MODULES = (
 )
 
 # 6.7 — the teaching lane, which must run without the optional Ipopt build.
-TEACHING_EXAMPLE_ROOTS = ("examples/tutorial", "examples/demos")
+TEACHING_EXAMPLE_ROOTS = (
+    "tutorials",
+    "examples",
+    "triage/tutorial",
+    "triage/demos",
+    "triage/example_minimal",
+)
 
 
 # 6.5 — the unit-test modules that are JAX from end to end, the only ones a
@@ -117,7 +123,8 @@ class Collection:
         self.skipped_modules, self.broken_modules, self.jax_tests_left = [], [], []
 
     def pytest_collectreport(self, report):
-        if report.skipped:
+        # a module skipped for another optional library is not JAX's
+        if report.skipped and "jax" in str(report.longrepr):
             self.skipped_modules.append(report.nodeid)
         if report.failed:
             self.broken_modules.append(report.nodeid)
@@ -295,7 +302,12 @@ class TestColabSetup(unittest.TestCase):
     """Every notebook runs in Colab from a clone of the default branch."""
 
     def test_notebooks_that_import_minilink_set_up_colab_first(self):
-        for path in sorted((REPO / "examples").rglob("*.ipynb")):
+        notebooks = [
+            path
+            for root in ("tutorials", "examples", "triage")
+            for path in (REPO / root).rglob("*.ipynb")
+        ]
+        for path in sorted(notebooks):
             name = path.relative_to(REPO)
             code = example_code(path)
             first_import = IMPORTS_MINILINK.search(code)

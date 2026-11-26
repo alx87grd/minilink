@@ -69,6 +69,34 @@ class TestSys2Gym(unittest.TestCase):
 
         check_env(self.make_env(), skip_render_check=True)
 
+    def test_a_rendered_env_reads_the_look_again_at_each_reset(self):
+        from unittest import mock
+
+        import matplotlib.pyplot as plt
+
+        env = self.make_env(render_mode="human")
+        plant_class = type(env.sys)
+        builds = []
+
+        def counted(plant):
+            builds.append(plant)
+            return build(plant)
+
+        build = plant_class.get_kinematic_geometry
+        with mock.patch.object(plant_class, "get_kinematic_geometry", counted):
+            env.reset(seed=0)
+            env.render()
+            for _ in range(3):
+                env.step(np.zeros(1))
+            self.assertEqual(len(builds), 1)
+
+            # A new episode: the look is read once more, then kept
+            env.reset(seed=1)
+            for _ in range(3):
+                env.step(np.zeros(1))
+            self.assertEqual(len(builds), 2)
+        plt.close("all")
+
     def test_spaces_match_bounds(self):
         env = self.make_env()
         np.testing.assert_allclose(env.observation_space.low, [-2.0 * np.pi, -12.0])

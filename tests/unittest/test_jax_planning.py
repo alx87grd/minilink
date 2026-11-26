@@ -181,7 +181,7 @@ pytest.importorskip("jax")
 from minilink.dynamics.catalog.vehicles.steering import (
     KinematicBicycle,
 )
-from examples.projects.car_trajopt.vehicles.ladder import BicycleAcc, BicycleKin
+from triage.projects.car_trajopt.vehicles.ladder import BicycleAcc, BicycleKin
 
 
 @pytest.mark.optional

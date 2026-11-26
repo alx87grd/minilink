@@ -42,8 +42,9 @@ _FORBIDDEN_DEMO_HARNESS = re.compile(
     r"MINILINK_NOTEBOOK_SMOKE|_NOTEBOOK_SMOKE\b|MINILINK_.*_SMOKE"
 )
 _DEMO_ROOTS = (
-    REPO_ROOT / "examples" / "tutorial",
-    REPO_ROOT / "examples" / "demos",
+    REPO_ROOT / "tutorials",
+    REPO_ROOT / "examples",
+    REPO_ROOT / "triage",
 )
 
 
@@ -74,7 +75,7 @@ class TestDemoCheckRunners(unittest.TestCase):
                     hits.append(path.relative_to(REPO_ROOT).as_posix())
         if hits:
             self.fail(
-                "examples/tutorial and examples/demos must not "
+                "triage/tutorial, triage/demos and triage/example_minimal must not "
                 "contain smoke/CI harness hooks (adapt in tests/demo_checks "
                 "instead):\n  " + "\n  ".join(hits)
             )
@@ -197,10 +198,10 @@ class TestDemoCheckManifests(unittest.TestCase):
         self.assertEqual(repeated, [])
         # The ids the ``--notebook`` usage and help text cite.
         self.assertEqual(
-            ids["examples/tutorial/showcase_minilink.ipynb"], "showcase_minilink"
+            ids["triage/tutorial/showcase_minilink.ipynb"], "showcase_minilink"
         )
         self.assertEqual(
-            ids["examples/tutorial/basics/01_minilink.ipynb"], "tutorial_01_minilink"
+            ids["triage/tutorial/basics/01_minilink.ipynb"], "tutorial_01_minilink"
         )
 
     def test_unknown_ids_are_cli_errors(self):

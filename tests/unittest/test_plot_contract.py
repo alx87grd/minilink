@@ -60,6 +60,7 @@ RENDERER_MODULES = {
     "graphical/animation/grid_animations.py",
     "graphical/animation/line_animations.py",
     "graphical/animation/renderers/matplotlib_renderer.py",
+    "graphical/animation/renderers/matplotlib_frames.py",
     "graphical/animation/renderers/plotly_renderer.py",
     "graphical/animation/renderers/meshcat_renderer.py",
     "graphical/animation/renderers/pygame_renderer.py",

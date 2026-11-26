@@ -423,6 +423,176 @@ def _rotation_from_a_to_b(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.eye(3) + K + K @ K * ((1.0 - c) / (s * s))
 
 
+# Commands sent before the server's answers are read (a frame's poses, a clip's pages)
+_PIPELINE_DEPTH = 256
+# A packed 64-bit float: its type byte, then the number, big-endian
+_PACKED_FLOAT = np.dtype([("tag", "u1"), ("value", ">f8")])
+
+
+class PipelinedWindow:
+    """
+    A Meshcat viewer window whose commands leave without waiting for each answer.
+
+    The window's own socket asks and waits, one command at a time. This one
+    sends the commands back to back on a socket of its own and reads the
+    server's answers together, at ``flush``: the server receives the same
+    commands in the same order. Everything else (the page, its address, the
+    browser handshake) is the window's, asked once the pipeline is empty.
+
+    It speaks the server's protocol itself: a dealer socket, whose empty first
+    part is the envelope the server's reply socket expects, then the command's
+    type, its path and its packed body.
+    """
+
+    def __init__(self, window):
+        # Lazy imports: Meshcat's own dependencies, loaded with the first viewer
+        import umsgpack
+        import zmq
+        from meshcat.commands import SetTransform
+
+        self.window = window
+        self.pack = umsgpack.packb
+        self.PoseCommand = SetTransform
+        self.pose_heads = {}  # Each path's address and the packed bytes before its pose
+        self.socket = window.context.socket(zmq.DEALER)
+        self.socket.connect(window.zmq_url)
+        self.pending = 0
+
+    def send(self, command):
+        if type(command) is self.PoseCommand and is_float_pose(command.matrix):
+            parts = pose_message(command, self.pose_heads, self.pack)
+        else:
+            data = command.lower()
+            parts = [
+                data["type"].encode("utf-8"),
+                data["path"].encode("utf-8"),
+                self.pack(data),
+            ]
+        self.socket.send_multipart([b"", *parts])
+        self.pending += 1
+        if self.pending >= _PIPELINE_DEPTH:
+            self.flush()
+
+    def flush(self):
+        """Wait until the server has answered every command sent."""
+        while self.pending > 0:
+            self.socket.recv_multipart()
+            self.pending -= 1
+
+    def wait(self):
+        self.flush()
+        return self.window.wait()
+
+    def get_scene(self):
+        self.flush()
+        return self.window.get_scene()
+
+    def get_image(self):
+        self.flush()
+        return self.window.get_image()
+
+    def __getattr__(self, name):
+        if name == "window":
+            raise AttributeError(name)
+
+        return getattr(self.window, name)
+
+
+def pipelined(vis):
+    """``vis`` with its commands pipelined to its server; a viewer without a server is returned as is."""
+    # Lazy import: Meshcat is optional
+    from meshcat.visualizer import ViewerWindow
+
+    if isinstance(getattr(vis, "window", None), ViewerWindow):
+        vis.window = PipelinedWindow(vis.window)
+
+    return vis
+
+
+def pose_message(command, heads, packb) -> list:
+    """
+    The three parts of a pose command's message, its sixteen numbers written straight into the packed bytes.
+
+    A live frame is one pose per primitive: the bytes are those ``packb``, the
+    general packer, gives the command's own description
+    (``test_a_pose_command_packs_to_the_same_bytes`` holds the two equal), a
+    map of the type, the path and the matrix as sixteen 64-bit floats, column
+    by column. ``heads`` keeps each path's address and the packed bytes before
+    its pose.
+    """
+    path = command.path
+    if path not in heads:
+        address = path.lower()
+        head = (
+            b"\x83"  # A map of three entries
+            + packb("type")
+            + packb("set_transform")
+            + packb("path")
+            + packb(address)
+            + packb("matrix")
+            + b"\xdc\x00\x10"  # An array of sixteen
+        )
+        heads[path] = (address.encode("utf-8"), head)
+    address, head = heads[path]
+    numbers = np.empty(16, dtype=_PACKED_FLOAT)
+    numbers["tag"] = 0xCB
+    numbers["value"] = command.matrix.T.reshape(-1)
+
+    return [b"set_transform", address, head + numbers.tobytes()]
+
+
+def is_float_pose(matrix) -> bool:
+    """True for a 4x4 array of 64-bit floats, the pose every primitive is placed with."""
+    return (
+        isinstance(matrix, np.ndarray)
+        and matrix.shape == (4, 4)
+        and matrix.dtype == np.float64
+    )
+
+
+def flush_commands(vis):
+    """Wait until the server of ``vis`` has answered every command sent to it."""
+    window = getattr(vis, "window", None)
+    if isinstance(window, PipelinedWindow):
+        window.flush()
+
+
+def pose_quaternions(poses) -> np.ndarray:
+    """
+    The rotations of ``poses`` (N x 4 x 4) as the viewer's quaternions ``(x, y, z, w)``, N x 4.
+
+    The quaternion of a rotation is the eigenvector of the largest eigenvalue
+    of its symmetric 4x4 matrix ``K``, with ``w >= 0``; all the poses of a
+    track are solved in one call.
+    """
+    m = poses[:, :3, :3]
+    m00, m01, m02 = m[:, 0, 0], m[:, 0, 1], m[:, 0, 2]
+    m10, m11, m12 = m[:, 1, 0], m[:, 1, 1], m[:, 1, 2]
+    m20, m21, m22 = m[:, 2, 0], m[:, 2, 1], m[:, 2, 2]
+
+    # Only the lower triangle of K is read
+    K = np.zeros((len(poses), 4, 4))
+    K[:, 0, 0] = m00 - m11 - m22
+    K[:, 1, 0] = m01 + m10
+    K[:, 1, 1] = m11 - m00 - m22
+    K[:, 2, 0] = m02 + m20
+    K[:, 2, 1] = m12 + m21
+    K[:, 2, 2] = m22 - m00 - m11
+    K[:, 3, 0] = m21 - m12
+    K[:, 3, 1] = m02 - m20
+    K[:, 3, 2] = m10 - m01
+    K[:, 3, 3] = m00 + m11 + m22
+    K /= 3.0
+
+    # K q = λ q, q the eigenvector of the largest λ, its sign the one with w ≥ 0
+    eigenvalues, eigenvectors = np.linalg.eigh(K)
+    largest = np.argmax(eigenvalues, axis=1)
+    q = eigenvectors[np.arange(len(poses)), :, largest]
+    xyzw = q * np.where(q[:, 3:4] < 0.0, -1.0, 1.0)
+
+    return xyzw
+
+
 class MeshcatCanvas:
     """Maps primitives to meshcat geometry under a scene path."""
 
@@ -854,7 +1024,7 @@ class MeshcatRenderer(AnimationRenderer):
     ) -> None:
         meshcat = _import_meshcat()
         self.show = show
-        self.vis = meshcat.Visualizer()
+        self.vis = pipelined(meshcat.Visualizer())
         # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
         self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         if show:
@@ -875,6 +1045,7 @@ class MeshcatRenderer(AnimationRenderer):
         # tree already holds commands, so nothing is sent before it.
         self._place_eye(camera)
         self._set_backdrop()
+        flush_commands(self.vis)
 
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         # The camera target stays at the orbit origin, so everything is drawn
@@ -882,6 +1053,10 @@ class MeshcatRenderer(AnimationRenderer):
         # transform. One scene-level slide sent after the primitives would let the
         # browser render in between: a followed body would show at its new pose
         # in the old view, then snap back, and flicker between the two.
+        # The server has taken the previous frame before this one is sent: it
+        # works through a frame while the caller computes the next, and never
+        # falls more than one frame behind
+        flush_commands(self.vis)
         shift = self.canvas._tf.translation_matrix(camera_world_shift(camera))
         self.canvas.reserve_slots(len(primitives))
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
@@ -909,6 +1084,7 @@ class MeshcatRenderer(AnimationRenderer):
             time.sleep(interval_s)
 
     def close_scene(self) -> None:
+        flush_commands(self.vis)
         self.canvas = None
         self.vis = None
 
@@ -1018,7 +1194,7 @@ class MeshcatRenderer(AnimationRenderer):
     def _keyframe_slot_pose(self, animation_obj, frames, i: int) -> None:
         """Pose of slot ``i``: placed at its first frame, keyframed only if it moves."""
         tf = self.canvas._tf
-        poses = []
+        keys, poses = [], []
         for k, frame in enumerate(frames):
             if i >= len(frame["primitives"]):
                 continue
@@ -1026,25 +1202,33 @@ class MeshcatRenderer(AnimationRenderer):
                 frame["primitives"][i], frame["transforms"][i], tf
             )
             if T is not None:
-                poses.append((k, np.asarray(T, dtype=float)))
+                keys.append(k)
+                poses.append(np.asarray(T, dtype=float))
         if not poses:
             return
+        poses = np.stack(poses)
         path = self.canvas._base_path(i)
-        path.set_transform(poses[0][1])
-        if all(np.allclose(T, poses[0][1], rtol=0.0, atol=1e-12) for _, T in poses):
+        path.set_transform(poses[0])
+        if np.allclose(poses, poses[0], rtol=0.0, atol=1e-12):
             return
-        for k, T in poses:
-            with animation_obj.at_frame(path, k) as frame_vis:
-                frame_vis.set_transform(T)
+        # One track of positions and one of rotations, a key per frame
+        positions = poses[:, :3, 3].tolist()
+        quaternions = pose_quaternions(poses).tolist()
+        clip = animation_obj.at_frame(path, keys[0]).get_clip()
+        for k, position, quaternion in zip(keys, positions, quaternions):
+            clip.set_property(k, "position", "vector3", position)
+            clip.set_property(k, "quaternion", "quaternion", quaternion)
 
     def _set_native_animation(self, frames, schedule):
         """Build a Visualizer, keyframe the native Meshcat animation, and play it."""
         meshcat = _import_meshcat()
-        self.vis = meshcat.Visualizer()
+        self.vis = pipelined(meshcat.Visualizer())
         # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
         self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         animation_obj = self._build_meshcat_animation(frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)
+        flush_commands(self.vis)
+
         return animation_obj
 
     def build_clip(

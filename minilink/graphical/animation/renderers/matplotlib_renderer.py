@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from itertools import product
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import matplotlib.animation as animation
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -22,6 +24,13 @@ from minilink.graphical.animation.primitives import (
     Sphere,
     TorqueArrow,
     world_to_camera,
+)
+from minilink.graphical.animation.renderers.matplotlib_frames import (
+    ClipPaletteWriter,
+    LayeredFFMpegWriter,
+    LayeredFrames,
+    LayeredHTMLWriter,
+    LayeredPillowWriter,
 )
 from minilink.graphical.animation.renderers.renderer import (
     AnimationRenderer,
@@ -402,6 +411,10 @@ class MatplotlibRenderer(AnimationRenderer):
         self.fig = None
         self.ax = None
         self.canvas = None
+        # The frames drawn in layers, flat views only: a live scene's, and a clip's
+        self.layers = None
+        self.clip_layers = None
+        self.window_shown = False  # A live scene's window has had its first draw
 
     def _apply_camera(self, ax, camera, is_3d):
         """Apply view limits, labels, and (3D) view orientation from *camera*."""
@@ -451,6 +464,8 @@ class MatplotlibRenderer(AnimationRenderer):
     ) -> None:
         self.fig, self.ax = self._create_figure_and_ax(is_3d, camera)
         self.canvas = MatplotlibCanvas(self.ax, is_3d=is_3d)
+        self.layers = None if is_3d else LayeredFrames(self.fig, self.ax, self.canvas)
+        self.window_shown = False
         if title:
             self.ax.set_title(title, fontsize=FONT_SIZE)
 
@@ -482,7 +497,24 @@ class MatplotlibRenderer(AnimationRenderer):
             if is_blocking_needed():
                 plt.show(block=True)
             return
+        window = self.fig.canvas
+        if (
+            self.window_shown
+            and self.layers is not None
+            and isinstance(window, FigureCanvasAgg)
+        ):
+            # The frame in layers, pushed to the window, then the window's events.
+            # A frame on a new view is the window's own full draw.
+            self.layers.draw_on(window)
+            window.blit(self.fig.bbox)
+            if interval_s is None:
+                window.flush_events()
+            else:
+                window.start_event_loop(interval_s)
+            return
+        # The first frame opens the window, with a full draw
         plt.pause(0.001 if interval_s is None else interval_s)
+        self.window_shown = True
 
     def poll_events(self) -> dict[str, bool]:
         if self.fig is None:
@@ -495,6 +527,8 @@ class MatplotlibRenderer(AnimationRenderer):
         self.fig = None
         self.ax = None
         self.canvas = None
+        self.layers = None
+        self.window_shown = False
 
     def _build_animation(
         self,
@@ -537,6 +571,7 @@ class MatplotlibRenderer(AnimationRenderer):
 
         # The first frame is on the figure before the animation plays
         update(0)
+        self.clip_layers = None if is_3d else LayeredFrames(fig, ax, canvas)
 
         return fig, ani
 
@@ -550,7 +585,14 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def show_clip(self, clip, place):
         """Play the clip inline (an HTML player) or in its window."""
-        show_matplotlib_clip(*clip.built(), place)
+        fig, ani = clip.built()
+        show_matplotlib_clip(
+            fig,
+            ani,
+            place,
+            layers=self.clip_layers,
+            fps=1000.0 / clip.schedule.interval_ms,
+        )
 
     def save_clip(self, clip, path):
         """A ``.gif`` (the default) or a video through ffmpeg (``.mp4``); a clip of one frame also as an image (``.png``, ``.pdf``, ``.svg``, …)."""
@@ -567,7 +609,9 @@ class MatplotlibRenderer(AnimationRenderer):
             # for an animation never played
             ani._draw_was_started = True
         else:
-            written = save_matplotlib_clip(ani, path, clip.schedule.target_fps)
+            written = save_matplotlib_clip(
+                ani, path, clip.schedule.target_fps, layers=self.clip_layers
+            )
 
         # A figure built for the file alone is not left for the notebook to show
         hold_back(fig, "matplotlib")
@@ -585,13 +629,18 @@ CLIP_SUFFIXES = ("", ".gif", ".mp4")
 PLAYING = set()
 
 
-def show_matplotlib_clip(fig, ani, place):
-    """Play ``ani`` inline, as an HTML player displayed now, or in its window."""
+def show_matplotlib_clip(fig, ani, place, *, layers=None, fps=None):
+    """
+    Play ``ani`` inline, as an HTML player displayed now, or in its window.
+
+    With ``layers`` (and the clip's ``fps``), the player's frames are drawn in
+    layers: the same images, without a full draw of the figure for each.
+    """
     if place == "inline":
         # Lazy import: IPython is optional, needed only in a notebook
         from IPython.display import HTML, display
 
-        display(HTML(ani.to_jshtml()))
+        display(HTML(player_html(ani, layers=layers, fps=fps)))
         plt.close(fig)
         return
 
@@ -601,14 +650,46 @@ def show_matplotlib_clip(fig, ani, place):
     show_in_window(fig)
 
 
-def save_matplotlib_clip(ani, path, fps):
-    """Write ``ani`` to ``path``: a GIF without a suffix or with ``.gif``, an ``.mp4`` video through ffmpeg."""
+def player_html(ani, *, layers=None, fps=None) -> str:
+    """The HTML player of ``ani``, its frames embedded."""
+    if layers is None or fps is None:
+        return ani.to_jshtml()
+
+    with TemporaryDirectory() as folder:
+        path = Path(folder, "player.html")
+        writer = LayeredHTMLWriter(
+            layers, fps=fps, embed_frames=True, default_mode="loop"
+        )
+        ani.save(str(path), writer=writer)
+        html = path.read_text()
+
+    return html
+
+
+def save_matplotlib_clip(ani, path, fps, *, layers=None):
+    """
+    Write ``ani`` to ``path``: a GIF without a suffix or with ``.gif``, an ``.mp4`` video through ffmpeg.
+
+    With ``layers``, the frames are drawn in layers: the same images, without
+    a full draw of the figure for each.
+    """
     path = Path(path)
     require_clip_suffix(path)
     if not path.suffix:
         path = path.with_suffix(".gif")
-    writer = "pillow" if path.suffix.lower() == ".gif" else "ffmpeg"
-    ani.save(str(path), writer=writer, fps=fps, dpi=DPI_EXPORT)
+    is_gif = path.suffix.lower() == ".gif"
+    if is_gif:
+        writer = (
+            ClipPaletteWriter(fps=fps)
+            if layers is None
+            else LayeredPillowWriter(layers, fps=fps)
+        )
+        ani.save(str(path), writer=writer, dpi=DPI_EXPORT)
+    elif layers is None or not animation.writers.is_available("ffmpeg"):
+        ani.save(str(path), writer="ffmpeg", fps=fps, dpi=DPI_EXPORT)
+    else:
+        writer = LayeredFFMpegWriter(layers, fps=fps)
+        ani.save(str(path), writer=writer, dpi=DPI_EXPORT)
 
     return path
 

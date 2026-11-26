@@ -1,7 +1,7 @@
 """The project folders' own car models and helpers: ``car_trajopt`` and ``pathtracking``.
 
 The catalog's contracts are in ``test_dynamics_catalog.py``; this file checks the code
-under ``examples/projects/``, which builds on the catalog.
+under ``triage/projects/``, which builds on the catalog.
 """
 
 import unittest
@@ -9,27 +9,27 @@ import unittest
 import numpy as np
 import pytest
 
-from examples.projects.car_trajopt.vehicles.extras import (
-    ConstantSpeedKinematicCar,
-    DynamicHolonomicMobileRobot,
-    HolonomicMobileRobot3D,
-)
-from examples.projects.car_trajopt.vehicles.ladder import (
-    BicycleDynEngine,
-    BicycleDynServo,
-)
-from examples.projects.pathtracking.common.vehicle import (
-    LinearTire,
-    Pacejka,
-    RearDriveBicycle,
-    create_vehicle,
-)
 from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 from minilink.graphical.animation.primitives import Arrow
 from tests.unittest.graphics_contract_helpers import (
     geometry_smoke,
     resolved_primitive_count,
+)
+from triage.projects.car_trajopt.vehicles.extras import (
+    ConstantSpeedKinematicCar,
+    DynamicHolonomicMobileRobot,
+    HolonomicMobileRobot3D,
+)
+from triage.projects.car_trajopt.vehicles.ladder import (
+    BicycleDynEngine,
+    BicycleDynServo,
+)
+from triage.projects.pathtracking.common.vehicle import (
+    LinearTire,
+    Pacejka,
+    RearDriveBicycle,
+    create_vehicle,
 )
 
 # The car_trajopt project's extras: the reference values, the arrows, the params
@@ -191,7 +191,7 @@ class TestBicycleDynEngine(unittest.TestCase):
 
 class TestCarProfile(unittest.TestCase):
     def test_registered_profiles(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
+        from triage.projects.car_trajopt.vehicles.car_profile import (
             CAR_PROFILES,
             get_car_profile,
             list_car_profiles,
@@ -202,7 +202,7 @@ class TestCarProfile(unittest.TestCase):
             self.assertIs(get_car_profile(name), CAR_PROFILES[name])
 
     def test_racecar_matches_demo_vehicle_geometry(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import racecar_profile
+        from triage.projects.car_trajopt.vehicles.car_profile import racecar_profile
 
         profile = racecar_profile()
         self.assertEqual(profile.mass, 700.0)
@@ -219,7 +219,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertEqual(profile.limits.tau_rear_min, -3400.0)
 
     def test_propulsion_limits_from_power_at_nominal(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
+        from triage.projects.car_trajopt.vehicles.car_profile import (
             get_car_profile,
             list_car_profiles,
         )
@@ -244,7 +244,7 @@ class TestCarProfile(unittest.TestCase):
             self.assertLessEqual(profile.v_nom, profile.limits.vx_max)
 
     def test_actuator_limits_exceed_traction_reference(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
+        from triage.projects.car_trajopt.vehicles.car_profile import (
             get_car_profile,
             list_car_profiles,
         )
@@ -265,8 +265,8 @@ class TestCarProfile(unittest.TestCase):
                 self.assertGreater(profile.actuator_traction_headroom(), 1.0, msg=name)
 
     def test_udes_matches_kinematic_racecar_geometry(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import udes_1_5_profile
         from minilink.catalog import UdeSRacecar
+        from triage.projects.car_trajopt.vehicles.car_profile import udes_1_5_profile
 
         udes = UdeSRacecar()
         profile = udes_1_5_profile()
@@ -275,7 +275,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(profile.length, udes.params["a"] + udes.params["b"])
 
     def test_apply_car_profile_rate_plant(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
+        from triage.projects.car_trajopt.vehicles.car_profile import (
             apply_car_profile,
             passenger_car_profile,
         )
@@ -294,7 +294,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_dot_max)
 
     def test_apply_car_profile_servo_plant(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
+        from triage.projects.car_trajopt.vehicles.car_profile import (
             apply_car_profile,
             racecar_profile,
         )
@@ -308,7 +308,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_max)
 
     def test_apply_car_profile_engine_plant(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
+        from triage.projects.car_trajopt.vehicles.car_profile import (
             apply_car_profile,
             racecar_profile,
         )
@@ -388,8 +388,8 @@ class TestPathtrackingVehicle(unittest.TestCase):
 # The pathtracking project's path helpers: the point ahead along the path, both copies
 
 PATH_MODULES = (
-    "examples.projects.pathtracking.bicycle_los.los",
-    "examples.projects.pathtracking.bicycle_los_v2.path_tracking",
+    "triage.projects.pathtracking.bicycle_los.los",
+    "triage.projects.pathtracking.bicycle_los_v2.path_tracking",
 )
 
 
@@ -425,7 +425,7 @@ def test_an_open_path_stops_at_its_end_with_its_last_heading(module):
 
 
 def test_a_closed_rounded_rectangle_does_not_repeat_its_first_waypoint():
-    from examples.projects.pathtracking.common.path_generator import (
+    from triage.projects.pathtracking.common.path_generator import (
         rounded_rectangle_path,
     )
 
@@ -445,9 +445,9 @@ def test_a_closed_rounded_rectangle_does_not_repeat_its_first_waypoint():
 def test_the_pathtracking_signal_blocks_trace_under_jit():
     jax = pytest.importorskip("jax")
     configure_jax(enable_x64=True)
-    from examples.projects.pathtracking.common.allocation import Allocation
-    from examples.projects.pathtracking.mpc_v1.nominal_refs import NominalRefs
-    from examples.projects.pathtracking.mpc_v1.plant_to_mpc import PlantToMpcState
+    from triage.projects.pathtracking.common.allocation import Allocation
+    from triage.projects.pathtracking.mpc_v1.nominal_refs import NominalRefs
+    from triage.projects.pathtracking.mpc_v1.plant_to_mpc import PlantToMpcState
 
     rng = np.random.default_rng(0)
     allocation = Allocation(0.34, 40000.0, transmission_ratio=2.0)

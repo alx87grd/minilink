@@ -1,5 +1,6 @@
 """Animation shortcuts: a system drawn, played back, or played live."""
 
+from importlib.util import find_spec
 
 ###############################################################################
 # Public API
@@ -149,7 +150,7 @@ class DynamicAnimation:
         joystick_axes=None,
         camera_axes=((3, -1.0), (4, -1.0)),
         plot=False,
-        plot_renderer="matplotlib",
+        plot_renderer=None,
         sync="locked",
         backend=None,
         max_steps=None,
@@ -179,7 +180,10 @@ class DynamicAnimation:
         a :class:`~minilink.simulation.realtime.RealtimeOutput` via
         ``output=`` receives every frame). Pass ``plot=True``, or the signals
         to show (``plot=("slip", "grip")``), to open a live rolling-window
-        time-signal plot alongside the scene, on ``plot_renderer``.
+        time-signal plot alongside the scene, on ``plot_renderer``:
+        ``"plotly"``, a browser page that draws the plot itself, or
+        ``"matplotlib"``, a window the session redraws. Left out, it is Plotly
+        when Plotly is installed, else matplotlib.
 
         ``backend=None`` (default) tries JAX when available and
         compatible, otherwise NumPy — preferred for live sessions where speed
@@ -202,7 +206,7 @@ class DynamicAnimation:
             renderer=renderer,
             is_3d=is_3d,
             plot=plot,
-            plot_renderer=plot_renderer,
+            plot_renderer=live_plot_renderer_of(plot_renderer),
             input=input,
             output=output,
             backend=backend,
@@ -215,3 +219,16 @@ class DynamicAnimation:
         self.traj = traj
 
         return traj
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def live_plot_renderer_of(plot_renderer):
+    """The drawing library of a live session's signal plot: the one named, else Plotly when installed, else matplotlib."""
+    if plot_renderer is not None:
+        return plot_renderer
+
+    return "plotly" if find_spec("plotly") is not None else "matplotlib"
