@@ -55,7 +55,7 @@ as the maintainer would and logged in the run's record.
 | Catalog hygiene | S64 | v0.5 | the per-plant clean-ups and the parameter keys |
 | Traceable linear analysis | S73 | v0.5 (any time) | `poles`, `frequency_response`, `margins` through the array module, and the sensitivity peaks |
 | Native solvers beyond the proof of concept | — | v0.5 | their shape (native-optimizers.md) |
-| The examples tree; where the projects live | K5 | v0.9 | repository-structure.md's options (§4 and §5 there; the course material is ruled) |
+| The examples tree; where the projects live | K5 | v0.4 | the target tree is agreed (repository-structure.md §4.1, 2026-11-26); the demo split and `advanced/`'s home are open (§4.4, §5) |
 | The teaching repository's switch to 0.4.0 | K6 | v0.4 (after the fall term) | pin every notebook on `0.4.0`, move the course notes' links |
 | The glyph rename | S30 | v0.9 | `SphereGlyph` / `BoxGlyph`, two public names |
 | The frozen surface | V3 | v0.9 | the names the v1.0 freeze covers |
@@ -770,10 +770,12 @@ terms; the v1.0 rows after two cohorts.
 ### v0.9 — what could still break a name
 
 - [ ] **Where the projects live, and the examples tree** (K5) **[ask — student-facing]**
-  `examples/projects/` in its own repository or here, and the examples tree's layout
-  (repository-structure.md §4 and §5). The course material is ruled and moved (§1 there: the
-  `alx87grd/teaching` repository, by topic, one list per course). Done when the ruling is
-  recorded.
+  The target tree is agreed (repository-structure.md §4.1, 2026-11-26): `tutorials/` at the
+  top level, `examples/` the showcase plus `games/` and `advanced/`, `benchmarks/` split into
+  `automatic/` and `manual/`. Open: the split of the demo set, whether `advanced/` stays here,
+  the notebooks that remain (§4.4 there). The course material is ruled and moved (§1 there:
+  the `alx87grd/teaching` repository, by topic, one list per course). Done when the tree is
+  in place and the open points are ruled.
 - [ ] **The teaching repository's switch** (K6) **[maintainer]**, after the fall term, once
   `dev` is merged into `main` and `0.4.0` tagged: every notebook's install cell and
   `requirements.txt` pinned on `0.4.0`, the citing documents updated (the GRO860 notes and

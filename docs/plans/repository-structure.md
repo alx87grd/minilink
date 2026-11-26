@@ -1,6 +1,7 @@
 # The examples tree and the repositories around minilink
 
-**What it is:** the layout of `examples/` (options and a recommendation, not decided), the
+**What it is:** the target tree of the user-facing folders (`tutorials/`, `examples/`,
+`benchmarks/`; agreed with the maintainer 2026-11-26, the demo split still open), the
 repositories the other material lives in (ruled 2026-11-13; what is left of the move), and how
 each of them follows minilink: its branches, its pin, and how a fix reaches a course during a
 term (§3, planned 2026-11-20, not set up).  
@@ -161,76 +162,139 @@ imported the examples tree by path): on 2026-11-20 no teaching notebook imports 
 
 ## 4. The examples tree
 
-### 4.1 Facts
+### 4.1 The target tree (agreed 2026-11-26)
 
-| Folder | Content |
-| --- | --- |
-| `tutorial/` | three layers, `basics/` (3 notebooks), `core/` (9), `advanced/` (5), and one showcase |
-| `demos/<chapter>/` | 85 scripts in 17 chapters: the package names plus `evaluation`, `rrt`, `hybrid`, `mpc`, `realtime`, `robotic`, `trajopt`, `udes_racecar` |
-| `demos_proposed_minimal/` | 16 scripts, the draft of the curated set (two in `dynamic_programming/`) |
-| `projects/` | 3 multi-file applications (`car_trajopt`, `mpc`, `pathtracking`) |
-
-The tree carries three axes: by *form* (scripts or notebooks), by *package*
-(`demos/<chapter>/` mirrors the library) and by *lane* (`projects/`).
-
-### 4.2 Options
-
-**B1 — keep the kinds, tidy the names.** Rename the demo chapters to the tutorial numbering
-(`demos/09_planning/` rather than `rrt`, `trajopt`, `value_iteration`).
-
-Pros: the smallest change. Cons: the axes stay, and the README table stays the only map.
-
-**B2 — one axis: the chapter.**
+The maintainer's demo pass (consolidation.md §4) leaves a small user-facing set. Public links
+break at this phase anyway, so the tree is drawn on a clean slate, not around today's paths.
 
 ```
-examples/
-  <NN>_<chapter>/            # one folder per textbook chapter, in tutorial order
-    README.md                # the chapter index: what each file teaches, in reading order
-    <chapter>.ipynb          # the tutorial notebook (today's tutorial/<layer>/NN_<chapter>.ipynb)
-    <plant>_<method>.py      # the canonical demos (today's demos/<chapter>/*.py)
-  research/
-    projects/<name>/         # multi-file applications (today's projects/)
+minilink/                              the library
+
+tutorials/                             notebooks, opened in Colab, read in order
+  showcase_minilink.ipynb
+  01_… .ipynb  →  0N_… .ipynb            6–8 numbered notebooks (18 today, in basics/ core/ advanced/)
+
+examples/                              scripts only
+  pendulum_classical_control.py        ┐
+  pendulum_value_iteration.py          │
+  pendulum_compare_planner.py          │
+  cartpole_swingup_trajopt.py          │  the showcase: 8–10 flat scripts,
+  cartpole_lqg.py                      │  one story each, nothing else at this level
+  racecar_kinematic_mpc.py             │
+  rrt_star_obstacles.py                │
+  ur5_impedance.py                     │
+  drone_learns_to_fly.py               ┘
+  games/
+    game_cartpole.py
+    game_udes_racecar.py
+    game_ur5_setpoint.py
+    offroad_car_game.py
+  advanced/                            a handful of deeper scripts, flat
+    pendulum_pid_gradient_tuning.py
+    racecar_dynamic_mpc.py
+    racecar_kinematic_mppi.py
+    cartpole_value_iteration.py
+    double_integrator_minimum_time.py
+    signal_blocks.py
+
+benchmarks/
+  automatic/                           run by CI: the regression gate
+    run_regression_check.py
+    suites/
+    scenarios/
+    baselines/
+    host_profiles/
+  manual/                              run by the maintainer
+    simulator_speed_matrix.py
+    trajopt_solver_presets.py
+    diagram_compiling.py
+  systems/                             fixture systems, used by both
+  simulation.py, trajopt.py, optimization.py,
+  f_evaluators.py, dynamic_programming.py,
+  baseline.py, common.py, host_profiles.py      measuring helpers, used by both
+
+tests/
+  unittest/                            (gains public_names.py, the public-name inventory)
+  demo_checks/
+  …
+
+docs/
 ```
 
-Two rules replace the README table: **a demo is a script, the chapter notebook is the
-chapter index**; `research/` is outside the release contract. The "no `.ipynb` and `.py` in
-one leaf" rule goes, since the chapter README carries the form. Promotion becomes one arrow:
-`research/` → a chapter.
+The script names are today's, in `example_minimal/`; the split between the showcase,
+`games/` and `advanced/` is a proposal (§4.4).
 
-Pros: the tree *is* the textbook. Cons: every demo moves (`git mv`, history kept);
-`tests/demo_checks` and the nightly sweep paths change; the chapter list has to be agreed,
-and `hybrid`, `mpc`, `realtime`, `robotic` and the racecar folder need a chapter each.
+### 4.2 The rules the tree carries
 
-**B3 — notebook-first with jupytext pairing.** Every example is a notebook; the scripts are
-generated twins (`.py:percent`), and diffs happen on the `.py`.
+- **One folder per kind of reader.** `tutorials/` is for someone learning minilink: notebooks,
+  read in order, opened in Colab. `examples/` is for someone who knows it and wants a result:
+  scripts, picked by topic, run locally. `benchmarks/` answers how fast or how accurate
+  minilink is; no student opens it.
+- **Position is meaning in `examples/`.** The top level holds the showcase and nothing else;
+  the cap (at most ten scripts) is a one-line test, like the knob allowlist.
+- **`examples/` holds scripts only**, so the rule "no `.ipynb` beside `.py`" holds by
+  construction.
+- **`games/` apart** because a game is a different kind of script: interactive, it needs a
+  display or a gamepad and never ends on its own; CI gives it a short headless smoke run.
+- **`advanced/` is flat and small** (about ten scripts at most): how to use minilink for
+  something harder. A script that teaches nothing about the API is a benchmark or goes to
+  workbench.
+- **A benchmark is a script that measures minilink; an example shows how to use it.** In
+  `benchmarks/`, one folder per way of running (`automatic/` by CI, `manual/` by hand); the
+  top level is what both import (two of the three manual studies use the gate's helpers and
+  fixture systems).
+- **CI follows the tree:** the showcase on every pull request (it replaces the flagship
+  manifest), `advanced/` nightly, `games/` a headless smoke run, `tutorials/` the notebook job.
 
-Pros: solves script-vs-notebook once; reviewable diffs. Cons: a new tool in the student path
-and in CI, and the demos' value is being short scripts a student reads top to bottom (RULES
-6.1, 6.10); a build step on the one thing that should have none.
+### 4.3 What leaves
 
-**B4 — course-first: the tree is the syllabus** (`examples/<course>/<week>/`). Rejected: the
-library is course-neutral by the constitution; the course axis lives in the teaching
-repository.
+- `example_minimal/` and `examples/demos/` fold into `examples/`. The 71 scripts still in
+  `examples/demos/` (2026-11-26) are each promoted to `advanced/`, moved to workbench, or
+  deleted; no `demos/` folder remains.
+- `examples/tutorial/` becomes `tutorials/`.
+- `examples/projects/` and `experimental/` go to workbench (consolidation.md §7).
+- `benchmarks/public_names.py` moves beside the unit test that reads it: it is an inventory,
+  not a benchmark.
 
-### 4.3 Recommendation
+The move touches the CI workflows, `AGENTS.md`, `tests/README.md`, `benchmarks/README.md`,
+`examples/README.md`, the demo-check manifest and allowlists, and the unit tests that import
+from `benchmarks`, all in one change; nothing in `minilink/` imports from these folders.
 
-**B2**, staged between terms: (1) agree the chapter list and write the two rules in
-`examples/README.md`; (2) move `demos/<chapter>/` into the chapters, one commit per chapter,
-`git mv`; (3) `projects/` under `research/`. B1's renames are a fallback that keeps the
-option open if B2 has to wait a term.
+### 4.4 Still open
 
-**To weigh against it:** the draft of the curated demo set (consolidation.md §4.2) is one
-flat folder of about ten scripts, each named by its plant and its task, with the tutorials as
-the tool-by-tool walk. If that set replaces `demos/`, the chapter folders hold one notebook
-each and B2 reduces to the tutorials' own layers.
+- Which scripts are the showcase and which are `advanced/` (the split drawn in §4.1 is a
+  proposal from the 19 scripts of `example_minimal/`).
+- Whether `advanced/` stays in minilink, or "advanced" means workbench.
+- Whether one game joins the showcase.
+- Which 6–8 notebooks remain in `tutorials/`, and whether they stay grouped by layer
+  (basics, core, advanced) or become one numbered sequence as drawn.
+
+### 4.5 Options set aside
+
+- **A top-level showcase folder beside `examples/`** (`example_minimal/` today): two doors for
+  the same kind of file, and "examples" then reads as the leftovers.
+- **By system** (`examples/pendulum/`, `cartpole/`, `racecar/`, `ur5/`): a ladder per plant,
+  but it hides which script is the showcase one and spreads ten files over five folders.
+- **Numbered showcase scripts** (`01_pendulum_classical_control.py`): a reading order at the
+  cost of a rename whenever the set changes; the tutorials carry the order.
+- **The tutorials inside `examples/`**: one fewer top-level folder, but it mixes two readers
+  and two media, and puts the "start here" one click deeper.
+- **The manual benchmarks under `examples/advanced/`**: they import the gate's helpers and
+  teach nothing about the API.
+- **The tutorials under `docs/`**, rendered by the documentation site: worth a look once the
+  notebooks are down to the ones that stay; it needs a notebook renderer in the docs build.
+- **The earlier options** of this section, before the demo pass: B1, renaming the demo
+  chapters; B2, one folder per textbook chapter holding its notebook and demos; B3, notebooks
+  first with paired scripts; B4, the tree as the syllabus (rejected: the course axis lives in
+  the teaching repository). The demo pass reduced the demos to a set of about ten, which
+  none of them was drawn for.
 
 ## 5. The asks
 
-1. **The layout of `examples/`** (§4), with the choice of the demo set.
-2. **The chapter list** for B2: the three tutorial layers as the spine, and a home for
-   `hybrid`, `mpc`, `realtime`, `robotic` and the racecar folder.
-3. **`projects/`:** to the research repository
-   (consolidation.md §7), or kept as `research/projects/`.
+1. **The split of the demo set** between the showcase, `games/` and `advanced/`, and the
+   notebooks that remain in `tutorials/` (§4.4). The tree itself is agreed (§4.1).
+2. **`advanced/`:** in minilink, or workbench.
+3. **`projects/`:** to workbench (consolidation.md §7), as §4.3 draws it.
 4. **The form of the pin** in the teaching repository: `pip install` at the release, with
    `git clone -b <tag>` kept for a notebook that needs the examples tree (§3.6).
 
