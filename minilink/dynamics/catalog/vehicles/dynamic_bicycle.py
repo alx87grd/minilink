@@ -121,10 +121,15 @@ class DynamicBicycle(DynamicSystem):
                 units=["rad/s", "rad"],
             )
         self.add_output_port("y", dim=6, function=self.h, dependencies=())
+        self.add_output_port("x", dim=6, function=self.compute_state)
 
         # Signal labels and units
         self.state.labels = ["x", "y", "psi", "vx", "vy", "yaw_rate"]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+        self.outputs["x"].labels = list(self.state.labels)
+        self.outputs["x"].units = list(self.state.units)
 
         # Graphics: the 2-D centerline look
         self.wheel_len = 0.76
@@ -654,6 +659,8 @@ class BicycleDynRate(DynamicBicycle):
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        self.outputs["x"].labels = list(self.state.labels)
+        self.outputs["x"].units = list(self.state.units)
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params

@@ -4,9 +4,15 @@ import numpy as np
 import pytest
 
 from minilink import KinematicBicycle
-from minilink.catalog import DrivetrainBicycle, UdeSRacecar, UdeSRacecarDyn
+from minilink.catalog import (
+    DrivetrainBicycle,
+    DynamicBicycle,
+    UdeSRacecar,
+    UdeSRacecarDyn,
+)
 from minilink.core.backends import configure_jax
 from minilink.core.system import automatic_step_of
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 from minilink.dynamics.catalog.vehicles.racecar import stiff_tires
 
 
@@ -44,7 +50,16 @@ def test_ports_and_state_layout():
     assert list(named.inputs) == ["P_cmd", "delta_cmd"]
     assert named.inputs["P_cmd"].upper == pytest.approx(car.params["P_max"])
     assert named.inputs["delta_cmd"].lower == pytest.approx(-car.params["delta_max"])
-    assert set(car.outputs) == {"y", "speed", "slip", "grip", "imu", "power", "ltr"}
+    assert set(car.outputs) == {
+        "y",
+        "x",
+        "speed",
+        "slip",
+        "grip",
+        "imu",
+        "power",
+        "ltr",
+    }
     assert car.h(car.x0, np.zeros(car.m)).shape == (9,)
 
 
@@ -208,6 +223,35 @@ def test_steering_is_rate_limited_and_stops_at_the_end_stop():
     beyond = np.zeros(car.n)
     beyond[7] = 1.5 * p["delta_max"]
     assert car.f(beyond, np.array([0.0, 2.0]))[7] <= 0.0
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        KinematicBicycle,
+        DynamicBicycle,
+        BicycleDynRate,
+        DrivetrainBicycle,
+        UdeSRacecar,
+        UdeSRacecarDyn,
+    ],
+    ids=lambda make: make.__name__,
+)
+def test_every_bicycle_gives_its_state_on_x_and_closes_a_state_feedback(make):
+    """``y`` and ``x`` are the state, labeled by it; ``StateFeedback @ car`` wires on every rung."""
+    from minilink.control.state import StateFeedback
+
+    car = make()
+    x = np.arange(car.n, dtype=float)
+
+    assert car.outputs["x"].labels == car.state.labels == car.outputs["y"].labels
+    assert car.outputs["x"].units == car.state.units
+    assert car.outputs["x"].compute(
+        x, np.zeros(car.m), 0.0, car.params
+    ) == pytest.approx(x)
+
+    closed_loop = StateFeedback(np.zeros((car.m, car.n))) @ car
+    assert closed_loop.n == car.n
 
 
 def test_the_load_transfer_ratios_of_the_rigid_car():

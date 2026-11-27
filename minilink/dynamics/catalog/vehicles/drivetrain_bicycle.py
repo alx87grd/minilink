@@ -60,7 +60,8 @@ class DrivetrainBicycle(DynamicBicycle):
 
     Outputs
     -------
-    ``y`` (the full state), ``speed`` [m/s], ``slip`` (``kappa_r``, ``alpha_f``,
+    ``y`` and ``x`` (the full state: the measurement, and the state a state
+    feedback reads), ``speed`` [m/s], ``slip`` (``kappa_r``, ``alpha_f``,
     ``alpha_r``), ``grip`` (used fraction of each friction ellipse), ``imu``
     (specific force at the centre of gravity and yaw rate), ``power``
     (the lagged power and the power actually reaching the wheel) and ``ltr``
@@ -158,6 +159,7 @@ class DrivetrainBicycle(DynamicBicycle):
         self.bound_commands()
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
+        self.add_output_port("x", dim=self.n, function=self.compute_state)
         self.add_output_port("speed", function=self.speed, labels=["vx"], units=["m/s"])
         self.add_output_port(
             "slip",
@@ -205,6 +207,8 @@ class DrivetrainBicycle(DynamicBicycle):
         self.state.units = units
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        self.outputs["x"].labels = list(self.state.labels)
+        self.outputs["x"].units = list(self.state.units)
 
     @property
     def track(self) -> float:

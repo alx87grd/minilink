@@ -36,6 +36,8 @@ class KinematicBicycle(DynamicSystem):
         self.inputs["u"].units = ["m/s", "rad"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        self.outputs["x"].labels = list(self.state.labels)
+        self.outputs["x"].units = list(self.state.units)
 
         # Graphics: the 2-D centerline look shared with :class:`DynamicBicycle`; the
         # track and the wheel radius place the front wheels for a four-wheel look
