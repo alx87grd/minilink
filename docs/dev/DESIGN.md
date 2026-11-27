@@ -572,7 +572,10 @@ The car models form a ladder (`dynamics/catalog/vehicles/`):
     and a limit is an input set (`as_input_set`). The planar equations keep the static axle
     loads: `h_cg` and `track`, in `params`, enter `ltr` and the look only, and `tf` places the
     body frame at the centre of gravity, `h_cg` above the ground, where every car look
-    expects it. A model that differs by its numbers is a preset class with no equations
+    expects it.
+    `KinematicBicycle` gives `y` and `x` alone: it carries no mass, tire or force, and a model
+    that reads limits from the turn it holds (the forces it demands, its grip, its load
+    transfer) is a class of its own beside it, not a port added to it. A model that differs by its numbers is a preset class with no equations
     (`UdeSRacecar`, `UdeSRacecarDyn`, `FormulaCar3D`, `OffRoadCar3D`); one that differs by its
     look is a skin.
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
