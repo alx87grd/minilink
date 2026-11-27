@@ -285,8 +285,9 @@ def least_margins(constraints: dict, traj: Trajectory) -> dict:
     run's samples and the set's rows, ``+inf`` for a set with no rows. A loop's run is
     read on its plant (``traj.of("plant")``), a logged run as it is. A read after the
     run, which no evaluation computes: the evaluation's single ``feasibility_margin`` is
-    the least of these when the sets are the members of ``X`` and ``U``. On the
-    trajectory's array module.
+    the least of these when the sets are the members of ``X`` and ``U``. Plain floats
+    for a run on NumPy, so the result prints as numbers; JAX scalars for a run on JAX,
+    so it traces.
     """
     run = traj
     if "plant" in traj.roles:
@@ -296,11 +297,13 @@ def least_margins(constraints: dict, traj: Trajectory) -> dict:
     t = run.t
     x = run.x.T
     u = run.u.T
+    on_numpy = array_module(x) is np
 
     # The least margin of each set over the samples, min_k min mᵢ(x_k, u_k, t_k)
     margins = {}
     for name, set_ in constraints.items():
-        margins[name] = least_margin(margin_function_of(set_), x, u, t)
+        least = least_margin(margin_function_of(set_), x, u, t)
+        margins[name] = float(least) if on_numpy else least
 
     return margins
 

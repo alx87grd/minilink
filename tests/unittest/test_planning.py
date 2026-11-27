@@ -2614,6 +2614,7 @@ def test_least_margins_names_the_limit_a_run_broke_and_agrees_with_the_evaluatio
 
     # The power broke, the box and the lane held: P = 3 v, v = 3 t, so P(1 s) = 9 W
     assert list(margins) == ["lane", "box", "power"]
+    assert all(type(m) is float for m in margins.values())
     assert margins["lane"] > 0.0 and margins["box"] == pytest.approx(1.0)
     assert margins["power"] == pytest.approx(0.3 - 9.0, abs=1e-6)
     assert min(margins.values()) == evaluation.feasibility_margin[0]
