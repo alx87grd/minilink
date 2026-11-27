@@ -21,7 +21,7 @@ PUBLIC_RACECAR_PARAMS = {
     "r_f": 0.05,  # [m]    front tire radius
     "r_r": 0.05,  # [m]    rear tire radius
     "gravity": 9.81,  # [m/s^2]
-    "h_cg": 0.06,  # [m]    CG above the floor, an estimate: the load transfer reads it
+    "h_cg": 0.06,  # [m]    CG above the floor, read by the load transfer
     # Aero and rolling resistance
     "rho": 1.2,  # [kg/m^3] air at room temperature
     "CdA": 0.03,  # [m^2]  frontal area at Cd ~ 1 for an open 1/10 body

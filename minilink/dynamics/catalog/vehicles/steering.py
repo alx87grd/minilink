@@ -19,7 +19,14 @@ from minilink.graphical.catalog.skins import car_skin_2d
 
 
 class KinematicBicycle(DynamicSystem):
-    """Kinematic bicycle model with speed and steering-angle inputs."""
+    """Kinematic bicycle model with speed and steering-angle inputs.
+
+    State ``[x, y, psi]``, inputs ``[speed, steering]``, outputs ``y`` and ``x`` (the
+    state). ``f`` is the no-slip model of the rear axle's centre, ``ẋ = v cos ψ``,
+    ``ẏ = v sin ψ``, ``ψ̇ = v tan δ / L``; ``tf`` draws ``(x, y)`` as the centre of
+    gravity, ``b`` ahead of the rear axle, as on the dynamic rungs. The drawing neglects
+    that point's sideslip ``β = atan(b tan δ / L)``, small at a small steer.
+    """
 
     def __init__(self):
         super().__init__(state_dim=3, input_dim=2, output_dim=3, expose_state=True)

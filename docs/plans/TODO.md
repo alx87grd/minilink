@@ -663,7 +663,13 @@ pillar names it.
   reads any non-box `U` as margin rows and its `bounding_box()` as bounds. The workbench's
   dynamic-supervisor prototype holds a local copy (`InputIntersection`, in
   `prototypes/dynamic_supervisor/minilink_proto/sets.py`) written as this mirror: move it here, then delete
-  the local one. Done when `car.input_box & a.as_input_set(...) & b.as_input_set(...)` builds a
+  the local one. **Once this branch is in `dev`,** the workbench's
+  `prototypes/dynamic_supervisor/minilink_proto/` can be deleted and the prototype import
+  minilink instead (`least_margins`, `OutputField`, `resample`, `from_waypoints`, `&` on its
+  input sets; `OffRoadBicycle` its numbers and look on `DrivetrainBicycle`, whose `ltr`, `h_cg`,
+  `track` and lifted body it then inherits; `OffRoadKinematicBicycle` keeps its own load
+  transfer). A scratch copy so ported ran every demo but the MPC lap to the original's last
+  digit. The switch is done on the workbench side, not from a minilink session. Done when `car.input_box & a.as_input_set(...) & b.as_input_set(...)` builds a
   `PlanningProblem` that `evaluate` and direct collocation accept, with a test beside
   `IntersectionSet`'s.
 

@@ -10,8 +10,7 @@ maintainer's private repository and build on the same pieces.
 (`UdeSRacecar`, `UdeSRacecarDyn`, `FormulaCar3D`, `OffRoadCar3D`) and their looks. How a car
 holds its parts' numbers is DESIGN §4, "Parameters"; the equations are each class's docstring.
 
-The open design questions of the built cars (the 3-D car's rear axle, the point the kinematic
-bicycle follows, the public face of the parts, three small points of the review) are in
+The open design questions of the built cars (the 3-D car's rear axle, the public face of the parts, three small points of the review) are in
 [QUESTIONS.md](../dev/QUESTIONS.md). The order of work is [TODO.md](TODO.md)'s.
 
 ## 1. The rules every new piece keeps
@@ -228,7 +227,7 @@ Taken by the agent during the build, each the recommended option; none is ruled.
 - **The default numbers are new and unvalidated:** `DrivetrainBicycle`'s (rung 3's car plus a
   drivetrain and a steering scaled from the racecar's: `P_max` 100 kW, `tau_sat` 2500 N m,
   `Jw_rear` 10 kg m², a slip floor of 0.5 m/s; the 3-D car's `h_cg` and track, held from
-  `DynamicBicycle` up, for the `ltr` output, the drawn track narrowing from 1.92 m to 1.6 m; the racecar preset's `h_cg` 0.06 m is an estimate), `SuspensionCar3D`'s (the same car plus a
+  `DynamicBicycle` up, for the `ltr` output, the drawn track narrowing from 1.92 m to 1.6 m; the racecar preset's `h_cg` 0.06 m, the maintainer's), `SuspensionCar3D`'s (the same car plus a
   track, `h_cg`, the roll and pitch inertias, a heave mode near 1.5 Hz at a damping ratio
   near 0.3), and the two presets' (`FORMULA_CAR_PARAMS`, `OFFROAD_CAR_PARAMS`).
 - **The skins of the two presets** are procedural cartoon meshes (no brand, no real vehicle).

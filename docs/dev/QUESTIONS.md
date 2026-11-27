@@ -68,24 +68,6 @@ settlement (PR #139) left, four questions on the car ladder, four on the archite
 - **Blocks:** the planar-controller-drives-the-3-D-car demo, and the presets' final numbers.
 - **Answer:**
 
-### Which point does the kinematic bicycle's `(x, y)` follow?
-- **Context:** `KinematicBicycle.f` writes `ẋ = v cos ψ`, `ψ̇ = v tan δ / L`, the equations of
-  the rear axle's centre. Its frames draw `(x, y)` as the centre of gravity, `b` ahead of the
-  rear axle, as on the dynamic rungs, where `(x, y)` is the centre of gravity. The ladder's
-  rule is that a state keeps its meaning from rung to rung. This predates the vehicle branch.
-- **Options:**
-  1. *The centre of gravity,* with the sideslip `β = atan(b tan δ / L)`:
-     `ẋ = v cos(ψ + β)`, `ψ̇ = v cos β tan δ / L`. The same point on every rung; one more line
-     in the first model a student reads, and the numbers of every kinematic demo move.
-  2. *The rear axle, drawn there:* `f` unchanged, the body frame's drawing moved back by `b`.
-     The simplest textbook model stays; `(x, y)` changes meaning between rungs 2 and 3, said
-     in both docstrings.
-  3. *Leave it,* and state the approximation in the docstring.
-- **Recommendation:** option 2: rung 2 is the no-slip lesson and its page should stay three
-  lines; the drawing and the docstring then tell the truth.
-- **Blocks:** nothing.
-- **Answer:**
-
 ### The public face of the car's parts
 - **Context:** the tires, the springs and the terrains are parts a car is built from. Three
   small inconsistencies, each a public name or call:
