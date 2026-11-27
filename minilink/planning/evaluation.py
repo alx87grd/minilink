@@ -288,9 +288,10 @@ def least_margins(constraints: dict, traj: Trajectory) -> dict:
     the least of these when the sets are the members of ``X`` and ``U``. On the
     trajectory's array module.
     """
-    run = traj.of("plant") if "plant" in traj.roles else traj
+    run = traj
     if "plant" in traj.roles:
         require_recorded_input(traj, "plant")
+        run = traj.of("plant")
 
     t = run.t
     x = run.x.T

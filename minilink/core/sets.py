@@ -542,20 +542,7 @@ class IntersectionSet(Set):
 
         Members whose boxes do not intersect make the set empty, which is refused.
         """
-        boxes = [
-            box
-            for box in (set_.bounding_box() for set_ in self.sets)
-            if box is not None
-        ]
-        if not boxes:
-            return None
-
-        # The boxes meet in max lowerᵢ ≤ z ≤ min upperᵢ
-        lower = np.max([box.lower for box in boxes], axis=0)
-        upper = np.min([box.upper for box in boxes], axis=0)
-        require_nonempty_intersection(lower, upper)
-
-        return BoxSet(lower, upper)
+        return boxes_meet(self.sets)
 
 
 class IntersectionInputSet(InputSet):
@@ -627,20 +614,7 @@ class IntersectionInputSet(InputSet):
 
         Members whose boxes do not intersect make the set empty, which is refused.
         """
-        boxes = [
-            box
-            for box in (set_.bounding_box() for set_ in self.sets)
-            if box is not None
-        ]
-        if not boxes:
-            return None
-
-        # The boxes meet in max lowerᵢ ≤ u ≤ min upperᵢ
-        lower = np.max([box.lower for box in boxes], axis=0)
-        upper = np.min([box.upper for box in boxes], axis=0)
-        require_nonempty_intersection(lower, upper)
-
-        return BoxSet(lower, upper)
+        return boxes_meet(self.sets)
 
 
 def is_finite_box(box) -> bool:
@@ -661,6 +635,20 @@ def has_finite_face(box) -> bool:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def boxes_meet(sets):
+    """The box the members' boxes meet in, ``max lowerᵢ ≤ z ≤ min upperᵢ``; ``None`` when no member has one."""
+    boxes = [box for box in (set_.bounding_box() for set_ in sets) if box is not None]
+    if not boxes:
+        return None
+
+    # The boxes meet in max lowerᵢ ≤ z ≤ min upperᵢ
+    lower = np.max([box.lower for box in boxes], axis=0)
+    upper = np.min([box.upper for box in boxes], axis=0)
+    require_nonempty_intersection(lower, upper)
+
+    return BoxSet(lower, upper)
 
 
 def require_member_size(z, bound, what):

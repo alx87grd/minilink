@@ -347,9 +347,9 @@ class OutputField(Field):
     An output function has the signature of a field, so a quantity a model
     publishes (a tire's used grip, a load transfer ratio, a speed) becomes a
     constraint or a cost in one line, the model the one home of its equations:
-    ``OutputField(car, "grip", "phi_r").as_input_set(upper=0.9)``. A port that
-    reads the input gives an input set (:meth:`~Field.as_input_set`); one that
-    reads the state alone (no direct feedthrough), a state set as well.
+    ``OutputField(car, "grip", "phi_r").as_set(upper=0.9)``. A port that reads the
+    state alone (no direct feedthrough) gives a state set (:meth:`~Field.as_set`);
+    one that reads the input, an input set at the state (:meth:`~Field.as_input_set`).
     ``params`` is the system's: the field moves with the model's numbers.
 
     Parameters

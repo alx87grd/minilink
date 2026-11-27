@@ -78,8 +78,9 @@ class DrivetrainBicycle(DynamicBicycle):
 
     ``LTR_x = 1`` lifts the front axle and ``-1`` the rear; ``LTR_y = +-1`` lifts one
     side. ``LTR_x`` holds the static share ``(a - b) / L`` of a centre of gravity off
-    the middle. The grip stays on the static loads, so under braking the front's used
-    grip is lower than the transferred load would make it. ``tf`` places the body frame
+    the middle. The grip is read on the static loads: under braking the front carries
+    more than its static load and the rear less, so the front's used grip reads high and
+    the rear's low (the reverse under drive). ``tf`` places the body frame
     at the centre of gravity, ``h_cg`` above the ground, where the 3-D looks expect it.
 
     Notes
