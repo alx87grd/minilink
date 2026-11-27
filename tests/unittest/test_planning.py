@@ -2665,6 +2665,20 @@ def test_an_output_field_reads_one_entry_of_a_port_and_moves_with_the_model():
     with pytest.raises(ValueError, match="out of range"):
         OutputField(car, "grip", 2)
 
+    # A port that reads the input is read with it: an input set, never a state set
+    from minilink.catalog import DynamicBicycle
+
+    bicycle = DynamicBicycle()
+    phi_r = OutputField(bicycle, "grip", "phi_r")
+    x_b = np.zeros(bicycle.n)
+    x_b[3] = 10.0
+    u_b = np.array([10.0 / bicycle.params["r_r"], 0.05])
+    assert phi_r.as_input_set(upper=0.9).margin(u_b, x_b) == pytest.approx(
+        0.9 - bicycle.grip(x_b, u_b)[1:]
+    )
+    with pytest.raises(ValueError, match="reads the input"):
+        phi_r.as_set(upper=0.9).margin(x_b)
+
 
 def test_a_field_has_four_conversions_and_a_gradient():
     from minilink.core.fields import Field

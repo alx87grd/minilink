@@ -372,6 +372,7 @@ class OutputField(Field):
         self.system = system
         self.port = port
         self.index = index_of(system.outputs[port], entry)
+        self.reads_input = system.outputs[port].dependencies != ()
 
     @property
     def dim(self) -> int:
@@ -383,6 +384,7 @@ class OutputField(Field):
 
         output = self.system.outputs[self.port].compute
         index = self.index
+        require_input_when_read(self, u)
 
         y = output(x, u, t, params)
         V = y[index]
@@ -1005,6 +1007,16 @@ def require_output_port(system, port):
         raise ValueError(
             f"{type(system).__name__} has no output port {port!r}; "
             f"its output ports: {', '.join(system.outputs)}"
+        )
+
+
+def require_input_when_read(field, u):
+    """Refuse to read a port that reads the input without one: its set is an input set."""
+    if field.reads_input and u is None:
+        raise ValueError(
+            f"output port {field.port!r} reads the input: read it with u, as an input set "
+            "(field.as_input_set(...)) or a running cost (field.as_cost(...)), not as a "
+            "state set or a terminal cost"
         )
 
 

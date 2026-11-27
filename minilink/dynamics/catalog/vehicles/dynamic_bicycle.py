@@ -55,8 +55,9 @@ class DynamicBicycle(DynamicSystem):
     (used fraction of each tire's friction ellipse, on the static axle loads), ``imu``
     (specific force at the centre of gravity and yaw rate) and ``ltr`` (the load
     transfer ratios ``LTR_x``, ``LTR_y`` of the rigid car, an output only: the planar
-    equations keep the static loads; see :class:`DrivetrainBicycle`). The wheel rate and the
-    steer are inputs on this rung, so every port but ``speed`` reads them.
+    equations keep the static loads; see :class:`DrivetrainBicycle`). The wheel rate and
+    the steer are inputs on this rung, so every port but ``speed`` reads them: a limit on
+    one is an input set.
     """
 
     params = held_params()
@@ -184,10 +185,10 @@ class DynamicBicycle(DynamicSystem):
 
         # Graphics: the 3-D four-wheel look (read by ``car_skin_3d`` / ``tf``). It
         # lives on the base plant, so the 3-D look is just ``skin = car_skin_3d``,
-        # and it does not affect the default 2-D centerline skin. A wide stance, a
-        # low body and a wide tub, a small gap between the body's underside and the
-        # tire crown, and larger tires (display only: the wheel centers use r_f / r_r);
-        # the track is ``params["track"]``
+        # and it does not affect the default 2-D centerline skin. A low body and a
+        # wide tub, a small gap between the body's underside and the tire crown, and
+        # larger tires (display only: the wheel centers use r_f / r_r); the track is
+        # ``params["track"]``
         self.body_height = 0.22
         self.body_width_ratio = 0.72
         self.body_length_overhang = 0.26
@@ -788,7 +789,8 @@ class BicycleDynRate(DynamicBicycle):
     (used fraction of each tire's friction ellipse, on the static axle loads), ``imu``
     (specific force at the centre of gravity and yaw rate) and ``ltr`` (the load
     transfer ratios ``LTR_x``, ``LTR_y`` of the rigid car, an output only: the planar
-    equations keep the static loads; see :class:`DrivetrainBicycle`). Each reads the state alone.
+    equations keep the static loads; see :class:`DrivetrainBicycle`). Each reads the state
+    alone.
     """
 
     def __init__(self, named_ports=False, tire=None, terrain=None):

@@ -905,7 +905,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `V(x, u, t) = y_port(x, u, t)[entry]` (the entry by label or by index), its `params` the
   system's: a quantity the model publishes becomes a constraint or a cost in one line,
   `OutputField(car, "grip", "phi_r").as_set(upper=0.9)` (a port that reads the input:
-  `as_input_set`), the model the one home of its equations.
+  `as_input_set`; read without `u`, as a state set or a terminal cost, it is refused), the
+  model the one home of its equations.
   `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
   `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
   the soft form of the constraint). The workspace fields subclass it (`planning/spatial/`).
