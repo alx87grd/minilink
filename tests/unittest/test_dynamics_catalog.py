@@ -348,7 +348,9 @@ class TestDynamicBicycle(unittest.TestCase):
         sys.camera_scale = 7.0
         frames = sys.tf(x, u, 0.0)
         camera = resolve_camera_from_hints(sys, frames, x, u, 0.0)
-        np.testing.assert_allclose(camera[:3, 3], np.array([11.0, 1.0, 0.5]))
+        # The camera follows the body frame, at the centre of gravity h_cg above the ground
+        h_cg = sys.params["h_cg"]
+        np.testing.assert_allclose(camera[:3, 3], np.array([11.0, 1.0, h_cg + 0.5]))
         x = np.array([0.1, -0.2, 0.3, 5.0, 0.4, 0.05])
         dx = sys.f(x, np.array([20.0, 0.1]))
         np.testing.assert_allclose(dx[:3], sys.N(x[:3]) @ x[3:])
