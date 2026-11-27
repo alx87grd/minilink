@@ -6,6 +6,7 @@ from minilink.core.geometry.paths import (
     circuit_waypoints,
     from_waypoints,
     is_closed,
+    resample,
 )
 from minilink.core.geometry.shapes import Box, Inflated, Shape, Sphere, Union
 
@@ -20,4 +21,5 @@ __all__ = [
     "circuit_waypoints",
     "from_waypoints",
     "is_closed",
+    "resample",
 ]

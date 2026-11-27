@@ -2151,6 +2151,20 @@ def test_jax_path_distance_matches():
     assert np.asarray(grad).shape == (2,)
 
 
+def test_jax_path_distance_has_a_gradient_on_the_path():
+    """On the path the distance is zero and its derivative zero, never NaN."""
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    for closed in (False, True):
+        path = PolylinePath([[0.0, 0.0], [10.0, 0.0], [10.0, 10.0]], closed=closed)
+        on_path = np.array(jax.grad(path.distance)(jnp.array([5.0, 0.0])))
+        off_path = np.array(jax.grad(path.distance)(jnp.array([5.0, 1.0])))
+
+        assert on_path == pytest.approx([0.0, 0.0], abs=0.0)
+        assert off_path == pytest.approx([0.0, 1.0], abs=1e-12)
+
+
 def test_plot_track_smoke():
     os.environ.setdefault("MPLBACKEND", "Agg")
     import matplotlib

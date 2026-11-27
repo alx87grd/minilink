@@ -11,6 +11,7 @@ from minilink.dynamics.catalog.vehicles.tires import (
     MagicFormulaTire,
     smooth_floor,
     tire_slip,
+    used_grip,
     wheel_slip,
 )
 
@@ -225,3 +226,19 @@ def test_a_tire_params_assignment_keeps_its_dict(law):
 
     assert tire.params is held
     assert held["mu"] == 0.7
+
+
+@pytest.mark.jax
+def test_the_used_grip_has_a_zero_gradient_at_zero_force():
+    """A tire that carries no force has a used grip of zero and a gradient of zero, never NaN."""
+    jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
+    jnp = jax.numpy
+    grip_of = jax.grad(lambda F: used_grip(F[0], F[1], FZ, MU))
+
+    at_rest = np.array(grip_of(jnp.zeros(2)))
+    loaded = np.array(grip_of(jnp.array([300.0, 400.0])))
+
+    assert float(used_grip(0.0, 0.0, FZ, MU)) == 0.0
+    assert at_rest == pytest.approx([0.0, 0.0], abs=0.0)
+    assert loaded == pytest.approx(np.array([0.6, 0.8]) / (MU * FZ), rel=1e-12)

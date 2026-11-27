@@ -4,7 +4,12 @@ import numpy as np
 import pytest
 
 from minilink.control import HeadingController, LineOfSight, PurePursuit, Stanley
-from minilink.core.geometry import circuit_waypoints, from_waypoints, is_closed
+from minilink.core.geometry import (
+    circuit_waypoints,
+    from_waypoints,
+    is_closed,
+    resample,
+)
 
 WHEELBASE = 0.34
 LOOKAHEAD = 0.6
@@ -75,6 +80,33 @@ def test_a_loop_is_read_as_closed_and_a_line_as_open():
     assert is_closed(line) is False
     assert from_waypoints(circuit_waypoints()).closed is False
     assert from_waypoints(circuit_waypoints(), closed=True).closed is True
+
+
+def test_a_resampled_line_keeps_its_ends_and_steps_evenly():
+    """An open polyline: both ends kept, equal steps near the spacing, the same curve."""
+    corner = np.array([[0.0, 0.0], [3.0, 0.0], [3.0, 4.0]])
+
+    waypoints = resample(corner, 0.45)
+    steps = np.linalg.norm(np.diff(waypoints, axis=0), axis=1)
+    path = from_waypoints(corner)
+
+    assert waypoints[0] == pytest.approx(corner[0], abs=0.0)
+    assert waypoints[-1] == pytest.approx(corner[-1], abs=0.0)
+    assert len(steps) == round(7.0 / 0.45)
+    assert steps.max() == pytest.approx(7.0 / len(steps), rel=1e-12)
+    assert max(path.distance(w) for w in waypoints) < 1e-12
+
+
+def test_a_resampled_loop_goes_once_round_without_repeating_its_start():
+    """A closed polyline: the closing step is one step like the others, the start not repeated."""
+    square = np.array([[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]])
+
+    waypoints = resample(square, 0.5, closed=True)
+    steps = np.linalg.norm(np.diff(waypoints, axis=0, append=waypoints[:1]), axis=1)
+
+    assert len(waypoints) == 16
+    assert steps == pytest.approx(np.full(16, 0.5), rel=1e-12)
+    assert is_closed(waypoints) is True
 
 
 def test_a_path_needs_at_least_two_points():

@@ -1931,7 +1931,10 @@ leaves of the tree of every set and cost built from it, under `"scene"` in the f
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`; `closed=True` adds the
 segment back to the first waypoint and wraps the arc length round the loop, a structural
 switch held on the path, not in its `params`; `path.at(s)` is the point at arc length `s`,
-`path.tangent(s)` its unit tangent), wrapped in
+`path.tangent(s)` its unit tangent; the distance has a zero derivative on the path itself,
+the guarded norm of `core/backends.py`, so a run that starts on its line has a gradient;
+`resample(waypoints, spacing, closed=)` evens the waypoints' arc-length spacing, the one
+`circuit_waypoints` takes), wrapped in
 `ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
 `distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
 `corridor_field(body).as_set(lower=0)` for a hard tube. Probe semantics match

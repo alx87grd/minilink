@@ -10,6 +10,7 @@ from minilink.core.backends import (
     COMPILE_BACKENDS,
     SIMULATOR_BACKENDS,
     TRANSCRIPTION_BACKENDS,
+    guarded_norm,
     normalize_backend,
     require_jax_numpy,
 )
@@ -397,3 +398,28 @@ def test_the_core_printer_loads_no_tool_band():
         "print(sorted(m for m in sys.modules if m.startswith(bands)))"
     )
     assert _run_fresh_python(probe, {}) == "[]"
+
+
+def test_the_guarded_norm_is_the_norm():
+    """Its value is the Euclidean norm along the axis, zero included."""
+    import numpy as np
+
+    v = np.array([[3.0, 4.0], [0.0, 0.0], [-1.0, 2.0]])
+
+    assert np.array_equal(guarded_norm(v, axis=-1), np.linalg.norm(v, axis=-1))
+    assert np.array_equal(guarded_norm(v.T, axis=0), np.linalg.norm(v, axis=-1))
+
+
+@pytest.mark.jax
+def test_the_guarded_norm_has_a_zero_gradient_at_the_origin():
+    """Zero, a subgradient of the norm at ``v = 0``, where the plain norm gives NaN."""
+    import numpy as np
+
+    jax = pytest.importorskip("jax")
+    jnp = require_jax_numpy()
+
+    at_origin = np.array(jax.grad(guarded_norm)(jnp.zeros(2)))
+    away = np.array(jax.grad(guarded_norm)(jnp.array([3.0, 4.0])))
+
+    assert at_origin == pytest.approx([0.0, 0.0], abs=0.0)
+    assert away == pytest.approx([0.6, 0.8], rel=1e-12)

@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from minilink.core.backends import array_module
+from minilink.core.backends import array_module, guarded_norm
 from minilink.core.params import own_params, param_view
 
 ###############################################################################
@@ -116,8 +116,8 @@ class PolylinePath(ReferencePath):
         tau = xp.clip(xp.sum(ap * ab, axis=-1) / xp.maximum(denom, 1e-12), 0.0, 1.0)
         closest = a + ab * tau[:, xp.newaxis]
 
-        # d(p) = minᵢ |p − cᵢ|
-        dist = xp.linalg.norm(p - closest, axis=-1)
+        # d(p) = minᵢ |p − cᵢ|, its derivative zero on the path itself
+        dist = guarded_norm(p - closest, axis=-1)
         d = xp.min(dist)
 
         return d
@@ -259,20 +259,57 @@ def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
         y = cy + radius * np.sin(angles)
         corners.append(np.column_stack([x, y]))
 
-    # The closed loop: the arcs, joined by the straights, back to the first point
-    loop = np.vstack([np.vstack(corners), np.vstack(corners)[:1]])
-
-    # Constant spacing: walk the closed polyline by arc length, and stretch the step so
-    # that a whole number of them goes around (the closing gap is then one step too)
-    steps = np.linalg.norm(np.diff(loop, axis=0), axis=1)
-    s = np.concatenate([[0.0], np.cumsum(steps)])
-    n_samples = max(int(round(s[-1] / spacing)), 8)
-    s_uniform = np.linspace(0.0, s[-1], n_samples, endpoint=False)
-    x_uniform = np.interp(s_uniform, s, loop[:, 0])
-    y_uniform = np.interp(s_uniform, s, loop[:, 1])
-    waypoints = np.column_stack([x_uniform, y_uniform])
+    # The closed loop, the arcs joined by the straights, at a constant spacing
+    loop = np.vstack(corners)
+    waypoints = resample(loop, spacing, closed=True)
 
     return waypoints
+
+
+def resample(waypoints, spacing, *, closed=False):
+    """The polyline through ``waypoints`` at equal arc-length steps of about ``spacing``.
+
+    The step is stretched so that a whole number of them covers the polyline: an open
+    one keeps both its ends (at least one step), a closed one goes once round its loop
+    and, as a closed path is written, does not repeat its first point (at least three
+    points). Only the points' spacing changes, not the curve they trace.
+
+    Parameters
+    ----------
+    waypoints : array_like, shape (N, d)
+        The polyline's vertices, ``N >= 2``; a closed loop does not repeat its first point.
+    spacing : float
+        The wished distance between consecutive points, in the waypoints' units.
+    closed : bool
+        Whether the polyline loops back to its first point.
+
+    Returns
+    -------
+    waypoints : array of shape (M, d)
+    """
+    wp = np.asarray(waypoints, dtype=float)
+    require_polyline(wp)
+
+    verts = vertices_of(wp, closed, np)
+    n_dims = wp.shape[1]
+
+    # The arc length at each vertex, s₀ = 0, s_{i+1} = sᵢ + |w_{i+1} − wᵢ|
+    _, s = arc_lengths(verts, np)
+    length = s[-1]
+
+    # n equal steps of length / n ≈ spacing: n + 1 points on a line, n round a loop
+    if closed:
+        n_steps = max(int(round(length / spacing)), 3)
+        s_even = np.linspace(0.0, length, n_steps, endpoint=False)
+    else:
+        n_steps = max(int(round(length / spacing)), 1)
+        s_even = np.linspace(0.0, length, n_steps + 1)
+
+    # w(s) by linear interpolation between the vertices, axis by axis
+    columns = [np.interp(s_even, s, verts[:, k]) for k in range(n_dims)]
+    resampled = np.column_stack(columns)
+
+    return resampled
 
 
 def is_closed(waypoints):

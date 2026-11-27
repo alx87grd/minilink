@@ -1,4 +1,4 @@
-"""NumPy/JAX backend policy: the backend strings, ``array_module``, and the lazy JAX imports."""
+"""NumPy/JAX backend policy: the backend strings, ``array_module``, the guarded norm, and the lazy JAX imports."""
 
 from __future__ import annotations
 
@@ -112,6 +112,25 @@ def array_module(*values) -> types.ModuleType:
             return jnp
 
     return np
+
+
+def guarded_norm(v, axis=-1):
+    """``|v| = √(Σ vᵢ²)`` along ``axis``, its derivative taken as zero at ``v = 0``.
+
+    The Euclidean norm has no derivative at ``v = 0``, and autodiff gives NaN there
+    (``0 / 0``). A distance, a speed or a used grip that reaches zero, and every
+    minimum over the samples of a run that holds that zero, then has a NaN gradient.
+    Zero is a subgradient of the norm at the origin, so it is taken there; the value
+    is the norm everywhere.
+    """
+    xp = array_module(v)
+
+    # |v|² = Σ vᵢ²; the inner where keeps √ off zero, so no 0 · ∞ reaches the gradient
+    v_sq = xp.sum(v**2, axis=axis)
+    v_sq_safe = xp.where(v_sq > 0.0, v_sq, 1.0)
+    norm = xp.where(v_sq > 0.0, xp.sqrt(v_sq_safe), 0.0)
+
+    return norm
 
 
 # The lazy JAX imports

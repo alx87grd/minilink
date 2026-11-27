@@ -2,7 +2,7 @@
 
 import copy
 
-from minilink.core.backends import array_module
+from minilink.core.backends import array_module, guarded_norm
 from minilink.core.params import own_params
 
 #: The floor of the slip demand: keeps √(s_x² + s_y²) differentiable at zero slip
@@ -301,11 +301,11 @@ def wheel_slip(vx, vy, w, R, v_min_epsilon):
 
 
 def used_grip(Fx, Fy, Fz, mu):
-    """Used fraction ``phi`` of the friction ellipse [-]: ``1`` means the tire slides."""
+    """Used fraction ``phi`` of the friction ellipse [-]: ``1`` means the tire slides; its derivative at zero force is zero."""
     xp = array_module(Fx, Fy, Fz)
 
     # φ = √(Fx² + Fy²) / (μ Fz), the radius in the normalized force plane
-    phi = xp.sqrt(Fx**2 + Fy**2) / (mu * Fz)
+    phi = guarded_norm(xp.stack([Fx, Fy]), axis=0) / (mu * Fz)
 
     return phi
 
