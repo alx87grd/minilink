@@ -562,13 +562,17 @@ The car models form a ladder (`dynamics/catalog/vehicles/`):
   - **One input layout.** Every car takes one stacked `u`; `named_ports=True` gives the named
     ports.
   - **One state output.** Every bicycle gives its state on `y` and on `x` (the port a state
-    feedback reads), both labeled as the state, so `lqr(...) @ car` wires on each rung. The
-    drivetrain bicycle adds `speed`, `slip`, `grip`, `imu`, `power` and `ltr`, the rigid car's
-    load transfer ratios `LTR_x`, `LTR_y` from its specific force; each reads the state alone,
-    so a limit on one is a state set (`OutputField(car, "ltr", "LTR_y").as_set(lower=-0.8,
-    upper=0.8)`). The planar equations keep the static axle loads: `h_cg` and `track`, in
-    `params`, enter `ltr` and the look only, and `tf` places the body frame at the centre of
-    gravity, `h_cg` above the ground, where every car look expects it. A model that differs by its numbers is a preset class with no equations
+    feedback reads), both labeled as the state, so `lqr(...) @ car` wires on each rung. Every
+    dynamic rung (`DynamicBicycle`, `BicycleDynRate`, `DrivetrainBicycle`) adds `speed`, `slip`,
+    `grip`, `imu` and `ltr`, the rigid car's load transfer ratios `LTR_x`, `LTR_y` from its
+    specific force, each coded in the rung's own class from its own equations; the drivetrain
+    bicycle adds `power`. Where the wheel rate and the steer are states, a port reads the
+    state alone and a limit on it is a state set (`OutputField(car, "ltr", "LTR_y").as_set(
+    lower=-0.8, upper=0.8)`); on `DynamicBicycle`, where they are inputs, the ports read `u`
+    and a limit is an input set (`as_input_set`). The planar equations keep the static axle
+    loads: `h_cg` and `track`, in `params`, enter `ltr` and the look only, and `tf` places the
+    body frame at the centre of gravity, `h_cg` above the ground, where every car look
+    expects it. A model that differs by its numbers is a preset class with no equations
     (`UdeSRacecar`, `UdeSRacecarDyn`, `FormulaCar3D`, `OffRoadCar3D`); one that differs by its
     look is a skin.
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,

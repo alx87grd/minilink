@@ -24,7 +24,7 @@ bicycle follows, the public face of the parts, three small points of the review)
 | Parts | a tire, a terrain and a spring own their numbers, held by the car at `params["tire"][wheel]`, `params["terrain"]`, `params["suspension"][wheel]`; the car's own numbers stay flat, one suffix per axle, left and right symmetric |
 | Tire laws | linear in the load, `F = Fz · φ(κ, α)`, with stiffnesses per unit load; `Fz` is an argument, never computed inside the law; the car calls the tire's slip at one place |
 | Friction | two owners, multiplied: the tire's `mu` and the terrain's `friction(x, y, t)` |
-| Load transfer | never in the single track's equations (the bicycles keep static axle loads; the drivetrain bicycle reports the rigid car's ratios as its `ltr` output, fed back nowhere); on the double track only, always an exact continuous model, never a lag on the acceleration |
+| Load transfer | never in the single track's equations (the bicycles keep static axle loads; each dynamic rung reports the rigid car's ratios as its `ltr` output, fed back nowhere); on the double track only, always an exact continuous model, never a lag on the acceleration |
 | Equations | on each plant's own page (RULES 7.8); the rungs share only the generic blocks of `tires.py` and `terrain.py` |
 | Project folders | `examples/projects/car_trajopt/` and `pathtracking/` are read only |
 
@@ -227,8 +227,8 @@ Taken by the agent during the build, each the recommended option; none is ruled.
   constructor option.
 - **The default numbers are new and unvalidated:** `DrivetrainBicycle`'s (rung 3's car plus a
   drivetrain and a steering scaled from the racecar's: `P_max` 100 kW, `tau_sat` 2500 N m,
-  `Jw_rear` 10 kg m², a slip floor of 0.5 m/s, and the 3-D car's `h_cg` and track for its
-  `ltr` output; the racecar preset's `h_cg` 0.06 m is an estimate), `SuspensionCar3D`'s (the same car plus a
+  `Jw_rear` 10 kg m², a slip floor of 0.5 m/s; the 3-D car's `h_cg` and track, held from
+  `DynamicBicycle` up, for the `ltr` output, the drawn track narrowing from 1.92 m to 1.6 m; the racecar preset's `h_cg` 0.06 m is an estimate), `SuspensionCar3D`'s (the same car plus a
   track, `h_cg`, the roll and pitch inertias, a heave mode near 1.5 Hz at a damping ratio
   near 0.3), and the two presets' (`FORMULA_CAR_PARAMS`, `OFFROAD_CAR_PARAMS`).
 - **The skins of the two presets** are procedural cartoon meshes (no brand, no real vehicle).

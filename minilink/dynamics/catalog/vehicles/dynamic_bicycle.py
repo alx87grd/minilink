@@ -47,6 +47,16 @@ class DynamicBicycle(DynamicSystem):
     ------
     w_rear : rear wheel angular rate [rad/s]
     delta  : front steer angle [rad]
+
+    Outputs
+    -------
+    ``y`` and ``x`` (the full state: the measurement, and the state a state feedback
+    reads), ``speed`` [m/s], ``slip`` (``kappa_r``, ``alpha_f``, ``alpha_r``), ``grip``
+    (used fraction of each tire's friction ellipse, on the static axle loads), ``imu``
+    (specific force at the centre of gravity and yaw rate) and ``ltr`` (the load
+    transfer ratios ``LTR_x``, ``LTR_y`` of the rigid car, an output only: the planar
+    equations keep the static loads; see :class:`DrivetrainBicycle`). The wheel rate and the
+    steer are inputs on this rung, so every port but ``speed`` reads them.
     """
 
     params = held_params()
@@ -78,6 +88,10 @@ class DynamicBicycle(DynamicSystem):
                 "Ck": 100000.0,
                 "mu": 1.0,
                 "v_min_epsilon": 0.1,
+                # Body above the road: the load transfer and the 3-D look read it, the
+                # planar equations do not
+                "h_cg": 0.55,  # [m] height of the centre of gravity
+                "track": 1.6,  # [m] distance between the left and right wheels
             }
         )
 
@@ -122,6 +136,39 @@ class DynamicBicycle(DynamicSystem):
             )
         self.add_output_port("y", dim=6, function=self.h, dependencies=())
         self.add_output_port("x", dim=6, function=self.compute_state)
+        self.add_output_port("speed", function=self.speed, labels=["vx"], units=["m/s"])
+        self.add_output_port(
+            "slip",
+            dim=3,
+            function=self.slips,
+            labels=["kappa_r", "alpha_f", "alpha_r"],
+            units=["-", "rad", "rad"],
+            dependencies="all",
+        )
+        self.add_output_port(
+            "grip",
+            dim=2,
+            function=self.grip,
+            labels=["phi_f", "phi_r"],
+            units=["-", "-"],
+            dependencies="all",
+        )
+        self.add_output_port(
+            "imu",
+            dim=3,
+            function=self.imu,
+            labels=["a_x", "a_y", "yaw_rate"],
+            units=["m/s^2", "m/s^2", "rad/s"],
+            dependencies="all",
+        )
+        self.add_output_port(
+            "ltr",
+            dim=2,
+            function=self.ltr,
+            labels=["LTR_x", "LTR_y"],
+            units=["-", "-"],
+            dependencies="all",
+        )
 
         # Signal labels and units
         self.state.labels = ["x", "y", "psi", "vx", "vy", "yaw_rate"]
@@ -139,8 +186,8 @@ class DynamicBicycle(DynamicSystem):
         # lives on the base plant, so the 3-D look is just ``skin = car_skin_3d``,
         # and it does not affect the default 2-D centerline skin. A wide stance, a
         # low body and a wide tub, a small gap between the body's underside and the
-        # tire crown, and larger tires (display only: the wheel centers use r_f / r_r)
-        self.track = 1.92
+        # tire crown, and larger tires (display only: the wheel centers use r_f / r_r);
+        # the track is ``params["track"]``
         self.body_height = 0.22
         self.body_width_ratio = 0.72
         self.body_length_overhang = 0.26
@@ -168,6 +215,15 @@ class DynamicBicycle(DynamicSystem):
     def solver_info(self, value: dict):
         self.own_solver_info = dict(value)
 
+    @property
+    def track(self) -> float:
+        """The track [m], a view of ``params["track"]``: the load transfer's and the drawn wheels'."""
+        return self.params["track"]
+
+    @track.setter
+    def track(self, value: float):
+        self.params["track"] = value
+
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x, u)
@@ -190,6 +246,114 @@ class DynamicBicycle(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x
+
+    def speed(self, x, u, t=0.0, params=None):
+        speed = x[3:4]
+
+        return speed
+
+    def slips(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        tire_f = self.tire["f"]
+        tire_r = self.tire["r"]
+        p_f, p_r = self.tire_params(params)
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+
+        v_body = x[3:6]
+        u_in = xp.asarray(u)  # The wheel rate and the steer, the inputs
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
+            v_body, u_in, params
+        )
+
+        # The rear slip ratio and the two slip angles
+        _, alpha_f = tire_f.slip(vx_f, vy_f, w_f, r_f, p_f)
+        kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, r_r, p_r)
+        slip = xp.stack([kappa_r, alpha_f, alpha_r])
+
+        return slip
+
+    def grip(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        tire_f = self.tire["f"]
+        tire_r = self.tire["r"]
+        p_f, p_r = self.tire_params(params)
+        mass = params["mass"]
+        gravity = params["gravity"]
+        a = params["a"]
+        b = params["b"]
+
+        q = x[0:3]
+        v_body = x[3:6]
+        u_in = xp.asarray(u)
+        friction_f, friction_r = self.contact_friction(q, params, t)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q, t)
+
+        # Static axle loads
+        Fz_f = mass * gravity * b / (a + b)
+        Fz_r = mass * gravity * a / (a + b)
+
+        # The used fraction of each tire's friction ellipse
+        phi_f = tire_f.friction_use(Fx_f, Fy_f, Fz_f, friction_f, p_f)
+        phi_r = tire_r.friction_use(Fx_r, Fy_r, Fz_r, friction_r, p_r)
+        grip = xp.stack([phi_f, phi_r])
+
+        return grip
+
+    def imu(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        mass = params["mass"]
+        rho = params["rho"]
+        CdA = params["CdA"]
+
+        vx = x[3]
+        yaw_rate = x[5]
+        delta = u[1]
+        q = x[0:3]
+        v_body = x[3:6]
+        u_in = xp.asarray(u)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q, t)
+        c_d = xp.cos(delta)
+        s_d = xp.sin(delta)
+
+        # Specific force at the centre of gravity: the contact and aero forces over the
+        # mass, with the drag ½ ρ CdA vx |vx|
+        F_aero = 0.5 * rho * CdA * vx * xp.abs(vx)
+        a_x = (Fx_r + Fx_f * c_d - Fy_f * s_d - F_aero) / mass
+        a_y = (Fy_r + Fx_f * s_d + Fy_f * c_d) / mass
+        imu = xp.stack([a_x, a_y, yaw_rate])
+
+        return imu
+
+    def ltr(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        a = params["a"]
+        b = params["b"]
+        h_cg = params["h_cg"]
+        track = params["track"]
+        g = params["gravity"]
+
+        imu = self.imu(x, u, t, params)
+        a_x = imu[0]
+        a_y = imu[1]
+        L = a + b
+
+        # LTR_x = (Fz_r − Fz_f) / (m g): the static share, plus the transfer of a_x
+        ltr_x = (a - b) / L + 2.0 * h_cg * a_x / (g * L)
+
+        # LTR_y = (Fz_right − Fz_left) / (m g), positive in a left turn
+        ltr_y = 2.0 * h_cg * a_y / (track * g)
+        ltr = xp.stack([ltr_x, ltr_y])
+
+        return ltr
 
     def M(self, q, params=None):
         params = self.params if params is None else params
@@ -434,7 +598,8 @@ class DynamicBicycle(DynamicSystem):
 
         a = params["a"]
         r_f = params["r_f"]
-        tr = self.track
+        h_cg = params["h_cg"]
+        tr = params["track"]
 
         delta = self.wheel_rate_and_steer(x, u)[1]
         # The body frame: 2-D chassis, 3-D body box, rear wheels, contact arrows
@@ -449,7 +614,16 @@ class DynamicBicycle(DynamicSystem):
         T_fl = T_wb @ translation(a, 0.5 * tr, r_f) @ R_steer
         T_fr = T_wb @ translation(a, -0.5 * tr, r_f) @ R_steer
 
-        return {"body": T_wb, "axle_front": T_front, "wheel_fl": T_fl, "wheel_fr": T_fr}
+        # The body frame at the centre of gravity, h_cg above the ground, where the
+        # car looks expect it
+        T_body = T_wb @ translation(0.0, 0.0, h_cg)
+
+        return {
+            "body": T_body,
+            "axle_front": T_front,
+            "wheel_fl": T_fl,
+            "wheel_fr": T_fr,
+        }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """2-D centerline look: one velocity and one force arrow per axle."""
@@ -606,6 +780,15 @@ class BicycleDynRate(DynamicBicycle):
     for a ``w_rear_dot`` and a ``delta_dot`` port. ``Jw_rear`` / ``bw_rear``
     feed :meth:`inverse_propulsion_dynamics`. ``tire`` as on
     :class:`DynamicBicycle`.
+
+    Outputs
+    -------
+    ``y`` and ``x`` (the full state: the measurement, and the state a state feedback
+    reads), ``speed`` [m/s], ``slip`` (``kappa_r``, ``alpha_f``, ``alpha_r``), ``grip``
+    (used fraction of each tire's friction ellipse, on the static axle loads), ``imu``
+    (specific force at the centre of gravity and yaw rate) and ``ltr`` (the load
+    transfer ratios ``LTR_x``, ``LTR_y`` of the rigid car, an output only: the planar
+    equations keep the static loads; see :class:`DrivetrainBicycle`). Each reads the state alone.
     """
 
     def __init__(self, named_ports=False, tire=None, terrain=None):
@@ -644,6 +827,35 @@ class BicycleDynRate(DynamicBicycle):
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
         self.add_output_port("x", dim=self.n, function=self.compute_state)
+        self.add_output_port("speed", function=self.speed, labels=["vx"], units=["m/s"])
+        self.add_output_port(
+            "slip",
+            dim=3,
+            function=self.slips,
+            labels=["kappa_r", "alpha_f", "alpha_r"],
+            units=["-", "rad", "rad"],
+        )
+        self.add_output_port(
+            "grip",
+            dim=2,
+            function=self.grip,
+            labels=["phi_f", "phi_r"],
+            units=["-", "-"],
+        )
+        self.add_output_port(
+            "imu",
+            dim=3,
+            function=self.imu,
+            labels=["a_x", "a_y", "yaw_rate"],
+            units=["m/s^2", "m/s^2", "rad/s"],
+        )
+        self.add_output_port(
+            "ltr",
+            dim=2,
+            function=self.ltr,
+            labels=["LTR_x", "LTR_y"],
+            units=["-", "-"],
+        )
 
         # Signal labels and units
         self.state.labels = [
@@ -683,6 +895,114 @@ class BicycleDynRate(DynamicBicycle):
         dx = xp.concatenate([dq, dv, rates])
 
         return dx
+
+    def speed(self, x, u, t=0.0, params=None):
+        speed = x[3:4]
+
+        return speed
+
+    def slips(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        tire_f = self.tire["f"]
+        tire_r = self.tire["r"]
+        p_f, p_r = self.tire_params(params)
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+
+        v_body = x[3:6]
+        u_in = x[6:8]  # The wheel rate and the steer, states
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
+            v_body, u_in, params
+        )
+
+        # The rear slip ratio and the two slip angles
+        _, alpha_f = tire_f.slip(vx_f, vy_f, w_f, r_f, p_f)
+        kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, r_r, p_r)
+        slip = xp.stack([kappa_r, alpha_f, alpha_r])
+
+        return slip
+
+    def grip(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        tire_f = self.tire["f"]
+        tire_r = self.tire["r"]
+        p_f, p_r = self.tire_params(params)
+        mass = params["mass"]
+        gravity = params["gravity"]
+        a = params["a"]
+        b = params["b"]
+
+        q = x[0:3]
+        v_body = x[3:6]
+        u_in = x[6:8]
+        friction_f, friction_r = self.contact_friction(q, params, t)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q, t)
+
+        # Static axle loads
+        Fz_f = mass * gravity * b / (a + b)
+        Fz_r = mass * gravity * a / (a + b)
+
+        # The used fraction of each tire's friction ellipse
+        phi_f = tire_f.friction_use(Fx_f, Fy_f, Fz_f, friction_f, p_f)
+        phi_r = tire_r.friction_use(Fx_r, Fy_r, Fz_r, friction_r, p_r)
+        grip = xp.stack([phi_f, phi_r])
+
+        return grip
+
+    def imu(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        mass = params["mass"]
+        rho = params["rho"]
+        CdA = params["CdA"]
+
+        vx = x[3]
+        yaw_rate = x[5]
+        delta = x[7]
+        q = x[0:3]
+        v_body = x[3:6]
+        u_in = x[6:8]
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q, t)
+        c_d = xp.cos(delta)
+        s_d = xp.sin(delta)
+
+        # Specific force at the centre of gravity: the contact and aero forces over the
+        # mass, with the drag ½ ρ CdA vx |vx|
+        F_aero = 0.5 * rho * CdA * vx * xp.abs(vx)
+        a_x = (Fx_r + Fx_f * c_d - Fy_f * s_d - F_aero) / mass
+        a_y = (Fy_r + Fx_f * s_d + Fy_f * c_d) / mass
+        imu = xp.stack([a_x, a_y, yaw_rate])
+
+        return imu
+
+    def ltr(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x, u)
+
+        a = params["a"]
+        b = params["b"]
+        h_cg = params["h_cg"]
+        track = params["track"]
+        g = params["gravity"]
+
+        imu = self.imu(x, u, t, params)
+        a_x = imu[0]
+        a_y = imu[1]
+        L = a + b
+
+        # LTR_x = (Fz_r − Fz_f) / (m g): the static share, plus the transfer of a_x
+        ltr_x = (a - b) / L + 2.0 * h_cg * a_x / (g * L)
+
+        # LTR_y = (Fz_right − Fz_left) / (m g), positive in a left turn
+        ltr_y = 2.0 * h_cg * a_y / (track * g)
+        ltr = xp.stack([ltr_x, ltr_y])
+
+        return ltr
 
     def inverse_propulsion_dynamics(self, x, u, t=0.0, params=None):
         """Rear motor torque [Nm] that produces the commanded ``w_rear_dot``.

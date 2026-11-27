@@ -254,6 +254,63 @@ def test_every_bicycle_gives_its_state_on_x_and_closes_a_state_feedback(make):
     assert closed_loop.n == car.n
 
 
+DYNAMIC_RUNGS = [DynamicBicycle, BicycleDynRate, DrivetrainBicycle]
+
+
+def rung_point(car, rng):
+    """A state and an input of the rung at cruise, its rear wheel near rolling."""
+    x = rng.normal(0.0, 1.0, car.n)
+    x[3] += 8.0
+    u = rng.normal(0.0, 1.0, car.m) * np.where(np.arange(car.m) == 0, 10.0, 0.1)
+    rolling = x[3] / car.params["r_r"] * (1.0 + 0.05 * rng.normal())
+    if car.n >= 8:
+        x[6] = rolling
+    else:
+        u[0] = rolling
+
+    return x, u
+
+
+@pytest.mark.parametrize("make", DYNAMIC_RUNGS, ids=lambda make: make.__name__)
+def test_every_dynamic_rung_publishes_its_physics(make):
+    """``speed``, ``slip``, ``grip``, ``imu`` and ``ltr`` on each rung, its ``imu`` its own ``v̇ + ω × v``."""
+    car = make()
+    rng = np.random.default_rng(1)
+
+    assert {"speed", "slip", "grip", "imu", "ltr"} <= set(car.outputs)
+    assert car.outputs["grip"].labels == ["phi_f", "phi_r"]
+    assert car.outputs["ltr"].labels == ["LTR_x", "LTR_y"]
+
+    for _ in range(10):
+        x, u = rung_point(car, rng)
+        dx = car.f(x, u)
+        vx, vy, r = x[3:6]
+
+        # The specific force at the centre of gravity is the body's: a = v̇ + ω × v
+        specific_force = np.array([dx[3] - r * vy, dx[4] + r * vx])
+        assert car.imu(x, u)[:2] == pytest.approx(specific_force, abs=1e-9)
+        assert car.speed(x, u) == pytest.approx([vx])
+        assert np.all(car.grip(x, u) >= 0.0)
+
+
+def test_the_ports_read_the_input_only_where_the_wheel_rate_and_steer_are_inputs():
+    """On the dynamic bicycle they are inputs: its ports move with ``u``; above it, they are states."""
+    rng = np.random.default_rng(2)
+    for make in DYNAMIC_RUNGS:
+        car = make()
+        x, u = rung_point(car, rng)
+        moved = u + np.array([5.0, 0.1])
+        reads_u = make is DynamicBicycle
+
+        for port in ("slip", "grip", "imu", "ltr"):
+            compute = car.outputs[port].compute
+            changed = not np.allclose(
+                compute(x, u, 0.0, None), compute(x, moved, 0.0, None)
+            )
+            assert changed == reads_u, (make.__name__, port)
+            assert (car.outputs[port].dependencies == "all") == reads_u
+
+
 def test_the_load_transfer_ratios_of_the_rigid_car():
     """``LTR_x`` the static share at rest, ``LTR_y`` the lateral transfer, one side lifting at ``a_y = g T / (2 h)``."""
     car = DrivetrainBicycle()
@@ -359,6 +416,26 @@ def test_numpy_and_jax_agree_on_the_equations_and_the_ports():
     )
 
     assert on_jax == pytest.approx(on_numpy, rel=1e-6, abs=1e-9)
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("make", DYNAMIC_RUNGS, ids=lambda make: make.__name__)
+def test_the_rungs_ports_agree_on_jax_and_have_a_gradient_at_rest(make):
+    """One equation path, two backends; the grip's gradient finite on a car at rest."""
+    jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
+    jnp = jax.numpy
+    car = make()
+    x, u = rung_point(car, np.random.default_rng(3))
+
+    for port in ("speed", "slip", "grip", "imu", "ltr"):
+        compute = car.outputs[port].compute
+        on_numpy = np.asarray(compute(x, u, 0.0, None))
+        on_jax = np.asarray(compute(jnp.asarray(x), jnp.asarray(u), 0.0, None))
+        assert on_jax == pytest.approx(on_numpy, rel=1e-9, abs=1e-12), port
+
+    grip_of = jax.jacfwd(lambda z: car.grip(z, jnp.zeros(car.m)))
+    assert np.all(np.isfinite(np.asarray(grip_of(jnp.zeros(car.n)))))
 
 
 @pytest.mark.jax

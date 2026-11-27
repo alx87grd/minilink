@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.kinematics import translation
 from minilink.core.signals import VectorSignal
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.dynamics.catalog.vehicles.tires import BrushTire, smooth_sign
@@ -89,7 +88,8 @@ class DrivetrainBicycle(DynamicBicycle):
     inertia, geometry and drag, its ``Ca`` and ``Ck`` over the static loads), with a
     100 kW drive, a road-car steering servo, a rear axle of 10 kg m^2 and a slip
     floor of 0.5 m/s, so a fixed-step run takes about 1 ms steps (:meth:`fastest_mode`).
-    Its track and the height of its centre of gravity are the 3-D car's, 1.6 m and 0.55 m.
+    Its track and the height of its centre of gravity, :class:`DynamicBicycle`'s, are the
+    3-D car's, 1.6 m and 0.55 m.
     """
 
     def __init__(self, named_ports=False, tire=None, wheel_angles=False, terrain=None):
@@ -117,10 +117,6 @@ class DrivetrainBicycle(DynamicBicycle):
             "bw_drive": 0.1,  # [N m s] viscous drag of the drivetrain
             "bw_rear": 0.0,  # [N m s] the base class's own wheel drag: f() adds bw_drive
             "tau_fric": 10.0,  # [N m] dry friction of the drivetrain
-            # Body above the road: the load transfer and the 3-D look read it, the
-            # planar equations do not
-            "h_cg": 0.55,  # [m] height of the centre of gravity
-            "track": 1.6,  # [m] distance between the left and right wheels
             # Steering
             "delta_max": 0.6,  # [rad] road-wheel lock, about 34 deg
             "steering_tau": 0.1,  # [s]
@@ -210,15 +206,6 @@ class DrivetrainBicycle(DynamicBicycle):
         self.outputs["y"].units = list(self.state.units)
         self.outputs["x"].labels = list(self.state.labels)
         self.outputs["x"].units = list(self.state.units)
-
-    @property
-    def track(self) -> float:
-        """The track [m], a view of ``params["track"]``: the load transfer's and the drawn wheels'."""
-        return self.params["track"]
-
-    @track.setter
-    def track(self, value: float):
-        self.params["track"] = value
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -412,17 +399,6 @@ class DrivetrainBicycle(DynamicBicycle):
         ltr = xp.stack([ltr_x, ltr_y])
 
         return ltr
-
-    def tf(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-
-        h_cg = params["h_cg"]
-
-        # The bicycle's frames, the body lifted to the centre of gravity
-        frames = super().tf(x, u, t, params)
-        frames["body"] = frames["body"] @ translation(0.0, 0.0, h_cg)
-
-        return frames
 
     def fastest_mode(self) -> float:
         """The solver hint, in seconds: ten times the largest step an explicit run takes stably.
