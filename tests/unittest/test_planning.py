@@ -2563,6 +2563,74 @@ def test_an_output_port_limit_meets_the_input_box_in_one_U():
     assert float(evaluation.feasibility_margin[0]) < 0.0
 
 
+def test_least_margins_names_the_limit_a_run_broke_and_agrees_with_the_evaluation():
+    """Per set, after the run; their least is the evaluation's single feasibility margin."""
+    from minilink import DynamicSystem, PlanningProblem, QuadraticCost
+    from minilink.blocks import Step
+    from minilink.core.fields import OutputField
+    from minilink.planning import least_margins
+
+    class Cart(DynamicSystem):
+        """``m v̇ = F``, its drive power ``P = F v`` an output port."""
+
+        def __init__(self):
+            super().__init__(state_dim=2, input_dim=1)
+            self.params = {"m": 1.0}
+            self.inputs["u"].lower = np.array([-4.0])
+            self.inputs["u"].upper = np.array([4.0])
+            self.add_output_port("power", function=self.power, labels=["P"])
+
+        def f(self, x, u, t=0.0, params=None):
+            params = self.params if params is None else params
+            xp = array_module(x)
+
+            m = params["m"]
+
+            dx = xp.stack([x[1], u[0] / m])
+
+            return dx
+
+        def power(self, x, u, t=0.0, params=None):
+            xp = array_module(x)
+
+            P = xp.stack([u[0] * x[1]])
+
+            return P
+
+    cart = Cart()
+    lane = BoxSet([-1.0, -10.0], [5.0, 10.0])
+    box = cart.input_box
+    power = OutputField(cart, "power", "P").as_input_set(upper=0.3)
+    cost = QuadraticCost.from_system(cart, x_bar=np.array([2.0, 0.0]))
+    problem = PlanningProblem(
+        cart, x0=np.zeros(2), cost=cost, horizon=1.0, X=lane, U=box & power
+    )
+
+    evaluation = problem.evaluate(
+        Step(final_value=[3.0], step_time=0.0), dt=0.01, trajectories=True
+    )
+    run = evaluation.trajectories[0]
+    margins = least_margins({"lane": lane, "box": box, "power": power}, run)
+
+    # The power broke, the box and the lane held: P = 3 v, v = 3 t, so P(1 s) = 9 W
+    assert list(margins) == ["lane", "box", "power"]
+    assert margins["lane"] > 0.0 and margins["box"] == pytest.approx(1.0)
+    assert margins["power"] == pytest.approx(0.3 - 9.0, abs=1e-6)
+    assert min(margins.values()) == evaluation.feasibility_margin[0]
+
+    # A logged plant run reads the same; the plant's run of the loop is the one read
+    plant_run = run.of("plant")
+    logged = Trajectory(plant_run.t, plant_run.x, plant_run.u)
+    assert least_margins({"power": power}, logged)["power"] == margins["power"]
+
+    # On JAX, the same numbers from the run's own arrays
+    jax = pytest.importorskip("jax")
+    on_jax = Trajectory(*(jax.numpy.asarray(a) for a in (logged.t, logged.x, logged.u)))
+    assert float(least_margins({"power": power}, on_jax)["power"]) == pytest.approx(
+        margins["power"], rel=1e-12
+    )
+
+
 def test_an_output_field_reads_one_entry_of_a_port_and_moves_with_the_model():
     """By label or by index; the model's numbers are the field's; a wrong port or entry is refused."""
     from minilink.catalog import DrivetrainBicycle

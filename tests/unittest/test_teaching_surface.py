@@ -167,6 +167,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Gaussian",
         "Uniform",
         "evaluate_trajectory",
+        "least_margins",
         "Evaluation",
         "ProblemEvaluator",
         "RRTPlanner",

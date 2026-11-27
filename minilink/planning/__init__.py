@@ -66,6 +66,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     # Evaluation: a controller on a problem, one run or the problem's draws
     "evaluate_trajectory": ("minilink.planning.evaluation", "evaluate_trajectory"),
+    "least_margins": ("minilink.planning.evaluation", "least_margins"),
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     "ProblemEvaluator": ("minilink.planning.evaluator", "ProblemEvaluator"),
     # Spatial scene: tracks, collision geometry, cost shaping

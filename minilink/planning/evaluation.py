@@ -13,6 +13,7 @@ from minilink.core.backends import (
     array_module,
     ensure_jax_x64,
 )
+from minilink.core.sets import InputSet
 from minilink.core.trajectory import Trajectory
 
 PROBLEM_FAILURE_COST = "problem"  # score_run's failure cost read from the problem
@@ -275,6 +276,34 @@ def evaluate_trajectory(problem, traj: Trajectory) -> Evaluation:
     )
 
 
+def least_margins(constraints: dict, traj: Trajectory) -> dict:
+    """
+    Each named set's least margin along a run you already hold: below zero, the run left it.
+
+    ``constraints`` maps a name to a state set (``margin(x, t)``) or an input set
+    (``margin(u, x, t)``); each entry of the result is ``min_k min mᵢ(z_k)`` over the
+    run's samples and the set's rows, ``+inf`` for a set with no rows. A loop's run is
+    read on its plant (``traj.of("plant")``), a logged run as it is. A read after the
+    run, which no evaluation computes: the evaluation's single ``feasibility_margin`` is
+    the least of these when the sets are the members of ``X`` and ``U``. On the
+    trajectory's array module.
+    """
+    run = traj.of("plant") if "plant" in traj.roles else traj
+    if "plant" in traj.roles:
+        require_recorded_input(traj, "plant")
+
+    t = run.t
+    x = run.x.T
+    u = run.u.T
+
+    # The least margin of each set over the samples, min_k min mᵢ(x_k, u_k, t_k)
+    margins = {}
+    for name, set_ in constraints.items():
+        margins[name] = least_margin(margin_function_of(set_), x, u, t)
+
+    return margins
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -437,3 +466,11 @@ def require_recorded_input(traj, role):
             f"record=({role + ':u'!r},), or score the loop with "
             f"loop.compute_cost(cost, of={role!r})"
         )
+
+
+def margin_function_of(set_):
+    """The set's margin as ``(x, u, t) → rows``: an input set reads ``u`` at ``(x, t)``, a state set ``x``."""
+    if isinstance(set_, InputSet):
+        return lambda xk, uk, tk: set_.margin(uk, xk, tk)
+
+    return lambda xk, uk, tk: set_.margin(xk, tk)

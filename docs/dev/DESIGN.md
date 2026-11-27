@@ -1502,6 +1502,10 @@ states stay finite while its cost overflows scores `+inf`, charged or not. A tra
 scored on its `plant` role; one without roles is scored as the plant's run only when `x`
 has the plant's `n`, `u` its `m`, and it carries no recorded signals (a logged run), and a
 trajectory with recorded signals and no role is refused.
+`least_margins(constraints, traj)` reads, after a run, each named set's least margin along it
+(`{"corridor": X_corr, "phi_r": U_phi}` → `{"corridor": 0.42, "phi_r": -0.03}`), a state set on
+`x`, an input set on `u` at `x`; the evaluation keeps its one `feasibility_margin`, the least of
+them when the sets are the members of `X` and `U`, and computes none of them.
 `evaluate_trajectory(problem, traj)` scores a trajectory already held (a loop's run
 through its `plant` role; a logged plant run without signals). **The planning problem defines
 the problem**: a tool may plan or train on a modified copy of it and its record names
