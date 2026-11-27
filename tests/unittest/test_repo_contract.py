@@ -48,7 +48,7 @@ LINKED_DOCS = (
     "docs/dev/QUESTIONS.md",
     "docs/dev/KNOWN_ISSUES.md",
     "README.md",
-    "examples/README.md",
+    "triage/README.md",
     "tests/README.md",
     "benchmarks/README.md",
 )

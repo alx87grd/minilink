@@ -10,7 +10,8 @@ This file is workflow: what to read, when to ask, and the local CI gate.
 User API: README.md. Contracts: docs/dev/DESIGN.md. Maturity: docs/dev/ROADMAP.md.
 The v0.4 plan, in reading order: ROADMAP §1 → ROADMAP §5.4 → TODO §1 →
 QUESTIONS (the open design questions) and TODO's "Rows waiting for the maintainer's go".
-Pytest policy: tests/README.md. Examples map: examples/README.md.
+Pytest policy: tests/README.md. Examples map: triage/README.md, until the sort into the target
+tree (docs/plans/repository-structure.md §4).
 
 ## Branch roles
 

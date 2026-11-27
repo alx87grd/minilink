@@ -195,7 +195,8 @@ concrete formatting, ordered by the cost of being wrong:
 - **3.1 Placement algorithm.** Is a `System` shelved by its diagram role and a verb by its
   tool band, with plant math under `dynamics/` and never under the `minilink.catalog` alias?
   Algorithm: DESIGN §3, 'Placement algorithm'. Runnable examples, prototypes included,
-  follow examples/README.md; developer benches live under `benchmarks/`.
+  follow the examples map (`triage/README.md`, until the sort into the target tree of
+  `docs/plans/repository-structure.md` §4); developer benches live under `benchmarks/`.
 - **3.2 The dependency law.** Does a library import a peer library or catalog content outside
   the exceptions DESIGN names? Law: DESIGN §3, 'Dependency law'.
 - **3.3 Two lanes.** Which lane does it join, and does it meet that lane's rules? Contract:
@@ -209,16 +210,16 @@ concrete formatting, ordered by the cost of being wrong:
 - **3.6 A folder README must earn its keep.** Add one only when it states a policy, how to
   run, or a bucket contract that a directory listing cannot. Do not add a README that
   merely lists the files in that folder. The existing maps (root `README.md`,
-  `examples/README.md`, `tests/README.md`) stay the maps; leaf demo folders do not get
+  the examples map, `tests/README.md`) stay the maps; leaf demo folders do not get
   a second copy. Do not add new markdown guides unless the maintainer asks.
 - **3.7 Intro surfaces stay canonical.** README.md, the showcase notebook, and
   `triage/tutorial/` present the main core tools: `System`, diagrams, simulate,
   compile, analysis, planning trajopt, the sampled step path (`StepSystem`,
   `StepDiagramSystem`, `SampledSystem`, `SampledDiagramSystem`), and MPC as its exemplar.
   Do not update them to track every new demo, compare script, or research-lane
-  experiment. New demos land under `examples/`, whose map is `examples/README.md`. Add a
+  experiment. New demos land under `examples/`, whose map is the examples map. Add a
   row to README's verb table only when a core tool gains its canonical call.
-- **3.8 Notebooks are not a second map.** The catalog is `examples/README.md`, whose Layout
+- **3.8 Notebooks are not a second map.** The catalog is the examples map, whose Layout
   section holds the link policy per notebook kind; a notebook does not duplicate it with See
   also / Where next hubs or peer links.
 
