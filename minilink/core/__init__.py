@@ -35,6 +35,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "QuadraticField": ("minilink.core.fields", "QuadraticField"),
     "EllipsoidSet": ("minilink.core.fields", "EllipsoidSet"),
     "MarginField": ("minilink.core.fields", "MarginField"),
+    "OutputField": ("minilink.core.fields", "OutputField"),
     "GridField": ("minilink.core.fields", "GridField"),
     # Sets
     "Set": ("minilink.core.sets", "Set"),
@@ -45,6 +46,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
     "CallableSet": ("minilink.core.sets", "CallableSet"),
     "IntersectionSet": ("minilink.core.sets", "IntersectionSet"),
+    "IntersectionInputSet": ("minilink.core.sets", "IntersectionInputSet"),
     # Distributions
     "Distribution": ("minilink.core.distributions", "Distribution"),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),

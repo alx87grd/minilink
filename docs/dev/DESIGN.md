@@ -57,7 +57,8 @@ root prelude plus the band facades, registered in `minilink/__init__.py` and the
 when a lesson uses it: `StepPlanningProblem` (`minilink.planning`), `StepCost` and
 `SampledCost` (`minilink.core`) are on their bands only; `StepSystem` is
 on the root. The core band facade exports the core's mathematical types, the composites
-included (`MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
+included (`MarginField`, `GridField`, `CallableSet`, `IntersectionSet`,
+`IntersectionInputSet`, `SumCost`,
 `ScaledCost`, `SampledSystem`, `SampledDiagramSystem`) and the shaping functions
 (`quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy`); of the fields, the
 concrete `QuadraticField` and `GridField` are also on the root. The model families a design
@@ -866,7 +867,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
   set's type. Compose with
-  `&` → `IntersectionSet`. `margin(z, t, params=None)`, the member first on every set (an
+  `&` → `IntersectionSet`, and input sets with `&` → `IntersectionInputSet`, its mirror over
+  `u` at `(x, t)` (`U = car.input_box & phi.as_input_set(upper=0.9)`): the members' rows
+  stacked, one row for each limit, their boxes met. `margin(z, t, params=None)`, the member first on every set (an
   input set's `margin(u, x, t, params=None)`; a box, a ball or a singleton refuses a member of
   another size, a static shape check that traces): a set's numbers are its `params`
   (`{"lower", "upper"}` on a box, `{"center", "radius"}` on a ball, `{"point"}` on a
@@ -883,6 +886,11 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   second positional argument is `u`. The shaping functions (`quadratic_hinge`,
   `quadratic_excess`, `inverse_barrier`, `occupancy`) are in `core/shaping.py`, exported on
   `minilink.core`.
+  `OutputField(system, port, entry)` is one entry of a system's output port as a field,
+  `V(x, u, t) = y_port(x, u, t)[entry]` (the entry by label or by index), its `params` the
+  system's: a quantity the model publishes becomes a constraint or a cost in one line,
+  `OutputField(car, "grip", "phi_r").as_input_set(upper=0.9)`, the model the one home of
+  its equations.
   `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
   `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
   the soft form of the constraint). The workspace fields subclass it (`planning/spatial/`).

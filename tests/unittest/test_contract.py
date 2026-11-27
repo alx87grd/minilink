@@ -150,7 +150,7 @@ def other_cases():
     """``(name, object, call)`` for the costs, sets, distributions, fields, shapes and paths."""
     from minilink import Gaussian, Pendulum, QuadraticCost, TimeCost, Uniform
     from minilink.core.distributions import Particles
-    from minilink.core.fields import QuadraticField
+    from minilink.core.fields import OutputField, QuadraticField
     from minilink.core.geometry import Box, Sphere, from_waypoints
     from minilink.core.sets import (
         BallSet,
@@ -214,6 +214,11 @@ def other_cases():
         ("Field schedule.as_cost", schedule.as_cost(), cost_call),
         ("Field.as_set", V.as_set(lower=0.1, upper=2.0), set_call),
         ("Field.as_input_set", V.as_input_set(upper=2.0), input_set_call),
+        (
+            "OutputField.as_input_set",
+            OutputField(plant, "y", 1).as_input_set(lower=-1.0, upper=2.0),
+            input_set_call,
+        ),
         ("Sphere", disc, shape_call),
         ("Box", wall, shape_call),
         ("Union", disc | wall, shape_call),
@@ -225,6 +230,11 @@ def other_cases():
         ("SingletonSet", SingletonSet([0.3, 0.0]), set_call),
         ("IntersectionSet", box & ball, set_call),
         ("BoxInputSet", BoxInputSet(BoxSet([-1.0], [1.0])), input_set_call),
+        (
+            "IntersectionInputSet",
+            BoxInputSet(BoxSet([-1.0], [1.0])) & V.as_input_set(upper=2.0),
+            input_set_call,
+        ),
         (
             "CallableSet",
             CallableSet(lambda z, t, p: p["r"] - z @ z, params={"r": np.asarray(1.0)}),

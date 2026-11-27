@@ -2500,6 +2500,103 @@ def test_a_track_draws_and_overlays_its_corridor_at_half_width_from_the_centerli
     plt.close(fig)
 
 
+def test_an_output_port_limit_meets_the_input_box_in_one_U():
+    """A limit the model publishes, ``P = F v ≤ P_max``, held with the input box by trajectory optimization."""
+    from minilink import DynamicSystem, PlanningProblem, QuadraticCost
+    from minilink.core.fields import OutputField
+    from minilink.core.sets import IntersectionInputSet
+    from minilink.planning import TrajectoryOptimizationPlanner
+
+    class Cart(DynamicSystem):
+        """``m v̇ = F``, its drive power ``P = F v`` an output port."""
+
+        def __init__(self):
+            super().__init__(state_dim=2, input_dim=1)
+            self.params = {"m": 1.0}
+            self.inputs["u"].lower = np.array([-4.0])
+            self.inputs["u"].upper = np.array([4.0])
+            self.add_output_port("power", function=self.power, labels=["P"])
+
+        def f(self, x, u, t=0.0, params=None):
+            params = self.params if params is None else params
+            xp = array_module(x)
+
+            m = params["m"]
+
+            dx = xp.stack([x[1], u[0] / m])
+
+            return dx
+
+        def power(self, x, u, t=0.0, params=None):
+            xp = array_module(x)
+
+            P = xp.stack([u[0] * x[1]])
+
+            return P
+
+    P_max = 0.3  # [W]
+    cart = Cart()
+    power = OutputField(cart, "power", "P")
+    U = cart.input_box & power.as_input_set(upper=P_max)
+    cost = QuadraticCost.from_system(
+        cart, Q=np.diag([1.0, 0.1]), R=np.eye(1), x_bar=np.array([2.0, 0.0])
+    )
+    problem = PlanningProblem(cart, x0=np.zeros(2), cost=cost, horizon=3.0, U=U)
+
+    planner = TrajectoryOptimizationPlanner(
+        problem, n_steps=15, transcription="direct_collocation"
+    )
+    plan = planner.solve().trajectory
+
+    # The box bounds the decision, the power is a margin row: both held at every knot
+    assert isinstance(U, IntersectionInputSet)
+    assert np.all(np.abs(plan.u) <= 4.0 + 1e-6)
+    assert np.max(plan.u[0] * plan.x[1]) <= P_max + 1e-6
+    assert np.max(plan.u[0] * plan.x[1]) == pytest.approx(P_max, abs=1e-3)
+    assert power(np.array([0.0, 2.0]), np.array([3.0])) == pytest.approx(6.0)
+
+    # The evaluator reads the same U: a law that overdrives the cart fails on it
+    from minilink.blocks import Step
+
+    evaluation = problem.evaluate(Step(final_value=[3.0], step_time=0.0), dt=0.01)
+    assert bool(evaluation.failed[0])
+    assert float(evaluation.feasibility_margin[0]) < 0.0
+
+
+def test_an_output_field_reads_one_entry_of_a_port_and_moves_with_the_model():
+    """By label or by index; the model's numbers are the field's; a wrong port or entry is refused."""
+    from minilink.catalog import DrivetrainBicycle
+    from minilink.core.fields import OutputField
+
+    car = DrivetrainBicycle()
+    x = np.zeros(car.n)
+    x[3] = 10.0
+    x[5] = 0.4
+    u = np.array([0.0, 0.05])
+
+    phi_r = OutputField(car, "grip", "phi_r")
+    LTR_y = OutputField(car, "ltr", 1)
+
+    assert phi_r(x, u) == pytest.approx(car.grip(x, u)[1])
+    assert LTR_y(x, u) == pytest.approx(car.ltr(x, u)[1])
+    assert phi_r.params is car.params
+    assert phi_r.dim == car.n
+
+    # The model's numbers move the field, and a tree passed is read in their place
+    before = float(LTR_y(x, u))
+    car.params["h_cg"] = 2.0 * car.params["h_cg"]
+    assert float(LTR_y(x, u)) == pytest.approx(2.0 * before)
+    halved = dict(car.params, h_cg=0.5 * car.params["h_cg"])
+    assert float(LTR_y(x, u, params=halved)) == pytest.approx(before)
+
+    with pytest.raises(ValueError, match="no output port 'gps'"):
+        OutputField(car, "gps")
+    with pytest.raises(ValueError, match="no entry 'phi_x'"):
+        OutputField(car, "grip", "phi_x")
+    with pytest.raises(ValueError, match="out of range"):
+        OutputField(car, "grip", 2)
+
+
 def test_a_field_has_four_conversions_and_a_gradient():
     from minilink.core.fields import Field
 

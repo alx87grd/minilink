@@ -142,6 +142,7 @@ def set_text(obj):
         BallSet,
         BoxInputSet,
         BoxSet,
+        IntersectionInputSet,
         IntersectionSet,
         SingletonSet,
     )
@@ -156,6 +157,9 @@ def set_text(obj):
     if isinstance(obj, IntersectionSet):
         parts = ", ".join(type(member).__name__ for member in obj.sets)
         return f"IntersectionSet of {parts}"
+    if isinstance(obj, IntersectionInputSet):
+        parts = ", ".join(type(member).__name__ for member in obj.sets)
+        return f"IntersectionInputSet of {parts}"
     if isinstance(obj, EllipsoidSet):
         center = array_text(obj.params["center"])
         return f"EllipsoidSet, dim={obj.params['center'].size}, (z - {center})ᵀ P (z - {center}) <= {obj.level:g}"

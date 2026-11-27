@@ -340,6 +340,56 @@ class MarginField(Field):
         return least
 
 
+class OutputField(Field):
+    """
+    One entry of a system's output port as a field: ``V(x, u, t) = y_port(x, u, t)[entry]``.
+
+    An output function has the signature of a field, so a quantity a model
+    publishes (a tire's used grip, a load transfer ratio, a speed) becomes a
+    constraint or a cost in one line, the model the one home of its equations:
+    ``OutputField(car, "grip", "phi_r").as_input_set(upper=0.9)``. A port that
+    reads the input gives an input set (:meth:`~Field.as_input_set`); one that
+    reads the state alone (no direct feedthrough), a state set as well.
+    ``params`` is the system's: the field moves with the model's numbers.
+
+    Parameters
+    ----------
+    system : System
+        The model whose output is read.
+    port : str
+        The output port's id.
+    entry : str or int
+        The entry's label, or its index in the port.
+    """
+
+    params = delegated_params(
+        "system", "The system's numbers: the field moves with them."
+    )
+
+    def __init__(self, system, port: str, entry: str | int = 0):
+        require_output_port(system, port)
+
+        self.system = system
+        self.port = port
+        self.index = index_of(system.outputs[port], entry)
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the state, the system's."""
+        return self.system.n
+
+    def value(self, x, u=None, t=0.0, params=None):
+        params = self.params if params is None else params
+
+        output = self.system.outputs[self.port].compute
+        index = self.index
+
+        y = output(x, u, t, params)
+        V = y[index]
+
+        return V
+
+
 class QuadraticField(Field):
     """
     The quadratic field ``V(x, t) = (x − c)ᵀ P(t) (x − c)``: a Lyapunov function, an LQR value.
@@ -947,3 +997,33 @@ def gaussian_and_uniform(key, count, dim):
     s = rng.random((count, 1))
 
     return g, s
+
+
+def require_output_port(system, port):
+    """Refuse a port id the system does not publish."""
+    if port not in system.outputs:
+        raise ValueError(
+            f"{type(system).__name__} has no output port {port!r}; "
+            f"its output ports: {', '.join(system.outputs)}"
+        )
+
+
+def index_of(output_port, entry) -> int:
+    """The index of ``entry`` in the port: its label's position, or the index given."""
+    labels = list(output_port.labels)
+    if isinstance(entry, str):
+        if entry not in labels:
+            raise ValueError(
+                f"output port {output_port.id!r} has no entry {entry!r}; "
+                f"its labels: {', '.join(labels)}"
+            )
+        return labels.index(entry)
+
+    index = int(entry)
+    if not -output_port.dim <= index < output_port.dim:
+        raise ValueError(
+            f"output port {output_port.id!r} has {output_port.dim} entries; "
+            f"index {index} is out of range"
+        )
+
+    return index

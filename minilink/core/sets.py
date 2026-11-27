@@ -161,6 +161,10 @@ class InputSet(ABC):
         """The tightest :class:`BoxSet` of inputs containing the set, or ``None`` when it has none."""
         return None
 
+    def __and__(self, other: "InputSet") -> "IntersectionInputSet":
+        """Return the intersection ``self & other`` of two input sets."""
+        return IntersectionInputSet.of(self, other)
+
     # Display
 
     def __str__(self):
@@ -547,6 +551,91 @@ class IntersectionSet(Set):
             return None
 
         # The boxes meet in max lowerᵢ ≤ z ≤ min upperᵢ
+        lower = np.max([box.lower for box in boxes], axis=0)
+        upper = np.min([box.upper for box in boxes], axis=0)
+        require_nonempty_intersection(lower, upper)
+
+        return BoxSet(lower, upper)
+
+
+class IntersectionInputSet(InputSet):
+    """
+    Intersection of several input sets, ``u in U_1(x, t) and u in U_2(x, t) and ...``.
+
+    Built by the ``&`` operator on :class:`InputSet`, the mirror of
+    :class:`IntersectionSet`: ``car.input_box & a.as_input_set(upper=1.0)`` holds an
+    actuator box and a limit that reads the input in one ``U``. Its margin stacks the
+    members' rows, one row for each limit; ``params`` holds the members' own trees
+    by class name, a repeat numbered.
+    """
+
+    params = held_params(
+        'The members\' numbers by class name: ``{"BoxInputSet": ..., "FieldInputSet": ...}``, a repeat numbered.'
+    )
+
+    def __init__(self, sets):
+        sets = tuple(sets)
+        require_members(sets)
+
+        self.sets = sets
+        self.params = {key: set_.params for key, set_ in zip(member_keys(sets), sets)}
+
+    def param_parts(self) -> dict:
+        """The members by key: the parts an assignment routes to."""
+        return dict(zip(member_keys(self.sets), self.sets))
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the input vector, read off the first member that states one."""
+        for set_ in self.sets:
+            if hasattr(set_, "dim"):
+                return set_.dim
+        raise AttributeError("no member of this intersection states its dimension")
+
+    @classmethod
+    def of(cls, *sets: InputSet) -> "IntersectionInputSet":
+        """Build an intersection, flattening nested intersections into one member list."""
+        members: list[InputSet] = []
+        for set_ in sets:
+            if isinstance(set_, IntersectionInputSet):
+                members.extend(set_.sets)
+            else:
+                members.append(set_)
+
+        return cls(tuple(members))
+
+    def margin(self, u, x=None, t=0.0, params=None):
+        """Concatenate the margins of all member sets at ``(x, t)`` (a scalar margin counts as one)."""
+        params = self.params if params is None else params
+        xp = array_module(u)
+
+        sets = self.sets
+
+        # Each member's margins as a vector, a scalar margin as one entry
+        margins = [
+            xp.reshape(xp.asarray(set_.margin(u, x=x, t=t, params=params[key])), (-1,))
+            for key, set_ in zip(member_keys(sets), sets)
+        ]
+
+        # u ∈ U₁(x, t) ∩ U₂(x, t) ∩ … ⇔ every member's margins ≥ 0
+        margin = xp.concatenate(margins)
+
+        return margin
+
+    def bounding_box(self):
+        """The intersection of the members' boxes; ``None`` when no member has one.
+
+        Members whose boxes do not intersect make the set empty, which is refused.
+        """
+        boxes = [
+            box
+            for box in (set_.bounding_box() for set_ in self.sets)
+            if box is not None
+        ]
+        if not boxes:
+            return None
+
+        # The boxes meet in max lowerᵢ ≤ u ≤ min upperᵢ
         lower = np.max([box.lower for box in boxes], axis=0)
         upper = np.min([box.upper for box in boxes], axis=0)
         require_nonempty_intersection(lower, upper)

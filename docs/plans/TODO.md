@@ -44,7 +44,6 @@ as the maintainer would and logged in the run's record.
 | The compile-time flatten default | — | standing (§3) | after one benchmark: off, on, or always |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
 | The rest of the field object | A1 | v0.5 | tabular RL's `Q` on a `GridField`, `CallableField`, `LinearApproximator` as a field |
-| Input sets intersect | — | v0.5 | `InputSet.__and__` and `IntersectionInputSet`, a new core name; the workbench's dynamic-supervisor copy moves in |
 | Workspace geometry | A3 | v0.5 | the rest of the `core/geometry/` package; `planning.spatial` moved, then deleted |
 | SAC's actor step | S50 | v0.5 | the critic before the update (today) or after it |
 | Policy iteration on the grid | S51 | v0.5 | a mode or a sibling of `DynamicProgrammingPlanner` |
@@ -652,7 +651,8 @@ pillar names it.
   baselines `cmp` and `test_planning_solution.py`, `test_rl_tabular.py` and
   `test_rl_planner.py` pass.
 
-- [ ] **Input sets intersect** **[ask — core]**: `InputSet.__and__` and an
+- [ ] **Input sets intersect** (in review on `claude/minilink-proto-workbench-c2db1o`, with
+  `OutputField`, `resample`, the guarded norm and the car's `ltr` port): `InputSet.__and__` and an
   `IntersectionInputSet`, the mirror of `IntersectionSet` (DESIGN §4, "Sets"): its margin
   stacks the members' rows (one row and one multiplier per limit, never their minimum), its
   `bounding_box()` the intersection of the members' boxes, its `params` the members' trees by
@@ -661,7 +661,7 @@ pillar names it.
   imposed) cannot hold them with its input box in one `U`; trajectory optimization already
   reads any non-box `U` as margin rows and its `bounding_box()` as bounds. The workbench's
   dynamic-supervisor prototype holds a local copy (`InputIntersection`, in
-  `prototypes/dynamic_supervisor/limits.py`) written as this mirror: move it here, then delete
+  `prototypes/dynamic_supervisor/minilink_proto/sets.py`) written as this mirror: move it here, then delete
   the local one. Done when `car.input_box & a.as_input_set(...) & b.as_input_set(...)` builds a
   `PlanningProblem` that `evaluate` and direct collocation accept, with a test beside
   `IntersectionSet`'s.

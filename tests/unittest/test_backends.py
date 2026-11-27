@@ -63,6 +63,7 @@ from minilink.core.sets import (
     BallSet,
     BoxSet,
     CallableSet,
+    InputSet,
     IntersectionSet,
     SingletonSet,
 )
@@ -345,6 +346,55 @@ def test_disjoint_members_make_an_empty_intersection():
     touch = BoxSet(lower=np.array([1.0, -1.0]), upper=np.array([2.0, 1.0]))
     np.testing.assert_allclose((box & touch).bounding_box().lower, [1.0, -1.0])
     np.testing.assert_allclose((box & touch).bounding_box().upper, [1.0, 1.0])
+
+
+def test_input_sets_intersect_like_sets():
+    """``&`` on input sets: one flat member list, every member's rows at ``(x, t)``, the boxes met."""
+    from minilink.core.sets import BoxInputSet, IntersectionInputSet
+
+    box = BoxInputSet(BoxSet([-2.0, -1.0], [2.0, 1.0]))
+    tight = BoxInputSet(BoxSet([-1.0, -3.0], [3.0, 0.5]))
+
+    def speed_limit(u, x, t, params):
+        """``|u₀| ≤ x₀``: a limit that reads the state."""
+        return np.array([x[0] - u[0], x[0] + u[0]])
+
+    class StateLimit(InputSet):
+        def margin(self, u, x=None, t=0.0, params=None):
+            return speed_limit(u, x, t, params)
+
+    limit = StateLimit()
+    U = (box & tight) & limit
+    u = np.array([0.5, 0.2])
+    x = np.array([0.8])
+
+    assert isinstance(U, IntersectionInputSet)
+    assert U.sets == (box, tight, limit)
+    np.testing.assert_allclose(
+        U.margin(u, x=x),
+        np.concatenate((box.margin(u), tight.margin(u), speed_limit(u, x, 0.0, None))),
+    )
+    assert bool(U.contains(u, x=x)) and not bool(U.contains(u, x=np.array([0.1])))
+    np.testing.assert_allclose(U.bounding_box().lower, [-1.0, -1.0])
+    np.testing.assert_allclose(U.bounding_box().upper, [2.0, 0.5])
+    assert U.dim == 2
+    assert str(U) == "IntersectionInputSet of BoxInputSet, BoxInputSet, StateLimit"
+
+    # The members' numbers by class name, a repeat numbered: an edit moves the member
+    assert list(U.params) == ["BoxInputSet", "BoxInputSet_2", "StateLimit"]
+    U.params["BoxInputSet_2"]["upper"] = np.array([3.0, 0.25])
+    np.testing.assert_allclose(U.bounding_box().upper, [2.0, 0.25])
+
+    # Members whose boxes do not intersect make the set empty
+    far = BoxInputSet(BoxSet([5.0, 5.0], [6.0, 6.0]))
+    with pytest.raises(ValueError, match="do not intersect: the set is empty"):
+        (box & far).bounding_box()
+
+    jax = pytest.importorskip("jax")
+    both = box & tight
+    np.testing.assert_allclose(
+        np.asarray(jax.jit(both.margin)(jax.numpy.asarray(u))), both.margin(u)
+    )
 
 
 @pytest.mark.jax
