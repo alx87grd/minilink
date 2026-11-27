@@ -35,20 +35,24 @@ def car_skin_2d(plant, color="#1a1a1a"):
     Frame keys: ``body`` (chassis along the wheelbase plus the rear wheel outline;
     the rear axle offset is baked into the wheel ``local_transform``), and
     ``axle_front`` (steered front wheel). The placing ``tf`` supplies world pose
-    and the front steer angle.
+    and the front steer angle. A plant whose ``params`` hold ``h_cg`` has its body
+    frame at the centre of gravity, ``h_cg`` above the ground: the look sits on the
+    ground under it.
     """
-    # The axle offsets, and the wheel outline's length and width
+    # The axle offsets, the wheel outline's length and width, and the ground below
+    # the body frame
     a, b = axle_offsets(plant)
     wl = getattr(plant, "wheel_len", 0.6)
     ww = getattr(plant, "wheel_width", 0.2)
+    g = -plant.params.get("h_cg", 0.0)
 
     # The chassis, from the rear axle at x = −b to the front axle at x = a
-    chassis_points = np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]])
+    chassis_points = np.array([[-b, 0.0, g], [a, 0.0, g]])
     chassis = Line(chassis_points, color=color, linewidth=2.5)
 
     # The rear wheel, fixed on the rear axle in the body frame
     rear_wheel = wheel_rectangle(wl, ww)
-    rear_wheel.local_transform = translation(-b, 0.0, 0.0)
+    rear_wheel.local_transform = translation(-b, 0.0, g)
 
     # The front wheel, placed and steered by its own frame
     front_wheel = wheel_rectangle(wl, ww)

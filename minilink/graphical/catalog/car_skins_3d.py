@@ -414,9 +414,10 @@ def offroad_car_skin_3d(plant, colors=None):
 def chassis(plant):
     """The sizes a car look follows: ``a``, ``b``, track, ride height, wheel radii [m].
 
-    The 3-D car keeps them all in ``params``. A bicycle rung has no ``track`` or
-    ``h_cg`` there: its track is a drawing attribute and its body frame sits on the
-    ground (a ride height of 0); a rung without wheel radii uses its drawn one.
+    The 3-D car and the drivetrain bicycle keep them all in ``params``, the body frame
+    ``h_cg`` above the ground. A rung without ``h_cg`` has its body frame on the ground
+    (a ride height of 0) and its track as a drawing attribute; a rung without wheel
+    radii uses its drawn one.
     """
     p = plant.params
     r_wheel = getattr(plant, "wheel_radius", 0.3)

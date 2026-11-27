@@ -21,6 +21,7 @@ PUBLIC_RACECAR_PARAMS = {
     "r_f": 0.05,  # [m]    front tire radius
     "r_r": 0.05,  # [m]    rear tire radius
     "gravity": 9.81,  # [m/s^2]
+    "h_cg": 0.06,  # [m]    CG above the floor, an estimate: the load transfer reads it
     # Aero and rolling resistance
     "rho": 1.2,  # [kg/m^3] air at room temperature
     "CdA": 0.03,  # [m^2]  frontal area at Cd ~ 1 for an open 1/10 body
@@ -130,10 +131,17 @@ class UdeSRacecarDyn(DrivetrainBicycle):
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
-        if self.wheel_angles:
-            return link_frames(x[0], x[1], x[2], x[7], params, self.track, x[9], x[10])
+        h_cg = params["h_cg"]
+        track = params["track"]
 
-        return link_frames(x[0], x[1], x[2], x[7], params, self.track)
+        # The link frames, the body lifted to the centre of gravity
+        if self.wheel_angles:
+            frames = link_frames(x[0], x[1], x[2], x[7], params, track, x[9], x[10])
+        else:
+            frames = link_frames(x[0], x[1], x[2], x[7], params, track)
+        frames["body"] = frames["body"] @ translation(0.0, 0.0, h_cg)
+
+        return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """The axle arrows of the 2-D look; none on the car whose wheels turn."""

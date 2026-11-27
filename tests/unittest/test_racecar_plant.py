@@ -44,7 +44,7 @@ def test_ports_and_state_layout():
     assert list(named.inputs) == ["P_cmd", "delta_cmd"]
     assert named.inputs["P_cmd"].upper == pytest.approx(car.params["P_max"])
     assert named.inputs["delta_cmd"].lower == pytest.approx(-car.params["delta_max"])
-    assert set(car.outputs) == {"y", "speed", "slip", "grip", "imu", "power"}
+    assert set(car.outputs) == {"y", "speed", "slip", "grip", "imu", "power", "ltr"}
     assert car.h(car.x0, np.zeros(car.m)).shape == (9,)
 
 
@@ -210,6 +210,46 @@ def test_steering_is_rate_limited_and_stops_at_the_end_stop():
     assert car.f(beyond, np.array([0.0, 2.0]))[7] <= 0.0
 
 
+def test_the_load_transfer_ratios_of_the_rigid_car():
+    """``LTR_x`` the static share at rest, ``LTR_y`` the lateral transfer, one side lifting at ``a_y = g T / (2 h)``."""
+    car = DrivetrainBicycle()
+    car.params["a"] = 1.2
+    car.params["b"] = 0.8
+
+    a = car.params["a"]
+    b = car.params["b"]
+    h = car.params["h_cg"]
+    T = car.params["track"]
+    g = car.params["gravity"]
+    L = a + b
+
+    # At rest: the static share of a centre of gravity behind the middle, no side lifting
+    at_rest = car.ltr(np.zeros(car.n), np.zeros(2))
+    assert at_rest == pytest.approx([(a - b) / L, 0.0], abs=1e-12)
+
+    # Cornering left: the ratios from the car's own specific force
+    x = cruise_state(car, 12.0, delta=0.08, power=20000.0)
+    x[5] = 0.6
+    u = np.array([20000.0, 0.08])
+    a_x, a_y, _ = car.imu(x, u)
+    ltr_x, ltr_y = car.outputs["ltr"].compute(x, u, 0.0, car.params)
+
+    assert a_y > 0.0 and ltr_y > 0.0
+    assert ltr_x == pytest.approx((a - b) / L + 2.0 * h * a_x / (g * L), rel=1e-12)
+    assert ltr_y == pytest.approx(2.0 * h * a_y / (T * g), rel=1e-12)
+    assert ltr_y * (g * T / (2.0 * h)) / a_y == pytest.approx(1.0, rel=1e-12)
+
+
+def test_the_body_frame_sits_at_the_centre_of_gravity():
+    """``tf`` lifts the body to ``h_cg``; the wheels stay on the ground."""
+    car = DrivetrainBicycle()
+    frames = car.tf(np.zeros(car.n), np.zeros(2))
+
+    assert np.asarray(frames["body"])[2, 3] == pytest.approx(car.params["h_cg"])
+    assert np.asarray(frames["wheel_fl"])[2, 3] == pytest.approx(car.params["r_f"])
+    assert car.track == car.params["track"]
+
+
 def test_mirror_symmetry():
     """The car built on a flat floor turns right exactly as it turns left."""
     car = UdeSRacecarDyn()
@@ -258,6 +298,7 @@ def test_numpy_and_jax_agree_on_the_equations_and_the_ports():
             car.grip(x, u),
             car.imu(x, u),
             car.power(x, u),
+            car.ltr(x, u),
         ]
     )
     x_jax, u_jax = jnp.asarray(x), jnp.asarray(u)
@@ -269,6 +310,7 @@ def test_numpy_and_jax_agree_on_the_equations_and_the_ports():
             np.asarray(car.grip(x_jax, u_jax)),
             np.asarray(car.imu(x_jax, u_jax)),
             np.asarray(car.power(x_jax, u_jax)),
+            np.asarray(car.ltr(x_jax, u_jax)),
         ]
     )
 
