@@ -652,7 +652,8 @@ pillar names it.
   `test_rl_planner.py` pass.
 
 - [ ] **Input sets intersect** (in review on `claude/minilink-proto-workbench-c2db1o`, with
-  `OutputField`, `resample`, the guarded norm and the car's `ltr` port): `InputSet.__and__` and an
+  `OutputField`, `least_margins`, `resample`, the guarded norm, the car's `ltr` port and every
+  bicycle's `x` port): `InputSet.__and__` and an
   `IntersectionInputSet`, the mirror of `IntersectionSet` (DESIGN §4, "Sets"): its margin
   stacks the members' rows (one row and one multiplier per limit, never their minimum), its
   `bounding_box()` the intersection of the members' boxes, its `params` the members' trees by
