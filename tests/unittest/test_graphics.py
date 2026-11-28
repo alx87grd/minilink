@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from minilink.core.assembly import propagate_animation_camera
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
@@ -133,6 +134,23 @@ class TestPropagateAnimationCamera(unittest.TestCase):
         propagate_animation_camera(diagram, plant)
         self.assertEqual(diagram.camera_follow_frame, "bike:body")
         self.assertEqual(diagram.camera_scale, 6.0)
+
+    def test_namespaces_follow_frame_through_nested_boxes(self):
+        plant = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+        plant.skin = lambda _self: {"body": []}
+        plant.camera_follow_frame = "body"
+        inner = DiagramSystem()
+        inner.add_subsystem(plant, "car")
+        propagate_animation_camera(inner, plant)
+
+        # The box itself in a diagram, and the box on a clock in a sampled diagram
+        for box, outer in (
+            (inner, DiagramSystem()),
+            (inner % 0.01, SampledDiagramSystem()),
+        ):
+            outer.add_subsystem(box, "plant")
+            propagate_animation_camera(outer, box)
+            self.assertEqual(outer.camera_follow_frame, "plant:car:body")
 
     def test_series_inherits_plant_camera_scale(self):
         from minilink.blocks.sources import Step

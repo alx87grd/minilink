@@ -530,22 +530,30 @@ def copy_animation_camera_hints(diagram, animated):
 def namespaced_camera_follow_frame(
     diagram: DiagramSystem, animated: System, follow: str | None
 ) -> str | None:
-    """The follow frame as ``sys_id:frame`` when ``animated`` is a block of ``diagram``; else as given."""
+    """The follow frame under ``animated``'s path in ``diagram`` (``path:frame``); else as given.
+
+    A follow frame names a frame of the block that holds it, so each diagram that wraps the
+    block adds the block's path, as its ``tf`` does to the frames.
+    """
     if follow is None:
         return None
-    if ":" in follow:
+
+    path = block_path(diagram, animated)
+    if path is None:
         return follow
 
-    sys_id = subsystem_id_for_leaf(diagram, animated)
-    if sys_id is None:
-        return follow
-
-    return f"{sys_id}:{follow}"
+    return f"{path}:{follow}"
 
 
-def subsystem_id_for_leaf(diagram: DiagramSystem, leaf: System) -> str | None:
-    """Return ``sys_id`` when *leaf* is a direct subsystem of *diagram*."""
+def block_path(diagram: DiagramSystem, block: System) -> str | None:
+    """The ids from *diagram* down to *block* (``plant:car``), or None when it is not inside."""
     for sys_id, subsystem in diagram.subsystems.items():
-        if subsystem is leaf:
+        if subsystem is block:
             return sys_id
+
+        if is_box(subsystem):
+            inner = block_path(subsystem, block)
+            if inner is not None:
+                return f"{sys_id}:{inner}"
+
     return None
