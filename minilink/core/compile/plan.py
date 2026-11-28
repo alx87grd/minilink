@@ -408,6 +408,7 @@ def gather_sources_of(
     sys_id: str,
     output_slices: dict[tuple[str, str], slice],
     dependencies="all",
+    edge_inputs=None,
 ) -> tuple[list[tuple[int, object, int]], int]:
     """Build the gather-source recipe for a subsystem's input ports.
 
@@ -420,6 +421,10 @@ def gather_sources_of(
         Pre-computed ``(sys_id, port_id) → slice`` map.
     dependencies : list or ``"all"``
         Which input ports are required.  ``"all"`` means every input port.
+    edge_inputs : dict, optional
+        The edge inputs the run's ``u`` carries, in order (default: the diagram's).
+        An edge input of the diagram beyond them, a nested box's unwired input
+        that flattening brought to the edge, reads its nominal value.
 
     Returns
     -------
@@ -429,6 +434,7 @@ def gather_sources_of(
         Total dimension of the assembled local input vector.
     """
     sys = diagram.subsystems[sys_id]
+    edge_inputs = diagram.inputs if edge_inputs is None else edge_inputs
     gather_sources: list[tuple[int, object, int]] = []
     u_dim = 0
 
@@ -440,10 +446,14 @@ def gather_sources_of(
         if source is None or not is_dependency:
             source_type = NOMINAL
             source_val = in_port.nominal_value
+        elif source[0] == "input" and source[1] not in edge_inputs:
+            # An edge input the run does not carry: its nominal value
+            source_type = NOMINAL
+            source_val = diagram.inputs[source[1]].nominal_value
         elif source[0] == "input":
             source_type = EXTERNAL_INPUT
             u_idx = 0
-            for input_port_id, input_port in diagram.inputs.items():
+            for input_port_id, input_port in edge_inputs.items():
                 if input_port_id == source[1]:
                     source_val = slice(u_idx, u_idx + input_port.dim)
                     break
@@ -584,7 +594,11 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
         path = paths[sys_id]
         x_slice, holds = layout[path]
         gather_sources, u_dim = gather_sources_of(
-            flat, sys_id, output_slices, dependencies=sys.outputs[port_id].dependencies
+            flat,
+            sys_id,
+            output_slices,
+            dependencies=sys.outputs[port_id].dependencies,
+            edge_inputs=diagram.inputs,
         )
         port_ops.append(
             SampledPortOperation(
@@ -611,7 +625,7 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
         path = paths[sys_id]
         face = face_of(sys, SampledSystem)
         gather_sources, u_dim = gather_sources_of(
-            flat, sys_id, output_slices, dependencies="all"
+            flat, sys_id, output_slices, dependencies="all", edge_inputs=diagram.inputs
         )
         step_ops.append(
             SampledStepOperation(

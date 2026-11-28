@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from minilink import PID, Integrator, P, Pendulum, Sine, StepSystem
+from minilink import PID, Gain, Integrator, Mux, P, Pendulum, Sine, Source, StepSystem
 from minilink.analysis import discretize, linearize
 from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
@@ -353,6 +353,44 @@ def test_a_static_box_joins_a_sampled_loop():
     ev = loop.compile()
     x = np.array([0.5])
     np.testing.assert_allclose(ev.outputs(x, np.zeros(0), 0)["y"], [3.0])
+
+
+def a_box_with_an_offset():
+    """``u = −y + b`` on a 0.1 s clock, the offset ``b`` an edge input of the box, nominal 2."""
+    offset = Gain(np.array([[1.0]]))
+    offset.inputs["u"].nominal_value = np.array([2.0])
+
+    box = SampledDiagramSystem()
+    box.add_subsystem(Gain(np.array([[-1.0]])) % 0.1, "feedback")
+    box.add_subsystem(offset, "offset")
+    box.add_subsystem(Mux((1, 1)), "terms")
+    box.add_subsystem(Gain(np.array([[1.0, 1.0]])), "sum")
+    box.connect("feedback", "y", "terms", "in0")
+    box.connect("offset", "y", "terms", "in1")
+    box.connect("terms", "y", "sum", "u")
+    box.expose_input("y", [("feedback", "u")])
+    box.expose_input("b", [("offset", "u")])
+    box.connect_new_output_port("sum", "y", "u")
+
+    return box
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_an_unwired_input_of_a_nested_box_reads_its_nominal_value(backend):
+    if backend == "jax":
+        pytest.importorskip("jax")
+    unwired = a_box_with_an_offset() @ Integrator(1)
+
+    wired = a_box_with_an_offset() @ Integrator(1)
+    offset = Source(1)
+    offset.params["value"] = np.array([2.0])
+    wired.add_subsystem(offset, "offset")
+    wired.connect("offset", "y", "controller", "b")
+
+    a = unwired.compute_trajectory(tf=1.0, dt=0.01, backend=backend)
+    b = wired.compute_trajectory(tf=1.0, dt=0.01, backend=backend)
+    np.testing.assert_allclose(a.x, b.x, rtol=1e-15, atol=1e-15)
+    assert a.x[0, -1] > 1.0
 
 
 def test_a_loop_keeps_its_own_x0_held_outputs_included():
